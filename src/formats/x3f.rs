@@ -43,6 +43,19 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
         return Err(ExifError::Format("Invalid X3F signature".to_string()));
     }
 
+    // Get file size and validate minimum size
+    // Minimum: 4 (sig) + 4 (ver) + 16 (uid) + 4 (mark) + 12 (dims) + 4 (dir_offset) = 44 bytes
+    let file_size = reader.seek(SeekFrom::End(0))?;
+    if file_size < 44 {
+        return Err(ExifError::Format(format!(
+            "X3F file too small: {} bytes (minimum 44 bytes required)",
+            file_size
+        )));
+    }
+
+    // Reset to read header
+    reader.seek(SeekFrom::Start(4))?; // Skip signature we already read
+
     // Read version
     let mut version = [0u8; 4];
     reader.read_exact(&mut version)?;
@@ -65,13 +78,18 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
         _rotation: rotation,
     };
 
-    // Get file size to find directory at the end
-    let _file_size = reader.seek(SeekFrom::End(0))?;
-
     // Directory is at the end of the file
     // Seek to end - 4 to read directory offset
     reader.seek(SeekFrom::End(-4))?;
     let directory_offset = reader.read_u32::<LittleEndian>()?;
+
+    // Validate directory offset is within file bounds
+    if directory_offset as u64 >= file_size {
+        return Err(ExifError::Format(format!(
+            "Invalid directory offset: {} (file size: {})",
+            directory_offset, file_size
+        )));
+    }
 
     // Seek to directory
     reader.seek(SeekFrom::Start(directory_offset as u64))?;

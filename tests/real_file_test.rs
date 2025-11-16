@@ -123,7 +123,8 @@ fn test_discover_available_files() {
                     let ext_str = ext.to_string_lossy().to_uppercase();
                     if matches!(
                         ext_str.as_str(),
-                        "RAF" | "CRW"
+                        "RAF"
+                            | "CRW"
                             | "CR2"
                             | "CR3"
                             | "NEF"
