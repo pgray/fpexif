@@ -86,6 +86,7 @@ fn test_file_against_exiftool(path: &str) {
             let mut critical_mismatches = 0; // Make/Model mismatches
             let mut dimension_mismatches = 0; // Width/Height mismatches (acceptable for RAW thumbnails)
             let mut photo_mismatches = 0; // ISO/Shutter/Aperture/FocalLength mismatches
+            let mut metadata_mismatches = 0; // Lens/DateTime/GPS/etc mismatches
 
             // Check Make
             if let Some(exiftool_make) = exiftool_data.get("Make").and_then(|v| v.as_str()) {
@@ -377,9 +378,221 @@ fn test_file_against_exiftool(path: &str) {
                 }
             }
 
+            // Check Lens Model
+            if let Some(exiftool_lens) = exiftool_data.get("LensModel").and_then(|v| v.as_str()) {
+                if let Some(fpexif_lens_value) = exif_data.get_tag_by_name("LensModel") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Ascii(fpexif_lens) = fpexif_lens_value {
+                        let normalized_exiftool = normalize_string(exiftool_lens);
+                        let normalized_fpexif = normalize_string(fpexif_lens);
+                        if normalized_exiftool == normalized_fpexif {
+                            println!("  ✓ Lens: \"{}\"", normalized_fpexif);
+                        } else {
+                            metadata_mismatches += 1;
+                            println!(
+                                "  ⚠ Lens mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                normalized_exiftool, normalized_fpexif
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Check Serial Number
+            if let Some(exiftool_serial) = exiftool_data
+                .get("SerialNumber")
+                .or_else(|| exiftool_data.get("InternalSerialNumber"))
+                .and_then(|v| v.as_str())
+            {
+                if let Some(fpexif_serial_value) = exif_data
+                    .get_tag_by_name("SerialNumber")
+                    .or_else(|| exif_data.get_tag_by_name("InternalSerialNumber"))
+                {
+                    validations += 1;
+                    match fpexif_serial_value {
+                        fpexif::data_types::ExifValue::Ascii(fpexif_serial) => {
+                            let normalized_exiftool = normalize_string(exiftool_serial);
+                            let normalized_fpexif = normalize_string(fpexif_serial);
+                            if normalized_exiftool == normalized_fpexif {
+                                println!("  ✓ Serial: \"{}\"", normalized_fpexif);
+                            } else {
+                                metadata_mismatches += 1;
+                                println!(
+                                    "  ⚠ Serial mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                    normalized_exiftool, normalized_fpexif
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Check Exposure Compensation
+            if let Some(exiftool_exp_comp) =
+                exiftool_data.get("ExposureCompensation").and_then(|v| {
+                    if let Some(f) = v.as_f64() {
+                        Some(f)
+                    } else if let Some(s) = v.as_str() {
+                        s.parse::<f64>().ok()
+                    } else {
+                        None
+                    }
+                })
+            {
+                if let Some(fpexif_exp_comp_value) =
+                    exif_data.get_tag_by_name("ExposureCompensation")
+                {
+                    validations += 1;
+                    match fpexif_exp_comp_value {
+                        fpexif::data_types::ExifValue::SRational(ref vals) => {
+                            if !vals.is_empty() {
+                                let (num, den) = vals[0];
+                                let fpexif_comp = if den > 0 {
+                                    num as f64 / den as f64
+                                } else {
+                                    0.0
+                                };
+                                if (fpexif_comp - exiftool_exp_comp).abs() < 0.1 {
+                                    println!("  ✓ Exp Comp: {:+.1} EV", fpexif_comp);
+                                } else {
+                                    metadata_mismatches += 1;
+                                    println!(
+                                        "  ⚠ Exp Comp mismatch: exiftool={:+.1} fpexif={:+.1}",
+                                        exiftool_exp_comp, fpexif_comp
+                                    );
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Check Flash
+            if let Some(exiftool_flash) = exiftool_data.get("Flash").and_then(|v| v.as_str()) {
+                if let Some(fpexif_flash_value) = exif_data.get_tag_by_name("Flash") {
+                    validations += 1;
+                    let exiftool_fired = exiftool_flash.to_lowercase().contains("fired");
+                    if let fpexif::data_types::ExifValue::Short(ref vals) = fpexif_flash_value {
+                        if !vals.is_empty() {
+                            let fpexif_fired = (vals[0] & 0x01) != 0;
+                            if exiftool_fired == fpexif_fired {
+                                println!(
+                                    "  ✓ Flash: {}",
+                                    if fpexif_fired { "Fired" } else { "Not Fired" }
+                                );
+                            } else {
+                                metadata_mismatches += 1;
+                                println!(
+                                    "  ⚠ Flash mismatch: exiftool={} fpexif={}",
+                                    if exiftool_fired { "Fired" } else { "Not Fired" },
+                                    if fpexif_fired { "Fired" } else { "Not Fired" }
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check DateTimeOriginal
+            if let Some(exiftool_datetime) = exiftool_data
+                .get("DateTimeOriginal")
+                .and_then(|v| v.as_str())
+            {
+                if let Some(fpexif_datetime_value) = exif_data.get_tag_by_name("DateTimeOriginal") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Ascii(fpexif_datetime) =
+                        fpexif_datetime_value
+                    {
+                        let normalized_exiftool = normalize_string(exiftool_datetime);
+                        let normalized_fpexif = normalize_string(fpexif_datetime);
+                        if normalized_exiftool == normalized_fpexif {
+                            println!("  ✓ DateTime: \"{}\"", normalized_fpexif);
+                        } else {
+                            metadata_mismatches += 1;
+                            println!(
+                                "  ⚠ DateTime mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                normalized_exiftool, normalized_fpexif
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Check Software
+            if let Some(exiftool_software) = exiftool_data.get("Software").and_then(|v| v.as_str())
+            {
+                if let Some(fpexif_software_value) = exif_data.get_tag_by_name("Software") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Ascii(fpexif_software) =
+                        fpexif_software_value
+                    {
+                        let normalized_exiftool = normalize_string(exiftool_software);
+                        let normalized_fpexif = normalize_string(fpexif_software);
+                        if normalized_exiftool == normalized_fpexif {
+                            println!("  ✓ Software: \"{}\"", normalized_fpexif);
+                        } else {
+                            metadata_mismatches += 1;
+                            println!(
+                                "  ⚠ Software mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                normalized_exiftool, normalized_fpexif
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Check Copyright
+            if let Some(exiftool_copyright) =
+                exiftool_data.get("Copyright").and_then(|v| v.as_str())
+            {
+                if let Some(fpexif_copyright_value) = exif_data.get_tag_by_name("Copyright") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Ascii(fpexif_copyright) =
+                        fpexif_copyright_value
+                    {
+                        let normalized_exiftool = normalize_string(exiftool_copyright);
+                        let normalized_fpexif = normalize_string(fpexif_copyright);
+                        if normalized_exiftool == normalized_fpexif {
+                            println!("  ✓ Copyright: \"{}\"", normalized_fpexif);
+                        } else {
+                            metadata_mismatches += 1;
+                            println!(
+                                "  ⚠ Copyright mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                normalized_exiftool, normalized_fpexif
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Check Artist
+            if let Some(exiftool_artist) = exiftool_data.get("Artist").and_then(|v| v.as_str()) {
+                if let Some(fpexif_artist_value) = exif_data.get_tag_by_name("Artist") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Ascii(fpexif_artist) = fpexif_artist_value
+                    {
+                        let normalized_exiftool = normalize_string(exiftool_artist);
+                        let normalized_fpexif = normalize_string(fpexif_artist);
+                        if normalized_exiftool == normalized_fpexif {
+                            println!("  ✓ Artist: \"{}\"", normalized_fpexif);
+                        } else {
+                            metadata_mismatches += 1;
+                            println!(
+                                "  ⚠ Artist mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                normalized_exiftool, normalized_fpexif
+                            );
+                        }
+                    }
+                }
+            }
+
             if validations > 0 {
-                let total_mismatches =
-                    critical_mismatches + dimension_mismatches + photo_mismatches;
+                let total_mismatches = critical_mismatches
+                    + dimension_mismatches
+                    + photo_mismatches
+                    + metadata_mismatches;
                 if total_mismatches > 0 {
                     let mut notes = Vec::new();
                     if dimension_mismatches > 0 {
@@ -387,6 +600,9 @@ fn test_file_against_exiftool(path: &str) {
                     }
                     if photo_mismatches > 0 {
                         notes.push(format!("{} photo", photo_mismatches));
+                    }
+                    if metadata_mismatches > 0 {
+                        notes.push(format!("{} metadata", metadata_mismatches));
                     }
 
                     if !notes.is_empty() && critical_mismatches == 0 {
