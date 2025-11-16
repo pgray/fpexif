@@ -3,11 +3,11 @@ name = "fpexif"
 version = "0.1.0"
 edition = "2021"
 authors = ["pgray <pgray@file.photo>"]
-description = "A pure Rust library for parsing and manipulating EXIF metadata"
+description = "A pure Rust library for parsing EXIF metadata from 20+ image formats including JPEG, PNG, WebP, AVIF, HEIC, RAW"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/pgray/fpexif"
-keywords = ["exif", "metadata", "image", "photo", "jpeg"]
+keywords = ["exif", "metadata", "image", "raw", "photography"]
 categories = ["multimedia::images", "parser-implementations"]
 
 [dependencies]
