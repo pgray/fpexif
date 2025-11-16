@@ -3,8 +3,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::OnceLock;
 
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
 /// Represents an EXIF tag identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ExifTagId {
     /// The numeric identifier of the tag
     pub id: u16,
@@ -14,6 +18,7 @@ pub struct ExifTagId {
 
 /// Different groups of EXIF tags
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TagGroup {
     /// Main image tags (IFD0)
     Main,

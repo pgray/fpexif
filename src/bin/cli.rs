@@ -1,6 +1,7 @@
 // src/bin/cli.rs - Command line interface for fpexif
 use clap::{Parser, Subcommand};
 use fpexif::{tags, ExifData, ExifParser};
+use serde::Serialize;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -24,6 +25,10 @@ enum Commands {
         /// Show verbose output
         #[arg(short, long)]
         verbose: bool,
+
+        /// Output in JSON format
+        #[arg(short, long)]
+        json: bool,
     },
 
     /// Extract a specific tag from a file
@@ -42,11 +47,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::List { file, verbose } => {
+        Commands::List {
+            file,
+            verbose,
+            json,
+        } => {
             let parser = ExifParser::new().verbose(*verbose);
             match parser.parse_file(file) {
                 Ok(exif_data) => {
-                    print_exif_data(&exif_data, *verbose);
+                    if *json {
+                        print_exif_data_json(&exif_data)?;
+                    } else {
+                        print_exif_data(&exif_data, *verbose);
+                    }
                     Ok(())
                 }
                 Err(err) => {
@@ -75,6 +88,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+}
+
+/// Serializable representation of an EXIF tag for JSON output
+#[derive(Serialize)]
+struct JsonTag {
+    tag_id: String,
+    tag_name: String,
+    tag_hex: String,
+    ifd: String,
+    value: fpexif::data_types::ExifValue,
+}
+
+/// Print all EXIF data in JSON format
+fn print_exif_data_json(exif_data: &ExifData) -> Result<(), Box<dyn std::error::Error>> {
+    let tags: Vec<JsonTag> = exif_data
+        .iter()
+        .map(|(tag_id, value)| JsonTag {
+            tag_id: tag_id.id.to_string(),
+            tag_name: tag_id.name().unwrap_or("Unknown Tag").to_string(),
+            tag_hex: format!("0x{:04X}", tag_id.id),
+            ifd: format!("{:?}", tag_id.ifd),
+            value: value.clone(),
+        })
+        .collect();
+
+    let json_output = serde_json::json!({
+        "tag_count": exif_data.len(),
+        "tags": tags,
+    });
+
+    println!("{}", serde_json::to_string_pretty(&json_output)?);
+    Ok(())
 }
 
 /// Print all EXIF data in a human-readable format
