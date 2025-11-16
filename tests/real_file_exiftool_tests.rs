@@ -736,6 +736,25 @@ fn test_orf_files() {
     assert!(!orf_files.is_empty(), "Expected to find ORF files");
 }
 
+// CRW Tests (Canon RAW - 34 files)
+#[test]
+fn test_crw_files() {
+    if !real_files_exist() {
+        println!("Skipping CRW tests - real files not available");
+        return;
+    }
+
+    let crw_files = find_files_by_extension("CRW");
+    println!("Found {} CRW files", crw_files.len());
+
+    for file in &crw_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    assert!(!crw_files.is_empty(), "Expected to find CRW files");
+}
+
 // ARW Tests (Sony RAW - 31 files)
 #[test]
 fn test_arw_files() {
@@ -1052,5 +1071,147 @@ fn test_dcr_files() {
     // DCR files might be rare
     if dcr_files.is_empty() {
         println!("No DCR files found - this is OK");
+    }
+}
+
+// MOS Tests (Leaf RAW - 2 files)
+#[test]
+fn test_mos_files() {
+    if !real_files_exist() {
+        println!("Skipping MOS tests - real files not available");
+        return;
+    }
+
+    let mos_files = find_files_by_extension("MOS");
+    println!("Found {} MOS files", mos_files.len());
+
+    for file in &mos_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // MOS files might be rare
+    if mos_files.is_empty() {
+        println!("No MOS files found - this is OK");
+    }
+}
+
+// SRF Tests (Sony RAW - 1 file)
+#[test]
+fn test_srf_files() {
+    if !real_files_exist() {
+        println!("Skipping SRF tests - real files not available");
+        return;
+    }
+
+    let srf_files = find_files_by_extension("SRF");
+    println!("Found {} SRF files", srf_files.len());
+
+    for file in &srf_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // SRF files might be rare
+    if srf_files.is_empty() {
+        println!("No SRF files found - this is OK");
+    }
+}
+
+// MEF Tests (Mamiya RAW - 1 file)
+#[test]
+fn test_mef_files() {
+    if !real_files_exist() {
+        println!("Skipping MEF tests - real files not available");
+        return;
+    }
+
+    let mef_files = find_files_by_extension("MEF");
+    println!("Found {} MEF files", mef_files.len());
+
+    for file in &mef_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // MEF files might be rare
+    if mef_files.is_empty() {
+        println!("No MEF files found - this is OK");
+    }
+}
+
+// MDC Tests (Minolta Digital Camera - 1 file)
+#[test]
+fn test_mdc_files() {
+    if !real_files_exist() {
+        println!("Skipping MDC tests - real files not available");
+        return;
+    }
+
+    let mdc_files = find_files_by_extension("MDC");
+    println!("Found {} MDC files", mdc_files.len());
+
+    for file in &mdc_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // MDC files might be rare
+    if mdc_files.is_empty() {
+        println!("No MDC files found - this is OK");
+    }
+}
+
+// TIFF Tests (3 files)
+#[test]
+fn test_tiff_files() {
+    if !real_files_exist() {
+        println!("Skipping TIFF tests - real files not available");
+        return;
+    }
+
+    let tiff_files = find_files_by_extension("TIFF");
+    let tif_files = find_files_by_extension("TIF");
+
+    let mut all_tiff_files = tiff_files;
+    all_tiff_files.extend(tif_files);
+
+    println!("Found {} TIFF files", all_tiff_files.len());
+
+    for file in &all_tiff_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // TIFF files should exist
+    if all_tiff_files.is_empty() {
+        println!("No TIFF files found - this is OK");
+    }
+}
+
+// JPEG Tests (1 file)
+#[test]
+fn test_jpeg_files() {
+    if !real_files_exist() {
+        println!("Skipping JPEG tests - real files not available");
+        return;
+    }
+
+    let jpeg_files = find_files_by_extension("JPEG");
+    let jpg_files = find_files_by_extension("JPG");
+
+    let mut all_jpeg_files = jpeg_files;
+    all_jpeg_files.extend(jpg_files);
+
+    println!("Found {} JPEG files", all_jpeg_files.len());
+
+    for file in &all_jpeg_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // JPEG files should exist
+    if all_jpeg_files.is_empty() {
+        println!("No JPEG files found - this is OK");
     }
 }
