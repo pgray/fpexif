@@ -81,11 +81,8 @@ mod tests {
         let result = extract_exif_segment(cursor);
 
         // Will fail because there's no EXIF data, but should not fail on brand check
-        match result {
-            Err(ExifError::Format(msg)) => {
-                assert!(!msg.contains("wrong brand"));
-            }
-            _ => {}
+        if let Err(ExifError::Format(msg)) = result {
+            assert!(!msg.contains("wrong brand"));
         }
     }
 
