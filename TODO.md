@@ -301,18 +301,18 @@ This document tracks planned image format support additions for the fpexif libra
 
 ## Implementation Strategy
 
-### Phase 1: Quick Wins (1-2 weeks)
-1. ARW explicit support
-2. PEF explicit support
-3. NRW support
-4. RWL support
-5. PNG EXIF support
+### Phase 1: Quick Wins ✅ COMPLETED
+1. ✅ ARW explicit support
+2. ✅ PEF explicit support
+3. ✅ NRW support
+4. ✅ RWL support
+5. ✅ PNG EXIF support
 
-### Phase 2: Modern Web Formats (2-3 weeks)
-1. WebP support (high priority)
-2. AVIF support (high priority)
-3. HEIC/HEIF full extraction
-4. JPEG XL support
+### Phase 2: Modern Web Formats ✅ COMPLETED
+1. ✅ WebP support (high priority)
+2. ✅ AVIF support (high priority)
+3. ✅ HEIC/HEIF full extraction
+4. ✅ JPEG XL support
 
 ### Phase 3: Legacy RAW Formats (2-3 weeks)
 1. CRW support (important for archives)
