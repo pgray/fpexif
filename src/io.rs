@@ -6,11 +6,22 @@ use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 /// Check if a file is likely to contain EXIF metadata
+///
+/// Supported formats:
+/// - JPEG (.jpg, .jpeg)
+/// - TIFF (.tif, .tiff)
+/// - RAF (.raf) - Fujifilm RAW
+/// - CR2 (.cr2) - Canon RAW 2
+/// - CR3 (.cr3) - Canon RAW 3
+/// - NEF (.nef) - Nikon Electronic Format
+/// - DNG (.dng) - Adobe Digital Negative
+/// - HEIC/HEIF (.heic, .heif)
+/// - And other TIFF-based RAW formats (ORF, SRW, RW2, ARW, etc.)
 pub fn is_exif_file<P: AsRef<Path>>(path: P) -> ExifResult<bool> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
-    // Check for JPEG, TIFF, HEIC, RAF, etc.
+    // Check for JPEG, TIFF, HEIC, RAF, CR3, etc.
     let mut signature = [0u8; 16];
     let read_bytes = reader.read(&mut signature)?;
 
@@ -18,7 +29,7 @@ pub fn is_exif_file<P: AsRef<Path>>(path: P) -> ExifResult<bool> {
         return Ok(false);
     }
 
-    // Check for RAF signature (FUJIFILMCCD-RAW)
+    // Check for RAF signature (FUJIFILMCCD-RAW) - Fujifilm RAW
     if read_bytes >= 15 && &signature[0..15] == b"FUJIFILMCCD-RAW" {
         return Ok(true);
     }
@@ -28,16 +39,37 @@ pub fn is_exif_file<P: AsRef<Path>>(path: P) -> ExifResult<bool> {
         return Ok(true);
     }
 
-    // Check for TIFF signature (49 49 2A 00 or 4D 4D 00 2A)
-    if (signature[0] == 0x49
-        && signature[1] == 0x49
-        && signature[2] == 0x2A
-        && signature[3] == 0x00)
-        || (signature[0] == 0x4D
-            && signature[1] == 0x4D
-            && signature[2] == 0x00
-            && signature[3] == 0x2A)
+    // Check for TIFF signature (II or MM) - covers TIFF, CR2, NEF, DNG, and other RAW formats
+    // II = little-endian (Intel), MM = big-endian (Motorola)
+    if (signature[0] == 0x49 && signature[1] == 0x49)
+        || (signature[0] == 0x4D && signature[1] == 0x4D)
     {
+        // Verify TIFF magic number at offset 2-3
+        let magic = if signature[0] == 0x49 {
+            u16::from_le_bytes([signature[2], signature[3]])
+        } else {
+            u16::from_be_bytes([signature[2], signature[3]])
+        };
+
+        // Accept various TIFF magic numbers:
+        // 0x002A = standard TIFF (also CR2, NEF, DNG)
+        // 0x002B = BigTIFF
+        // 0x4F52 = ORF (Olympus)
+        // 0x5352 = SRW (Samsung)
+        // 0x0055 = RW2 (Panasonic)
+        if magic == 0x002A
+            || magic == 0x002B
+            || magic == 0x4F52
+            || magic == 0x5352
+            || magic == 0x0055
+        {
+            return Ok(true);
+        }
+    }
+
+    // Check for CR3 signature (Canon RAW 3) - ISO Base Media File Format
+    // CR3 files start with: [size:4 bytes][ftyp][crx ]
+    if read_bytes >= 12 && &signature[4..8] == b"ftyp" && &signature[8..12] == b"crx " {
         return Ok(true);
     }
 
