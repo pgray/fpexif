@@ -1,8 +1,12 @@
 // data_types.rs - EXIF data type definitions
 use std::fmt;
 
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
 /// Represents the byte order (endianness) of the EXIF data
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Endianness {
     /// Little endian (Intel)
     Little,
@@ -12,6 +16,8 @@ pub enum Endianness {
 
 /// Represents the different EXIF data types
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ExifValue {
     /// Unsigned byte (8 bits)
     Byte(Vec<u8>),
