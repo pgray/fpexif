@@ -1,6 +1,7 @@
 // lib.rs - Main API entry point
 pub mod data_types;
 pub mod errors;
+pub mod formats;
 pub mod io;
 pub mod parser;
 pub mod tags;
