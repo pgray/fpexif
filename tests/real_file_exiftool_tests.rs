@@ -85,6 +85,7 @@ fn test_file_against_exiftool(path: &str) {
             let mut validations = 0;
             let mut critical_mismatches = 0; // Make/Model mismatches
             let mut dimension_mismatches = 0; // Width/Height mismatches (acceptable for RAW thumbnails)
+            let mut photo_mismatches = 0; // ISO/Shutter/Aperture/FocalLength mismatches
 
             // Check Make
             if let Some(exiftool_make) = exiftool_data.get("Make").and_then(|v| v.as_str()) {
@@ -237,27 +238,178 @@ fn test_file_against_exiftool(path: &str) {
                 }
             }
 
+            // Check ISO
+            if let Some(exiftool_iso) = exiftool_data.get("ISO").and_then(|v| v.as_u64()) {
+                if let Some(fpexif_iso_value) = exif_data.get_tag_by_name("ISOSpeedRatings") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Short(ref vals) = fpexif_iso_value {
+                        if !vals.is_empty() && vals[0] as u64 == exiftool_iso {
+                            println!("  ✓ ISO: {}", vals[0]);
+                        } else if !vals.is_empty() {
+                            photo_mismatches += 1;
+                            println!(
+                                "  ⚠ ISO mismatch: exiftool={} fpexif={}",
+                                exiftool_iso, vals[0]
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Check Shutter Speed (ExposureTime)
+            if let Some(exiftool_exposure) = exiftool_data.get("ExposureTime").and_then(|v| {
+                if let Some(s) = v.as_str() {
+                    // Parse fraction like "1/100" or decimal like "0.01"
+                    if s.contains('/') {
+                        let parts: Vec<&str> = s.split('/').collect();
+                        if parts.len() == 2 {
+                            let num = parts[0].parse::<u32>().ok()?;
+                            let den = parts[1].parse::<u32>().ok()?;
+                            Some((num, den))
+                        } else {
+                            None
+                        }
+                    } else {
+                        s.parse::<f64>().ok().and_then(|f| {
+                            // Convert decimal to rational
+                            let den = 1000u32;
+                            let num = (f * den as f64).round() as u32;
+                            Some((num, den))
+                        })
+                    }
+                } else {
+                    None
+                }
+            }) {
+                if let Some(fpexif_exposure_value) = exif_data.get_tag_by_name("ExposureTime") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Rational(ref vals) = fpexif_exposure_value
+                    {
+                        if !vals.is_empty() {
+                            let (fpexif_num, fpexif_den) = vals[0];
+                            let (exiftool_num, exiftool_den) = exiftool_exposure;
+                            // Compare as fractions (cross multiply to avoid floating point issues)
+                            if fpexif_num * exiftool_den == exiftool_num * fpexif_den {
+                                println!("  ✓ Shutter Speed: {}/{}", fpexif_num, fpexif_den);
+                            } else {
+                                photo_mismatches += 1;
+                                println!(
+                                    "  ⚠ Shutter Speed mismatch: exiftool={}/{} fpexif={}/{}",
+                                    exiftool_num, exiftool_den, fpexif_num, fpexif_den
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check Aperture (FNumber)
+            if let Some(exiftool_aperture) = exiftool_data.get("FNumber").and_then(|v| {
+                if let Some(f) = v.as_f64() {
+                    Some(f)
+                } else if let Some(s) = v.as_str() {
+                    s.parse::<f64>().ok()
+                } else {
+                    None
+                }
+            }) {
+                if let Some(fpexif_aperture_value) = exif_data.get_tag_by_name("FNumber") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Rational(ref vals) = fpexif_aperture_value
+                    {
+                        if !vals.is_empty() {
+                            let (num, den) = vals[0];
+                            let fpexif_f = if den > 0 {
+                                num as f64 / den as f64
+                            } else {
+                                0.0
+                            };
+                            // Allow small floating point differences
+                            if (fpexif_f - exiftool_aperture).abs() < 0.01 {
+                                println!("  ✓ Aperture: f/{:.1}", fpexif_f);
+                            } else {
+                                photo_mismatches += 1;
+                                println!(
+                                    "  ⚠ Aperture mismatch: exiftool=f/{:.1} fpexif=f/{:.1}",
+                                    exiftool_aperture, fpexif_f
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check Focal Length
+            if let Some(exiftool_focal) = exiftool_data.get("FocalLength").and_then(|v| {
+                if let Some(f) = v.as_f64() {
+                    Some(f)
+                } else if let Some(s) = v.as_str() {
+                    // Parse strings like "50.0 mm" or "50"
+                    s.split_whitespace()
+                        .next()
+                        .and_then(|num_str| num_str.parse::<f64>().ok())
+                } else {
+                    None
+                }
+            }) {
+                if let Some(fpexif_focal_value) = exif_data.get_tag_by_name("FocalLength") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Rational(ref vals) = fpexif_focal_value {
+                        if !vals.is_empty() {
+                            let (num, den) = vals[0];
+                            let fpexif_focal = if den > 0 {
+                                num as f64 / den as f64
+                            } else {
+                                0.0
+                            };
+                            // Allow small floating point differences
+                            if (fpexif_focal - exiftool_focal).abs() < 0.1 {
+                                println!("  ✓ Focal Length: {:.1}mm", fpexif_focal);
+                            } else {
+                                photo_mismatches += 1;
+                                println!(
+                                    "  ⚠ Focal Length mismatch: exiftool={:.1}mm fpexif={:.1}mm",
+                                    exiftool_focal, fpexif_focal
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             if validations > 0 {
-                let total_mismatches = critical_mismatches + dimension_mismatches;
+                let total_mismatches =
+                    critical_mismatches + dimension_mismatches + photo_mismatches;
                 if total_mismatches > 0 {
-                    if dimension_mismatches > 0 && critical_mismatches == 0 {
+                    let mut notes = Vec::new();
+                    if dimension_mismatches > 0 {
+                        notes.push(format!("{} dimension", dimension_mismatches));
+                    }
+                    if photo_mismatches > 0 {
+                        notes.push(format!("{} photo", photo_mismatches));
+                    }
+
+                    if !notes.is_empty() && critical_mismatches == 0 {
                         println!(
-                            "  ✓ Validated {}/{} common tags ({} dimension mismatches - expected for RAW thumbnails)",
-                            validations - total_mismatches, validations, dimension_mismatches
+                            "  ✓ Validated {}/{} tags ({} mismatches - may be expected)",
+                            validations - total_mismatches,
+                            validations,
+                            notes.join(", ")
                         );
                     } else {
                         println!(
-                            "  Validated {}/{} common tags",
+                            "  Validated {}/{} tags",
                             validations - total_mismatches,
                             validations
                         );
                     }
                 } else {
-                    println!("  ✓ Validated {}/{} common tags", validations, validations);
+                    println!("  ✓ Validated {}/{} tags", validations, validations);
                 }
 
-                // Only fail on critical mismatches (Make/Model/Orientation), not dimensions
+                // Only fail on critical mismatches (Make/Model/Orientation), not dimensions or photo metadata
                 // (dimensions can differ for RAW files when comparing thumbnail vs full image)
+                // (photo metadata might have minor precision differences)
                 assert_eq!(
                     critical_mismatches, 0,
                     "Found {} critical tag value mismatches in {}",
