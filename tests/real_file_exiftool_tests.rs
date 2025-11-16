@@ -736,6 +736,25 @@ fn test_orf_files() {
     assert!(!orf_files.is_empty(), "Expected to find ORF files");
 }
 
+// CRW Tests (Canon RAW - 34 files)
+#[test]
+fn test_crw_files() {
+    if !real_files_exist() {
+        println!("Skipping CRW tests - real files not available");
+        return;
+    }
+
+    let crw_files = find_files_by_extension("CRW");
+    println!("Found {} CRW files", crw_files.len());
+
+    for file in &crw_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    assert!(!crw_files.is_empty(), "Expected to find CRW files");
+}
+
 // ARW Tests (Sony RAW - 31 files)
 #[test]
 fn test_arw_files() {
@@ -1052,5 +1071,93 @@ fn test_dcr_files() {
     // DCR files might be rare
     if dcr_files.is_empty() {
         println!("No DCR files found - this is OK");
+    }
+}
+
+// MOS Tests (Leaf RAW - 2 files)
+#[test]
+fn test_mos_files() {
+    if !real_files_exist() {
+        println!("Skipping MOS tests - real files not available");
+        return;
+    }
+
+    let mos_files = find_files_by_extension("MOS");
+    println!("Found {} MOS files", mos_files.len());
+
+    for file in &mos_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // MOS files might be rare
+    if mos_files.is_empty() {
+        println!("No MOS files found - this is OK");
+    }
+}
+
+// SRF Tests (Sony RAW - 1 file)
+#[test]
+fn test_srf_files() {
+    if !real_files_exist() {
+        println!("Skipping SRF tests - real files not available");
+        return;
+    }
+
+    let srf_files = find_files_by_extension("SRF");
+    println!("Found {} SRF files", srf_files.len());
+
+    for file in &srf_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // SRF files might be rare
+    if srf_files.is_empty() {
+        println!("No SRF files found - this is OK");
+    }
+}
+
+// MEF Tests (Mamiya RAW - 1 file)
+#[test]
+fn test_mef_files() {
+    if !real_files_exist() {
+        println!("Skipping MEF tests - real files not available");
+        return;
+    }
+
+    let mef_files = find_files_by_extension("MEF");
+    println!("Found {} MEF files", mef_files.len());
+
+    for file in &mef_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // MEF files might be rare
+    if mef_files.is_empty() {
+        println!("No MEF files found - this is OK");
+    }
+}
+
+// MDC Tests (Minolta Digital Camera - 1 file)
+#[test]
+fn test_mdc_files() {
+    if !real_files_exist() {
+        println!("Skipping MDC tests - real files not available");
+        return;
+    }
+
+    let mdc_files = find_files_by_extension("MDC");
+    println!("Found {} MDC files", mdc_files.len());
+
+    for file in &mdc_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // MDC files might be rare
+    if mdc_files.is_empty() {
+        println!("No MDC files found - this is OK");
     }
 }

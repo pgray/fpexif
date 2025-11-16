@@ -58,8 +58,16 @@ impl<R: Read + Seek> CiffParser<R> {
         // Skip version (2 bytes) and reserved (8 bytes)
         reader.seek(SeekFrom::Current(10))?;
 
-        // Read offset to root directory
-        let root_dir_offset = reader.read_u32::<LittleEndian>()?;
+        // Read offset to root directory (often 0, will be overridden from file footer)
+        let _root_dir_offset_header = reader.read_u32::<LittleEndian>()?;
+
+        // In CIFF format, the actual root directory offset is stored in the last 4 bytes of the file
+        // This offset is relative to the heap start (after the header)
+        reader.seek(SeekFrom::End(-4))?;
+        let heap_offset = reader.read_u32::<LittleEndian>()?;
+
+        // Convert heap offset to file offset by adding header length
+        let root_dir_offset = heap_offset + header_length;
 
         let header = CiffHeader {
             is_little_endian,
@@ -108,7 +116,9 @@ impl<R: Read + Seek> CiffParser<R> {
         for entry in entries {
             if entry.tag == EXIF_TAG_TYPE {
                 // Found EXIF data - read it
-                self.reader.seek(SeekFrom::Start(entry.offset as u64))?;
+                // Convert heap offset to file offset
+                let file_offset = entry.offset + self.header.header_length;
+                self.reader.seek(SeekFrom::Start(file_offset as u64))?;
                 let mut exif_data = vec![0u8; entry.size as usize];
                 self.reader.read_exact(&mut exif_data)?;
                 return Ok(Some(exif_data));
@@ -118,10 +128,13 @@ impl<R: Read + Seek> CiffParser<R> {
             // Directory entries have the high bit set in their tag
             if (entry.tag & 0xC000) == 0xC000 {
                 // This is a subdirectory, search it recursively
-                if let Ok(subdir_entries) = self.read_directory(entry.offset) {
+                // Convert heap offset to file offset
+                let subdir_offset = entry.offset + self.header.header_length;
+                if let Ok(subdir_entries) = self.read_directory(subdir_offset) {
                     for subentry in subdir_entries {
                         if subentry.tag == EXIF_TAG_TYPE {
-                            self.reader.seek(SeekFrom::Start(subentry.offset as u64))?;
+                            let file_offset = subentry.offset + self.header.header_length;
+                            self.reader.seek(SeekFrom::Start(file_offset as u64))?;
                             let mut exif_data = vec![0u8; subentry.size as usize];
                             self.reader.read_exact(&mut exif_data)?;
                             return Ok(Some(exif_data));
@@ -160,13 +173,21 @@ mod tests {
         data.extend_from_slice(&26u32.to_le_bytes()); // Header length
         data.extend_from_slice(CIFF_SIGNATURE); // Valid signature
         data.extend_from_slice(&[0u8; 10]); // Version + reserved
-        data.extend_from_slice(&100u32.to_le_bytes()); // Root dir offset
+        data.extend_from_slice(&0u32.to_le_bytes()); // Root dir offset (ignored, read from footer)
+
+        // Add some dummy data to simulate file content
+        data.extend_from_slice(&[0u8; 50]); // Padding
+
+        // Add footer: last 4 bytes contain heap offset to root directory
+        // If we want file offset 100, and header is 26 bytes, heap offset should be 74
+        let heap_offset = 74u32;
+        data.extend_from_slice(&heap_offset.to_le_bytes());
 
         let cursor = Cursor::new(data);
         let result = CiffParser::new(cursor);
 
         assert!(result.is_ok());
         let parser = result.unwrap();
-        assert_eq!(parser.header.root_dir_offset, 100);
+        assert_eq!(parser.header.root_dir_offset, 100); // 74 + 26 = 100
     }
 }
