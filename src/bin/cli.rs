@@ -1,7 +1,6 @@
 // src/bin/cli.rs - Command line interface for fpexif
 use clap::{Parser, Subcommand};
 use fpexif::{tags, ExifData, ExifParser};
-use serde::Serialize;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -136,15 +135,105 @@ fn format_exif_value_for_json(
             Value::String(cleaned.to_string())
         }
 
-        // Single-value numeric types - return as number
-        ExifValue::Byte(v) if v.len() == 1 => Value::Number(v[0].into()),
+        // Single-value numeric types - return as number or interpreted string
+        ExifValue::Byte(v) if v.len() == 1 => {
+            // Check for tags that need interpretation
+            match tag_id {
+                0xA300 => {
+                    // FileSource
+                    Value::String(fpexif::tags::get_file_source_description(v[0]).to_string())
+                }
+                0xA301 => {
+                    // SceneType
+                    Value::String(fpexif::tags::get_scene_type_description(v[0]).to_string())
+                }
+                _ => Value::Number(v[0].into()),
+            }
+        }
         ExifValue::Short(v) if v.len() == 1 => {
-            // Special handling for Orientation - can return as number or interpreted string
-            if tag_id == 0x0112 {
-                // Orientation tag
-                Value::Number(v[0].into())
-            } else {
-                Value::Number(v[0].into())
+            // Check for tags that need human-readable interpretation
+            match tag_id {
+                0x0112 => {
+                    // Orientation
+                    Value::String(fpexif::tags::get_orientation_description(v[0]).to_string())
+                }
+                0x0103 => {
+                    // Compression
+                    Value::String(fpexif::tags::get_compression_description(v[0]).to_string())
+                }
+                0x0128 => {
+                    // ResolutionUnit
+                    Value::String(fpexif::tags::get_resolution_unit_description(v[0]).to_string())
+                }
+                0x0213 => {
+                    // YCbCrPositioning
+                    Value::String(fpexif::tags::get_ycbcr_positioning_description(v[0]).to_string())
+                }
+                0x8822 => {
+                    // ExposureProgram
+                    Value::String(fpexif::tags::get_exposure_program_description(v[0]).to_string())
+                }
+                0x9207 => {
+                    // MeteringMode
+                    Value::String(fpexif::tags::get_metering_mode_description(v[0]).to_string())
+                }
+                0x9208 => {
+                    // LightSource
+                    Value::String(fpexif::tags::get_light_source_description(v[0]).to_string())
+                }
+                0x9209 => {
+                    // Flash
+                    Value::String(fpexif::tags::get_flash_description(v[0]).to_string())
+                }
+                0xA001 => {
+                    // ColorSpace
+                    Value::String(fpexif::tags::get_color_space_description(v[0]).to_string())
+                }
+                0xA402 => {
+                    // ExposureMode
+                    Value::String(fpexif::tags::get_exposure_mode_description(v[0]).to_string())
+                }
+                0xA403 => {
+                    // WhiteBalance
+                    Value::String(fpexif::tags::get_white_balance_description(v[0]).to_string())
+                }
+                0xA406 => {
+                    // SceneCaptureType
+                    Value::String(
+                        fpexif::tags::get_scene_capture_type_description(v[0]).to_string(),
+                    )
+                }
+                0xA408 => {
+                    // Contrast
+                    Value::String(fpexif::tags::get_contrast_description(v[0]).to_string())
+                }
+                0xA409 => {
+                    // Saturation
+                    Value::String(fpexif::tags::get_saturation_description(v[0]).to_string())
+                }
+                0xA40A => {
+                    // Sharpness
+                    Value::String(fpexif::tags::get_sharpness_description(v[0]).to_string())
+                }
+                0xA40C => {
+                    // SubjectDistanceRange
+                    Value::String(
+                        fpexif::tags::get_subject_distance_range_description(v[0]).to_string(),
+                    )
+                }
+                0xA401 => {
+                    // CustomRendered
+                    Value::String(fpexif::tags::get_custom_rendered_description(v[0]).to_string())
+                }
+                0xA40B => {
+                    // GainControl
+                    Value::String(fpexif::tags::get_gain_control_description(v[0]).to_string())
+                }
+                0x041A => {
+                    // SensingMethod
+                    Value::String(fpexif::tags::get_sensing_method_description(v[0]).to_string())
+                }
+                _ => Value::Number(v[0].into()),
             }
         }
         ExifValue::Long(v) if v.len() == 1 => Value::Number(v[0].into()),
@@ -264,19 +353,32 @@ fn format_exif_value_for_json(
                 .collect(),
         ),
 
-        // Undefined - return as base64 or hex string
+        // Undefined - return as base64 or hex string, or interpret special tags
         ExifValue::Undefined(v) => {
-            if v.len() <= 32 {
-                // For short undefined data, show as hex
-                Value::String(
-                    v.iter()
-                        .map(|b| format!("{:02x}", b))
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                )
-            } else {
-                // For longer data, use base64
-                Value::String(base64_encode(v))
+            // Special handling for FileSource and SceneType which are often Undefined type
+            match tag_id {
+                0xA300 if v.len() == 1 => {
+                    // FileSource
+                    Value::String(fpexif::tags::get_file_source_description(v[0]).to_string())
+                }
+                0xA301 if v.len() == 1 => {
+                    // SceneType
+                    Value::String(fpexif::tags::get_scene_type_description(v[0]).to_string())
+                }
+                _ => {
+                    if v.len() <= 32 {
+                        // For short undefined data, show as hex
+                        Value::String(
+                            v.iter()
+                                .map(|b| format!("{:02x}", b))
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        )
+                    } else {
+                        // For longer data, use base64
+                        Value::String(base64_encode(v))
+                    }
+                }
             }
         }
     }

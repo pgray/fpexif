@@ -708,3 +708,199 @@ pub fn get_flash_description(value: u16) -> &'static str {
         _ => "Unknown flash mode",
     }
 }
+
+/// Human-readable descriptions for ColorSpace values
+pub fn get_color_space_description(value: u16) -> &'static str {
+    match value {
+        1 => "sRGB",
+        2 => "Adobe RGB",
+        0xFFFF => "Uncalibrated",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for WhiteBalance values
+pub fn get_white_balance_description(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Manual",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for ExposureMode values
+pub fn get_exposure_mode_description(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Manual",
+        2 => "Auto bracket",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for SceneCaptureType values
+pub fn get_scene_capture_type_description(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Landscape",
+        2 => "Portrait",
+        3 => "Night scene",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for Contrast values
+pub fn get_contrast_description(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Soft",
+        2 => "Hard",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for Saturation values
+pub fn get_saturation_description(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Low",
+        2 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for Sharpness values
+pub fn get_sharpness_description(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Soft",
+        2 => "Hard",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for ResolutionUnit values
+pub fn get_resolution_unit_description(value: u16) -> &'static str {
+    match value {
+        1 => "None",
+        2 => "inches",
+        3 => "cm",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for YCbCrPositioning values
+pub fn get_ycbcr_positioning_description(value: u16) -> &'static str {
+    match value {
+        1 => "Centered",
+        2 => "Co-sited",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for Compression values
+pub fn get_compression_description(value: u16) -> &'static str {
+    match value {
+        1 => "Uncompressed",
+        2 => "CCITT 1D",
+        3 => "T4/Group 3 Fax",
+        4 => "T6/Group 4 Fax",
+        5 => "LZW",
+        6 => "JPEG (old-style)",
+        7 => "JPEG",
+        8 => "Adobe Deflate",
+        9 => "JBIG B&W",
+        10 => "JBIG Color",
+        99 => "JPEG",
+        262 => "Kodak 262",
+        32766 => "Next",
+        32767 => "Sony ARW Compressed",
+        32769 => "Packed RAW",
+        32770 => "Samsung SRW Compressed",
+        32771 => "CCIRLEW",
+        32773 => "PackBits",
+        32809 => "Thunderscan",
+        32867 => "Kodak KDC Compressed",
+        32895 => "IT8CTPAD",
+        32896 => "IT8LW",
+        32897 => "IT8MP",
+        32898 => "IT8BL",
+        32908 => "PixarFilm",
+        32909 => "PixarLog",
+        32946 => "Deflate",
+        32947 => "DCS",
+        34661 => "JBIG",
+        34676 => "SGILog",
+        34677 => "SGILog24",
+        34712 => "JPEG 2000",
+        34713 => "Nikon NEF Compressed",
+        34892 => "JPEG XR",
+        65000 => "Kodak DCR Compressed",
+        65535 => "Pentax PEF Compressed",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for SensingMethod values
+pub fn get_sensing_method_description(value: u16) -> &'static str {
+    match value {
+        1 => "Not defined",
+        2 => "One-chip color area",
+        3 => "Two-chip color area",
+        4 => "Three-chip color area",
+        5 => "Color sequential area",
+        7 => "Trilinear",
+        8 => "Color sequential linear",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for FileSource values
+pub fn get_file_source_description(value: u8) -> &'static str {
+    match value {
+        1 => "Film Scanner",
+        2 => "Reflection Print Scanner",
+        3 => "Digital Camera",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for SceneType values
+pub fn get_scene_type_description(value: u8) -> &'static str {
+    match value {
+        1 => "Directly photographed",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for CustomRendered values
+pub fn get_custom_rendered_description(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Custom",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for GainControl values
+pub fn get_gain_control_description(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Low gain up",
+        2 => "High gain up",
+        3 => "Low gain down",
+        4 => "High gain down",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for SubjectDistanceRange values
+pub fn get_subject_distance_range_description(value: u16) -> &'static str {
+    match value {
+        0 => "Unknown",
+        1 => "Macro",
+        2 => "Close",
+        3 => "Distant",
+        _ => "Unknown",
+    }
+}
