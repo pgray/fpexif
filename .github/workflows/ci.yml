@@ -139,12 +139,6 @@ jobs:
         if: steps.check_files.outputs.exists == 'true'
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install exiftool
-        if: steps.check_files.outputs.exists == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libimage-exiftool-perl
-
       - name: Cache cargo registry
         if: steps.check_files.outputs.exists == 'true'
         uses: actions/cache@v4
