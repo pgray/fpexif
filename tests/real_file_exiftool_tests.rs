@@ -1161,3 +1161,57 @@ fn test_mdc_files() {
         println!("No MDC files found - this is OK");
     }
 }
+
+// TIFF Tests (3 files)
+#[test]
+fn test_tiff_files() {
+    if !real_files_exist() {
+        println!("Skipping TIFF tests - real files not available");
+        return;
+    }
+
+    let tiff_files = find_files_by_extension("TIFF");
+    let tif_files = find_files_by_extension("TIF");
+
+    let mut all_tiff_files = tiff_files;
+    all_tiff_files.extend(tif_files);
+
+    println!("Found {} TIFF files", all_tiff_files.len());
+
+    for file in &all_tiff_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // TIFF files should exist
+    if all_tiff_files.is_empty() {
+        println!("No TIFF files found - this is OK");
+    }
+}
+
+// JPEG Tests (1 file)
+#[test]
+fn test_jpeg_files() {
+    if !real_files_exist() {
+        println!("Skipping JPEG tests - real files not available");
+        return;
+    }
+
+    let jpeg_files = find_files_by_extension("JPEG");
+    let jpg_files = find_files_by_extension("JPG");
+
+    let mut all_jpeg_files = jpeg_files;
+    all_jpeg_files.extend(jpg_files);
+
+    println!("Found {} JPEG files", all_jpeg_files.len());
+
+    for file in &all_jpeg_files {
+        println!("\nTesting: {}", file);
+        test_file_against_exiftool(file);
+    }
+
+    // JPEG files should exist
+    if all_jpeg_files.is_empty() {
+        println!("No JPEG files found - this is OK");
+    }
+}
