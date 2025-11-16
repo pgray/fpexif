@@ -1,1 +1,5 @@
-we must always run `cargo fmt` and `cargo clippy` before pushing our branches
+we must always run the following before pushing our branches
+
+- `cargo test`
+- `cargo fmt`
+- `cargo clippy`
