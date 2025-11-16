@@ -1,5 +1,7 @@
 # fpexif: A Pure Rust EXIF Metadata Library
 
+[![CI](https://github.com/pgray/fpexif/actions/workflows/ci.yml/badge.svg)](https://github.com/pgray/fpexif/actions/workflows/ci.yml)
+
 fpexif is a pure Rust library for parsing, manipulating, and writing EXIF metadata in image files.
 
 It aims to be a complete alternative to libraries like libexiv2 and ExifTool, with a focus on safety, performance, and ease of use.
