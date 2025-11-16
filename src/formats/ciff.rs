@@ -77,6 +77,14 @@ impl<R: Read + Seek> CiffParser<R> {
         // Read number of entries (2 bytes)
         let entry_count = self.reader.read_u16::<LittleEndian>()?;
 
+        // Sanity check: limit to reasonable number of entries to prevent excessive allocation
+        if entry_count > 10000 {
+            return Err(ExifError::Format(format!(
+                "Invalid CIFF directory: too many entries ({})",
+                entry_count
+            )));
+        }
+
         let mut entries = Vec::with_capacity(entry_count as usize);
 
         // Each entry is 10 bytes: tag (2) + size (4) + offset (4)

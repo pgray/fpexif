@@ -97,6 +97,14 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
     // Read number of directory entries
     let num_entries = reader.read_u32::<LittleEndian>()?;
 
+    // Sanity check: limit to reasonable number of entries to prevent excessive allocation
+    if num_entries > 1000 {
+        return Err(ExifError::Format(format!(
+            "Invalid X3F directory: too many entries ({})",
+            num_entries
+        )));
+    }
+
     // Read directory entries
     let mut entries = Vec::with_capacity(num_entries as usize);
     for _ in 0..num_entries {
