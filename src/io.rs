@@ -10,12 +10,17 @@ pub fn is_exif_file<P: AsRef<Path>>(path: P) -> ExifResult<bool> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
-    // Check for JPEG, TIFF, HEIC, etc.
-    let mut signature = [0u8; 12];
+    // Check for JPEG, TIFF, HEIC, RAF, etc.
+    let mut signature = [0u8; 16];
     let read_bytes = reader.read(&mut signature)?;
 
     if read_bytes < 4 {
         return Ok(false);
+    }
+
+    // Check for RAF signature (FUJIFILMCCD-RAW)
+    if read_bytes >= 15 && &signature[0..15] == b"FUJIFILMCCD-RAW" {
+        return Ok(true);
     }
 
     // Check for JPEG signature (FF D8 FF)
