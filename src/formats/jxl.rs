@@ -127,7 +127,10 @@ mod tests {
 
     #[test]
     fn test_jxl_codestream_signature() {
-        let data = vec![0xFF, 0x0A, 0x00, 0x00];
+        // Create enough data for signature check (12 bytes minimum)
+        let data = vec![
+            0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
         let cursor = Cursor::new(data);
         let result = extract_exif_segment(cursor);
 
@@ -142,7 +145,10 @@ mod tests {
 
     #[test]
     fn test_jxl_invalid_signature() {
-        let data = vec![0x00, 0x00, 0x00, 0x00];
+        // Create 12 bytes with invalid signature
+        let data = vec![
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
         let cursor = Cursor::new(data);
         let result = extract_exif_segment(cursor);
 

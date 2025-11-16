@@ -140,7 +140,10 @@ mod tests {
 
     #[test]
     fn test_invalid_riff() {
-        let invalid_data = vec![0x00, 0x00, 0x00, 0x00];
+        // Create 12 bytes with invalid signature
+        let invalid_data = vec![
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
         let cursor = Cursor::new(invalid_data);
         let result = RiffParser::new(cursor);
 

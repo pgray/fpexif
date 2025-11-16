@@ -81,7 +81,8 @@ mod tests {
 
     #[test]
     fn test_invalid_signature() {
-        let invalid_data = vec![0x00, 0x00, 0x00, 0x00];
+        // Create 8 bytes with invalid PNG signature
+        let invalid_data = vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
         let cursor = Cursor::new(invalid_data);
         let result = extract_exif_segment(cursor);
 
