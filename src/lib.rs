@@ -6,6 +6,9 @@ pub mod io;
 pub mod parser;
 pub mod tags;
 
+#[cfg(feature = "wasm")]
+pub mod wasm;
+
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;

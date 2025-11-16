@@ -19,10 +19,16 @@ byteorder = "1.4"
 chrono = "0.4"
 # Optional: for command line interface
 clap = { version = "4.0", optional = true, features = ["derive"] }
+# Optional: for WebAssembly bindings
+wasm-bindgen = { version = "0.2", optional = true }
+serde = { version = "1.0", optional = true, features = ["derive"] }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [features]
 default = []
 cli = ["clap"]
+wasm = ["wasm-bindgen", "serde", "serde-wasm-bindgen", "serde_json"]
 
 [[bin]]
 name = "fpexif"
@@ -32,3 +38,4 @@ required-features = ["cli"]
 [lib]
 name = "fpexif"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
