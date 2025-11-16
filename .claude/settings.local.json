@@ -7,7 +7,10 @@
       "Bash(test:*)",
       "Bash(cargo test:*)",
       "Bash(exiftool:*)",
-      "Bash(cargo fmt:*)"
+      "Bash(cargo fmt:*)",
+      "Bash(nice -n 19 cargo test:*)",
+      "Bash(nice -n 19 cargo fmt:*)",
+      "Bash(nice -n 19 cargo clippy:*)"
     ],
     "deny": [],
     "ask": []

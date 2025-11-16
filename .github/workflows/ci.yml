@@ -119,24 +119,25 @@ jobs:
   real-files:
     name: Real File Format Tests
     runs-on: self-hosted
-    # Only run if the test files directory exists
-    if: hashFiles('/fpexif/raws/welcome.html') != ''
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
 
       - name: Check if test files exist
         id: check_files
         run: |
           if [ -f /fpexif/raws/welcome.html ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Test files found at /fpexif/raws"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Test files not found - skipping real file tests"
           fi
+
+      - name: Install Rust toolchain
+        if: steps.check_files.outputs.exists == 'true'
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install exiftool
         if: steps.check_files.outputs.exists == 'true'
