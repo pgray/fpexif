@@ -1,0 +1,55 @@
+# Ignore all image files by default to prevent committing large test files
+*.RAF
+*.raf
+*.CRW
+*.crw
+*.CR2
+*.cr2
+*.CR3
+*.cr3
+*.NEF
+*.nef
+*.NRW
+*.nrw
+*.ARW
+*.arw
+*.DNG
+*.dng
+*.ORF
+*.orf
+*.PEF
+*.pef
+*.RWL
+*.rwl
+*.SRW
+*.srw
+*.RW2
+*.rw2
+*.MRW
+*.mrw
+*.X3F
+*.x3f
+*.PNG
+*.png
+*.WEBP
+*.webp
+*.AVIF
+*.avif
+*.HEIC
+*.heic
+*.HEIF
+*.heif
+*.JXL
+*.jxl
+*.JPG
+*.jpg
+*.JPEG
+*.jpeg
+
+# Keep these files
+!README.md
+!download-samples.sh
+!.gitignore
+
+# Exception: Allow specific test files if explicitly added
+# To add a test file to git, use: git add -f test-data/filename.ext

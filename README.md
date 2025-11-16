@@ -10,7 +10,10 @@ It aims to be a complete alternative to libraries like libexiv2 and ExifTool, wi
 - Zero dependencies for the core functionality
 - Fast and memory-efficient parsing
 - Support for all standard EXIF tags
-- Support for various file formats (JPEG, TIFF, etc.)
+- Support for 23+ image formats including:
+  - **Web formats**: JPEG, PNG, WebP, AVIF, HEIC/HEIF, JPEG XL
+  - **RAW formats**: CR2, CR3, CRW, NEF, NRW, DNG, ARW, PEF, RWL, ORF, SRW, RW2, RAF, MRW, X3F
+  - **Standard formats**: TIFF
 - Simple and intuitive API
 - Comprehensive documentation and examples
 
@@ -92,6 +95,36 @@ fpexif extract path/to/image.jpg DateTimeOriginal
    cargo test
    ```
 
+## Supported Image Formats
+
+### Modern Web Formats
+- **JPEG** (.jpg, .jpeg) - Joint Photographic Experts Group
+- **PNG** (.png) - Portable Network Graphics (with eXIf chunk)
+- **WebP** (.webp) - Google WebP format
+- **AVIF** (.avif) - AV1 Image File Format
+- **HEIC/HEIF** (.heic, .heif) - High Efficiency Image Format
+- **JPEG XL** (.jxl) - Next-generation JPEG format
+
+### RAW Camera Formats
+- **CR2** (.cr2) - Canon RAW 2
+- **CR3** (.cr3) - Canon RAW 3
+- **CRW** (.crw) - Canon RAW v1 (CIFF format)
+- **NEF** (.nef) - Nikon Electronic Format (DSLR)
+- **NRW** (.nrw) - Nikon RAW (Coolpix)
+- **ARW** (.arw) - Sony Alpha RAW
+- **DNG** (.dng) - Adobe Digital Negative
+- **RAF** (.raf) - Fujifilm RAW
+- **MRW** (.mrw) - Minolta RAW
+- **X3F** (.x3f) - Sigma/Foveon RAW
+- **ORF** (.orf) - Olympus RAW Format
+- **PEF** (.pef) - Pentax Electronic File
+- **RWL** (.rwl) - Leica RAW
+- **SRW** (.srw) - Samsung RAW Format
+- **RW2** (.rw2) - Panasonic RAW Format
+
+### Standard Formats
+- **TIFF** (.tif, .tiff) - Tagged Image File Format
+
 ## Architecture
 
 fpexif is organized into several modules:
@@ -99,6 +132,7 @@ fpexif is organized into several modules:
 - **parser**: Responsible for binary parsing of EXIF data blocks
 - **data_types**: Definitions for EXIF value types like SHORT, LONG, RATIONAL, etc.
 - **tags**: Definitions and mappings for standard EXIF tags
+- **formats**: Format-specific handlers for different image types
 - **io**: Utilities for reading and writing EXIF data to files
 - **errors**: Error types and handling
 
@@ -130,11 +164,14 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 ## Roadmap
 
+- [x] Support for modern web formats (PNG, HEIC, WebP, AVIF, JPEG XL) ✅
+- [x] Support for major RAW formats (ARW, PEF, NRW, RWL, etc.) ✅
+- [x] Support for legacy RAW formats (CRW, MRW, X3F) ✅
 - [ ] Complete TIFF writer implementation
 - [ ] Support for non-standard maker notes (Canon, Nikon, etc.)
 - [ ] Support for XMP and IPTC metadata
 - [ ] Performance optimizations
-- [ ] Support for more image formats (PNG, HEIC, WebP)
+- [ ] Support for medium format RAW (3FR, FFF, DCR, KDC, MEF, MOS)
 - [ ] Integration with popular Rust image processing libraries
 
 ## License

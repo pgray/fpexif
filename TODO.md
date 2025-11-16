@@ -5,17 +5,27 @@ This document tracks planned image format support additions for the fpexif libra
 ## Currently Supported Formats ✅
 
 - [x] JPEG (.jpg, .jpeg)
+- [x] PNG (.png) - Portable Network Graphics
+- [x] WebP (.webp) - Google WebP format
+- [x] AVIF (.avif) - AV1 Image File Format
+- [x] HEIC/HEIF (.heic, .heif) - High Efficiency Image Format
+- [x] JPEG XL (.jxl) - Next-generation JPEG format
 - [x] TIFF (.tif, .tiff)
 - [x] RAF (.raf) - Fujifilm RAW
 - [x] CR2 (.cr2) - Canon RAW 2
 - [x] CR3 (.cr3) - Canon RAW 3
+- [x] CRW (.crw) - Canon RAW v1 (CIFF format)
 - [x] NEF (.nef) - Nikon Electronic Format
+- [x] NRW (.nrw) - Nikon RAW (Coolpix)
 - [x] DNG (.dng) - Adobe Digital Negative
 - [x] ORF (.orf) - Olympus RAW Format
 - [x] SRW (.srw) - Samsung RAW Format
 - [x] RW2 (.rw2) - Panasonic RAW Format
-- [x] ARW (.arw) - Sony Alpha RAW (via TIFF handler, implicit)
-- [x] HEIC/HEIF (.heic, .heif) - Detection only (no extraction)
+- [x] ARW (.arw) - Sony Alpha RAW
+- [x] PEF (.pef) - Pentax Electronic File
+- [x] RWL (.rwl) - Leica RAW
+- [x] MRW (.mrw) - Minolta RAW
+- [x] X3F (.x3f) - Sigma/Foveon RAW
 
 ---
 
@@ -301,23 +311,23 @@ This document tracks planned image format support additions for the fpexif libra
 
 ## Implementation Strategy
 
-### Phase 1: Quick Wins (1-2 weeks)
-1. ARW explicit support
-2. PEF explicit support
-3. NRW support
-4. RWL support
-5. PNG EXIF support
+### Phase 1: Quick Wins ✅ COMPLETED
+1. ✅ ARW explicit support
+2. ✅ PEF explicit support
+3. ✅ NRW support
+4. ✅ RWL support
+5. ✅ PNG EXIF support
 
-### Phase 2: Modern Web Formats (2-3 weeks)
-1. WebP support (high priority)
-2. AVIF support (high priority)
-3. HEIC/HEIF full extraction
-4. JPEG XL support
+### Phase 2: Modern Web Formats ✅ COMPLETED
+1. ✅ WebP support (high priority)
+2. ✅ AVIF support (high priority)
+3. ✅ HEIC/HEIF full extraction
+4. ✅ JPEG XL support
 
-### Phase 3: Legacy RAW Formats (2-3 weeks)
-1. CRW support (important for archives)
-2. MRW support
-3. X3F support
+### Phase 3: Legacy RAW Formats ✅ COMPLETED
+1. ✅ CRW support (important for archives)
+2. ✅ MRW support
+3. ✅ X3F support
 
 ### Phase 4: Specialized/Medium Format (ongoing)
 1. 3FR, FFF, DCR, KDC, MEF, MOS, etc.

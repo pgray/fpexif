@@ -1,8 +1,19 @@
 // formats/mod.rs - Image format handlers
+pub mod avif;
+pub mod ciff;
 pub mod cr3;
+pub mod crw;
+pub mod heif;
+pub mod isobmff;
 pub mod jpeg;
+pub mod jxl;
+pub mod mrw;
+pub mod png;
 pub mod raf;
+pub mod riff;
 pub mod tiff;
+pub mod webp;
+pub mod x3f;
 
 use crate::errors::ExifResult;
 use std::io::{Read, Seek};
@@ -12,13 +23,27 @@ use std::io::{Read, Seek};
 ///
 /// Supported formats:
 /// - JPEG (.jpg, .jpeg)
+/// - PNG (.png) - Portable Network Graphics (with eXIf chunk)
+/// - WebP (.webp) - Google WebP format
+/// - AVIF (.avif) - AV1 Image File Format
+/// - HEIC/HEIF (.heic, .heif) - High Efficiency Image Format
+/// - JPEG XL (.jxl) - Next-generation JPEG format
+/// - TIFF (.tif, .tiff) - Tagged Image File Format
 /// - RAF (.raf) - Fujifilm RAW
+/// - CRW (.crw) - Canon RAW v1 (CIFF format)
 /// - CR2 (.cr2) - Canon RAW 2
 /// - CR3 (.cr3) - Canon RAW 3
-/// - NEF (.nef) - Nikon Electronic Format
+/// - MRW (.mrw) - Minolta RAW
+/// - X3F (.x3f) - Sigma/Foveon RAW
+/// - NEF (.nef) - Nikon Electronic Format (DSLR)
+/// - NRW (.nrw) - Nikon RAW (Coolpix)
 /// - DNG (.dng) - Adobe Digital Negative
-/// - TIFF (.tif, .tiff) - Tagged Image File Format
-/// - And other TIFF-based RAW formats (ORF, SRW, RW2, etc.)
+/// - ARW (.arw) - Sony Alpha RAW
+/// - PEF (.pef) - Pentax Electronic File
+/// - RWL (.rwl) - Leica RAW
+/// - ORF (.orf) - Olympus RAW Format
+/// - SRW (.srw) - Samsung RAW Format
+/// - RW2 (.rw2) - Panasonic RAW Format
 pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>> {
     // Read first few bytes to detect format
     let mut signature = [0u8; 16];
@@ -32,9 +57,47 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
         return raf::extract_exif_segment(reader);
     }
 
+    // Check for MRW signature (Minolta RAW: 0x00 0x4D 0x52 0x4D)
+    if signature[0] == 0x00 && signature[1] == 0x4D && signature[2] == 0x52 && signature[3] == 0x4D
+    {
+        return mrw::extract_exif_segment(reader);
+    }
+
+    // Check for X3F signature (Sigma/Foveon: FOVb)
+    if &signature[0..4] == b"FOVb" {
+        return x3f::extract_exif_segment(reader);
+    }
+
+    // Check for PNG signature (0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A)
+    if signature[0] == 0x89
+        && signature[1] == 0x50
+        && signature[2] == 0x4E
+        && signature[3] == 0x47
+        && signature[4] == 0x0D
+        && signature[5] == 0x0A
+        && signature[6] == 0x1A
+        && signature[7] == 0x0A
+    {
+        return png::extract_exif_segment(reader);
+    }
+
+    // Check for WebP signature (RIFF....WEBP)
+    if &signature[0..4] == b"RIFF" && &signature[8..12] == b"WEBP" {
+        return webp::extract_exif_segment(reader);
+    }
+
     // Check for JPEG signature (FF D8 FF)
     if signature[0] == 0xFF && signature[1] == 0xD8 && signature[2] == 0xFF {
         return jpeg::extract_exif_segment(reader);
+    }
+
+    // Check for CRW signature (CIFF format: II/MM followed by HEAPCCDR at offset 6)
+    if ((signature[0] == b'I' && signature[1] == b'I')
+        || (signature[0] == b'M' && signature[1] == b'M'))
+        && signature.len() >= 14
+        && &signature[6..14] == b"HEAPCCDR"
+    {
+        return crw::extract_exif_segment(reader);
     }
 
     // Check for TIFF signature (II or MM) - covers CR2, NEF, DNG, and other TIFF-based RAW formats
@@ -44,13 +107,45 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
         return tiff::extract_exif_segment(reader);
     }
 
-    // Check for CR3 signature (Canon RAW 3) - ISO Base Media File Format
-    // CR3 files start with: [size:4 bytes][ftyp][crx ]
+    // Check for ISO Base Media File Format (ftyp box)
+    // Used by CR3, AVIF, HEIF/HEIC, and potentially JPEG XL
     if signature[4..8] == *b"ftyp" && signature.len() >= 12 {
-        // Check for CR3 brand
-        if &signature[8..12] == b"crx " {
+        let brand = &signature[8..12];
+
+        // CR3 (Canon RAW 3)
+        if brand == b"crx " {
             return cr3::extract_exif_segment(reader);
         }
+
+        // AVIF (AV1 Image File Format)
+        if brand == b"avif" || brand == b"avis" || brand == b"avio" {
+            return avif::extract_exif_segment(reader);
+        }
+
+        // HEIF/HEIC (High Efficiency Image Format)
+        if brand == b"heic"
+            || brand == b"heix"
+            || brand == b"hevc"
+            || brand == b"hevx"
+            || brand == b"heim"
+            || brand == b"heis"
+            || brand == b"hevm"
+            || brand == b"hevs"
+            || brand == b"mif1"
+            || brand == b"msf1"
+        {
+            return heif::extract_exif_segment(reader);
+        }
+
+        // JPEG XL (container format)
+        if brand == b"jxl " || brand == b"jxll" {
+            return jxl::extract_exif_segment(reader);
+        }
+    }
+
+    // Check for JPEG XL naked codestream (0xFF 0x0A)
+    if signature[0] == 0xFF && signature[1] == 0x0A {
+        return jxl::extract_exif_segment(reader);
     }
 
     // Unknown format

@@ -52,48 +52,74 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
     Ok(app1_data)
 }
 
-/// Detect specific TIFF-based RAW format from header
+/// Detect specific TIFF-based RAW format from TIFF data
+/// This function examines the TIFF header and first IFD to identify specific camera formats
 #[allow(dead_code)]
-pub fn detect_tiff_format(header: &[u8]) -> Option<&'static str> {
-    if header.len() < 12 {
+pub fn detect_tiff_format(tiff_data: &[u8]) -> Option<&'static str> {
+    if tiff_data.len() < 12 {
         return None;
     }
 
     // Check TIFF signature
-    if !((header[0] == b'I' && header[1] == b'I') || (header[0] == b'M' && header[1] == b'M')) {
+    if !((tiff_data[0] == b'I' && tiff_data[1] == b'I')
+        || (tiff_data[0] == b'M' && tiff_data[1] == b'M'))
+    {
         return None;
     }
 
-    let is_little_endian = header[0] == b'I';
+    let is_little_endian = tiff_data[0] == b'I';
 
     // Check magic number at offset 2-3
     let magic = if is_little_endian {
-        u16::from_le_bytes([header[2], header[3]])
+        u16::from_le_bytes([tiff_data[2], tiff_data[3]])
     } else {
-        u16::from_be_bytes([header[2], header[3]])
+        u16::from_be_bytes([tiff_data[2], tiff_data[3]])
     };
 
     // Check for format-specific markers
     match magic {
         0x002A => {
             // Standard TIFF - check for specific RAW format markers
-            // CR2 has "CR" at offset 8-9 in some implementations
-            if header.len() >= 10 {
-                // DNG version check (DNG has version at offset 8)
-                let byte8 = if is_little_endian {
-                    u32::from_le_bytes([header[8], header[9], header[10], header[11]])
-                } else {
-                    u32::from_be_bytes([header[8], header[9], header[10], header[11]])
-                };
+            // Try to identify format by reading Make tag from first IFD
+            if let Some(make) = extract_make_from_ifd(tiff_data, is_little_endian) {
+                let make_lower = make.to_lowercase();
 
-                // DNG versions are typically 1.x.x.x format
-                if byte8 & 0xFF000000 == 0x01000000 || byte8 & 0x000000FF == 0x01 {
-                    return Some("DNG");
+                // Sony ARW - Sony Alpha RAW
+                if make_lower.contains("sony") {
+                    return Some("ARW");
+                }
+
+                // Pentax PEF - Pentax Electronic File
+                if make_lower.contains("pentax") || make_lower.contains("asahi") {
+                    return Some("PEF");
+                }
+
+                // Nikon NRW - Nikon RAW (Coolpix series)
+                // NEF is for DSLRs, NRW is for Coolpix compacts
+                // Both use "NIKON" as make, differentiation would require model tag
+                if make_lower.contains("nikon") {
+                    // For now, we'll identify both as NEF since they're structurally identical
+                    // A more detailed check would examine the Model tag
+                    return Some("NEF");
+                }
+
+                // Leica RWL - typically saved as DNG
+                if make_lower.contains("leica") {
+                    // Check if it's a DNG variant
+                    if has_dng_tags(tiff_data, is_little_endian) {
+                        return Some("DNG");
+                    }
+                    return Some("RWL");
                 }
             }
 
+            // Check for DNG version tag
+            if has_dng_tags(tiff_data, is_little_endian) {
+                return Some("DNG");
+            }
+
             // Check for CR2 marker (Canon Raw 2)
-            if header.len() >= 10 && header[8] == b'C' && header[9] == b'R' {
+            if tiff_data.len() >= 10 && tiff_data[8] == b'C' && tiff_data[9] == b'R' {
                 return Some("CR2");
             }
 
@@ -105,4 +131,127 @@ pub fn detect_tiff_format(header: &[u8]) -> Option<&'static str> {
         0x0055 => Some("RW2"), // Panasonic Raw Format
         _ => None,
     }
+}
+
+/// Extract the Make tag (0x010F) from the first IFD
+fn extract_make_from_ifd(tiff_data: &[u8], is_little_endian: bool) -> Option<String> {
+    if tiff_data.len() < 8 {
+        return None;
+    }
+
+    // Read IFD0 offset from bytes 4-7
+    let ifd_offset = if is_little_endian {
+        u32::from_le_bytes([tiff_data[4], tiff_data[5], tiff_data[6], tiff_data[7]]) as usize
+    } else {
+        u32::from_be_bytes([tiff_data[4], tiff_data[5], tiff_data[6], tiff_data[7]]) as usize
+    };
+
+    if ifd_offset + 2 > tiff_data.len() {
+        return None;
+    }
+
+    // Read number of directory entries
+    let num_entries = if is_little_endian {
+        u16::from_le_bytes([tiff_data[ifd_offset], tiff_data[ifd_offset + 1]])
+    } else {
+        u16::from_be_bytes([tiff_data[ifd_offset], tiff_data[ifd_offset + 1]])
+    };
+
+    // Each IFD entry is 12 bytes
+    let mut offset = ifd_offset + 2;
+    for _ in 0..num_entries {
+        if offset + 12 > tiff_data.len() {
+            break;
+        }
+
+        // Read tag ID
+        let tag_id = if is_little_endian {
+            u16::from_le_bytes([tiff_data[offset], tiff_data[offset + 1]])
+        } else {
+            u16::from_be_bytes([tiff_data[offset], tiff_data[offset + 1]])
+        };
+
+        // Check if this is the Make tag (0x010F)
+        if tag_id == 0x010F {
+            // Read value offset (bytes 8-11 of the entry)
+            let value_offset = if is_little_endian {
+                u32::from_le_bytes([
+                    tiff_data[offset + 8],
+                    tiff_data[offset + 9],
+                    tiff_data[offset + 10],
+                    tiff_data[offset + 11],
+                ]) as usize
+            } else {
+                u32::from_be_bytes([
+                    tiff_data[offset + 8],
+                    tiff_data[offset + 9],
+                    tiff_data[offset + 10],
+                    tiff_data[offset + 11],
+                ]) as usize
+            };
+
+            // Read the Make string
+            if value_offset < tiff_data.len() {
+                let make_bytes = &tiff_data[value_offset..];
+                if let Some(null_pos) = make_bytes.iter().position(|&b| b == 0) {
+                    if let Ok(make_str) = std::str::from_utf8(&make_bytes[..null_pos]) {
+                        return Some(make_str.to_string());
+                    }
+                }
+            }
+            break;
+        }
+
+        offset += 12;
+    }
+
+    None
+}
+
+/// Check if the TIFF data contains DNG-specific tags
+fn has_dng_tags(tiff_data: &[u8], is_little_endian: bool) -> bool {
+    if tiff_data.len() < 8 {
+        return false;
+    }
+
+    // Read IFD0 offset
+    let ifd_offset = if is_little_endian {
+        u32::from_le_bytes([tiff_data[4], tiff_data[5], tiff_data[6], tiff_data[7]]) as usize
+    } else {
+        u32::from_be_bytes([tiff_data[4], tiff_data[5], tiff_data[6], tiff_data[7]]) as usize
+    };
+
+    if ifd_offset + 2 > tiff_data.len() {
+        return false;
+    }
+
+    // Read number of directory entries
+    let num_entries = if is_little_endian {
+        u16::from_le_bytes([tiff_data[ifd_offset], tiff_data[ifd_offset + 1]])
+    } else {
+        u16::from_be_bytes([tiff_data[ifd_offset], tiff_data[ifd_offset + 1]])
+    };
+
+    // Look for DNGVersion tag (0xC612)
+    let mut offset = ifd_offset + 2;
+    for _ in 0..num_entries {
+        if offset + 12 > tiff_data.len() {
+            break;
+        }
+
+        let tag_id = if is_little_endian {
+            u16::from_le_bytes([tiff_data[offset], tiff_data[offset + 1]])
+        } else {
+            u16::from_be_bytes([tiff_data[offset], tiff_data[offset + 1]])
+        };
+
+        // DNGVersion tag
+        if tag_id == 0xC612 {
+            return true;
+        }
+
+        offset += 12;
+    }
+
+    false
 }
