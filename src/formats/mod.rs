@@ -1,6 +1,7 @@
 // formats/mod.rs - Image format handlers
 pub mod cr3;
 pub mod jpeg;
+pub mod png;
 pub mod raf;
 pub mod tiff;
 
@@ -12,13 +13,20 @@ use std::io::{Read, Seek};
 ///
 /// Supported formats:
 /// - JPEG (.jpg, .jpeg)
+/// - PNG (.png) - Portable Network Graphics (with eXIf chunk)
+/// - TIFF (.tif, .tiff) - Tagged Image File Format
 /// - RAF (.raf) - Fujifilm RAW
 /// - CR2 (.cr2) - Canon RAW 2
 /// - CR3 (.cr3) - Canon RAW 3
-/// - NEF (.nef) - Nikon Electronic Format
+/// - NEF (.nef) - Nikon Electronic Format (DSLR)
+/// - NRW (.nrw) - Nikon RAW (Coolpix)
 /// - DNG (.dng) - Adobe Digital Negative
-/// - TIFF (.tif, .tiff) - Tagged Image File Format
-/// - And other TIFF-based RAW formats (ORF, SRW, RW2, etc.)
+/// - ARW (.arw) - Sony Alpha RAW
+/// - PEF (.pef) - Pentax Electronic File
+/// - RWL (.rwl) - Leica RAW
+/// - ORF (.orf) - Olympus RAW Format
+/// - SRW (.srw) - Samsung RAW Format
+/// - RW2 (.rw2) - Panasonic RAW Format
 pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>> {
     // Read first few bytes to detect format
     let mut signature = [0u8; 16];
@@ -30,6 +38,19 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
     // Check for RAF signature (Fujifilm RAW)
     if signature.starts_with(b"FUJIFILMCCD-RAW") {
         return raf::extract_exif_segment(reader);
+    }
+
+    // Check for PNG signature (0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A)
+    if signature[0] == 0x89
+        && signature[1] == 0x50
+        && signature[2] == 0x4E
+        && signature[3] == 0x47
+        && signature[4] == 0x0D
+        && signature[5] == 0x0A
+        && signature[6] == 0x1A
+        && signature[7] == 0x0A
+    {
+        return png::extract_exif_segment(reader);
     }
 
     // Check for JPEG signature (FF D8 FF)
