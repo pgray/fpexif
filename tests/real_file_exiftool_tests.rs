@@ -36,6 +36,17 @@ fn get_exiftool_output(path: &str) -> Result<serde_json::Value, String> {
     Ok(data)
 }
 
+/// Helper to normalize string values for comparison
+fn normalize_string(s: &str) -> String {
+    // Remove null bytes and non-printable characters
+    s.chars()
+        .take_while(|&c| c != '\0')
+        .filter(|c| c.is_ascii_graphic() || c.is_whitespace())
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
 /// Helper function to test a single file
 fn test_file_against_exiftool(path: &str) {
     if !real_files_exist() {
@@ -68,17 +79,191 @@ fn test_file_against_exiftool(path: &str) {
                 path
             );
 
-            // Check some common EXIF tags if they exist in exiftool output
-            if let Some(make) = exiftool_data.get("Make").and_then(|v| v.as_str()) {
-                println!("  Make (exiftool): {}", make);
-                // We can optionally verify fpexif extracted the same value
-            }
-
-            if let Some(model) = exiftool_data.get("Model").and_then(|v| v.as_str()) {
-                println!("  Model (exiftool): {}", model);
-            }
-
             println!("  fpexif extracted {} tags", exif_data.len());
+
+            // Validate common EXIF tags
+            let mut validations = 0;
+            let mut critical_mismatches = 0; // Make/Model mismatches
+            let mut dimension_mismatches = 0; // Width/Height mismatches (acceptable for RAW thumbnails)
+
+            // Check Make
+            if let Some(exiftool_make) = exiftool_data.get("Make").and_then(|v| v.as_str()) {
+                if let Some(fpexif_make_value) = exif_data.get_tag_by_name("Make") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Ascii(fpexif_make) = fpexif_make_value {
+                        let normalized_exiftool = normalize_string(exiftool_make);
+                        let normalized_fpexif = normalize_string(fpexif_make);
+                        if normalized_exiftool == normalized_fpexif {
+                            println!("  ✓ Make: \"{}\"", normalized_fpexif);
+                        } else {
+                            critical_mismatches += 1;
+                            println!(
+                                "  ✗ Make mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                normalized_exiftool, normalized_fpexif
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Check Model
+            if let Some(exiftool_model) = exiftool_data.get("Model").and_then(|v| v.as_str()) {
+                if let Some(fpexif_model_value) = exif_data.get_tag_by_name("Model") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Ascii(fpexif_model) = fpexif_model_value {
+                        let normalized_exiftool = normalize_string(exiftool_model);
+                        let normalized_fpexif = normalize_string(fpexif_model);
+                        if normalized_exiftool == normalized_fpexif {
+                            println!("  ✓ Model: \"{}\"", normalized_fpexif);
+                        } else {
+                            critical_mismatches += 1;
+                            println!(
+                                "  ✗ Model mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                normalized_exiftool, normalized_fpexif
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Check Orientation
+            if let Some(exiftool_orientation) = exiftool_data.get("Orientation").and_then(|v| {
+                // Exiftool returns a string like "Horizontal (normal)"
+                // We want to extract just the number
+                if let Some(num_str) = v.as_str() {
+                    // Try to parse as number directly, or extract from string
+                    num_str.chars().find(|c| c.is_numeric()).and_then(|_| {
+                        num_str
+                            .split_whitespace()
+                            .next()
+                            .and_then(|s| s.parse::<u16>().ok())
+                    })
+                } else {
+                    v.as_u64().map(|n| n as u16)
+                }
+            }) {
+                if let Some(fpexif_orientation_value) = exif_data.get_tag_by_name("Orientation") {
+                    validations += 1;
+                    if let fpexif::data_types::ExifValue::Short(ref vals) = fpexif_orientation_value
+                    {
+                        if !vals.is_empty() && vals[0] == exiftool_orientation {
+                            println!("  ✓ Orientation: {}", vals[0]);
+                        } else if !vals.is_empty() {
+                            critical_mismatches += 1;
+                            println!(
+                                "  ✗ Orientation mismatch: exiftool={} fpexif={}",
+                                exiftool_orientation, vals[0]
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Check ImageWidth
+            if let Some(exiftool_width) = exiftool_data
+                .get("ImageWidth")
+                .or_else(|| exiftool_data.get("ExifImageWidth"))
+                .and_then(|v| v.as_u64().map(|n| n as u32))
+            {
+                if let Some(fpexif_width_value) = exif_data
+                    .get_tag_by_name("ImageWidth")
+                    .or_else(|| exif_data.get_tag_by_name("ExifImageWidth"))
+                {
+                    validations += 1;
+                    match fpexif_width_value {
+                        fpexif::data_types::ExifValue::Short(ref vals) if !vals.is_empty() => {
+                            if vals[0] as u32 == exiftool_width {
+                                println!("  ✓ ImageWidth: {}", vals[0]);
+                            } else {
+                                dimension_mismatches += 1;
+                                println!(
+                                    "  ⚠ ImageWidth mismatch: exiftool={} fpexif={} (may be thumbnail)",
+                                    exiftool_width, vals[0]
+                                );
+                            }
+                        }
+                        fpexif::data_types::ExifValue::Long(ref vals) if !vals.is_empty() => {
+                            if vals[0] == exiftool_width {
+                                println!("  ✓ ImageWidth: {}", vals[0]);
+                            } else {
+                                dimension_mismatches += 1;
+                                println!(
+                                    "  ⚠ ImageWidth mismatch: exiftool={} fpexif={} (may be thumbnail)",
+                                    exiftool_width, vals[0]
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Check ImageHeight
+            if let Some(exiftool_height) = exiftool_data
+                .get("ImageHeight")
+                .or_else(|| exiftool_data.get("ExifImageHeight"))
+                .and_then(|v| v.as_u64().map(|n| n as u32))
+            {
+                if let Some(fpexif_height_value) = exif_data
+                    .get_tag_by_name("ImageLength")
+                    .or_else(|| exif_data.get_tag_by_name("ExifImageHeight"))
+                {
+                    validations += 1;
+                    match fpexif_height_value {
+                        fpexif::data_types::ExifValue::Short(ref vals) if !vals.is_empty() => {
+                            if vals[0] as u32 == exiftool_height {
+                                println!("  ✓ ImageHeight: {}", vals[0]);
+                            } else {
+                                dimension_mismatches += 1;
+                                println!(
+                                    "  ⚠ ImageHeight mismatch: exiftool={} fpexif={} (may be thumbnail)",
+                                    exiftool_height, vals[0]
+                                );
+                            }
+                        }
+                        fpexif::data_types::ExifValue::Long(ref vals) if !vals.is_empty() => {
+                            if vals[0] == exiftool_height {
+                                println!("  ✓ ImageHeight: {}", vals[0]);
+                            } else {
+                                dimension_mismatches += 1;
+                                println!(
+                                    "  ⚠ ImageHeight mismatch: exiftool={} fpexif={} (may be thumbnail)",
+                                    exiftool_height, vals[0]
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if validations > 0 {
+                let total_mismatches = critical_mismatches + dimension_mismatches;
+                if total_mismatches > 0 {
+                    if dimension_mismatches > 0 && critical_mismatches == 0 {
+                        println!(
+                            "  ✓ Validated {}/{} common tags ({} dimension mismatches - expected for RAW thumbnails)",
+                            validations - total_mismatches, validations, dimension_mismatches
+                        );
+                    } else {
+                        println!(
+                            "  Validated {}/{} common tags",
+                            validations - total_mismatches,
+                            validations
+                        );
+                    }
+                } else {
+                    println!("  ✓ Validated {}/{} common tags", validations, validations);
+                }
+
+                // Only fail on critical mismatches (Make/Model/Orientation), not dimensions
+                // (dimensions can differ for RAW files when comparing thumbnail vs full image)
+                assert_eq!(
+                    critical_mismatches, 0,
+                    "Found {} critical tag value mismatches in {}",
+                    critical_mismatches, path
+                );
+            }
         }
         Err(e) => {
             // Some files may not have EXIF data or may use formats we don't support yet

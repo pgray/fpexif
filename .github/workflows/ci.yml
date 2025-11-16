@@ -118,7 +118,7 @@ jobs:
 
   real-files:
     name: Real File Format Tests
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     # Only run if the test files directory exists
     if: hashFiles('/fpexif/raws/welcome.html') != ''
 
