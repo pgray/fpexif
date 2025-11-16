@@ -1,0 +1,734 @@
+// parser.rs - EXIF raw binary parsing implementation
+use crate::data_types::{Endianness, ExifValue};
+use crate::errors::{ExifError, ExifResult};
+use crate::tags::ExifTagId;
+use crate::tags::TagGroup;
+use std::collections::HashMap;
+use std::io::{Read, Seek, SeekFrom};
+
+/// Parse EXIF data from a reader
+pub fn parse_exif<R>(mut reader: R, strict: bool, verbose: bool) -> ExifResult<crate::ExifData>
+where
+    R: Read + Seek,
+{
+    // Initialize an empty EXIF data container
+    let mut exif_data = crate::ExifData::new();
+
+    // Check for JPEG markers
+    let mut marker_buffer = [0u8; 2];
+    reader.read_exact(&mut marker_buffer)?;
+
+    // JPEG marker should start with 0xFF 0xD8 (SOI - Start of Image)
+    if marker_buffer != [0xFF, 0xD8] {
+        return Err(ExifError::Format("Not a valid JPEG file".to_string()));
+    }
+
+    // Find the APP1 marker (0xFF 0xE1) which contains EXIF data
+    loop {
+        reader.read_exact(&mut marker_buffer)?;
+
+        // Check for end of image (0xFF 0xD9)
+        if marker_buffer == [0xFF, 0xD9] {
+            return Err(ExifError::Format("No EXIF data found".to_string()));
+        }
+
+        // Check if we found the APP1 marker
+        if marker_buffer[0] == 0xFF && marker_buffer[1] == 0xE1 {
+            break;
+        }
+
+        // Not the APP1 marker - skip this segment
+        // First, read the length (2 bytes)
+        let mut length_buffer = [0u8; 2];
+        reader.read_exact(&mut length_buffer)?;
+
+        // Calculate the length (big-endian, includes the length bytes themselves)
+        let length = u16::from_be_bytes(length_buffer) as u64 - 2;
+
+        // Skip to the next marker
+        reader.seek(SeekFrom::Current(length as i64))?;
+    }
+
+    // Read APP1 length (2 bytes)
+    let mut length_buffer = [0u8; 2];
+    reader.read_exact(&mut length_buffer)?;
+    let app1_length = u16::from_be_bytes(length_buffer) as usize - 2;
+
+    // Read APP1 data
+    let mut app1_data = vec![0u8; app1_length];
+    reader.read_exact(&mut app1_data)?;
+
+    // Check for "Exif\0\0" marker
+    if app1_data.len() < 6 || &app1_data[0..6] != b"Exif\0\0" {
+        return Err(ExifError::Format(
+            "Not a valid EXIF APP1 segment".to_string(),
+        ));
+    }
+
+    // Parse the TIFF header, which starts after the Exif marker
+    let tiff_offset = 6;
+    if app1_data.len() < tiff_offset + 8 {
+        return Err(ExifError::Format("EXIF data too short".to_string()));
+    }
+
+    // Determine endianness from TIFF header (II = little endian, MM = big endian)
+    let endian = match (app1_data[tiff_offset], app1_data[tiff_offset + 1]) {
+        (b'I', b'I') => Endianness::Little,
+        (b'M', b'M') => Endianness::Big,
+        _ => return Err(ExifError::Format("Invalid TIFF header".to_string())),
+    };
+
+    // Store the endianness in the result
+    exif_data.endian = endian;
+
+    // Read TIFF header version (should be 0x002A for TIFF)
+    let tiff_version = read_u16(&app1_data[tiff_offset + 2..tiff_offset + 4], endian);
+    if tiff_version != 0x002A {
+        return Err(ExifError::Format(format!(
+            "Invalid TIFF version: 0x{:04X}",
+            tiff_version
+        )));
+    }
+
+    // Read offset to first IFD (Image File Directory)
+    let ifd_offset = read_u32(&app1_data[tiff_offset + 4..tiff_offset + 8], endian) as usize;
+    if tiff_offset + ifd_offset + 2 > app1_data.len() {
+        return Err(ExifError::Format("Invalid IFD offset".to_string()));
+    }
+
+    // Parse the main IFD (IFD0)
+    let (tags, next_ifd_offset) = parse_ifd(
+        &app1_data,
+        tiff_offset + ifd_offset,
+        tiff_offset,
+        endian,
+        TagGroup::Main,
+        strict,
+        verbose,
+    )?;
+
+    // Add the parsed tags to our result
+    for (tag_id, value) in tags {
+        exif_data.tags.insert(tag_id, value);
+    }
+
+    // Check for EXIF SubIFD
+    if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(0x8769) {
+        if !offsets.is_empty() {
+            let exif_offset = offsets[0] as usize;
+            let (exif_tags, _) = parse_ifd(
+                &app1_data,
+                tiff_offset + exif_offset,
+                tiff_offset,
+                endian,
+                TagGroup::Exif,
+                strict,
+                verbose,
+            )?;
+
+            // Add the EXIF SubIFD tags
+            for (tag_id, value) in exif_tags {
+                exif_data.tags.insert(tag_id, value);
+            }
+        }
+    }
+
+    // Check for GPS SubIFD
+    if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(0x8825) {
+        if !offsets.is_empty() {
+            let gps_offset = offsets[0] as usize;
+            let (gps_tags, _) = parse_ifd(
+                &app1_data,
+                tiff_offset + gps_offset,
+                tiff_offset,
+                endian,
+                TagGroup::Gps,
+                strict,
+                verbose,
+            )?;
+
+            // Add the GPS SubIFD tags
+            for (tag_id, value) in gps_tags {
+                exif_data.tags.insert(tag_id, value);
+            }
+        }
+    }
+
+    // Check for Interoperability SubIFD
+    if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(0xA005) {
+        if !offsets.is_empty() {
+            let interop_offset = offsets[0] as usize;
+            let (interop_tags, _) = parse_ifd(
+                &app1_data,
+                tiff_offset + interop_offset,
+                tiff_offset,
+                endian,
+                TagGroup::Interop,
+                strict,
+                verbose,
+            )?;
+
+            // Add the Interoperability SubIFD tags
+            for (tag_id, value) in interop_tags {
+                exif_data.tags.insert(tag_id, value);
+            }
+        }
+    }
+
+    // Parse thumbnail IFD (IFD1) if present
+    if next_ifd_offset > 0 && tiff_offset + next_ifd_offset as usize + 2 <= app1_data.len() {
+        let (thumbnail_tags, _) = parse_ifd(
+            &app1_data,
+            tiff_offset + next_ifd_offset as usize,
+            tiff_offset,
+            endian,
+            TagGroup::Thumbnail,
+            strict,
+            verbose,
+        )?;
+
+        // Add the thumbnail tags
+        for (tag_id, value) in thumbnail_tags {
+            exif_data.tags.insert(tag_id, value);
+        }
+    }
+
+    Ok(exif_data)
+}
+
+/// Parse an Image File Directory (IFD)
+fn parse_ifd(
+    data: &[u8],
+    offset: usize,
+    base_offset: usize,
+    endian: Endianness,
+    ifd_type: TagGroup,
+    strict: bool,
+    verbose: bool,
+) -> ExifResult<(HashMap<ExifTagId, ExifValue>, u32)> {
+    // Get number of entries in this IFD
+    if offset + 2 > data.len() {
+        return Err(ExifError::Format("Invalid IFD offset".to_string()));
+    }
+
+    let entry_count = read_u16(&data[offset..offset + 2], endian) as usize;
+    if verbose {
+        println!("IFD has {} entries", entry_count);
+    }
+
+    // Calculate the size of the entire IFD
+    let ifd_size = 2 + entry_count * 12 + 4;
+    if offset + ifd_size > data.len() {
+        return Err(ExifError::Format(format!(
+            "IFD extends beyond data length (offset: {}, size: {}, data length: {})",
+            offset,
+            ifd_size,
+            data.len()
+        )));
+    }
+
+    let mut tags = HashMap::new();
+
+    // Parse each IFD entry (12 bytes each)
+    for i in 0..entry_count {
+        let entry_offset = offset + 2 + i * 12;
+
+        // Parse the IFD entry
+        let tag_id = read_u16(&data[entry_offset..entry_offset + 2], endian);
+        let tag_type = read_u16(&data[entry_offset + 2..entry_offset + 4], endian);
+        let count = read_u32(&data[entry_offset + 4..entry_offset + 8], endian);
+        let value_offset = &data[entry_offset + 8..entry_offset + 12];
+
+        // Create an ExifTagId with the appropriate IFD type
+        let exif_tag_id = ExifTagId::new(tag_id, ifd_type);
+
+        // Parse the value based on the type and count
+        match parse_tag_value(data, tag_type, count, value_offset, base_offset, endian) {
+            Ok(value) => {
+                tags.insert(exif_tag_id, value);
+            }
+            Err(err) => {
+                if verbose {
+                    println!("Error parsing tag 0x{:04X}: {}", tag_id, err);
+                }
+                // If in strict mode, propagate the error
+                if strict {
+                    return Err(err);
+                }
+                // Otherwise, continue with the next tag
+                continue;
+            }
+        }
+    }
+
+    // Read next IFD offset (4 bytes after the entries)
+    let next_offset = read_u32(
+        &data[offset + 2 + entry_count * 12..offset + 2 + entry_count * 12 + 4],
+        endian,
+    );
+
+    Ok((tags, next_offset))
+}
+
+/// Parse a tag value based on its type and count
+fn parse_tag_value(
+    data: &[u8],
+    tag_type: u16,
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    match tag_type {
+        1 => {
+            // BYTE (8-bit unsigned integer)
+            parse_byte_array(data, count, value_offset, base_offset, endian)
+        }
+        2 => {
+            // ASCII (null-terminated string)
+            parse_ascii(data, count, value_offset, base_offset, endian)
+        }
+        3 => {
+            // SHORT (16-bit unsigned integer)
+            parse_short_array(data, count, value_offset, base_offset, endian)
+        }
+        4 => {
+            // LONG (32-bit unsigned integer)
+            parse_long_array(data, count, value_offset, base_offset, endian)
+        }
+        5 => {
+            // RATIONAL (two 32-bit unsigned integers: numerator/denominator)
+            parse_rational_array(data, count, value_offset, base_offset, endian)
+        }
+        6 => {
+            // SBYTE (8-bit signed integer)
+            parse_sbyte_array(data, count, value_offset, base_offset, endian)
+        }
+        7 => {
+            // UNDEFINED (8-bit byte with no interpretation)
+            parse_undefined_array(data, count, value_offset, base_offset, endian)
+        }
+        8 => {
+            // SSHORT (16-bit signed integer)
+            parse_sshort_array(data, count, value_offset, base_offset, endian)
+        }
+        9 => {
+            // SLONG (32-bit signed integer)
+            parse_slong_array(data, count, value_offset, base_offset, endian)
+        }
+        10 => {
+            // SRATIONAL (two 32-bit signed integers: numerator/denominator)
+            parse_srational_array(data, count, value_offset, base_offset, endian)
+        }
+        11 => {
+            // FLOAT (32-bit IEEE floating point)
+            parse_float_array(data, count, value_offset, base_offset, endian)
+        }
+        12 => {
+            // DOUBLE (64-bit IEEE floating point)
+            parse_double_array(data, count, value_offset, base_offset, endian)
+        }
+        _ => Err(ExifError::Unsupported(format!(
+            "Unsupported tag type: {}",
+            tag_type
+        ))),
+    }
+}
+
+// Helper functions for reading values with the correct endianness
+fn read_u16(data: &[u8], endian: Endianness) -> u16 {
+    let bytes = [data[0], data[1]];
+    match endian {
+        Endianness::Little => u16::from_le_bytes(bytes),
+        Endianness::Big => u16::from_be_bytes(bytes),
+    }
+}
+
+fn read_u32(data: &[u8], endian: Endianness) -> u32 {
+    let bytes = [data[0], data[1], data[2], data[3]];
+    match endian {
+        Endianness::Little => u32::from_le_bytes(bytes),
+        Endianness::Big => u32::from_be_bytes(bytes),
+    }
+}
+
+fn read_i16(data: &[u8], endian: Endianness) -> i16 {
+    let bytes = [data[0], data[1]];
+    match endian {
+        Endianness::Little => i16::from_le_bytes(bytes),
+        Endianness::Big => i16::from_be_bytes(bytes),
+    }
+}
+
+fn read_i32(data: &[u8], endian: Endianness) -> i32 {
+    let bytes = [data[0], data[1], data[2], data[3]];
+    match endian {
+        Endianness::Little => i32::from_le_bytes(bytes),
+        Endianness::Big => i32::from_be_bytes(bytes),
+    }
+}
+
+fn read_f32(data: &[u8], endian: Endianness) -> f32 {
+    let bytes = [data[0], data[1], data[2], data[3]];
+    match endian {
+        Endianness::Little => f32::from_le_bytes(bytes),
+        Endianness::Big => f32::from_be_bytes(bytes),
+    }
+}
+
+fn read_f64(data: &[u8], endian: Endianness) -> f64 {
+    let bytes = [
+        data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
+    ];
+    match endian {
+        Endianness::Little => f64::from_le_bytes(bytes),
+        Endianness::Big => f64::from_be_bytes(bytes),
+    }
+}
+
+// Parse functions for each data type
+fn parse_byte_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // If count <= 4, the values are stored directly in the value_offset field
+    if count <= 4 {
+        values.extend_from_slice(&value_offset[0..count]);
+    } else {
+        // Otherwise, value_offset contains an offset to the values
+        let offset = read_u32(value_offset, endian) as usize + base_offset;
+        if offset + count > data.len() {
+            return Err(ExifError::Format(
+                "Byte array extends beyond data".to_string(),
+            ));
+        }
+        values.extend_from_slice(&data[offset..offset + count]);
+    }
+
+    Ok(ExifValue::Byte(values))
+}
+
+fn parse_ascii(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut ascii_data: Vec<u8>;
+
+    // If count <= 4, the ASCII string is stored directly in the value_offset field
+    if count <= 4 {
+        ascii_data = value_offset[0..count].to_vec();
+    } else {
+        // Otherwise, value_offset contains an offset to the ASCII string
+        let offset = read_u32(value_offset, endian) as usize + base_offset;
+        if offset + count > data.len() {
+            return Err(ExifError::Format(
+                "ASCII string extends beyond data".to_string(),
+            ));
+        }
+        ascii_data = data[offset..offset + count].to_vec();
+    }
+
+    // ASCII strings are null-terminated, so remove the trailing null byte if present
+    if !ascii_data.is_empty() && ascii_data[ascii_data.len() - 1] == 0 {
+        ascii_data.pop();
+    }
+
+    // Convert the ASCII data to a UTF-8 string, replacing invalid characters
+    let string = String::from_utf8_lossy(&ascii_data).into_owned();
+    Ok(ExifValue::Ascii(string))
+}
+
+fn parse_short_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // If count <= 2, the values are stored directly in the value_offset field
+    if count <= 2 {
+        for i in 0..count {
+            let value = read_u16(&value_offset[i * 2..(i + 1) * 2], endian);
+            values.push(value);
+        }
+    } else {
+        // Otherwise, value_offset contains an offset to the values
+        let offset = read_u32(value_offset, endian) as usize + base_offset;
+        if offset + count * 2 > data.len() {
+            return Err(ExifError::Format(
+                "Short array extends beyond data".to_string(),
+            ));
+        }
+        for i in 0..count {
+            let value = read_u16(&data[offset + i * 2..offset + (i + 1) * 2], endian);
+            values.push(value);
+        }
+    }
+
+    Ok(ExifValue::Short(values))
+}
+
+fn parse_long_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // If count == 1, the value is stored directly in the value_offset field
+    if count == 1 {
+        let value = read_u32(value_offset, endian);
+        values.push(value);
+    } else {
+        // Otherwise, value_offset contains an offset to the values
+        let offset = read_u32(value_offset, endian) as usize + base_offset;
+        if offset + count * 4 > data.len() {
+            return Err(ExifError::Format(
+                "Long array extends beyond data".to_string(),
+            ));
+        }
+        for i in 0..count {
+            let value = read_u32(&data[offset + i * 4..offset + (i + 1) * 4], endian);
+            values.push(value);
+        }
+    }
+
+    Ok(ExifValue::Long(values))
+}
+
+fn parse_rational_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // Rational values are always stored at the offset, never inline
+    let offset = read_u32(value_offset, endian) as usize + base_offset;
+    if offset + count * 8 > data.len() {
+        return Err(ExifError::Format(
+            "Rational array extends beyond data".to_string(),
+        ));
+    }
+
+    for i in 0..count {
+        let numerator = read_u32(&data[offset + i * 8..offset + i * 8 + 4], endian);
+        let denominator = read_u32(&data[offset + i * 8 + 4..offset + i * 8 + 8], endian);
+        values.push((numerator, denominator));
+    }
+
+    Ok(ExifValue::Rational(values))
+}
+
+fn parse_sbyte_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // If count <= 4, the values are stored directly in the value_offset field
+    if count <= 4 {
+        values.extend(value_offset[0..count].iter().map(|&b| b as i8));
+    } else {
+        // Otherwise, value_offset contains an offset to the values
+        let offset = read_u32(value_offset, endian) as usize + base_offset;
+        if offset + count > data.len() {
+            return Err(ExifError::Format(
+                "SByte array extends beyond data".to_string(),
+            ));
+        }
+        for i in 0..count {
+            values.push(data[offset + i] as i8);
+        }
+    }
+
+    Ok(ExifValue::SByte(values))
+}
+
+fn parse_undefined_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    // Undefined type is treated like BYTE array
+    let result = parse_byte_array(data, count, value_offset, base_offset, endian)?;
+    match result {
+        ExifValue::Byte(bytes) => Ok(ExifValue::Undefined(bytes)),
+        _ => Err(ExifError::Format(
+            "Failed to parse UNDEFINED type".to_string(),
+        )),
+    }
+}
+
+fn parse_sshort_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // If count <= 2, the values are stored directly in the value_offset field
+    if count <= 2 {
+        for i in 0..count {
+            let value = read_i16(&value_offset[i * 2..(i + 1) * 2], endian);
+            values.push(value);
+        }
+    } else {
+        // Otherwise, value_offset contains an offset to the values
+        let offset = read_u32(value_offset, endian) as usize + base_offset;
+        if offset + count * 2 > data.len() {
+            return Err(ExifError::Format(
+                "SShort array extends beyond data".to_string(),
+            ));
+        }
+        for i in 0..count {
+            let value = read_i16(&data[offset + i * 2..offset + (i + 1) * 2], endian);
+            values.push(value);
+        }
+    }
+
+    Ok(ExifValue::SShort(values))
+}
+
+fn parse_slong_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // If count == 1, the value is stored directly in the value_offset field
+    if count == 1 {
+        let value = read_i32(value_offset, endian);
+        values.push(value);
+    } else {
+        // Otherwise, value_offset contains an offset to the values
+        let offset = read_u32(value_offset, endian) as usize + base_offset;
+        if offset + count * 4 > data.len() {
+            return Err(ExifError::Format(
+                "SLong array extends beyond data".to_string(),
+            ));
+        }
+        for i in 0..count {
+            let value = read_i32(&data[offset + i * 4..offset + (i + 1) * 4], endian);
+            values.push(value);
+        }
+    }
+
+    Ok(ExifValue::SLong(values))
+}
+
+fn parse_srational_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // SRational values are always stored at the offset, never inline
+    let offset = read_u32(value_offset, endian) as usize + base_offset;
+    if offset + count * 8 > data.len() {
+        return Err(ExifError::Format(
+            "SRational array extends beyond data".to_string(),
+        ));
+    }
+
+    for i in 0..count {
+        let numerator = read_i32(&data[offset + i * 8..offset + i * 8 + 4], endian);
+        let denominator = read_i32(&data[offset + i * 8 + 4..offset + i * 8 + 8], endian);
+        values.push((numerator, denominator));
+    }
+
+    Ok(ExifValue::SRational(values))
+}
+
+fn parse_float_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // If count == 1, the value is stored directly in the value_offset field
+    if count == 1 {
+        let value = read_f32(value_offset, endian);
+        values.push(value);
+    } else {
+        // Otherwise, value_offset contains an offset to the values
+        let offset = read_u32(value_offset, endian) as usize + base_offset;
+        if offset + count * 4 > data.len() {
+            return Err(ExifError::Format(
+                "Float array extends beyond data".to_string(),
+            ));
+        }
+        for i in 0..count {
+            let value = read_f32(&data[offset + i * 4..offset + (i + 1) * 4], endian);
+            values.push(value);
+        }
+    }
+
+    Ok(ExifValue::Float(values))
+}
+
+fn parse_double_array(
+    data: &[u8],
+    count: u32,
+    value_offset: &[u8],
+    base_offset: usize,
+    endian: Endianness,
+) -> ExifResult<ExifValue> {
+    let count = count as usize;
+    let mut values = Vec::with_capacity(count);
+
+    // Double values are always stored at the offset, never inline
+    let offset = read_u32(value_offset, endian) as usize + base_offset;
+    if offset + count * 8 > data.len() {
+        return Err(ExifError::Format(
+            "Double array extends beyond data".to_string(),
+        ));
+    }
+
+    for i in 0..count {
+        let value = read_f64(&data[offset + i * 8..offset + (i + 1) * 8], endian);
+        values.push(value);
+    }
+
+    Ok(ExifValue::Double(values))
+}

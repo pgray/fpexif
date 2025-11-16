@@ -1,0 +1,705 @@
+// tags.rs - EXIF tag definitions and mappings
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::OnceLock;
+
+/// Represents an EXIF tag identifier
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ExifTagId {
+    /// The numeric identifier of the tag
+    pub id: u16,
+    /// The IFD (Image File Directory) the tag belongs to
+    pub ifd: TagGroup,
+}
+
+/// Different groups of EXIF tags
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TagGroup {
+    /// Main image tags (IFD0)
+    Main,
+    /// Thumbnail image tags (IFD1)
+    Thumbnail,
+    /// EXIF specific tags
+    Exif,
+    /// GPS tags
+    Gps,
+    /// Interoperability tags
+    Interop,
+}
+
+impl ExifTagId {
+    /// Create a new tag identifier
+    pub fn new(id: u16, ifd: TagGroup) -> Self {
+        Self { id, ifd }
+    }
+
+    /// Get the name of the tag, if known
+    pub fn name(&self) -> Option<&'static str> {
+        get_tag_name(*self)
+    }
+}
+
+impl From<u16> for ExifTagId {
+    fn from(id: u16) -> Self {
+        // By default, assume it's in the main IFD
+        Self::new(id, TagGroup::Main)
+    }
+}
+
+impl fmt::Display for ExifTagId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(name) = self.name() {
+            write!(f, "{} (0x{:04X})", name, self.id)
+        } else {
+            write!(f, "Unknown Tag (0x{:04X})", self.id)
+        }
+    }
+}
+
+// Common EXIF tag IDs
+pub const TAG_IMAGE_WIDTH: ExifTagId = ExifTagId {
+    id: 0x0100,
+    ifd: TagGroup::Main,
+};
+pub const TAG_IMAGE_LENGTH: ExifTagId = ExifTagId {
+    id: 0x0101,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BITS_PER_SAMPLE: ExifTagId = ExifTagId {
+    id: 0x0102,
+    ifd: TagGroup::Main,
+};
+pub const TAG_COMPRESSION: ExifTagId = ExifTagId {
+    id: 0x0103,
+    ifd: TagGroup::Main,
+};
+pub const TAG_PHOTOMETRIC_INTERPRETATION: ExifTagId = ExifTagId {
+    id: 0x0106,
+    ifd: TagGroup::Main,
+};
+pub const TAG_MAKE: ExifTagId = ExifTagId {
+    id: 0x010F,
+    ifd: TagGroup::Main,
+};
+pub const TAG_MODEL: ExifTagId = ExifTagId {
+    id: 0x0110,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ORIENTATION: ExifTagId = ExifTagId {
+    id: 0x0112,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SAMPLES_PER_PIXEL: ExifTagId = ExifTagId {
+    id: 0x0115,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ROWS_PER_STRIP: ExifTagId = ExifTagId {
+    id: 0x0116,
+    ifd: TagGroup::Main,
+};
+pub const TAG_STRIP_OFFSETS: ExifTagId = ExifTagId {
+    id: 0x0111,
+    ifd: TagGroup::Main,
+};
+pub const TAG_STRIP_BYTE_COUNTS: ExifTagId = ExifTagId {
+    id: 0x0117,
+    ifd: TagGroup::Main,
+};
+pub const TAG_X_RESOLUTION: ExifTagId = ExifTagId {
+    id: 0x011A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_Y_RESOLUTION: ExifTagId = ExifTagId {
+    id: 0x011B,
+    ifd: TagGroup::Main,
+};
+pub const TAG_PLANAR_CONFIGURATION: ExifTagId = ExifTagId {
+    id: 0x011C,
+    ifd: TagGroup::Main,
+};
+pub const TAG_RESOLUTION_UNIT: ExifTagId = ExifTagId {
+    id: 0x0128,
+    ifd: TagGroup::Main,
+};
+pub const TAG_TRANSFER_FUNCTION: ExifTagId = ExifTagId {
+    id: 0x012D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SOFTWARE: ExifTagId = ExifTagId {
+    id: 0x0131,
+    ifd: TagGroup::Main,
+};
+pub const TAG_DATE_TIME: ExifTagId = ExifTagId {
+    id: 0x0132,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ARTIST: ExifTagId = ExifTagId {
+    id: 0x013B,
+    ifd: TagGroup::Main,
+};
+pub const TAG_WHITE_POINT: ExifTagId = ExifTagId {
+    id: 0x013E,
+    ifd: TagGroup::Main,
+};
+pub const TAG_PRIMARY_CHROMATICITIES: ExifTagId = ExifTagId {
+    id: 0x013F,
+    ifd: TagGroup::Main,
+};
+pub const TAG_JPEG_INTERCHANGE_FORMAT: ExifTagId = ExifTagId {
+    id: 0x0201,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_JPEG_INTERCHANGE_FORMAT_LENGTH: ExifTagId = ExifTagId {
+    id: 0x0202,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_YCBCR_COEFFICIENTS: ExifTagId = ExifTagId {
+    id: 0x0211,
+    ifd: TagGroup::Main,
+};
+pub const TAG_YCBCR_SUB_SAMPLING: ExifTagId = ExifTagId {
+    id: 0x0212,
+    ifd: TagGroup::Main,
+};
+pub const TAG_YCBCR_POSITIONING: ExifTagId = ExifTagId {
+    id: 0x0213,
+    ifd: TagGroup::Main,
+};
+pub const TAG_REFERENCE_BLACK_WHITE: ExifTagId = ExifTagId {
+    id: 0x0214,
+    ifd: TagGroup::Main,
+};
+pub const TAG_COPYRIGHT: ExifTagId = ExifTagId {
+    id: 0x8298,
+    ifd: TagGroup::Main,
+};
+pub const TAG_EXIF_OFFSET: ExifTagId = ExifTagId {
+    id: 0x8769,
+    ifd: TagGroup::Main,
+};
+pub const TAG_GPS_INFO: ExifTagId = ExifTagId {
+    id: 0x8825,
+    ifd: TagGroup::Main,
+};
+
+// EXIF SubIFD tags
+pub const TAG_EXPOSURE_TIME: ExifTagId = ExifTagId {
+    id: 0x829A,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_F_NUMBER: ExifTagId = ExifTagId {
+    id: 0x829D,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_EXPOSURE_PROGRAM: ExifTagId = ExifTagId {
+    id: 0x8822,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_ISO_SPEED_RATINGS: ExifTagId = ExifTagId {
+    id: 0x8827,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_EXIF_VERSION: ExifTagId = ExifTagId {
+    id: 0x9000,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_DATE_TIME_ORIGINAL: ExifTagId = ExifTagId {
+    id: 0x9003,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_DATE_TIME_DIGITIZED: ExifTagId = ExifTagId {
+    id: 0x9004,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_COMPONENTS_CONFIGURATION: ExifTagId = ExifTagId {
+    id: 0x9101,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_COMPRESSED_BITS_PER_PIXEL: ExifTagId = ExifTagId {
+    id: 0x9102,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SHUTTER_SPEED_VALUE: ExifTagId = ExifTagId {
+    id: 0x9201,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_APERTURE_VALUE: ExifTagId = ExifTagId {
+    id: 0x9202,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_BRIGHTNESS_VALUE: ExifTagId = ExifTagId {
+    id: 0x9203,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_EXPOSURE_BIAS_VALUE: ExifTagId = ExifTagId {
+    id: 0x9204,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_MAX_APERTURE_VALUE: ExifTagId = ExifTagId {
+    id: 0x9205,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SUBJECT_DISTANCE: ExifTagId = ExifTagId {
+    id: 0x9206,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_METERING_MODE: ExifTagId = ExifTagId {
+    id: 0x9207,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LIGHT_SOURCE: ExifTagId = ExifTagId {
+    id: 0x9208,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_FLASH: ExifTagId = ExifTagId {
+    id: 0x9209,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_FOCAL_LENGTH: ExifTagId = ExifTagId {
+    id: 0x920A,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SUBJECT_AREA: ExifTagId = ExifTagId {
+    id: 0x9214,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_MAKER_NOTE: ExifTagId = ExifTagId {
+    id: 0x927C,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_USER_COMMENT: ExifTagId = ExifTagId {
+    id: 0x9286,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SUB_SEC_TIME: ExifTagId = ExifTagId {
+    id: 0x9290,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SUB_SEC_TIME_ORIGINAL: ExifTagId = ExifTagId {
+    id: 0x9291,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SUB_SEC_TIME_DIGITIZED: ExifTagId = ExifTagId {
+    id: 0x9292,
+    ifd: TagGroup::Exif,
+};
+
+// More EXIF tags
+pub const TAG_FLASHPIX_VERSION: ExifTagId = ExifTagId {
+    id: 0xA000,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_COLOR_SPACE: ExifTagId = ExifTagId {
+    id: 0xA001,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_PIXEL_X_DIMENSION: ExifTagId = ExifTagId {
+    id: 0xA002,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_PIXEL_Y_DIMENSION: ExifTagId = ExifTagId {
+    id: 0xA003,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_RELATED_SOUND_FILE: ExifTagId = ExifTagId {
+    id: 0xA004,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_INTEROPERABILITY_IFD_POINTER: ExifTagId = ExifTagId {
+    id: 0xA005,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_FLASH_ENERGY: ExifTagId = ExifTagId {
+    id: 0xA20B,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SPATIAL_FREQUENCY_RESPONSE: ExifTagId = ExifTagId {
+    id: 0xA20C,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_FOCAL_PLANE_X_RESOLUTION: ExifTagId = ExifTagId {
+    id: 0xA20E,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_FOCAL_PLANE_Y_RESOLUTION: ExifTagId = ExifTagId {
+    id: 0xA20F,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_FOCAL_PLANE_RESOLUTION_UNIT: ExifTagId = ExifTagId {
+    id: 0xA210,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SUBJECT_LOCATION: ExifTagId = ExifTagId {
+    id: 0xA214,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_EXPOSURE_INDEX: ExifTagId = ExifTagId {
+    id: 0xA215,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SENSING_METHOD: ExifTagId = ExifTagId {
+    id: 0xA217,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_FILE_SOURCE: ExifTagId = ExifTagId {
+    id: 0xA300,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SCENE_TYPE: ExifTagId = ExifTagId {
+    id: 0xA301,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_CFA_PATTERN: ExifTagId = ExifTagId {
+    id: 0xA302,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_CUSTOM_RENDERED: ExifTagId = ExifTagId {
+    id: 0xA401,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_EXPOSURE_MODE: ExifTagId = ExifTagId {
+    id: 0xA402,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_WHITE_BALANCE: ExifTagId = ExifTagId {
+    id: 0xA403,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_DIGITAL_ZOOM_RATIO: ExifTagId = ExifTagId {
+    id: 0xA404,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_FOCAL_LENGTH_IN_35MM_FILM: ExifTagId = ExifTagId {
+    id: 0xA405,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SCENE_CAPTURE_TYPE: ExifTagId = ExifTagId {
+    id: 0xA406,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_GAIN_CONTROL: ExifTagId = ExifTagId {
+    id: 0xA407,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_CONTRAST: ExifTagId = ExifTagId {
+    id: 0xA408,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SATURATION: ExifTagId = ExifTagId {
+    id: 0xA409,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SHARPNESS: ExifTagId = ExifTagId {
+    id: 0xA40A,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_DEVICE_SETTING_DESCRIPTION: ExifTagId = ExifTagId {
+    id: 0xA40B,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SUBJECT_DISTANCE_RANGE: ExifTagId = ExifTagId {
+    id: 0xA40C,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_IMAGE_UNIQUE_ID: ExifTagId = ExifTagId {
+    id: 0xA420,
+    ifd: TagGroup::Exif,
+};
+
+// GPS tags
+pub const TAG_GPS_VERSION_ID: ExifTagId = ExifTagId {
+    id: 0x0000,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_LATITUDE_REF: ExifTagId = ExifTagId {
+    id: 0x0001,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_LATITUDE: ExifTagId = ExifTagId {
+    id: 0x0002,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_LONGITUDE_REF: ExifTagId = ExifTagId {
+    id: 0x0003,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_LONGITUDE: ExifTagId = ExifTagId {
+    id: 0x0004,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_ALTITUDE_REF: ExifTagId = ExifTagId {
+    id: 0x0005,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_ALTITUDE: ExifTagId = ExifTagId {
+    id: 0x0006,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_TIMESTAMP: ExifTagId = ExifTagId {
+    id: 0x0007,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_SATELLITES: ExifTagId = ExifTagId {
+    id: 0x0008,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_STATUS: ExifTagId = ExifTagId {
+    id: 0x0009,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_MEASURE_MODE: ExifTagId = ExifTagId {
+    id: 0x000A,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_DOP: ExifTagId = ExifTagId {
+    id: 0x000B,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_SPEED_REF: ExifTagId = ExifTagId {
+    id: 0x000C,
+    ifd: TagGroup::Gps,
+};
+pub const TAG_GPS_SPEED: ExifTagId = ExifTagId {
+    id: 0x000D,
+    ifd: TagGroup::Gps,
+};
+
+// A static mapping of tag IDs to names
+static TAG_NAMES: OnceLock<HashMap<ExifTagId, &'static str>> = OnceLock::new();
+
+// Initialize tag names map
+fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
+    let mut map = HashMap::new();
+
+    // Add tag names for common tags
+    map.insert(TAG_IMAGE_WIDTH, "ImageWidth");
+    map.insert(TAG_IMAGE_LENGTH, "ImageLength");
+    map.insert(TAG_BITS_PER_SAMPLE, "BitsPerSample");
+    map.insert(TAG_COMPRESSION, "Compression");
+    map.insert(TAG_PHOTOMETRIC_INTERPRETATION, "PhotometricInterpretation");
+    map.insert(TAG_MAKE, "Make");
+    map.insert(TAG_MODEL, "Model");
+    map.insert(TAG_ORIENTATION, "Orientation");
+    map.insert(TAG_SAMPLES_PER_PIXEL, "SamplesPerPixel");
+    map.insert(TAG_ROWS_PER_STRIP, "RowsPerStrip");
+    map.insert(TAG_STRIP_OFFSETS, "StripOffsets");
+    map.insert(TAG_STRIP_BYTE_COUNTS, "StripByteCounts");
+    map.insert(TAG_X_RESOLUTION, "XResolution");
+    map.insert(TAG_Y_RESOLUTION, "YResolution");
+    map.insert(TAG_PLANAR_CONFIGURATION, "PlanarConfiguration");
+    map.insert(TAG_RESOLUTION_UNIT, "ResolutionUnit");
+    map.insert(TAG_TRANSFER_FUNCTION, "TransferFunction");
+    map.insert(TAG_SOFTWARE, "Software");
+    map.insert(TAG_DATE_TIME, "DateTime");
+    map.insert(TAG_ARTIST, "Artist");
+    map.insert(TAG_WHITE_POINT, "WhitePoint");
+    map.insert(TAG_PRIMARY_CHROMATICITIES, "PrimaryChromaticities");
+    map.insert(TAG_JPEG_INTERCHANGE_FORMAT, "JPEGInterchangeFormat");
+    map.insert(
+        TAG_JPEG_INTERCHANGE_FORMAT_LENGTH,
+        "JPEGInterchangeFormatLength",
+    );
+    map.insert(TAG_YCBCR_COEFFICIENTS, "YCbCrCoefficients");
+    map.insert(TAG_YCBCR_SUB_SAMPLING, "YCbCrSubSampling");
+    map.insert(TAG_YCBCR_POSITIONING, "YCbCrPositioning");
+    map.insert(TAG_REFERENCE_BLACK_WHITE, "ReferenceBlackWhite");
+    map.insert(TAG_COPYRIGHT, "Copyright");
+    map.insert(TAG_EXIF_OFFSET, "ExifOffset");
+    map.insert(TAG_GPS_INFO, "GPSInfo");
+
+    // EXIF SubIFD tags
+    map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
+    map.insert(TAG_F_NUMBER, "FNumber");
+    map.insert(TAG_EXPOSURE_PROGRAM, "ExposureProgram");
+    map.insert(TAG_ISO_SPEED_RATINGS, "ISOSpeedRatings");
+    map.insert(TAG_EXIF_VERSION, "ExifVersion");
+    map.insert(TAG_DATE_TIME_ORIGINAL, "DateTimeOriginal");
+    map.insert(TAG_DATE_TIME_DIGITIZED, "DateTimeDigitized");
+    map.insert(TAG_COMPONENTS_CONFIGURATION, "ComponentsConfiguration");
+    map.insert(TAG_COMPRESSED_BITS_PER_PIXEL, "CompressedBitsPerPixel");
+    map.insert(TAG_SHUTTER_SPEED_VALUE, "ShutterSpeedValue");
+    map.insert(TAG_APERTURE_VALUE, "ApertureValue");
+    map.insert(TAG_BRIGHTNESS_VALUE, "BrightnessValue");
+    map.insert(TAG_EXPOSURE_BIAS_VALUE, "ExposureBiasValue");
+    map.insert(TAG_MAX_APERTURE_VALUE, "MaxApertureValue");
+    map.insert(TAG_SUBJECT_DISTANCE, "SubjectDistance");
+    map.insert(TAG_METERING_MODE, "MeteringMode");
+    map.insert(TAG_LIGHT_SOURCE, "LightSource");
+    map.insert(TAG_FLASH, "Flash");
+    map.insert(TAG_FOCAL_LENGTH, "FocalLength");
+    map.insert(TAG_SUBJECT_AREA, "SubjectArea");
+    map.insert(TAG_MAKER_NOTE, "MakerNote");
+    map.insert(TAG_USER_COMMENT, "UserComment");
+    map.insert(TAG_SUB_SEC_TIME, "SubSecTime");
+    map.insert(TAG_SUB_SEC_TIME_ORIGINAL, "SubSecTimeOriginal");
+    map.insert(TAG_SUB_SEC_TIME_DIGITIZED, "SubSecTimeDigitized");
+    map.insert(TAG_FLASHPIX_VERSION, "FlashpixVersion");
+    map.insert(TAG_COLOR_SPACE, "ColorSpace");
+    map.insert(TAG_PIXEL_X_DIMENSION, "PixelXDimension");
+    map.insert(TAG_PIXEL_Y_DIMENSION, "PixelYDimension");
+    map.insert(TAG_RELATED_SOUND_FILE, "RelatedSoundFile");
+    map.insert(
+        TAG_INTEROPERABILITY_IFD_POINTER,
+        "InteroperabilityIFDPointer",
+    );
+    map.insert(TAG_FOCAL_PLANE_X_RESOLUTION, "FocalPlaneXResolution");
+    map.insert(TAG_FOCAL_PLANE_Y_RESOLUTION, "FocalPlaneYResolution");
+    map.insert(TAG_FOCAL_PLANE_RESOLUTION_UNIT, "FocalPlaneResolutionUnit");
+    map.insert(TAG_CUSTOM_RENDERED, "CustomRendered");
+    map.insert(TAG_EXPOSURE_MODE, "ExposureMode");
+    map.insert(TAG_WHITE_BALANCE, "WhiteBalance");
+    map.insert(TAG_SCENE_CAPTURE_TYPE, "SceneCaptureType");
+
+    // GPS tags
+    map.insert(TAG_GPS_VERSION_ID, "GPSVersionID");
+    map.insert(TAG_GPS_LATITUDE_REF, "GPSLatitudeRef");
+    map.insert(TAG_GPS_LATITUDE, "GPSLatitude");
+    map.insert(TAG_GPS_LONGITUDE_REF, "GPSLongitudeRef");
+    map.insert(TAG_GPS_LONGITUDE, "GPSLongitude");
+    map.insert(TAG_GPS_ALTITUDE_REF, "GPSAltitudeRef");
+    map.insert(TAG_GPS_ALTITUDE, "GPSAltitude");
+    map.insert(TAG_GPS_TIMESTAMP, "GPSTimeStamp");
+    map.insert(TAG_GPS_SATELLITES, "GPSSatellites");
+    map.insert(TAG_GPS_STATUS, "GPSStatus");
+    map.insert(TAG_GPS_MEASURE_MODE, "GPSMeasureMode");
+    map.insert(TAG_GPS_DOP, "GPSDOP");
+    map.insert(TAG_GPS_SPEED_REF, "GPSSpeedRef");
+    map.insert(TAG_GPS_SPEED, "GPSSpeed");
+
+    map
+}
+
+/// Get the name of a tag from its ID
+pub fn get_tag_name(tag_id: ExifTagId) -> Option<&'static str> {
+    TAG_NAMES.get_or_init(init_tag_names).get(&tag_id).copied()
+}
+
+// Reverse mapping of tag names to IDs
+static TAG_IDS_BY_NAME: OnceLock<HashMap<&'static str, ExifTagId>> = OnceLock::new();
+
+// Initialize the reverse mapping
+fn init_tag_ids_by_name() -> HashMap<&'static str, ExifTagId> {
+    let tag_names = TAG_NAMES.get_or_init(init_tag_names);
+    let mut map = HashMap::new();
+
+    for (&tag_id, &name) in tag_names {
+        map.insert(name, tag_id);
+    }
+
+    map
+}
+
+/// Get the tag ID from its name
+pub fn get_tag_id_by_name(name: &str) -> Option<ExifTagId> {
+    TAG_IDS_BY_NAME
+        .get_or_init(init_tag_ids_by_name)
+        .get(name)
+        .copied()
+}
+
+/// Human-readable descriptions for various EXIF orientation values
+pub fn get_orientation_description(value: u16) -> &'static str {
+    match value {
+        1 => "Normal (top-left is 0,0)",
+        2 => "Mirrored horizontally (top-right is 0,0)",
+        3 => "Rotated 180° (bottom-right is 0,0)",
+        4 => "Mirrored vertically (bottom-left is 0,0)",
+        5 => "Mirrored horizontally and rotated 90° CCW (left-top is 0,0)",
+        6 => "Rotated 90° CCW (right-top is 0,0)",
+        7 => "Mirrored horizontally and rotated 90° CW (right-bottom is 0,0)",
+        8 => "Rotated 90° CW (left-bottom is 0,0)",
+        _ => "Unknown orientation",
+    }
+}
+
+/// Human-readable descriptions for various EXIF exposure program values
+pub fn get_exposure_program_description(value: u16) -> &'static str {
+    match value {
+        0 => "Not defined",
+        1 => "Manual",
+        2 => "Normal program",
+        3 => "Aperture priority",
+        4 => "Shutter priority",
+        5 => "Creative program (biased toward depth of field)",
+        6 => "Action program (biased toward fast shutter speed)",
+        7 => "Portrait mode (for closeup photos with the background out of focus)",
+        8 => "Landscape mode (for landscape photos with the background in focus)",
+        _ => "Unknown exposure program",
+    }
+}
+
+/// Human-readable descriptions for various EXIF metering mode values
+pub fn get_metering_mode_description(value: u16) -> &'static str {
+    match value {
+        0 => "Unknown",
+        1 => "Average",
+        2 => "Center-weighted average",
+        3 => "Spot",
+        4 => "Multi-spot",
+        5 => "Pattern",
+        6 => "Partial",
+        255 => "Other",
+        _ => "Reserved",
+    }
+}
+
+/// Human-readable descriptions for various EXIF light source values
+pub fn get_light_source_description(value: u16) -> &'static str {
+    match value {
+        0 => "Unknown",
+        1 => "Daylight",
+        2 => "Fluorescent",
+        3 => "Tungsten (incandescent light)",
+        4 => "Flash",
+        9 => "Fine weather",
+        10 => "Cloudy weather",
+        11 => "Shade",
+        12 => "Daylight fluorescent (D 5700 – 7100K)",
+        13 => "Day white fluorescent (N 4600 – 5400K)",
+        14 => "Cool white fluorescent (W 3900 – 4500K)",
+        15 => "White fluorescent (WW 3200 – 3700K)",
+        17 => "Standard light A",
+        18 => "Standard light B",
+        19 => "Standard light C",
+        20 => "D55",
+        21 => "D65",
+        22 => "D75",
+        23 => "D50",
+        24 => "ISO studio tungsten",
+        255 => "Other light source",
+        _ => "Reserved",
+    }
+}
+
+/// Human-readable descriptions for various EXIF flash values
+pub fn get_flash_description(value: u16) -> &'static str {
+    match value {
+        0x0000 => "Flash did not fire",
+        0x0001 => "Flash fired",
+        0x0005 => "Strobe return light not detected",
+        0x0007 => "Strobe return light detected",
+        0x0009 => "Flash fired, compulsory flash mode",
+        0x000D => "Flash fired, compulsory flash mode, return light not detected",
+        0x000F => "Flash fired, compulsory flash mode, return light detected",
+        0x0010 => "Flash did not fire, compulsory flash mode",
+        0x0018 => "Flash did not fire, auto mode",
+        0x0019 => "Flash fired, auto mode",
+        0x001D => "Flash fired, auto mode, return light not detected",
+        0x001F => "Flash fired, auto mode, return light detected",
+        0x0020 => "No flash function",
+        0x0041 => "Flash fired, red-eye reduction mode",
+        0x0045 => "Flash fired, red-eye reduction mode, return light not detected",
+        0x0047 => "Flash fired, red-eye reduction mode, return light detected",
+        0x0049 => "Flash fired, compulsory flash mode, red-eye reduction mode",
+        0x004D => {
+            "Flash fired, compulsory flash mode, red-eye reduction mode, return light not detected"
+        }
+        0x004F => {
+            "Flash fired, compulsory flash mode, red-eye reduction mode, return light detected"
+        }
+        0x0059 => "Flash fired, auto mode, red-eye reduction mode",
+        0x005D => "Flash fired, auto mode, return light not detected, red-eye reduction mode",
+        0x005F => "Flash fired, auto mode, return light detected, red-eye reduction mode",
+        _ => "Unknown flash mode",
+    }
+}
