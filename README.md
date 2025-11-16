@@ -10,9 +10,9 @@ It aims to be a complete alternative to libraries like libexiv2 and ExifTool, wi
 - Zero dependencies for the core functionality
 - Fast and memory-efficient parsing
 - Support for all standard EXIF tags
-- Support for 20+ image formats including:
+- Support for 23+ image formats including:
   - **Web formats**: JPEG, PNG, WebP, AVIF, HEIC/HEIF, JPEG XL
-  - **RAW formats**: CR2, CR3, NEF, NRW, DNG, ARW, PEF, RWL, ORF, SRW, RW2, RAF
+  - **RAW formats**: CR2, CR3, CRW, NEF, NRW, DNG, ARW, PEF, RWL, ORF, SRW, RW2, RAF, MRW, X3F
   - **Standard formats**: TIFF
 - Simple and intuitive API
 - Comprehensive documentation and examples
@@ -108,11 +108,14 @@ fpexif extract path/to/image.jpg DateTimeOriginal
 ### RAW Camera Formats
 - **CR2** (.cr2) - Canon RAW 2
 - **CR3** (.cr3) - Canon RAW 3
+- **CRW** (.crw) - Canon RAW v1 (CIFF format)
 - **NEF** (.nef) - Nikon Electronic Format (DSLR)
 - **NRW** (.nrw) - Nikon RAW (Coolpix)
 - **ARW** (.arw) - Sony Alpha RAW
 - **DNG** (.dng) - Adobe Digital Negative
 - **RAF** (.raf) - Fujifilm RAW
+- **MRW** (.mrw) - Minolta RAW
+- **X3F** (.x3f) - Sigma/Foveon RAW
 - **ORF** (.orf) - Olympus RAW Format
 - **PEF** (.pef) - Pentax Electronic File
 - **RWL** (.rwl) - Leica RAW
@@ -163,11 +166,11 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 - [x] Support for modern web formats (PNG, HEIC, WebP, AVIF, JPEG XL) ✅
 - [x] Support for major RAW formats (ARW, PEF, NRW, RWL, etc.) ✅
+- [x] Support for legacy RAW formats (CRW, MRW, X3F) ✅
 - [ ] Complete TIFF writer implementation
 - [ ] Support for non-standard maker notes (Canon, Nikon, etc.)
 - [ ] Support for XMP and IPTC metadata
 - [ ] Performance optimizations
-- [ ] Support for legacy RAW formats (CRW, MRW, X3F)
 - [ ] Support for medium format RAW (3FR, FFF, DCR, KDC, MEF, MOS)
 - [ ] Integration with popular Rust image processing libraries
 

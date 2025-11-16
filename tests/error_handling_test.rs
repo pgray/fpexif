@@ -1,6 +1,5 @@
 // Error handling tests
 use fpexif::{errors::ExifError, ExifParser};
-use std::io::Cursor;
 
 #[test]
 fn test_io_error_handling() {
