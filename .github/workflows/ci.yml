@@ -115,3 +115,59 @@ jobs:
 
       - name: Run WASM tests with Deno
         run: deno test --allow-read tests/wasm_test.ts
+
+  real-files:
+    name: Real File Format Tests
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check if test files exist
+        id: check_files
+        run: |
+          if [ -f /fpexif/raws/welcome.html ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Test files found at /fpexif/raws"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Test files not found - skipping real file tests"
+          fi
+
+      - name: Install Rust toolchain
+        if: steps.check_files.outputs.exists == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        if: steps.check_files.outputs.exists == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo index
+        if: steps.check_files.outputs.exists == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Cache cargo build
+        if: steps.check_files.outputs.exists == 'true'
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-target-
+
+      - name: Run real file format tests
+        if: steps.check_files.outputs.exists == 'true'
+        run: nice -n 19 cargo test --test real_file_exiftool_tests --verbose
+        env:
+          FPEXIF_TEST_FILES: /fpexif/raws

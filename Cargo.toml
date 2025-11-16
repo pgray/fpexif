@@ -39,3 +39,6 @@ required-features = ["cli"]
 name = "fpexif"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
+
+[dev-dependencies]
+serde_json = "1.0"
