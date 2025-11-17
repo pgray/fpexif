@@ -204,9 +204,12 @@ fn compare_json_outputs(
     differences
 }
 
-#[test]
-fn test_exiftool_json_compatibility_cr2() {
-    require_real_files_or_skip("test_exiftool_json_compatibility_cr2");
+/// Generic helper function to test exiftool JSON compatibility for a given file extension
+fn test_format_exiftool_json_compatibility(extension: &str) {
+    require_real_files_or_skip(&format!(
+        "test_exiftool_json_compatibility_{}",
+        extension.to_lowercase()
+    ));
     if !real_files_exist() {
         return;
     }
@@ -216,13 +219,13 @@ fn test_exiftool_json_compatibility_cr2() {
         return;
     }
 
-    // Find a CR2 file to test
+    // Find a file with the given extension to test
     let test_files = std::fs::read_dir("/fpexif/raws").ok().and_then(|entries| {
         entries.filter_map(|e| e.ok()).find(|e| {
             e.path()
                 .extension()
                 .and_then(|ext| ext.to_str())
-                .map(|ext| ext.eq_ignore_ascii_case("cr2"))
+                .map(|ext| ext.eq_ignore_ascii_case(extension))
                 .unwrap_or(false)
         })
     });
@@ -230,7 +233,7 @@ fn test_exiftool_json_compatibility_cr2() {
     let test_file = match test_files {
         Some(entry) => entry.path(),
         None => {
-            println!("No CR2 files found for testing");
+            println!("No {} files found for testing", extension.to_uppercase());
             return;
         }
     };
@@ -259,32 +262,165 @@ fn test_exiftool_json_compatibility_cr2() {
 
     if !differences.is_empty() {
         println!("\nFound {} differences:", differences.len());
+
+        // Categorize differences
+        let mut missing_fields = Vec::new();
+        let mut value_mismatches = Vec::new();
+        let mut extra_fields = Vec::new();
+
         for diff in &differences {
-            println!("  - {}", diff);
+            if diff.contains("Missing field in fpexif:") {
+                missing_fields.push(diff);
+            } else if diff.contains("Extra field in fpexif") {
+                extra_fields.push(diff);
+            } else {
+                value_mismatches.push(diff);
+            }
         }
 
-        // Only fail on critical differences (missing important fields)
+        if !missing_fields.is_empty() {
+            println!("\n--- Missing Fields ({}) ---", missing_fields.len());
+            for diff in missing_fields.iter().take(10) {
+                println!("  {}", diff);
+            }
+            if missing_fields.len() > 10 {
+                println!("  ... and {} more", missing_fields.len() - 10);
+            }
+        }
+
+        if !value_mismatches.is_empty() {
+            println!("\n--- Value Mismatches ({}) ---", value_mismatches.len());
+            for diff in &value_mismatches {
+                println!("  {}", diff);
+            }
+        }
+
+        if !extra_fields.is_empty() {
+            println!("\n--- Extra Fields ({}) ---", extra_fields.len());
+            for diff in extra_fields.iter().take(5) {
+                println!("  {}", diff);
+            }
+            if extra_fields.len() > 5 {
+                println!("  ... and {} more", extra_fields.len() - 5);
+            }
+        }
+
+        // Filter critical differences using the same logic as the RAF test
         let critical_differences: Vec<_> = differences
             .iter()
             .filter(|d| {
-                d.contains("Missing field") &&
-                !d.contains("Extra field") &&
-                // Allow missing some less critical fields
-                !d.contains("SubSecTime") &&
-                !d.contains("Thumbnail") &&
-                !d.contains("Preview")
+                if d.contains("mismatch") {
+                    // These are known format differences we accept
+                    let acceptable = d.contains("ComponentsConfiguration")
+                        || d.contains("ExifVersion")
+                        || d.contains("FlashpixVersion")
+                        || d.contains("FocalLength")
+                        || d.contains("ExposureTime")
+                        || d.contains("ApertureValue")
+                        || d.contains("MaxApertureValue")
+                        || d.contains("ExposureProgram")
+                        || d.contains("Flash")
+                        || d.contains("MeteringMode")
+                        || d.contains("ShutterSpeedValue")
+                        || d.contains("FocalPlaneResolutionUnit");
+                    !acceptable
+                } else if d.contains("Missing field in fpexif:") {
+                    // Filter out expected missing fields (maker notes, derived fields, etc.)
+                    let field_name = d.split("Missing field in fpexif: ").nth(1).unwrap_or("");
+                    let has_brand_prefix = field_name.starts_with("Canon")
+                        || field_name.starts_with("Nikon")
+                        || field_name.starts_with("Sony")
+                        || field_name.starts_with("Olympus")
+                        || field_name.starts_with("Panasonic")
+                        || field_name.starts_with("Pentax")
+                        || field_name.starts_with("Fuji");
+
+                    let is_derived = field_name == "Aperture"
+                        || field_name == "ShutterSpeed"
+                        || field_name == "ISO"
+                        || field_name == "LightValue"
+                        || field_name == "ImageSize"
+                        || field_name == "Megapixels"
+                        || field_name == "ScaleFactor35efl"
+                        || field_name == "FOV"
+                        || field_name == "HyperfocalDistance"
+                        || field_name == "CircleOfConfusion"
+                        || field_name == "FocalLength35efl";
+
+                    let is_file_meta = field_name.starts_with("File")
+                        || field_name.starts_with("Directory")
+                        || field_name == "ExifByteOrder"
+                        || field_name == "ExifToolVersion"
+                        || field_name == "MIMEType";
+
+                    let is_thumbnail = field_name.contains("Thumbnail")
+                        || field_name.contains("Preview")
+                        || field_name == "ThumbnailImage"
+                        || field_name == "PreviewImage";
+
+                    let is_interop = field_name.starts_with("Interop");
+
+                    // Only flag as critical if it's not in any of these categories
+                    !(has_brand_prefix || is_derived || is_file_meta || is_thumbnail || is_interop)
+                } else {
+                    false
+                }
             })
             .collect();
 
         if !critical_differences.is_empty() {
-            panic!(
-                "Found {} critical differences in JSON output",
+            println!(
+                "\n❌ Found {} critical differences:",
                 critical_differences.len()
+            );
+            for diff in &critical_differences {
+                println!("  {}", diff);
+            }
+            panic!(
+                "Found {} critical differences in JSON output for {}",
+                critical_differences.len(),
+                extension.to_uppercase()
+            );
+        } else {
+            println!("\n✓ No critical differences found!");
+            println!(
+                "  (Found {} expected variations from exiftool)",
+                differences.len()
             );
         }
     } else {
-        println!("✓ JSON outputs match!");
+        println!("\n✓ JSON outputs match perfectly!");
     }
+}
+
+#[test]
+fn test_exiftool_json_compatibility_cr2() {
+    test_format_exiftool_json_compatibility("cr2");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_nef() {
+    test_format_exiftool_json_compatibility("nef");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_arw() {
+    test_format_exiftool_json_compatibility("arw");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_orf() {
+    test_format_exiftool_json_compatibility("orf");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_dng() {
+    test_format_exiftool_json_compatibility("dng");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_rw2() {
+    test_format_exiftool_json_compatibility("rw2");
 }
 
 #[test]
