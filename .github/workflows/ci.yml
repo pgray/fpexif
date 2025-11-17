@@ -191,7 +191,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-cargo-release-
 
       - name: Build release binary
-        run: cargo build --release --features cli --target ${{ matrix.target }}
+        run: nice -n 19 cargo build --release --features cli --target ${{ matrix.target }}
 
       - name: Rename binary
         run: |
