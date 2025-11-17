@@ -175,16 +175,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
 
-      - name: Run real file format tests
+      - name: Run all tests (including format-specific tests)
         if: steps.check_files.outputs.exists == 'true'
-        run: nice -n 19 cargo test --test real_file_exiftool_tests --verbose
-        env:
-          CI: true
-          FPEXIF_TEST_FILES: /fpexif/raws
-
-      - name: Run exiftool JSON comparison tests
-        if: steps.check_files.outputs.exists == 'true'
-        run: nice -n 19 cargo test --test exiftool_json_comparison --verbose
+        run: nice -n 19 cargo test --verbose
         env:
           CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
