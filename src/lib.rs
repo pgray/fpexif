@@ -3,6 +3,7 @@ pub mod data_types;
 pub mod errors;
 pub mod formats;
 pub mod io;
+pub mod makernotes;
 pub mod parser;
 pub mod tags;
 
@@ -71,6 +72,8 @@ pub struct ExifData {
     tags: std::collections::HashMap<tags::ExifTagId, data_types::ExifValue>,
     // Track the original endianness of the data
     endian: data_types::Endianness,
+    // Parsed maker notes
+    maker_notes: Option<std::collections::HashMap<u16, makernotes::MakerNoteTag>>,
 }
 
 impl ExifData {
@@ -79,6 +82,7 @@ impl ExifData {
         Self {
             tags: std::collections::HashMap::new(),
             endian: data_types::Endianness::Little,
+            maker_notes: None,
         }
     }
 
@@ -106,6 +110,13 @@ impl ExifData {
     /// Check if there are no tags
     pub fn is_empty(&self) -> bool {
         self.tags.is_empty()
+    }
+
+    /// Get the parsed maker notes
+    pub fn get_maker_notes(
+        &self,
+    ) -> Option<&std::collections::HashMap<u16, makernotes::MakerNoteTag>> {
+        self.maker_notes.as_ref()
     }
 }
 

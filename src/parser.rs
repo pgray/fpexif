@@ -146,6 +146,26 @@ where
         }
     }
 
+    // Parse maker notes if present (tag 0x927C)
+    if let Some(ExifValue::Undefined(maker_note_data)) = exif_data.get_tag_by_id(0x927C) {
+        // Get the camera make to determine which parser to use
+        let make = exif_data
+            .get_tag_by_id(0x010F) // Make tag
+            .and_then(|v| match v {
+                ExifValue::Ascii(s) => Some(s.as_str()),
+                _ => None,
+            });
+
+        // Parse the maker notes
+        if let Ok(parsed_maker_notes) =
+            crate::makernotes::parse_maker_notes(maker_note_data, make, endian)
+        {
+            if !parsed_maker_notes.is_empty() {
+                exif_data.maker_notes = Some(parsed_maker_notes);
+            }
+        }
+    }
+
     Ok(exif_data)
 }
 
