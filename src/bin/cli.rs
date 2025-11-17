@@ -28,6 +28,10 @@ enum Commands {
         /// Output in JSON format
         #[arg(short, long)]
         json: bool,
+
+        /// Output in exiftool-compatible JSON format (same as --json)
+        #[arg(long)]
+        exiftool_json: bool,
     },
 
     /// Extract a specific tag from a file
@@ -50,11 +54,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             file,
             verbose,
             json,
+            exiftool_json,
         } => {
             let parser = ExifParser::new().verbose(*verbose);
             match parser.parse_file(file) {
                 Ok(exif_data) => {
-                    if *json {
+                    if *json || *exiftool_json {
                         print_exif_data_json(&exif_data)?;
                     } else {
                         print_exif_data(&exif_data, *verbose);
