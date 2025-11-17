@@ -46,6 +46,15 @@ enum Commands {
     },
 }
 
+/// Calculate greatest common divisor
+fn gcd(a: u32, b: u32) -> u32 {
+    if b == 0 {
+        a
+    } else {
+        gcd(b, a % b)
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
@@ -205,6 +214,17 @@ fn format_exif_value_for_json(
                     // ColorSpace
                     Value::String(fpexif::tags::get_color_space_description(v[0]).to_string())
                 }
+                0xA210 => {
+                    // FocalPlaneResolutionUnit
+                    Value::String(
+                        match v[0] {
+                            2 => "inches",
+                            3 => "cm",
+                            _ => "unknown",
+                        }
+                        .to_string(),
+                    )
+                }
                 0xA402 => {
                     // ExposureMode
                     Value::String(fpexif::tags::get_exposure_mode_description(v[0]).to_string())
@@ -274,16 +294,39 @@ fn format_exif_value_for_json(
                 // Special handling for certain tags
                 match tag_id {
                     0x829A => {
-                        // ExposureTime - show as fraction
-                        if num == 1 {
-                            Value::String(format!("1/{}", den))
+                        // ExposureTime - show as simplified fraction
+                        let gcd = gcd(num, den);
+                        let simplified_num = num / gcd;
+                        let simplified_den = den / gcd;
+                        if simplified_num == 1 {
+                            Value::String(format!("1/{}", simplified_den))
                         } else {
-                            let decimal = num as f64 / den as f64;
-                            Value::String(format!("{:.6}", decimal))
+                            Value::String(format!("{}/{}", simplified_num, simplified_den))
                         }
                     }
-                    0x9201 | 0x9202 | 0x9203 | 0x9204 | 0x9205 => {
-                        // APEX values - show as decimal
+                    0x9201 => {
+                        // ShutterSpeedValue (APEX) - convert to shutter speed fraction
+                        let apex_value = num as f64 / den as f64;
+                        let shutter_speed = 2f64.powf(apex_value);
+                        let denominator = shutter_speed.round() as u32;
+                        Value::String(format!("1/{}", denominator))
+                    }
+                    0x9202 | 0x9205 => {
+                        // ApertureValue, MaxApertureValue (APEX) - convert to f-number and round to 1 decimal
+                        let apex_value = num as f64 / den as f64;
+                        let f_number = 2f64.powf(apex_value / 2.0);
+                        let rounded = (f_number * 10.0).round() / 10.0;
+                        serde_json::Number::from_f64(rounded)
+                            .map(Value::Number)
+                            .unwrap_or_else(|| Value::String(rounded.to_string()))
+                    }
+                    0x920A => {
+                        // FocalLength - add mm unit
+                        let focal_length = num as f64 / den as f64;
+                        Value::String(format!("{} mm", focal_length))
+                    }
+                    0x9203 | 0x9204 => {
+                        // Other APEX values - show as decimal
                         let decimal = num as f64 / den as f64;
                         serde_json::Number::from_f64(decimal)
                             .map(Value::Number)
@@ -306,10 +349,22 @@ fn format_exif_value_for_json(
             if den == 0 {
                 Value::String("inf".to_string())
             } else {
-                let decimal = num as f64 / den as f64;
-                serde_json::Number::from_f64(decimal)
-                    .map(Value::Number)
-                    .unwrap_or_else(|| Value::String(decimal.to_string()))
+                // Special handling for certain tags
+                match tag_id {
+                    0x9201 => {
+                        // ShutterSpeedValue (APEX) - convert to shutter speed fraction
+                        let apex_value = num as f64 / den as f64;
+                        let shutter_speed = 2f64.powf(apex_value);
+                        let denominator = shutter_speed.round() as i32;
+                        Value::String(format!("1/{}", denominator))
+                    }
+                    _ => {
+                        let decimal = num as f64 / den as f64;
+                        serde_json::Number::from_f64(decimal)
+                            .map(Value::Number)
+                            .unwrap_or_else(|| Value::String(decimal.to_string()))
+                    }
+                }
             }
         }
 
@@ -373,6 +428,36 @@ fn format_exif_value_for_json(
         ExifValue::Undefined(v) => {
             // Special handling for FileSource and SceneType which are often Undefined type
             match tag_id {
+                0x9000 | 0xA000 => {
+                    // ExifVersion, FlashpixVersion - decode ASCII bytes to string
+                    String::from_utf8(v.to_vec())
+                        .map(Value::String)
+                        .unwrap_or_else(|_| {
+                            Value::String(
+                                v.iter()
+                                    .map(|b| format!("{:02x}", b))
+                                    .collect::<Vec<_>>()
+                                    .join(" "),
+                            )
+                        })
+                }
+                0x9101 if v.len() == 4 => {
+                    // ComponentsConfiguration - decode to channel names
+                    let channels: Vec<&str> = v
+                        .iter()
+                        .map(|&b| match b {
+                            0 => "-",
+                            1 => "Y",
+                            2 => "Cb",
+                            3 => "Cr",
+                            4 => "R",
+                            5 => "G",
+                            6 => "B",
+                            _ => "?",
+                        })
+                        .collect();
+                    Value::String(channels.join(", "))
+                }
                 0xA300 if v.len() == 1 => {
                     // FileSource
                     Value::String(fpexif::tags::get_file_source_description(v[0]).to_string())
