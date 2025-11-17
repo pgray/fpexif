@@ -139,6 +139,15 @@ jobs:
         if: steps.check_files.outputs.exists == 'true'
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install exiftool
+        if: steps.check_files.outputs.exists == 'true'
+        run: |
+          if ! command -v exiftool &> /dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq libimage-exiftool-perl
+          fi
+          exiftool -ver
+
       - name: Cache cargo registry
         if: steps.check_files.outputs.exists == 'true'
         uses: actions/cache@v4
@@ -170,4 +179,12 @@ jobs:
         if: steps.check_files.outputs.exists == 'true'
         run: nice -n 19 cargo test --test real_file_exiftool_tests --verbose
         env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Run exiftool JSON comparison tests
+        if: steps.check_files.outputs.exists == 'true'
+        run: nice -n 19 cargo test --test exiftool_json_comparison --verbose
+        env:
+          CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
