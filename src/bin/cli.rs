@@ -112,6 +112,17 @@ fn print_exif_data_json(exif_data: &ExifData) -> Result<(), Box<dyn std::error::
         output.insert(tag_name, json_value);
     }
 
+    // Add maker notes if present
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        for (tag_id, maker_tag) in maker_notes.iter() {
+            let tag_name = maker_tag
+                .tag_name
+                .unwrap_or_else(|| Box::leak(format!("MakerNote{:04X}", tag_id).into_boxed_str()));
+            let json_value = format_exif_value_for_json(&maker_tag.value, *tag_id);
+            output.insert(tag_name.to_string(), json_value);
+        }
+    }
+
     // Wrap in an array like exiftool does
     let result = Value::Array(vec![Value::Object(output)]);
 
