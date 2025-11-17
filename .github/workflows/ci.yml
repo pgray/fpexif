@@ -15,16 +15,35 @@ env:
 jobs:
   build:
     name: Build and Test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check if test files exist
+        id: check_files
+        run: |
+          if [ -f /fpexif/raws/welcome.html ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Test files found at /fpexif/raws"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Test files not found - real file tests will fail"
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
+      - name: Install exiftool
+        run: |
+          if ! command -v exiftool &> /dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq libimage-exiftool-perl
+          fi
+          exiftool -ver
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -55,6 +74,9 @@ jobs:
 
       - name: Run tests
         run: nice -n 19 cargo test --verbose
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
       - name: Run clippy
         run: nice -n 19 cargo clippy -- -D warnings
@@ -67,7 +89,7 @@ jobs:
 
   wasm:
     name: WebAssembly Build and Test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
@@ -115,69 +137,3 @@ jobs:
 
       - name: Run WASM tests with Deno
         run: deno test --allow-read tests/wasm_test.ts
-
-  real-files:
-    name: Real File Format Tests
-    runs-on: self-hosted
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Check if test files exist
-        id: check_files
-        run: |
-          if [ -f /fpexif/raws/welcome.html ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Test files found at /fpexif/raws"
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Test files not found - skipping real file tests"
-          fi
-
-      - name: Install Rust toolchain
-        if: steps.check_files.outputs.exists == 'true'
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install exiftool
-        if: steps.check_files.outputs.exists == 'true'
-        run: |
-          if ! command -v exiftool &> /dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq libimage-exiftool-perl
-          fi
-          exiftool -ver
-
-      - name: Cache cargo registry
-        if: steps.check_files.outputs.exists == 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
-
-      - name: Cache cargo index
-        if: steps.check_files.outputs.exists == 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-git-
-
-      - name: Cache cargo build
-        if: steps.check_files.outputs.exists == 'true'
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-target-
-
-      - name: Run all tests (including format-specific tests)
-        if: steps.check_files.outputs.exists == 'true'
-        run: nice -n 19 cargo test --verbose
-        env:
-          CI: true
-          FPEXIF_TEST_FILES: /fpexif/raws
