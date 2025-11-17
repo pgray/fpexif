@@ -1,14 +1,52 @@
 #!/usr/bin/env bash
+# Compare fpexif --exiftool-json output with actual exiftool output
+# Usage: ./exiftool-compare [FILE]
+#   or:  TESTFILE=path/to/file.RAF ./exiftool-compare
+
 ID=$RANDOM
-TESTFILE=${TESTFILE:-./test-data/DSCF0062.RAF}
+TESTFILE=${1:-${TESTFILE:-./test-data/DSCF0062.RAF}}
 
 FPEXIF_FILE=/tmp/${ID}-fpexif.json
 EXIFTOOL_FILE=/tmp/${ID}-exiftool.json
 
 set -eo pipefail
 
-cargo run --bin fpexif --features=cli -- list --exiftool-json $TESTFILE > $FPEXIF_FILE
+echo "Comparing outputs for: $TESTFILE"
+echo ""
 
-exiftool -j $TESTFILE > $EXIFTOOL_FILE
+# Generate outputs
+echo "Generating fpexif output..."
+cargo run --release --bin fpexif --features=cli -- list --exiftool-json "$TESTFILE" > $FPEXIF_FILE 2>/dev/null
 
-diff $FPEXIF_FILE $EXIFTOOL_FILE
+echo "Generating exiftool output..."
+exiftool -j "$TESTFILE" > $EXIFTOOL_FILE
+
+# Count fields
+FPEXIF_COUNT=$(jq '.[0] | keys | length' $FPEXIF_FILE)
+EXIFTOOL_COUNT=$(jq '.[0] | keys | length' $EXIFTOOL_FILE)
+
+echo "Field count: fpexif=$FPEXIF_COUNT, exiftool=$EXIFTOOL_COUNT"
+echo ""
+
+# Show sample fields
+echo "=== Sample fpexif fields (first 10) ==="
+jq -r '.[0] | keys[0:10] | .[]' $FPEXIF_FILE
+echo ""
+
+echo "=== Sample exiftool fields (first 10) ==="
+jq -r '.[0] | keys[0:10] | .[]' $EXIFTOOL_FILE
+echo ""
+
+# Try diff
+echo "=== Running diff ==="
+if diff -u $EXIFTOOL_FILE $FPEXIF_FILE; then
+    echo "✓ Outputs match exactly!"
+else
+    echo ""
+    echo "Outputs saved to:"
+    echo "  fpexif:   $FPEXIF_FILE"
+    echo "  exiftool: $EXIFTOOL_FILE"
+    echo ""
+    echo "To inspect: jq . $FPEXIF_FILE"
+    exit 1
+fi

@@ -4,9 +4,29 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+/// Helper function to check if we're running in CI
+fn is_ci() -> bool {
+    std::env::var("CI").is_ok()
+}
+
 /// Helper function to check if real files directory exists
 fn real_files_exist() -> bool {
     Path::new("/fpexif/raws/welcome.html").exists()
+}
+
+/// Helper function to check real files exist or fail in CI
+fn require_real_files_or_skip(test_name: &str) {
+    if !real_files_exist() {
+        if is_ci() {
+            panic!(
+                "Test '{}' requires /fpexif/raws directory but it was not found. \
+                In CI, this directory must be present.",
+                test_name
+            );
+        } else {
+            println!("Skipping {} - real files directory not found", test_name);
+        }
+    }
 }
 
 /// Helper function to get exiftool JSON output for a file
@@ -49,11 +69,6 @@ fn normalize_string(s: &str) -> String {
 
 /// Helper function to test a single file
 fn test_file_against_exiftool(path: &str) {
-    if !real_files_exist() {
-        println!("Skipping test - real files directory not found");
-        return;
-    }
-
     // Get exiftool output
     let exiftool_data = match get_exiftool_output(path) {
         Ok(data) => data,
@@ -682,8 +697,8 @@ fn collect_files_recursive(dir: &Path, extension: &str, files: &mut Vec<String>)
 // CR2 Tests (Canon RAW - 55 files)
 #[test]
 fn test_cr2_files() {
+    require_real_files_or_skip("test_cr2_files");
     if !real_files_exist() {
-        println!("Skipping CR2 tests - real files not available");
         return;
     }
 
@@ -701,8 +716,8 @@ fn test_cr2_files() {
 // NEF Tests (Nikon RAW - 47 files)
 #[test]
 fn test_nef_files() {
+    require_real_files_or_skip("test_nef_files");
     if !real_files_exist() {
-        println!("Skipping NEF tests - real files not available");
         return;
     }
 
@@ -720,8 +735,8 @@ fn test_nef_files() {
 // ORF Tests (Olympus RAW - 36 files)
 #[test]
 fn test_orf_files() {
+    require_real_files_or_skip("test_orf_files");
     if !real_files_exist() {
-        println!("Skipping ORF tests - real files not available");
         return;
     }
 
@@ -739,8 +754,8 @@ fn test_orf_files() {
 // CRW Tests (Canon RAW - 34 files)
 #[test]
 fn test_crw_files() {
+    require_real_files_or_skip("test_crw_files");
     if !real_files_exist() {
-        println!("Skipping CRW tests - real files not available");
         return;
     }
 
@@ -758,8 +773,8 @@ fn test_crw_files() {
 // ARW Tests (Sony RAW - 31 files)
 #[test]
 fn test_arw_files() {
+    require_real_files_or_skip("test_arw_files");
     if !real_files_exist() {
-        println!("Skipping ARW tests - real files not available");
         return;
     }
 
@@ -777,8 +792,8 @@ fn test_arw_files() {
 // RAF Tests (Fujifilm RAW - 30 files)
 #[test]
 fn test_raf_files() {
+    require_real_files_or_skip("test_raf_files");
     if !real_files_exist() {
-        println!("Skipping RAF tests - real files not available");
         return;
     }
 
@@ -796,8 +811,8 @@ fn test_raf_files() {
 // RW2 Tests (Panasonic RAW - 20 files)
 #[test]
 fn test_rw2_files() {
+    require_real_files_or_skip("test_rw2_files");
     if !real_files_exist() {
-        println!("Skipping RW2 tests - real files not available");
         return;
     }
 
@@ -815,8 +830,8 @@ fn test_rw2_files() {
 // DNG Tests (Adobe DNG - 18 files)
 #[test]
 fn test_dng_files() {
+    require_real_files_or_skip("test_dng_files");
     if !real_files_exist() {
-        println!("Skipping DNG tests - real files not available");
         return;
     }
 
@@ -834,8 +849,8 @@ fn test_dng_files() {
 // PEF Tests (Pentax RAW - 17 files)
 #[test]
 fn test_pef_files() {
+    require_real_files_or_skip("test_pef_files");
     if !real_files_exist() {
-        println!("Skipping PEF tests - real files not available");
         return;
     }
 
@@ -853,8 +868,8 @@ fn test_pef_files() {
 // Generic RAW Tests (15 files)
 #[test]
 fn test_raw_files() {
+    require_real_files_or_skip("test_raw_files");
     if !real_files_exist() {
-        println!("Skipping RAW tests - real files not available");
         return;
     }
 
@@ -875,8 +890,8 @@ fn test_raw_files() {
 // MRW Tests (Minolta RAW - 9 files)
 #[test]
 fn test_mrw_files() {
+    require_real_files_or_skip("test_mrw_files");
     if !real_files_exist() {
-        println!("Skipping MRW tests - real files not available");
         return;
     }
 
@@ -894,8 +909,8 @@ fn test_mrw_files() {
 // X3F Tests (Sigma RAW - 8 files)
 #[test]
 fn test_x3f_files() {
+    require_real_files_or_skip("test_x3f_files");
     if !real_files_exist() {
-        println!("Skipping X3F tests - real files not available");
         return;
     }
 
@@ -913,8 +928,8 @@ fn test_x3f_files() {
 // SRW Tests (Samsung RAW - 7 files)
 #[test]
 fn test_srw_files() {
+    require_real_files_or_skip("test_srw_files");
     if !real_files_exist() {
-        println!("Skipping SRW tests - real files not available");
         return;
     }
 
@@ -932,8 +947,8 @@ fn test_srw_files() {
 // KDC Tests (Kodak RAW - 5 files)
 #[test]
 fn test_kdc_files() {
+    require_real_files_or_skip("test_kdc_files");
     if !real_files_exist() {
-        println!("Skipping KDC tests - real files not available");
         return;
     }
 
@@ -951,8 +966,8 @@ fn test_kdc_files() {
 // NRW Tests (Nikon RAW - 4 files)
 #[test]
 fn test_nrw_files() {
+    require_real_files_or_skip("test_nrw_files");
     if !real_files_exist() {
-        println!("Skipping NRW tests - real files not available");
         return;
     }
 
@@ -970,8 +985,8 @@ fn test_nrw_files() {
 // 3FR Tests (Hasselblad RAW - 3 files)
 #[test]
 fn test_3fr_files() {
+    require_real_files_or_skip("test_3fr_files");
     if !real_files_exist() {
-        println!("Skipping 3FR tests - real files not available");
         return;
     }
 
@@ -989,8 +1004,8 @@ fn test_3fr_files() {
 // SR2 Tests (Sony RAW - 1 file)
 #[test]
 fn test_sr2_files() {
+    require_real_files_or_skip("test_sr2_files");
     if !real_files_exist() {
-        println!("Skipping SR2 tests - real files not available");
         return;
     }
 
@@ -1011,8 +1026,8 @@ fn test_sr2_files() {
 // PPM Tests (Portable Pixmap - 1 file)
 #[test]
 fn test_ppm_files() {
+    require_real_files_or_skip("test_ppm_files");
     if !real_files_exist() {
-        println!("Skipping PPM tests - real files not available");
         return;
     }
 
@@ -1033,8 +1048,8 @@ fn test_ppm_files() {
 // ERF Tests (Epson RAW - 1 file)
 #[test]
 fn test_erf_files() {
+    require_real_files_or_skip("test_erf_files");
     if !real_files_exist() {
-        println!("Skipping ERF tests - real files not available");
         return;
     }
 
@@ -1055,8 +1070,8 @@ fn test_erf_files() {
 // DCR Tests (Kodak RAW - 1 file)
 #[test]
 fn test_dcr_files() {
+    require_real_files_or_skip("test_dcr_files");
     if !real_files_exist() {
-        println!("Skipping DCR tests - real files not available");
         return;
     }
 
@@ -1077,8 +1092,8 @@ fn test_dcr_files() {
 // MOS Tests (Leaf RAW - 2 files)
 #[test]
 fn test_mos_files() {
+    require_real_files_or_skip("test_mos_files");
     if !real_files_exist() {
-        println!("Skipping MOS tests - real files not available");
         return;
     }
 
@@ -1099,8 +1114,8 @@ fn test_mos_files() {
 // SRF Tests (Sony RAW - 1 file)
 #[test]
 fn test_srf_files() {
+    require_real_files_or_skip("test_srf_files");
     if !real_files_exist() {
-        println!("Skipping SRF tests - real files not available");
         return;
     }
 
@@ -1121,8 +1136,8 @@ fn test_srf_files() {
 // MEF Tests (Mamiya RAW - 1 file)
 #[test]
 fn test_mef_files() {
+    require_real_files_or_skip("test_mef_files");
     if !real_files_exist() {
-        println!("Skipping MEF tests - real files not available");
         return;
     }
 
@@ -1143,8 +1158,8 @@ fn test_mef_files() {
 // MDC Tests (Minolta Digital Camera - 1 file)
 #[test]
 fn test_mdc_files() {
+    require_real_files_or_skip("test_mdc_files");
     if !real_files_exist() {
-        println!("Skipping MDC tests - real files not available");
         return;
     }
 
@@ -1165,8 +1180,8 @@ fn test_mdc_files() {
 // TIFF Tests (3 files)
 #[test]
 fn test_tiff_files() {
+    require_real_files_or_skip("test_tiff_files");
     if !real_files_exist() {
-        println!("Skipping TIFF tests - real files not available");
         return;
     }
 
@@ -1192,8 +1207,8 @@ fn test_tiff_files() {
 // JPEG Tests (1 file)
 #[test]
 fn test_jpeg_files() {
+    require_real_files_or_skip("test_jpeg_files");
     if !real_files_exist() {
-        println!("Skipping JPEG tests - real files not available");
         return;
     }
 
