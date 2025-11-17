@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+ID=$RANDOM
+TESTFILE=${TESTFILE:-./test-data/DSCF0062.RAF}
+
+FPEXIF_FILE=/tmp/${ID}-fpexif.json
+EXIFTOOL_FILE=/tmp/${ID}-exiftool.json
+
+set -eo pipefail
+
+cargo run --bin fpexif --features=cli -- list --exiftool-json $TESTFILE > $FPEXIF_FILE
+
+exiftool -j $TESTFILE > $EXIFTOOL_FILE
+
+diff $FPEXIF_FILE $EXIFTOOL_FILE
