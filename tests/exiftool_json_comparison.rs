@@ -2,9 +2,29 @@
 use std::path::Path;
 use std::process::Command;
 
+/// Helper function to check if we're running in CI
+fn is_ci() -> bool {
+    std::env::var("CI").is_ok()
+}
+
 /// Helper function to check if real files directory exists
 fn real_files_exist() -> bool {
     Path::new("/fpexif/raws/welcome.html").exists()
+}
+
+/// Helper function to check real files exist or fail in CI
+fn require_real_files_or_skip(test_name: &str) {
+    if !real_files_exist() {
+        if is_ci() {
+            panic!(
+                "Test '{}' requires /fpexif/raws directory but it was not found. \
+                In CI, this directory must be present.",
+                test_name
+            );
+        } else {
+            println!("Skipping {} - real files directory not found", test_name);
+        }
+    }
 }
 
 /// Helper function to check if exiftool is available
@@ -186,8 +206,8 @@ fn compare_json_outputs(
 
 #[test]
 fn test_exiftool_json_compatibility_cr2() {
+    require_real_files_or_skip("test_exiftool_json_compatibility_cr2");
     if !real_files_exist() {
-        println!("Skipping test - real files not available");
         return;
     }
 
