@@ -9,10 +9,7 @@ fn real_files_exist() -> bool {
 
 /// Helper function to check if exiftool is available
 fn exiftool_available() -> bool {
-    Command::new("exiftool")
-        .arg("--version")
-        .output()
-        .is_ok()
+    Command::new("exiftool").arg("--version").output().is_ok()
 }
 
 /// Helper function to get exiftool JSON output
@@ -30,7 +27,15 @@ fn get_exiftool_json_output(path: &str) -> Result<serde_json::Value, String> {
 /// Helper function to get fpexif --exiftool-json output
 fn get_fpexif_exiftool_json_output(path: &str) -> Result<serde_json::Value, String> {
     let output = Command::new("cargo")
-        .args(&["run", "--release", "--features", "cli", "--bin", "fpexif", "--"])
+        .args(&[
+            "run",
+            "--release",
+            "--features",
+            "cli",
+            "--bin",
+            "fpexif",
+            "--",
+        ])
         .args(&["list", path, "--exiftool-json"])
         .output()
         .map_err(|e| format!("Failed to run fpexif: {}", e))?;
@@ -86,23 +91,23 @@ fn compare_json_outputs(
     {
         // Fields to ignore (exiftool-specific or expected to differ)
         let ignore_fields = [
-            "SourceFile",        // Paths may differ
-            "ExifToolVersion",   // We don't include this
-            "FileName",          // File metadata we don't include
-            "Directory",         // File metadata we don't include
-            "FileSize",          // File metadata we don't include
-            "FileModifyDate",    // File metadata we don't include
-            "FileAccessDate",    // File metadata we don't include
-            "FileInodeChangeDate", // File metadata we don't include
-            "FilePermissions",   // File metadata we don't include
-            "FileType",          // File metadata we don't include
-            "FileTypeExtension", // File metadata we don't include
-            "MIMEType",          // File metadata we don't include
-            "CurrentIPTCDigest", // IPTC data we don't parse yet
-            "CodedCharacterSet", // IPTC data we don't parse yet
+            "SourceFile",               // Paths may differ
+            "ExifToolVersion",          // We don't include this
+            "FileName",                 // File metadata we don't include
+            "Directory",                // File metadata we don't include
+            "FileSize",                 // File metadata we don't include
+            "FileModifyDate",           // File metadata we don't include
+            "FileAccessDate",           // File metadata we don't include
+            "FileInodeChangeDate",      // File metadata we don't include
+            "FilePermissions",          // File metadata we don't include
+            "FileType",                 // File metadata we don't include
+            "FileTypeExtension",        // File metadata we don't include
+            "MIMEType",                 // File metadata we don't include
+            "CurrentIPTCDigest",        // IPTC data we don't parse yet
+            "CodedCharacterSet",        // IPTC data we don't parse yet
             "ApplicationRecordVersion", // IPTC data we don't parse yet
-            "XMPToolkit",        // XMP data we don't parse yet
-            "MakerNote",         // Raw maker note data - we parse it differently
+            "XMPToolkit",               // XMP data we don't parse yet
+            "MakerNote",                // Raw maker note data - we parse it differently
         ];
 
         // Check for fields in exiftool that are missing or different in fpexif
@@ -165,7 +170,11 @@ fn compare_json_outputs(
 
         // Check for extra fields in fpexif that aren't in exiftool (informational, not an error)
         for key in fpexif_obj.keys() {
-            if !exiftool_obj.contains_key(key) && !key.starts_with("Canon") && !key.starts_with("Nikon") && !key.starts_with("Sony") {
+            if !exiftool_obj.contains_key(key)
+                && !key.starts_with("Canon")
+                && !key.starts_with("Nikon")
+                && !key.starts_with("Sony")
+            {
                 // Note: Maker note tags are expected to be different
                 differences.push(format!("Extra field in fpexif (not in exiftool): {}", key));
             }
@@ -188,19 +197,15 @@ fn test_exiftool_json_compatibility_cr2() {
     }
 
     // Find a CR2 file to test
-    let test_files = std::fs::read_dir("/fpexif/raws")
-        .ok()
-        .and_then(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .find(|e| {
-                    e.path()
-                        .extension()
-                        .and_then(|ext| ext.to_str())
-                        .map(|ext| ext.eq_ignore_ascii_case("cr2"))
-                        .unwrap_or(false)
-                })
-        });
+    let test_files = std::fs::read_dir("/fpexif/raws").ok().and_then(|entries| {
+        entries.filter_map(|e| e.ok()).find(|e| {
+            e.path()
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext.eq_ignore_ascii_case("cr2"))
+                .unwrap_or(false)
+        })
+    });
 
     let test_file = match test_files {
         Some(entry) => entry.path(),
