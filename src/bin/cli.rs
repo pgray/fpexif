@@ -44,6 +44,18 @@ enum Commands {
         #[arg(required = true)]
         tag: String,
     },
+
+    /// Exiftool-compatible interface
+    #[command(name = "exiftool")]
+    Exiftool {
+        /// Output in JSON format (exiftool -j)
+        #[arg(short = 'j', long = "json")]
+        json: bool,
+
+        /// Path to the image file(s)
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -90,6 +102,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::process::exit(1);
                 }
             }
+        }
+        Commands::Exiftool { json, files } => {
+            let parser = ExifParser::new();
+
+            if *json {
+                // Process all files and output as JSON array
+                let mut all_results = Vec::new();
+
+                for file in files {
+                    match parser.parse_file(file) {
+                        Ok(exif_data) => {
+                            // Get the filename as a string
+                            let filename = file.to_string_lossy().to_string();
+                            let json_obj =
+                                fpexif::output::to_exiftool_json(&exif_data, Some(&filename));
+
+                            // Extract the single object from the array
+                            if let serde_json::Value::Array(mut arr) = json_obj {
+                                if let Some(obj) = arr.pop() {
+                                    all_results.push(obj);
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("Error parsing {}: {}", file.display(), err);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+
+                // Output as JSON array
+                let result = serde_json::Value::Array(all_results);
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                // Non-JSON output: process each file
+                for file in files {
+                    match parser.parse_file(file) {
+                        Ok(exif_data) => {
+                            println!("======== {} ========", file.display());
+                            print_exif_data(&exif_data, false);
+                            println!();
+                        }
+                        Err(err) => {
+                            eprintln!("Error parsing {}: {}", file.display(), err);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+            }
+            Ok(())
         }
     }
 }
