@@ -7,6 +7,9 @@ pub mod makernotes;
 pub mod parser;
 pub mod tags;
 
+#[cfg(feature = "serde")]
+pub mod output;
+
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
