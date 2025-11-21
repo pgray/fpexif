@@ -73,10 +73,71 @@ jobs:
         run: nice -n 19 cargo build --verbose
 
       - name: Run tests
-        run: nice -n 19 cargo test --verbose
+        run: nice -n 19 cargo test --verbose 2>&1 | tee test-output.txt
         env:
           CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Extract unknown tags report
+        if: github.event_name == 'pull_request'
+        id: unknown_tags
+        run: |
+          # Extract unknown tag lines from test output
+          UNKNOWN_TAGS=$(grep -E "unknown tags:" test-output.txt || true)
+
+          if [ -n "$UNKNOWN_TAGS" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            # Create report content
+            {
+              echo "## Unknown Tags Report"
+              echo ""
+              echo "The following unknown EXIF tags were encountered during testing:"
+              echo ""
+              echo "\`\`\`"
+              echo "$UNKNOWN_TAGS"
+              echo "\`\`\`"
+              echo ""
+              echo "To add support for these tags, add definitions to \`src/tags.rs\`."
+            } > unknown-tags-report.md
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+            echo "No unknown tags found!" > unknown-tags-report.md
+          fi
+
+      - name: Post unknown tags comment on PR
+        if: github.event_name == 'pull_request' && steps.unknown_tags.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('unknown-tags-report.md', 'utf8');
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('## Unknown Tags Report')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: report
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: report
+              });
+            }
 
       - name: Run clippy
         run: nice -n 19 cargo clippy -- -D warnings
