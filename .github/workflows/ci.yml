@@ -42,16 +42,8 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Install exiftool and exiv2
+      - name: Check exiftool and exiv2
         run: |
-          if ! command -v exiftool &> /dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq libimage-exiftool-perl
-          fi
-          if ! command -v exiv2 &> /dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq exiv2
-          fi
           exiftool -ver
           exiv2 --version | head -1
 
