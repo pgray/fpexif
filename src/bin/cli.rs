@@ -144,13 +144,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let result = serde_json::Value::Array(all_results);
                 println!("{}", serde_json::to_string_pretty(&result)?);
             } else {
-                // Non-JSON output: process each file
+                // Non-JSON output: exiftool-style format
                 for file in files {
                     match parser.parse_file(file) {
                         Ok(exif_data) => {
-                            println!("======== {} ========", file.display());
-                            print_exif_data(&exif_data, false);
-                            println!();
+                            print_exif_data_exiftool(&exif_data);
                         }
                         Err(err) => {
                             eprintln!("Error parsing {}: {}", file.display(), err);
@@ -177,6 +175,74 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
+    }
+}
+
+/// Print all EXIF data in exiftool text format: `Tag Name                        : Value`
+fn print_exif_data_exiftool(exif_data: &ExifData) {
+    for (tag_id, value) in exif_data.iter() {
+        let tag_name = tag_id.name().unwrap_or("Unknown");
+        let display_value = format_exiftool_text_value(value);
+        println!("{:<32}: {}", tag_name, display_value);
+    }
+}
+
+/// Format an ExifValue for exiftool-style text output
+fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue) -> String {
+    use fpexif::data_types::ExifValue;
+
+    match value {
+        ExifValue::Ascii(s) => s.trim_end_matches('\0').to_string(),
+        ExifValue::Byte(v) => format_values(v),
+        ExifValue::Short(v) => format_values(v),
+        ExifValue::Long(v) => format_values(v),
+        ExifValue::Rational(v) => {
+            if v.len() == 1 {
+                let (n, d) = v[0];
+                if d != 0 {
+                    let val = n as f64 / d as f64;
+                    if val == val.floor() {
+                        format!("{}", val as u32)
+                    } else {
+                        format!("{:.6}", val)
+                            .trim_end_matches('0')
+                            .trim_end_matches('.')
+                            .to_string()
+                    }
+                } else {
+                    format!("{}/{}", n, d)
+                }
+            } else {
+                v.iter()
+                    .map(|(n, d)| format!("{}/{}", n, d))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
+        }
+        ExifValue::SByte(v) => format_values(v),
+        ExifValue::SShort(v) => format_values(v),
+        ExifValue::SLong(v) => format_values(v),
+        ExifValue::SRational(v) => {
+            if v.len() == 1 {
+                let (n, d) = v[0];
+                if d != 0 {
+                    format!("{:.6}", n as f64 / d as f64)
+                        .trim_end_matches('0')
+                        .trim_end_matches('.')
+                        .to_string()
+                } else {
+                    format!("{}/{}", n, d)
+                }
+            } else {
+                v.iter()
+                    .map(|(n, d)| format!("{}/{}", n, d))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
+        }
+        ExifValue::Float(v) => format_values(v),
+        ExifValue::Double(v) => format_values(v),
+        ExifValue::Undefined(v) => format!("(Binary data {} bytes)", v.len()),
     }
 }
 
