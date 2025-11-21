@@ -158,6 +158,31 @@ pub const TAG_JPEG_INTERCHANGE_FORMAT_LENGTH: ExifTagId = ExifTagId {
     id: 0x0202,
     ifd: TagGroup::Thumbnail,
 };
+// Additional Thumbnail IFD tags (same IDs as Main but in IFD1)
+pub const TAG_THUMBNAIL_COMPRESSION: ExifTagId = ExifTagId {
+    id: 0x0103,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_ORIENTATION: ExifTagId = ExifTagId {
+    id: 0x0112,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_X_RESOLUTION: ExifTagId = ExifTagId {
+    id: 0x011A,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_Y_RESOLUTION: ExifTagId = ExifTagId {
+    id: 0x011B,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_RESOLUTION_UNIT: ExifTagId = ExifTagId {
+    id: 0x0128,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_YCBCR_POSITIONING: ExifTagId = ExifTagId {
+    id: 0x0213,
+    ifd: TagGroup::Thumbnail,
+};
 pub const TAG_YCBCR_COEFFICIENTS: ExifTagId = ExifTagId {
     id: 0x0211,
     ifd: TagGroup::Main,
@@ -536,6 +561,13 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
         TAG_JPEG_INTERCHANGE_FORMAT_LENGTH,
         "JPEGInterchangeFormatLength",
     );
+    // Thumbnail IFD tags with "Thumbnail" prefix
+    map.insert(TAG_THUMBNAIL_COMPRESSION, "ThumbnailCompression");
+    map.insert(TAG_THUMBNAIL_ORIENTATION, "ThumbnailOrientation");
+    map.insert(TAG_THUMBNAIL_X_RESOLUTION, "ThumbnailXResolution");
+    map.insert(TAG_THUMBNAIL_Y_RESOLUTION, "ThumbnailYResolution");
+    map.insert(TAG_THUMBNAIL_RESOLUTION_UNIT, "ThumbnailResolutionUnit");
+    map.insert(TAG_THUMBNAIL_YCBCR_POSITIONING, "ThumbnailYCbCrPositioning");
     map.insert(TAG_YCBCR_COEFFICIENTS, "YCbCrCoefficients");
     map.insert(TAG_YCBCR_SUB_SAMPLING, "YCbCrSubSampling");
     map.insert(TAG_YCBCR_POSITIONING, "YCbCrPositioning");
