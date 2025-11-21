@@ -82,46 +82,94 @@ jobs:
           CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
 
-      - name: Extract unknown tags report
+      - name: Extract test issues report
         if: always() && github.event_name == 'pull_request'
-        id: unknown_tags
+        id: test_issues
         run: |
-          # Extract unknown tag lines from test output
+          # Extract various test issues from test output
           UNKNOWN_TAGS=$(grep -E "unknown tags:" test-output.txt || true)
+          MISSING_FIELDS=$(grep -E "Missing field in fpexif:" test-output.txt || true)
+          VALUE_MISMATCHES=$(grep -E "mismatch:" test-output.txt | grep -v "Found.*mismatches" || true)
+          CRITICAL_DIFFS=$(grep -E "Found.*critical differences" test-output.txt || true)
 
-          if [ -n "$UNKNOWN_TAGS" ]; then
-            echo "found=true" >> $GITHUB_OUTPUT
-            # Create report content
-            {
-              echo "## Unknown Tags Report"
+          HAS_ISSUES=false
+
+          {
+            echo "## Test Issues Report"
+            echo ""
+
+            if [ -n "$UNKNOWN_TAGS" ]; then
+              HAS_ISSUES=true
+              echo "### Unknown EXIF Tags"
               echo ""
-              echo "The following unknown EXIF tags were encountered during testing:"
+              echo "The following unknown EXIF tags were encountered:"
               echo ""
               echo "\`\`\`"
               echo "$UNKNOWN_TAGS"
               echo "\`\`\`"
               echo ""
-              echo "To add support for these tags, add definitions to \`src/tags.rs\`."
-            } > unknown-tags-report.md
+              echo "To add support, add definitions to \`src/tags.rs\`."
+              echo ""
+            fi
+
+            if [ -n "$MISSING_FIELDS" ]; then
+              HAS_ISSUES=true
+              echo "### Missing Fields"
+              echo ""
+              echo "fpexif is missing the following fields that exiftool/exiv2 support:"
+              echo ""
+              echo "\`\`\`"
+              echo "$MISSING_FIELDS" | head -20
+              if [ $(echo "$MISSING_FIELDS" | wc -l) -gt 20 ]; then
+                echo "... and $(( $(echo "$MISSING_FIELDS" | wc -l) - 20 )) more"
+              fi
+              echo "\`\`\`"
+              echo ""
+            fi
+
+            if [ -n "$VALUE_MISMATCHES" ]; then
+              HAS_ISSUES=true
+              echo "### Value Mismatches"
+              echo ""
+              echo "The following fields have mismatched values:"
+              echo ""
+              echo "\`\`\`"
+              echo "$VALUE_MISMATCHES" | head -20
+              if [ $(echo "$VALUE_MISMATCHES" | wc -l) -gt 20 ]; then
+                echo "... and $(( $(echo "$VALUE_MISMATCHES" | wc -l) - 20 )) more"
+              fi
+              echo "\`\`\`"
+              echo ""
+            fi
+
+            if [ -n "$CRITICAL_DIFFS" ]; then
+              HAS_ISSUES=true
+              echo "### Summary"
+              echo ""
+              echo "\`\`\`"
+              echo "$CRITICAL_DIFFS"
+              echo "\`\`\`"
+              echo ""
+            fi
+
+            if [ "$HAS_ISSUES" = false ]; then
+              echo "✅ All tests passed! No unknown tags, missing fields, or value mismatches."
+            fi
+          } > test-issues-report.md
+
+          if [ "$HAS_ISSUES" = true ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
           else
             echo "found=false" >> $GITHUB_OUTPUT
-            echo "No unknown tags found!" > unknown-tags-report.md
           fi
 
-      - name: Post unknown tags comment on PR
+      - name: Post test issues comment on PR
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const found = '${{ steps.unknown_tags.outputs.found }}' === 'true';
-
-            let report;
-            if (found) {
-              report = fs.readFileSync('unknown-tags-report.md', 'utf8');
-            } else {
-              report = '## Unknown Tags Report\n\n✅ All EXIF tags are identified! No unknown tags found.';
-            }
+            const report = fs.readFileSync('test-issues-report.md', 'utf8');
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -131,7 +179,7 @@ jobs:
             });
 
             const botComment = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('## Unknown Tags Report')
+              c.user.type === 'Bot' && c.body.includes('## Test Issues Report')
             );
 
             if (botComment) {
