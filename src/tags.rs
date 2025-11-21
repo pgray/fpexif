@@ -204,6 +204,10 @@ pub const TAG_ISO_SPEED_RATINGS: ExifTagId = ExifTagId {
     id: 0x8827,
     ifd: TagGroup::Exif,
 };
+pub const TAG_SENSITIVITY_TYPE: ExifTagId = ExifTagId {
+    id: 0x8830,
+    ifd: TagGroup::Exif,
+};
 pub const TAG_EXIF_VERSION: ExifTagId = ExifTagId {
     id: 0x9000,
     ifd: TagGroup::Exif,
@@ -434,6 +438,10 @@ pub const TAG_LENS_SERIAL_NUMBER: ExifTagId = ExifTagId {
     id: 0xA435,
     ifd: TagGroup::Exif,
 };
+pub const TAG_PRINT_IM: ExifTagId = ExifTagId {
+    id: 0xC4A5,
+    ifd: TagGroup::Main,
+};
 
 // GPS tags
 pub const TAG_GPS_VERSION_ID: ExifTagId = ExifTagId {
@@ -535,12 +543,14 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_COPYRIGHT, "Copyright");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
+    map.insert(TAG_PRINT_IM, "PrintIM");
 
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
     map.insert(TAG_F_NUMBER, "FNumber");
     map.insert(TAG_EXPOSURE_PROGRAM, "ExposureProgram");
     map.insert(TAG_ISO_SPEED_RATINGS, "ISOSpeedRatings");
+    map.insert(TAG_SENSITIVITY_TYPE, "SensitivityType");
     map.insert(TAG_EXIF_VERSION, "ExifVersion");
     map.insert(TAG_DATE_TIME_ORIGINAL, "DateTimeOriginal");
     map.insert(TAG_DATE_TIME_DIGITIZED, "DateTimeDigitized");
@@ -574,6 +584,10 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_FOCAL_PLANE_X_RESOLUTION, "FocalPlaneXResolution");
     map.insert(TAG_FOCAL_PLANE_Y_RESOLUTION, "FocalPlaneYResolution");
     map.insert(TAG_FOCAL_PLANE_RESOLUTION_UNIT, "FocalPlaneResolutionUnit");
+    map.insert(TAG_SENSING_METHOD, "SensingMethod");
+    map.insert(TAG_FILE_SOURCE, "FileSource");
+    map.insert(TAG_SCENE_TYPE, "SceneType");
+    map.insert(TAG_CFA_PATTERN, "CFAPattern");
     map.insert(TAG_CUSTOM_RENDERED, "CustomRendered");
     map.insert(TAG_EXPOSURE_MODE, "ExposureMode");
     map.insert(TAG_WHITE_BALANCE, "WhiteBalance");
