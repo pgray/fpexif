@@ -159,22 +159,10 @@ fn compare_json_outputs(
                         let et_normalized = et_str.trim();
                         let fp_normalized = fp_str.trim();
                         if et_normalized != fp_normalized {
-                            // Some known acceptable differences
-                            let acceptable_difference = match key.as_str() {
-                                "Orientation" => {
-                                    // ExifTool might say "Horizontal (normal)" vs our "Normal (top-left is 0,0)"
-                                    et_normalized.contains("normal")
-                                        && fp_normalized.contains("Normal")
-                                }
-                                _ => false,
-                            };
-
-                            if !acceptable_difference {
-                                differences.push(format!(
-                                    "String mismatch for {}: exiftool=\"{}\" fpexif=\"{}\"",
-                                    key, et_str, fp_str
-                                ));
-                            }
+                            differences.push(format!(
+                                "String mismatch for {}: exiftool=\"{}\" fpexif=\"{}\"",
+                                key, et_str, fp_str
+                            ));
                         }
                     }
                     // Different types
@@ -310,20 +298,8 @@ fn test_format_exiftool_json_compatibility(extension: &str) {
             .iter()
             .filter(|d| {
                 if d.contains("mismatch") {
-                    // These are known format differences we accept
-                    let acceptable = d.contains("ComponentsConfiguration")
-                        || d.contains("ExifVersion")
-                        || d.contains("FlashpixVersion")
-                        || d.contains("FocalLength")
-                        || d.contains("ExposureTime")
-                        || d.contains("ApertureValue")
-                        || d.contains("MaxApertureValue")
-                        || d.contains("ExposureProgram")
-                        || d.contains("Flash")
-                        || d.contains("MeteringMode")
-                        || d.contains("ShutterSpeedValue")
-                        || d.contains("FocalPlaneResolutionUnit");
-                    !acceptable
+                    // All value mismatches are critical
+                    true
                 } else if d.contains("Missing field in fpexif:") {
                     // Filter out expected missing fields (maker notes, derived fields, etc.)
                     let field_name = d.split("Missing field in fpexif: ").nth(1).unwrap_or("");
@@ -644,22 +620,9 @@ fn test_exiftool_json_compatibility_dscf_raf() {
                         || is_minor_standard);
                 }
 
-                // Value mismatches are concerning, but some are expected format differences
+                // All value mismatches are critical
                 if d.contains("mismatch") {
-                    // These are known format differences we accept for now
-                    let acceptable = d.contains("ComponentsConfiguration") ||  // hex vs text
-                                    d.contains("ExifVersion") ||              // version formatting
-                                    d.contains("FlashpixVersion") ||          // version formatting
-                                    d.contains("FocalLength") ||              // units
-                                    d.contains("FocalPlaneResolutionUnit") || // enum vs number
-                                    d.contains("ExposureTime") ||             // fraction vs decimal
-                                    d.contains("ShutterSpeedValue") ||        // APEX vs fraction
-                                    d.contains("ApertureValue") ||            // rounding difference
-                                    d.contains("MaxApertureValue") ||         // rounding difference
-                                    d.contains("ExposureProgram") ||          // text variations
-                                    d.contains("Flash") ||                    // text variations
-                                    d.contains("MeteringMode"); // text variations
-                    return !acceptable;
+                    return true;
                 }
 
                 false

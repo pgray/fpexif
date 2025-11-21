@@ -290,12 +290,9 @@ fn test_format_exiv2_compatibility(extension: &str) {
                     return !(is_maker_note || is_thumbnail || is_iptc_xmp);
                 }
 
-                // Value mismatches - some are expected
+                // All value mismatches are critical
                 if d.contains("mismatch") {
-                    // Acceptable format differences
-                    let acceptable = d.contains("Undefined")  // Binary data formatting
-                        || d.contains("bytes"); // Size descriptions
-                    return !acceptable;
+                    return true;
                 }
 
                 false

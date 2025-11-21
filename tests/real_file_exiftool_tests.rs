@@ -652,13 +652,11 @@ fn test_file_against_exiftool(path: &str) {
                     println!("  ✓ Validated {}/{} tags", validations, validations);
                 }
 
-                // Only fail on critical mismatches (Make/Model/Orientation), not dimensions or photo metadata
-                // (dimensions can differ for RAW files when comparing thumbnail vs full image)
-                // (photo metadata might have minor precision differences)
+                // Fail on any mismatches
                 assert_eq!(
-                    critical_mismatches, 0,
-                    "Found {} critical tag value mismatches in {}",
-                    critical_mismatches, path
+                    total_mismatches, 0,
+                    "Found {} tag value mismatches in {}",
+                    total_mismatches, path
                 );
             }
         }
