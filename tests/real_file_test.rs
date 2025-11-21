@@ -6,8 +6,14 @@ use std::path::Path;
 fn test_real_file(filename: &str, format_name: &str, min_tags: usize) {
     let test_file = Path::new("test-data").join(filename);
 
-    // Skip test if file doesn't exist (e.g., in minimal test environments)
+    // In CI, fail if file doesn't exist; otherwise skip
     if !test_file.exists() {
+        if std::env::var("CI").is_ok() {
+            panic!(
+                "Test file not found at {:?} - required in CI",
+                test_file
+            );
+        }
         eprintln!(
             "Skipping test - {} file not found at {:?}",
             format_name, test_file
@@ -50,49 +56,41 @@ fn test_parse_real_raf_file() {
 // Tests for additional formats - add as test files become available
 
 #[test]
-#[ignore] // Ignored until test file is added
 fn test_parse_real_crw_file() {
     test_real_file("sample.CRW", "CRW", 20);
 }
 
 #[test]
-#[ignore] // Ignored until test file is added
 fn test_parse_real_cr2_file() {
     test_real_file("sample.CR2", "CR2", 50);
 }
 
 #[test]
-#[ignore] // Ignored until test file is added
 fn test_parse_real_nef_file() {
     test_real_file("sample.NEF", "NEF", 50);
 }
 
 #[test]
-#[ignore] // Ignored until test file is added
 fn test_parse_real_arw_file() {
     test_real_file("sample.ARW", "ARW", 50);
 }
 
 #[test]
-#[ignore] // Ignored until test file is added
 fn test_parse_real_dng_file() {
     test_real_file("sample.DNG", "DNG", 40);
 }
 
 #[test]
-#[ignore] // Ignored until test file is added
 fn test_parse_real_png_file() {
     test_real_file("sample.png", "PNG", 10);
 }
 
 #[test]
-#[ignore] // Ignored until test file is added
 fn test_parse_real_webp_file() {
     test_real_file("sample.webp", "WebP", 10);
 }
 
 #[test]
-#[ignore] // Ignored until test file is added
 fn test_parse_real_heic_file() {
     test_real_file("sample.heic", "HEIC", 30);
 }

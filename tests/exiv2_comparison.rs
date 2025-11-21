@@ -223,15 +223,15 @@ fn test_format_exiv2_compatibility(extension: &str) {
         println!("\nFound {} differences:", differences.len());
 
         // Categorize differences
-        let mut missing_fields: Vec<_> = differences
+        let missing_fields: Vec<_> = differences
             .iter()
             .filter(|d| d.contains("Missing field in fpexif:"))
             .collect();
-        let mut extra_fields: Vec<_> = differences
+        let extra_fields: Vec<_> = differences
             .iter()
             .filter(|d| d.contains("Extra field in fpexif:"))
             .collect();
-        let mut mismatches: Vec<_> = differences
+        let mismatches: Vec<_> = differences
             .iter()
             .filter(|d| d.contains("mismatch"))
             .collect();
