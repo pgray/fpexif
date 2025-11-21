@@ -410,6 +410,30 @@ pub const TAG_IMAGE_UNIQUE_ID: ExifTagId = ExifTagId {
     id: 0xA420,
     ifd: TagGroup::Exif,
 };
+pub const TAG_CAMERA_OWNER_NAME: ExifTagId = ExifTagId {
+    id: 0xA430,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_BODY_SERIAL_NUMBER: ExifTagId = ExifTagId {
+    id: 0xA431,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LENS_SPECIFICATION: ExifTagId = ExifTagId {
+    id: 0xA432,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LENS_MAKE: ExifTagId = ExifTagId {
+    id: 0xA433,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LENS_MODEL: ExifTagId = ExifTagId {
+    id: 0xA434,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LENS_SERIAL_NUMBER: ExifTagId = ExifTagId {
+    id: 0xA435,
+    ifd: TagGroup::Exif,
+};
 
 // GPS tags
 pub const TAG_GPS_VERSION_ID: ExifTagId = ExifTagId {
@@ -553,7 +577,22 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_CUSTOM_RENDERED, "CustomRendered");
     map.insert(TAG_EXPOSURE_MODE, "ExposureMode");
     map.insert(TAG_WHITE_BALANCE, "WhiteBalance");
+    map.insert(TAG_DIGITAL_ZOOM_RATIO, "DigitalZoomRatio");
+    map.insert(TAG_FOCAL_LENGTH_IN_35MM_FILM, "FocalLengthIn35mmFilm");
     map.insert(TAG_SCENE_CAPTURE_TYPE, "SceneCaptureType");
+    map.insert(TAG_GAIN_CONTROL, "GainControl");
+    map.insert(TAG_CONTRAST, "Contrast");
+    map.insert(TAG_SATURATION, "Saturation");
+    map.insert(TAG_SHARPNESS, "Sharpness");
+    map.insert(TAG_DEVICE_SETTING_DESCRIPTION, "DeviceSettingDescription");
+    map.insert(TAG_SUBJECT_DISTANCE_RANGE, "SubjectDistanceRange");
+    map.insert(TAG_IMAGE_UNIQUE_ID, "ImageUniqueID");
+    map.insert(TAG_CAMERA_OWNER_NAME, "CameraOwnerName");
+    map.insert(TAG_BODY_SERIAL_NUMBER, "BodySerialNumber");
+    map.insert(TAG_LENS_SPECIFICATION, "LensSpecification");
+    map.insert(TAG_LENS_MAKE, "LensMake");
+    map.insert(TAG_LENS_MODEL, "LensModel");
+    map.insert(TAG_LENS_SERIAL_NUMBER, "LensSerialNumber");
 
     // GPS tags
     map.insert(TAG_GPS_VERSION_ID, "GPSVersionID");
