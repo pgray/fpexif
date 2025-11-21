@@ -49,7 +49,8 @@ fn format_short_value(value: u16, tag_id: u16) -> Value {
         }
         0xA401 => Value::String(crate::tags::get_custom_rendered_description(value).to_string()),
         0xA40B => Value::String(crate::tags::get_gain_control_description(value).to_string()),
-        0x041A => Value::String(crate::tags::get_sensing_method_description(value).to_string()),
+        0xA217 => Value::String(crate::tags::get_sensing_method_description(value).to_string()),
+        0x8830 => Value::String(crate::tags::get_sensitivity_type_description(value).to_string()),
         _ => Value::Number(value.into()),
     }
 }

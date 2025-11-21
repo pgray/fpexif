@@ -940,6 +940,21 @@ pub fn get_sensing_method_description(value: u16) -> &'static str {
     }
 }
 
+/// Human-readable descriptions for SensitivityType values
+pub fn get_sensitivity_type_description(value: u16) -> &'static str {
+    match value {
+        0 => "Unknown",
+        1 => "Standard Output Sensitivity",
+        2 => "Recommended Exposure Index",
+        3 => "ISO Speed",
+        4 => "Standard Output Sensitivity and Recommended Exposure Index",
+        5 => "Standard Output Sensitivity and ISO Speed",
+        6 => "Recommended Exposure Index and ISO Speed",
+        7 => "Standard Output Sensitivity, Recommended Exposure Index and ISO Speed",
+        _ => "Unknown",
+    }
+}
+
 /// Human-readable descriptions for FileSource values
 pub fn get_file_source_description(value: u8) -> &'static str {
     match value {
