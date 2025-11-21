@@ -96,6 +96,20 @@ fn test_file_against_exiftool(path: &str) {
 
             println!("  fpexif extracted {} tags", exif_data.len());
 
+            // Track unknown tags
+            let unknown_tags: Vec<_> = exif_data
+                .iter()
+                .filter(|(tag_id, _)| tag_id.name().is_none())
+                .map(|(tag_id, _)| format!("0x{:04X}", tag_id.id))
+                .collect();
+            if !unknown_tags.is_empty() {
+                println!(
+                    "  ⚠ {} unknown tags: {}",
+                    unknown_tags.len(),
+                    unknown_tags.join(", ")
+                );
+            }
+
             // Validate common EXIF tags
             let mut validations = 0;
             let mut critical_mismatches = 0; // Make/Model mismatches
