@@ -78,7 +78,9 @@ jobs:
         run: nice -n 19 cargo build --verbose
 
       - name: Run tests
-        run: nice -n 19 cargo test --verbose 2>&1 | tee test-output.txt
+        run: |
+          set -eo pipefail
+          nice -n 19 cargo test --verbose 2>&1 | tee test-output.txt
         env:
           CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
