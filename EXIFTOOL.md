@@ -6,91 +6,91 @@ This document tracks progress toward matching exiftool's most commonly used feat
 
 ### Implemented
 
-- [x] **JSON output (`-j`)**
+- [x] **E1. JSON output (`-j`)**
   - `fpexif exiftool -j image.jpg`
   - Implementation: Uses `serde_json` to serialize ExifData to exiftool-compatible JSON format.
 
-- [x] **Multiple file processing**
+- [x] **E2. Multiple file processing**
   - `fpexif exiftool -j *.jpg`
   - Implementation: CLI accepts `Vec<PathBuf>` and iterates through all files.
 
 ### Core Reading Features
 
-- [ ] **Print all tags (default behavior)**
+- [ ] **E3. Print all tags (default behavior)**
   - `fpexif exiftool image.jpg`
   - Implementation: Already works, but output format should match exiftool's `Tag Name : Value` format more closely. Update `print_exif_data()` to use exiftool's exact formatting.
 
-- [ ] **Extract specific tag (`-TAG`)**
+- [ ] **E4. Extract specific tag (`-TAG`)**
   - `fpexif exiftool -Make -Model image.jpg`
   - Implementation: Add `-T` or `--tag` flag that filters output to only specified tags. Parse tag names from args prefixed with `-`.
 
-- [ ] **Group filtering (`-g`, `-G`)**
+- [ ] **E5. Group filtering (`-g`, `-G`)**
   - `fpexif exiftool -g image.jpg` (organize by group)
   - `fpexif exiftool -G image.jpg` (show group prefix)
   - Implementation: Already have `TagGroup` enum. Add flags to control output grouping and add group prefixes like `[EXIF]`, `[GPS]`, etc.
 
-- [ ] **Short output (`-s`, `-S`)**
+- [ ] **E6. Short output (`-s`, `-S`)**
   - `fpexif exiftool -s image.jpg` (tag names without spaces)
   - `fpexif exiftool -S image.jpg` (very short, tag=value)
   - Implementation: Add formatting options enum and modify output based on selected format.
 
-- [ ] **Numeric values (`-n`)**
+- [ ] **E7. Numeric values (`-n`)**
   - `fpexif exiftool -n image.jpg`
   - Implementation: Skip human-readable descriptions and output raw numeric values. Add a `raw_values: bool` to output config.
 
-- [ ] **Binary output (`-b`)**
+- [ ] **E8. Binary output (`-b`)**
   - `fpexif exiftool -b -ThumbnailImage image.jpg > thumb.jpg`
   - Implementation: For Undefined/binary tags, output raw bytes to stdout. Useful for extracting embedded thumbnails.
 
-- [ ] **Coordinates format (`-c`)**
+- [ ] **E9. Coordinates format (`-c`)**
   - `fpexif exiftool -c "%.6f" image.jpg`
   - Implementation: Add GPS coordinate formatting with configurable precision. Parse format string for degrees/decimal conversion.
 
-- [ ] **Date format (`-d`)**
+- [ ] **E10. Date format (`-d`)**
   - `fpexif exiftool -d "%Y-%m-%d" image.jpg`
   - Implementation: Parse EXIF date strings and reformat using strftime-style format strings.
 
-- [ ] **Duplicates (`-a`)**
+- [ ] **E11. Duplicates (`-a`)**
   - `fpexif exiftool -a image.jpg`
   - Implementation: Show duplicate tags (same tag ID in different IFDs). Currently we overwrite duplicates.
 
-- [ ] **Unknown tags (`-u`, `-U`)**
+- [ ] **E12. Unknown tags (`-u`, `-U`)**
   - `fpexif exiftool -u image.jpg`
   - Implementation: Include tags we don't have names for, showing as hex IDs.
 
 ### Output Format Features
 
-- [ ] **CSV output (`-csv`)**
+- [ ] **E13. CSV output (`-csv`)**
   - `fpexif exiftool -csv *.jpg`
   - Implementation: Add CSV serialization with headers as tag names, one row per file.
 
-- [ ] **Tab-separated (`-t`)**
+- [ ] **E14. Tab-separated (`-t`)**
   - `fpexif exiftool -t image.jpg`
   - Implementation: Simple tab-delimited output format.
 
-- [ ] **XML output (`-X`)**
+- [ ] **E15. XML output (`-X`)**
   - `fpexif exiftool -X image.jpg`
   - Implementation: Add optional `quick-xml` dependency for XML serialization.
 
-- [ ] **HTML output (`-h`)**
+- [ ] **E16. HTML output (`-h`)**
   - `fpexif exiftool -h image.jpg`
   - Implementation: Generate HTML table of tags. Low priority.
 
-- [ ] **PHP output (`-php`)**
+- [ ] **E17. PHP output (`-php`)**
   - `fpexif exiftool -php image.jpg`
   - Implementation: Generate PHP array syntax. Low priority.
 
 ### File Selection Features
 
-- [ ] **Recursive directory processing (`-r`)**
+- [ ] **E18. Recursive directory processing (`-r`)**
   - `fpexif exiftool -r -j ./photos/`
   - Implementation: Use `walkdir` crate to recursively find image files in directories.
 
-- [ ] **File extension filter (`-ext`)**
+- [ ] **E19. File extension filter (`-ext`)**
   - `fpexif exiftool -ext jpg -ext png ./photos/`
   - Implementation: Filter files by extension during directory traversal.
 
-- [ ] **Condition filtering (`-if`)**
+- [ ] **E20. Condition filtering (`-if`)**
   - `fpexif exiftool -if '$Make eq "Canon"' *.jpg`
   - Implementation: Add simple expression parser for tag-based filtering. Complex feature.
 
@@ -98,29 +98,29 @@ This document tracks progress toward matching exiftool's most commonly used feat
 
 ### Basic Writing
 
-- [ ] **Set tag value (`-TAG=VALUE`)**
+- [ ] **E21. Set tag value (`-TAG=VALUE`)**
   - `fpexif exiftool -Artist="John Doe" image.jpg`
   - Implementation: Requires EXIF writing support in `io.rs`. Parse assignment syntax, locate tag in IFD, update value, rewrite file.
 
-- [ ] **Remove tag (`-TAG=`)**
+- [ ] **E22. Remove tag (`-TAG=`)**
   - `fpexif exiftool -Artist= image.jpg`
   - Implementation: Same as above but remove the tag entry from IFD.
 
-- [ ] **Copy tags from another file (`-TagsFromFile`)**
+- [ ] **E23. Copy tags from another file (`-TagsFromFile`)**
   - `fpexif exiftool -TagsFromFile src.jpg dst.jpg`
   - Implementation: Parse source file, extract specified tags, write to destination.
 
-- [ ] **Remove all metadata (`-all=`)**
+- [ ] **E24. Remove all metadata (`-all=`)**
   - `fpexif exiftool -all= image.jpg`
   - Implementation: Strip entire APP1 segment from JPEG or equivalent for other formats.
 
 ### Writing Safety
 
-- [ ] **Backup originals (`-overwrite_original_in_place`)**
+- [ ] **E25. Backup originals (`-overwrite_original_in_place`)**
   - `fpexif exiftool -overwrite_original_in_place image.jpg`
   - Implementation: Create backup before modifying, or modify in-place without backup.
 
-- [ ] **Preserve modification time (`-P`)**
+- [ ] **E26. Preserve modification time (`-P`)**
   - `fpexif exiftool -P -Artist="John" image.jpg`
   - Implementation: Save file mtime before write, restore after.
 
@@ -128,71 +128,71 @@ This document tracks progress toward matching exiftool's most commonly used feat
 
 ### Maker Notes
 
-- [ ] **Full maker note parsing**
+- [ ] **E27. Full maker note parsing**
   - Currently partial support for Canon, Nikon, Sony
   - Implementation: Expand maker note parsers for more camera brands (Fuji, Olympus, Panasonic, etc.)
 
-- [ ] **Maker note writing**
+- [ ] **E28. Maker note writing**
   - Implementation: Very complex due to proprietary formats. Low priority.
 
 ### Geolocation
 
-- [ ] **Geotagging (`-geotag`)**
+- [ ] **E29. Geotagging (`-geotag`)**
   - `fpexif exiftool -geotag track.gpx *.jpg`
   - Implementation: Parse GPX files, match timestamps to photos, write GPS coordinates. Requires GPX parser.
 
-- [ ] **Reverse geocoding**
+- [ ] **E30. Reverse geocoding**
   - Implementation: Call external API to convert GPS coordinates to place names. Would require network access.
 
 ### Special Operations
 
-- [ ] **Rename files (`-filename`)**
+- [ ] **E31. Rename files (`-filename`)**
   - `fpexif exiftool '-filename<DateTimeOriginal' -d %Y%m%d_%H%M%S.%%e *.jpg`
   - Implementation: Template-based renaming using tag values. Parse template syntax, extract values, rename files.
 
-- [ ] **JSON to tags (`-json=`)**
+- [ ] **E32. JSON to tags (`-json=`)**
   - `fpexif exiftool -json=metadata.json image.jpg`
   - Implementation: Read JSON file, map keys to tag names, write values.
 
-- [ ] **Execute command (`-execute`)**
+- [ ] **E33. Execute command (`-execute`)**
   - Implementation: Process multiple command sets in one invocation. Batch operation support.
 
 ## Testing Checklist
 
 For each implemented feature, we should have:
 
-- [ ] Unit tests for the parsing/formatting logic
-- [ ] Integration test comparing output with exiftool
-- [ ] Test with multiple file formats (JPEG, TIFF, RAW variants)
-- [ ] Edge case handling (missing tags, corrupt data, etc.)
+- [ ] **T1.** Unit tests for the parsing/formatting logic
+- [ ] **T2.** Integration test comparing output with exiftool
+- [ ] **T3.** Test with multiple file formats (JPEG, TIFF, RAW variants)
+- [ ] **T4.** Edge case handling (missing tags, corrupt data, etc.)
 
 ### CI Test Improvements Needed
 
-- [ ] Add direct JSON output comparison test for `fpexif exiftool -j`
-- [ ] Test multiple file output matches exiftool array format
-- [ ] Validate tag name compatibility (e.g., "FNumber" vs "F-Number")
-- [ ] Test numeric value precision matches exiftool
+- [ ] **T5.** Add direct JSON output comparison test for `fpexif exiftool -j`
+- [ ] **T6.** Test multiple file output matches exiftool array format
+- [ ] **T7.** Validate tag name compatibility (e.g., "FNumber" vs "F-Number")
+- [ ] **T8.** Test numeric value precision matches exiftool
 
 ## Priority Order
 
 1. **High Priority** (commonly used, relatively easy):
-   - Extract specific tags (`-TAG`)
-   - Numeric values (`-n`)
-   - Group display (`-g`, `-G`)
-   - Recursive processing (`-r`)
-   - Short output formats (`-s`, `-S`)
+   - E4. Extract specific tags (`-TAG`)
+   - E7. Numeric values (`-n`)
+   - E5. Group display (`-g`, `-G`)
+   - E18. Recursive processing (`-r`)
+   - E6. Short output formats (`-s`, `-S`)
 
 2. **Medium Priority** (useful, moderate complexity):
-   - CSV output (`-csv`)
-   - Date formatting (`-d`)
-   - GPS coordinate formatting (`-c`)
-   - Tag filtering (`-if` simple cases)
+   - E13. CSV output (`-csv`)
+   - E10. Date formatting (`-d`)
+   - E9. GPS coordinate formatting (`-c`)
+   - E20. Tag filtering (`-if` simple cases)
 
 3. **Low Priority** (complex or rarely needed):
-   - Writing features (requires significant new code)
-   - Geotagging
-   - File renaming
-   - XML/HTML/PHP output
+   - E21-E26. Writing features (requires significant new code)
+   - E29. Geotagging
+   - E31. File renaming
+   - E15-E17. XML/HTML/PHP output
 
 ## Contributing
 
