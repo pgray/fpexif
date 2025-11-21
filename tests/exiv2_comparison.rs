@@ -393,3 +393,49 @@ fn test_exiv2_compatibility_dng() {
 fn test_exiv2_compatibility_jpg() {
     test_format_exiv2_compatibility("jpg");
 }
+
+// =============================================================================
+// Placeholder tests for flags not yet implemented
+// =============================================================================
+
+#[test]
+#[ignore = "exiv2 -p (print mode) not yet implemented"]
+fn test_exiv2_print_mode_flag() {
+    // TODO: Implement -p flag support
+    // exiv2 -pa (print all), -pe (print Exif), -pi (print IPTC), -px (print XMP)
+}
+
+#[test]
+#[ignore = "exiv2 -g (grep) not yet implemented"]
+fn test_exiv2_grep_flag() {
+    // TODO: Implement -g flag support
+    // exiv2 -g <pattern> filters output by key pattern
+}
+
+#[test]
+#[ignore = "exiv2 -K (key) not yet implemented"]
+fn test_exiv2_key_flag() {
+    // TODO: Implement -K flag support
+    // exiv2 -K <key> shows only specified key
+}
+
+#[test]
+#[ignore = "exiv2 -b (binary) not yet implemented"]
+fn test_exiv2_binary_flag() {
+    // TODO: Implement -b flag support
+    // exiv2 -b outputs binary data (e.g., thumbnails)
+}
+
+#[test]
+#[ignore = "exiv2 -u (unknown tags) not yet implemented"]
+fn test_exiv2_unknown_flag() {
+    // TODO: Implement -u flag support
+    // exiv2 -u shows unknown tags
+}
+
+#[test]
+#[ignore = "exiv2 -t (translated) not yet implemented"]
+fn test_exiv2_translated_flag() {
+    // TODO: Implement -t flag support
+    // exiv2 -t shows translated tag values
+}

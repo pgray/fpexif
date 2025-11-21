@@ -322,3 +322,56 @@ fn test_exiftool_text_compatibility_dng() {
 fn test_exiftool_text_compatibility_jpg() {
     test_format_exiftool_text_compatibility("jpg");
 }
+
+// =============================================================================
+// Placeholder tests for flags not yet implemented
+// =============================================================================
+
+#[test]
+#[ignore = "exiftool -g (group by category) not yet implemented"]
+fn test_exiftool_group_flag() {
+    // TODO: Implement -g flag support
+    // exiftool -g groups output by category (EXIF, File, etc.)
+}
+
+#[test]
+#[ignore = "exiftool -s (short names) not yet implemented"]
+fn test_exiftool_short_names_flag() {
+    // TODO: Implement -s flag support
+    // exiftool -s shows short tag names instead of descriptions
+}
+
+#[test]
+#[ignore = "exiftool -n (numeric values) not yet implemented"]
+fn test_exiftool_numeric_flag() {
+    // TODO: Implement -n flag support
+    // exiftool -n shows raw numeric values instead of converted
+}
+
+#[test]
+#[ignore = "exiftool -S (very short) not yet implemented"]
+fn test_exiftool_very_short_flag() {
+    // TODO: Implement -S flag support
+    // exiftool -S shows very short output (tag names only, no descriptions)
+}
+
+#[test]
+#[ignore = "exiftool -t (tab-separated) not yet implemented"]
+fn test_exiftool_tab_separated_flag() {
+    // TODO: Implement -t flag support
+    // exiftool -t outputs tab-separated values
+}
+
+#[test]
+#[ignore = "exiftool -csv not yet implemented"]
+fn test_exiftool_csv_flag() {
+    // TODO: Implement -csv flag support
+    // exiftool -csv outputs CSV format
+}
+
+#[test]
+#[ignore = "exiftool -X (XML) not yet implemented"]
+fn test_exiftool_xml_flag() {
+    // TODO: Implement -X flag support
+    // exiftool -X outputs XML format
+}
