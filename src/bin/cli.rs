@@ -56,6 +56,14 @@ enum Commands {
         #[arg(required = true)]
         files: Vec<PathBuf>,
     },
+
+    /// Exiv2-compatible interface
+    #[command(name = "exiv2")]
+    Exiv2 {
+        /// Path to the image file(s)
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -153,7 +161,90 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
+        Commands::Exiv2 { files } => {
+            let parser = ExifParser::new();
+
+            for file in files {
+                match parser.parse_file(file) {
+                    Ok(exif_data) => {
+                        print_exif_data_exiv2(&exif_data);
+                    }
+                    Err(err) => {
+                        eprintln!("Error parsing {}: {}", file.display(), err);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Ok(())
+        }
     }
+}
+
+/// Print all EXIF data in exiv2 format: `Exif.Image.Make  Ascii  6  Canon`
+fn print_exif_data_exiv2(exif_data: &ExifData) {
+    for (tag_id, value) in exif_data.iter() {
+        let group = match tag_id.group {
+            tags::TagGroup::Main => "Exif.Image",
+            tags::TagGroup::Exif => "Exif.Photo",
+            tags::TagGroup::Gps => "Exif.GPSInfo",
+            tags::TagGroup::Thumbnail => "Exif.Thumbnail",
+            tags::TagGroup::Interop => "Exif.Iop",
+        };
+        let tag_name = tag_id.name().unwrap_or("Unknown");
+        let key = format!("{}.{}", group, tag_name);
+
+        let (type_name, count, display_value) = format_exiv2_value(value);
+
+        println!(
+            "{:<44} {:12} {:>4}  {}",
+            key, type_name, count, display_value
+        );
+    }
+}
+
+/// Format an ExifValue for exiv2-style output
+fn format_exiv2_value(value: &fpexif::data_types::ExifValue) -> (&'static str, usize, String) {
+    use fpexif::data_types::ExifValue;
+
+    match value {
+        ExifValue::Ascii(s) => {
+            let cleaned = s.trim_end_matches('\0');
+            ("Ascii", cleaned.len(), cleaned.to_string())
+        }
+        ExifValue::Byte(v) => ("Byte", v.len(), format_values(v)),
+        ExifValue::Short(v) => ("Short", v.len(), format_values(v)),
+        ExifValue::Long(v) => ("Long", v.len(), format_values(v)),
+        ExifValue::Rational(v) => (
+            "Rational",
+            v.len(),
+            v.iter()
+                .map(|(n, d)| format!("{}/{}", n, d))
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        ExifValue::SByte(v) => ("SByte", v.len(), format_values(v)),
+        ExifValue::SShort(v) => ("SShort", v.len(), format_values(v)),
+        ExifValue::SLong(v) => ("SLong", v.len(), format_values(v)),
+        ExifValue::SRational(v) => (
+            "SRational",
+            v.len(),
+            v.iter()
+                .map(|(n, d)| format!("{}/{}", n, d))
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        ExifValue::Float(v) => ("Float", v.len(), format_values(v)),
+        ExifValue::Double(v) => ("Double", v.len(), format_values(v)),
+        ExifValue::Undefined(v) => ("Undefined", v.len(), format!("{} bytes", v.len())),
+    }
+}
+
+fn format_values<T: std::fmt::Display>(values: &[T]) -> String {
+    values
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Print all EXIF data in JSON format (exiftool-compatible)
