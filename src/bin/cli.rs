@@ -183,7 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Print all EXIF data in exiv2 format: `Exif.Image.Make  Ascii  6  Canon`
 fn print_exif_data_exiv2(exif_data: &ExifData) {
     for (tag_id, value) in exif_data.iter() {
-        let group = match tag_id.group {
+        let group = match tag_id.ifd {
             tags::TagGroup::Main => "Exif.Image",
             tags::TagGroup::Exif => "Exif.Photo",
             tags::TagGroup::Gps => "Exif.GPSInfo",
