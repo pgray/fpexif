@@ -105,12 +105,19 @@ jobs:
           fi
 
       - name: Post unknown tags comment on PR
-        if: github.event_name == 'pull_request' && steps.unknown_tags.outputs.found == 'true'
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const report = fs.readFileSync('unknown-tags-report.md', 'utf8');
+            const found = '${{ steps.unknown_tags.outputs.found }}' === 'true';
+
+            let report;
+            if (found) {
+              report = fs.readFileSync('unknown-tags-report.md', 'utf8');
+            } else {
+              report = '## Unknown Tags Report\n\n✅ All EXIF tags are identified! No unknown tags found.';
+            }
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
