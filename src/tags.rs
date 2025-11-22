@@ -687,18 +687,18 @@ pub fn get_tag_id_by_name(name: &str) -> Option<ExifTagId> {
         .copied()
 }
 
-/// Human-readable descriptions for various EXIF orientation values
+/// Human-readable descriptions for various EXIF orientation values (exiftool-compatible)
 pub fn get_orientation_description(value: u16) -> &'static str {
     match value {
-        1 => "Normal (top-left is 0,0)",
-        2 => "Mirrored horizontally (top-right is 0,0)",
-        3 => "Rotated 180° (bottom-right is 0,0)",
-        4 => "Mirrored vertically (bottom-left is 0,0)",
-        5 => "Mirrored horizontally and rotated 90° CCW (left-top is 0,0)",
-        6 => "Rotated 90° CCW (right-top is 0,0)",
-        7 => "Mirrored horizontally and rotated 90° CW (right-bottom is 0,0)",
-        8 => "Rotated 90° CW (left-bottom is 0,0)",
-        _ => "Unknown orientation",
+        1 => "Horizontal (normal)",
+        2 => "Mirror horizontal",
+        3 => "Rotate 180",
+        4 => "Mirror vertical",
+        5 => "Mirror horizontal and rotate 270 CW",
+        6 => "Rotate 90 CW",
+        7 => "Mirror horizontal and rotate 90 CW",
+        8 => "Rotate 270 CW",
+        _ => "Unknown",
     }
 }
 
