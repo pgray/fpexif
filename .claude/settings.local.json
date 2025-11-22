@@ -11,7 +11,8 @@
       "Bash(nice -n 19 cargo test:*)",
       "Bash(nice -n 19 cargo fmt:*)",
       "Bash(nice -n 19 cargo clippy:*)",
-      "Bash(gh run:*)"
+      "Bash(gh run:*)",
+      "Bash(./bin/ccc:*)"
     ],
     "deny": [],
     "ask": []

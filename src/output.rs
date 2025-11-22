@@ -354,13 +354,11 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
 
     // Add derived fields for exiftool compatibility
     // Aperture is derived from FNumber
-    if let Some(fnumber) = exif_data.get_tag_by_id(0x829D) {
-        if let ExifValue::Rational(v) = fnumber {
-            if !v.is_empty() && v[0].1 != 0 {
-                let aperture = v[0].0 as f64 / v[0].1 as f64;
-                if let Some(num) = serde_json::Number::from_f64(aperture) {
-                    output.insert("Aperture".to_string(), Value::Number(num));
-                }
+    if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829D) {
+        if !v.is_empty() && v[0].1 != 0 {
+            let aperture = v[0].0 as f64 / v[0].1 as f64;
+            if let Some(num) = serde_json::Number::from_f64(aperture) {
+                output.insert("Aperture".to_string(), Value::Number(num));
             }
         }
     }

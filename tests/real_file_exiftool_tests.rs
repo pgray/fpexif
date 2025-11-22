@@ -300,11 +300,11 @@ fn test_file_against_exiftool(path: &str) {
                             None
                         }
                     } else {
-                        s.parse::<f64>().ok().and_then(|f| {
+                        s.parse::<f64>().ok().map(|f| {
                             // Convert decimal to rational
                             let den = 1000u32;
                             let num = (f * den as f64).round() as u32;
-                            Some((num, den))
+                            (num, den)
                         })
                     }
                 } else {
@@ -438,21 +438,19 @@ fn test_file_against_exiftool(path: &str) {
                     .or_else(|| exif_data.get_tag_by_name("InternalSerialNumber"))
                 {
                     validations += 1;
-                    match fpexif_serial_value {
-                        fpexif::data_types::ExifValue::Ascii(fpexif_serial) => {
-                            let normalized_exiftool = normalize_string(exiftool_serial);
-                            let normalized_fpexif = normalize_string(fpexif_serial);
-                            if normalized_exiftool == normalized_fpexif {
-                                println!("  ✓ Serial: \"{}\"", normalized_fpexif);
-                            } else {
-                                metadata_mismatches += 1;
-                                println!(
-                                    "  ⚠ Serial mismatch: exiftool=\"{}\" fpexif=\"{}\"",
-                                    normalized_exiftool, normalized_fpexif
-                                );
-                            }
+                    if let fpexif::data_types::ExifValue::Ascii(fpexif_serial) = fpexif_serial_value
+                    {
+                        let normalized_exiftool = normalize_string(exiftool_serial);
+                        let normalized_fpexif = normalize_string(fpexif_serial);
+                        if normalized_exiftool == normalized_fpexif {
+                            println!("  ✓ Serial: \"{}\"", normalized_fpexif);
+                        } else {
+                            metadata_mismatches += 1;
+                            println!(
+                                "  ⚠ Serial mismatch: exiftool=\"{}\" fpexif=\"{}\"",
+                                normalized_exiftool, normalized_fpexif
+                            );
                         }
-                        _ => {}
                     }
                 }
             }
@@ -473,27 +471,26 @@ fn test_file_against_exiftool(path: &str) {
                     exif_data.get_tag_by_name("ExposureCompensation")
                 {
                     validations += 1;
-                    match fpexif_exp_comp_value {
-                        fpexif::data_types::ExifValue::SRational(ref vals) => {
-                            if !vals.is_empty() {
-                                let (num, den) = vals[0];
-                                let fpexif_comp = if den > 0 {
-                                    num as f64 / den as f64
-                                } else {
-                                    0.0
-                                };
-                                if (fpexif_comp - exiftool_exp_comp).abs() < 0.1 {
-                                    println!("  ✓ Exp Comp: {:+.1} EV", fpexif_comp);
-                                } else {
-                                    metadata_mismatches += 1;
-                                    println!(
-                                        "  ⚠ Exp Comp mismatch: exiftool={:+.1} fpexif={:+.1}",
-                                        exiftool_exp_comp, fpexif_comp
-                                    );
-                                }
+                    if let fpexif::data_types::ExifValue::SRational(ref vals) =
+                        fpexif_exp_comp_value
+                    {
+                        if !vals.is_empty() {
+                            let (num, den) = vals[0];
+                            let fpexif_comp = if den > 0 {
+                                num as f64 / den as f64
+                            } else {
+                                0.0
+                            };
+                            if (fpexif_comp - exiftool_exp_comp).abs() < 0.1 {
+                                println!("  ✓ Exp Comp: {:+.1} EV", fpexif_comp);
+                            } else {
+                                metadata_mismatches += 1;
+                                println!(
+                                    "  ⚠ Exp Comp mismatch: exiftool={:+.1} fpexif={:+.1}",
+                                    exiftool_exp_comp, fpexif_comp
+                                );
                             }
                         }
-                        _ => {}
                     }
                 }
             }

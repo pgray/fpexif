@@ -47,7 +47,7 @@ fn get_exiftool_json_output(path: &str) -> Result<serde_json::Value, String> {
 /// Helper function to get fpexif --exiftool-json output
 fn get_fpexif_exiftool_json_output(path: &str) -> Result<serde_json::Value, String> {
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--release",
             "--features",
@@ -56,7 +56,7 @@ fn get_fpexif_exiftool_json_output(path: &str) -> Result<serde_json::Value, Stri
             "fpexif",
             "--",
         ])
-        .args(&["list", path, "--exiftool-json"])
+        .args(["list", path, "--exiftool-json"])
         .output()
         .map_err(|e| format!("Failed to run fpexif: {}", e))?;
 

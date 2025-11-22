@@ -199,10 +199,7 @@ jobs:
             }
 
       - name: Run clippy
-        run: nice -n 19 cargo clippy -- -D warnings
-
-      - name: Check formatting
-        run: nice -n 19 cargo fmt -- --check
+        run: ./bin/ccc
 
       - name: Build examples
         run: nice -n 19 cargo build --examples --verbose
