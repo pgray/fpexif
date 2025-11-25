@@ -224,6 +224,46 @@ pub const TAG_IPTC_NAA: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 // Some manufacturers put these EXIF tags in Main IFD instead of EXIF SubIFD
+pub const TAG_EXPOSURE_TIME_MAIN: ExifTagId = ExifTagId {
+    id: 0x829A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_F_NUMBER_MAIN: ExifTagId = ExifTagId {
+    id: 0x829D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_EXPOSURE_PROGRAM_MAIN: ExifTagId = ExifTagId {
+    id: 0x8822,
+    ifd: TagGroup::Main,
+};
+pub const TAG_EXPOSURE_BIAS_VALUE_MAIN: ExifTagId = ExifTagId {
+    id: 0x9204,
+    ifd: TagGroup::Main,
+};
+pub const TAG_MAX_APERTURE_VALUE_MAIN: ExifTagId = ExifTagId {
+    id: 0x9205,
+    ifd: TagGroup::Main,
+};
+pub const TAG_METERING_MODE_MAIN: ExifTagId = ExifTagId {
+    id: 0x9207,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LIGHT_SOURCE_MAIN: ExifTagId = ExifTagId {
+    id: 0x9208,
+    ifd: TagGroup::Main,
+};
+pub const TAG_FOCAL_LENGTH_MAIN: ExifTagId = ExifTagId {
+    id: 0x920A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_IMAGE_NUMBER_MAIN: ExifTagId = ExifTagId {
+    id: 0x9211,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SENSING_METHOD_MAIN: ExifTagId = ExifTagId {
+    id: 0x9217,
+    ifd: TagGroup::Main,
+};
 pub const TAG_DATE_TIME_ORIGINAL_MAIN: ExifTagId = ExifTagId {
     id: 0x9003,
     ifd: TagGroup::Main,
@@ -681,6 +721,17 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_XMP_METADATA, "XMPMetadata");
     map.insert(TAG_SUB_IFDS, "SubIFDs");
     map.insert(TAG_IPTC_NAA, "IPTC/NAA");
+    // EXIF tags in Main IFD (non-standard placement)
+    map.insert(TAG_EXPOSURE_TIME_MAIN, "ExposureTime");
+    map.insert(TAG_F_NUMBER_MAIN, "FNumber");
+    map.insert(TAG_EXPOSURE_PROGRAM_MAIN, "ExposureProgram");
+    map.insert(TAG_EXPOSURE_BIAS_VALUE_MAIN, "ExposureBiasValue");
+    map.insert(TAG_MAX_APERTURE_VALUE_MAIN, "MaxApertureValue");
+    map.insert(TAG_METERING_MODE_MAIN, "MeteringMode");
+    map.insert(TAG_LIGHT_SOURCE_MAIN, "LightSource");
+    map.insert(TAG_FOCAL_LENGTH_MAIN, "FocalLength");
+    map.insert(TAG_IMAGE_NUMBER_MAIN, "ImageNumber");
+    map.insert(TAG_SENSING_METHOD_MAIN, "SensingMethod");
     map.insert(TAG_DATE_TIME_ORIGINAL_MAIN, "DateTimeOriginal");
     map.insert(TAG_TIFF_EP_STANDARD_ID_MAIN, "TIFF/EPStandardID");
     map.insert(TAG_COPYRIGHT, "Copyright");
@@ -727,6 +778,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_FOCAL_LENGTH, "FocalLength");
     map.insert(TAG_IMAGE_NUMBER, "ImageNumber");
     map.insert(TAG_SUBJECT_AREA, "SubjectArea");
+    map.insert(TAG_EXPOSURE_INDEX, "ExposureIndex");
     map.insert(TAG_TIFF_EP_STANDARD_ID, "TIFF/EPStandardID");
     map.insert(TAG_MAKER_NOTE, "MakerNote");
     map.insert(TAG_USER_COMMENT, "UserComment");
