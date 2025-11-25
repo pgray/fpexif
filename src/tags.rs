@@ -223,6 +223,15 @@ pub const TAG_IPTC_NAA: ExifTagId = ExifTagId {
     id: 0x83BB,
     ifd: TagGroup::Main,
 };
+// Some manufacturers put these EXIF tags in Main IFD instead of EXIF SubIFD
+pub const TAG_DATE_TIME_ORIGINAL_MAIN: ExifTagId = ExifTagId {
+    id: 0x9003,
+    ifd: TagGroup::Main,
+};
+pub const TAG_TIFF_EP_STANDARD_ID_MAIN: ExifTagId = ExifTagId {
+    id: 0x9216,
+    ifd: TagGroup::Main,
+};
 pub const TAG_COPYRIGHT: ExifTagId = ExifTagId {
     id: 0x8298,
     ifd: TagGroup::Main,
@@ -672,6 +681,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_XMP_METADATA, "XMPMetadata");
     map.insert(TAG_SUB_IFDS, "SubIFDs");
     map.insert(TAG_IPTC_NAA, "IPTC/NAA");
+    map.insert(TAG_DATE_TIME_ORIGINAL_MAIN, "DateTimeOriginal");
+    map.insert(TAG_TIFF_EP_STANDARD_ID_MAIN, "TIFF/EPStandardID");
     map.insert(TAG_COPYRIGHT, "Copyright");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
