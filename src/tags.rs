@@ -382,6 +382,46 @@ pub const TAG_UNIQUE_CAMERA_MODEL: ExifTagId = ExifTagId {
     id: 0xC614,
     ifd: TagGroup::Main,
 };
+pub const TAG_LOCALIZED_CAMERA_MODEL: ExifTagId = ExifTagId {
+    id: 0xC615,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CFA_PLANE_COLOR: ExifTagId = ExifTagId {
+    id: 0xC616,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CFA_LAYOUT: ExifTagId = ExifTagId {
+    id: 0xC617,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LINEARIZATION_TABLE: ExifTagId = ExifTagId {
+    id: 0xC618,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BLACK_LEVEL_REPEAT_DIM: ExifTagId = ExifTagId {
+    id: 0xC619,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CAMERA_SERIAL_NUMBER: ExifTagId = ExifTagId {
+    id: 0xC61A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LENS_INFO: ExifTagId = ExifTagId {
+    id: 0xC61D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ORIGINAL_RAW_FILE_NAME: ExifTagId = ExifTagId {
+    id: 0xC61E,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ORIGINAL_RAW_FILE_DATA: ExifTagId = ExifTagId {
+    id: 0xC61F,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ACTIVE_AREA: ExifTagId = ExifTagId {
+    id: 0xC620,
+    ifd: TagGroup::Main,
+};
 pub const TAG_COLOR_MATRIX1: ExifTagId = ExifTagId {
     id: 0xC621,
     ifd: TagGroup::Main,
@@ -410,8 +450,20 @@ pub const TAG_BASELINE_SHARPNESS: ExifTagId = ExifTagId {
     id: 0xC62C,
     ifd: TagGroup::Main,
 };
+pub const TAG_PREVIEW_COLOR_SPACE: ExifTagId = ExifTagId {
+    id: 0xC62D,
+    ifd: TagGroup::Main,
+};
 pub const TAG_LINEAR_RESPONSE_LIMIT: ExifTagId = ExifTagId {
     id: 0xC62E,
+    ifd: TagGroup::Main,
+};
+pub const TAG_RAW_DATA_UNIQUE_ID: ExifTagId = ExifTagId {
+    id: 0xC65C,
+    ifd: TagGroup::Main,
+};
+pub const TAG_MASKED_AREAS: ExifTagId = ExifTagId {
+    id: 0xC632,
     ifd: TagGroup::Main,
 };
 pub const TAG_SHADOW_SCALE: ExifTagId = ExifTagId {
@@ -428,6 +480,10 @@ pub const TAG_CALIBRATION_ILLUMINANT2: ExifTagId = ExifTagId {
 };
 pub const TAG_BEST_QUALITY_SCALE: ExifTagId = ExifTagId {
     id: 0xC65D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
+    id: 0xC68D,
     ifd: TagGroup::Main,
 };
 
@@ -859,6 +915,16 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_DNG_VERSION, "DNGVersion");
     map.insert(TAG_DNG_BACKWARD_VERSION, "DNGBackwardVersion");
     map.insert(TAG_UNIQUE_CAMERA_MODEL, "UniqueCameraModel");
+    map.insert(TAG_LOCALIZED_CAMERA_MODEL, "LocalizedCameraModel");
+    map.insert(TAG_CFA_PLANE_COLOR, "CFAPlaneColor");
+    map.insert(TAG_CFA_LAYOUT, "CFALayout");
+    map.insert(TAG_LINEARIZATION_TABLE, "LinearizationTable");
+    map.insert(TAG_BLACK_LEVEL_REPEAT_DIM, "BlackLevelRepeatDim");
+    map.insert(TAG_CAMERA_SERIAL_NUMBER, "CameraSerialNumber");
+    map.insert(TAG_LENS_INFO, "LensInfo");
+    map.insert(TAG_ORIGINAL_RAW_FILE_NAME, "OriginalRawFileName");
+    map.insert(TAG_ORIGINAL_RAW_FILE_DATA, "OriginalRawFileData");
+    map.insert(TAG_ACTIVE_AREA, "ActiveArea");
     map.insert(TAG_COLOR_MATRIX1, "ColorMatrix1");
     map.insert(TAG_COLOR_MATRIX2, "ColorMatrix2");
     map.insert(TAG_ANALOG_BALANCE, "AnalogBalance");
@@ -866,11 +932,15 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_BASELINE_EXPOSURE, "BaselineExposure");
     map.insert(TAG_BASELINE_NOISE, "BaselineNoise");
     map.insert(TAG_BASELINE_SHARPNESS, "BaselineSharpness");
+    map.insert(TAG_PREVIEW_COLOR_SPACE, "PreviewColorSpace");
     map.insert(TAG_LINEAR_RESPONSE_LIMIT, "LinearResponseLimit");
+    map.insert(TAG_RAW_DATA_UNIQUE_ID, "RawDataUniqueID");
+    map.insert(TAG_MASKED_AREAS, "MaskedAreas");
     map.insert(TAG_SHADOW_SCALE, "ShadowScale");
     map.insert(TAG_CALIBRATION_ILLUMINANT1, "CalibrationIlluminant1");
     map.insert(TAG_CALIBRATION_ILLUMINANT2, "CalibrationIlluminant2");
     map.insert(TAG_BEST_QUALITY_SCALE, "BestQualityScale");
+    map.insert(TAG_RAW_IMAGE_DIGEST, "RawImageDigest");
 
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
