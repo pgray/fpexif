@@ -232,6 +232,64 @@ pub const TAG_GPS_INFO: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 
+// DNG (Adobe Digital Negative) tags
+pub const TAG_DNG_VERSION: ExifTagId = ExifTagId {
+    id: 0xC612,
+    ifd: TagGroup::Main,
+};
+pub const TAG_DNG_BACKWARD_VERSION: ExifTagId = ExifTagId {
+    id: 0xC613,
+    ifd: TagGroup::Main,
+};
+pub const TAG_UNIQUE_CAMERA_MODEL: ExifTagId = ExifTagId {
+    id: 0xC614,
+    ifd: TagGroup::Main,
+};
+pub const TAG_COLOR_MATRIX1: ExifTagId = ExifTagId {
+    id: 0xC621,
+    ifd: TagGroup::Main,
+};
+pub const TAG_COLOR_MATRIX2: ExifTagId = ExifTagId {
+    id: 0xC622,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ANALOG_BALANCE: ExifTagId = ExifTagId {
+    id: 0xC627,
+    ifd: TagGroup::Main,
+};
+pub const TAG_AS_SHOT_NEUTRAL: ExifTagId = ExifTagId {
+    id: 0xC628,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BASELINE_EXPOSURE: ExifTagId = ExifTagId {
+    id: 0xC62A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BASELINE_NOISE: ExifTagId = ExifTagId {
+    id: 0xC62B,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BASELINE_SHARPNESS: ExifTagId = ExifTagId {
+    id: 0xC62C,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LINEAR_RESPONSE_LIMIT: ExifTagId = ExifTagId {
+    id: 0xC62E,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SHADOW_SCALE: ExifTagId = ExifTagId {
+    id: 0xC634,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CALIBRATION_ILLUMINANT1: ExifTagId = ExifTagId {
+    id: 0xC65A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CALIBRATION_ILLUMINANT2: ExifTagId = ExifTagId {
+    id: 0xC65B,
+    ifd: TagGroup::Main,
+};
+
 // EXIF SubIFD tags
 pub const TAG_EXPOSURE_TIME: ExifTagId = ExifTagId {
     id: 0x829A,
@@ -608,7 +666,22 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_COPYRIGHT, "Copyright");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
-    map.insert(TAG_PRINT_IM, "PrintIM");
+
+    // DNG tags
+    map.insert(TAG_DNG_VERSION, "DNGVersion");
+    map.insert(TAG_DNG_BACKWARD_VERSION, "DNGBackwardVersion");
+    map.insert(TAG_UNIQUE_CAMERA_MODEL, "UniqueCameraModel");
+    map.insert(TAG_COLOR_MATRIX1, "ColorMatrix1");
+    map.insert(TAG_COLOR_MATRIX2, "ColorMatrix2");
+    map.insert(TAG_ANALOG_BALANCE, "AnalogBalance");
+    map.insert(TAG_AS_SHOT_NEUTRAL, "AsShotNeutral");
+    map.insert(TAG_BASELINE_EXPOSURE, "BaselineExposure");
+    map.insert(TAG_BASELINE_NOISE, "BaselineNoise");
+    map.insert(TAG_BASELINE_SHARPNESS, "BaselineSharpness");
+    map.insert(TAG_LINEAR_RESPONSE_LIMIT, "LinearResponseLimit");
+    map.insert(TAG_SHADOW_SCALE, "ShadowScale");
+    map.insert(TAG_CALIBRATION_ILLUMINANT1, "CalibrationIlluminant1");
+    map.insert(TAG_CALIBRATION_ILLUMINANT2, "CalibrationIlluminant2");
 
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
