@@ -517,11 +517,12 @@ fn test_file_against_exiftool(path: &str) {
                             } else {
                                 metadata_mismatches += 1;
                                 println!(
-                                    "  ⚠ Flash mismatch in {}: exiftool=\"{}\" ({}) fpexif={}",
+                                    "  ⚠ Flash mismatch in {}: exiftool=\"{}\" ({}) fpexif={} (raw value: 0x{:04X})",
                                     path,
                                     exiftool_flash,
                                     if exiftool_fired { "Fired" } else { "Not Fired" },
-                                    if fpexif_fired { "Fired" } else { "Not Fired" }
+                                    if fpexif_fired { "Fired" } else { "Not Fired" },
+                                    vals[0]
                                 );
                             }
                         }
