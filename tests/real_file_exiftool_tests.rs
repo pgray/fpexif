@@ -278,8 +278,8 @@ fn test_file_against_exiftool(path: &str) {
                         } else if !vals.is_empty() {
                             photo_mismatches += 1;
                             println!(
-                                "  ⚠ ISO mismatch: exiftool={} fpexif={}",
-                                exiftool_iso, vals[0]
+                                "  ⚠ ISO mismatch in {}: exiftool={} fpexif={}",
+                                path, exiftool_iso, vals[0]
                             );
                         }
                     }
@@ -324,8 +324,8 @@ fn test_file_against_exiftool(path: &str) {
                             } else {
                                 photo_mismatches += 1;
                                 println!(
-                                    "  ⚠ Shutter Speed mismatch: exiftool={}/{} fpexif={}/{}",
-                                    exiftool_num, exiftool_den, fpexif_num, fpexif_den
+                                    "  ⚠ Shutter Speed mismatch in {}: exiftool={}/{} fpexif={}/{}",
+                                    path, exiftool_num, exiftool_den, fpexif_num, fpexif_den
                                 );
                             }
                         }
@@ -360,8 +360,8 @@ fn test_file_against_exiftool(path: &str) {
                             } else {
                                 photo_mismatches += 1;
                                 println!(
-                                    "  ⚠ Aperture mismatch: exiftool=f/{:.1} fpexif=f/{:.1}",
-                                    exiftool_aperture, fpexif_f
+                                    "  ⚠ Aperture mismatch in {}: exiftool=f/{:.1} fpexif=f/{:.1}",
+                                    path, exiftool_aperture, fpexif_f
                                 );
                             }
                         }
@@ -398,8 +398,8 @@ fn test_file_against_exiftool(path: &str) {
                             } else {
                                 photo_mismatches += 1;
                                 println!(
-                                    "  ⚠ Focal Length mismatch: exiftool={:.1}mm fpexif={:.1}mm",
-                                    exiftool_focal, fpexif_focal
+                                    "  ⚠ Focal Length mismatch in {}: exiftool={:.1}mm fpexif={:.1}mm",
+                                    path, exiftool_focal, fpexif_focal
                                 );
                             }
                         }
