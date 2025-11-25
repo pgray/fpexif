@@ -62,6 +62,10 @@ impl fmt::Display for ExifTagId {
 }
 
 // Common EXIF tag IDs
+pub const TAG_NEW_SUBFILE_TYPE: ExifTagId = ExifTagId {
+    id: 0x00FE,
+    ifd: TagGroup::Main,
+};
 pub const TAG_IMAGE_WIDTH: ExifTagId = ExifTagId {
     id: 0x0100,
     ifd: TagGroup::Main,
@@ -80,6 +84,10 @@ pub const TAG_COMPRESSION: ExifTagId = ExifTagId {
 };
 pub const TAG_PHOTOMETRIC_INTERPRETATION: ExifTagId = ExifTagId {
     id: 0x0106,
+    ifd: TagGroup::Main,
+};
+pub const TAG_IMAGE_DESCRIPTION: ExifTagId = ExifTagId {
+    id: 0x010E,
     ifd: TagGroup::Main,
 };
 pub const TAG_MAKE: ExifTagId = ExifTagId {
@@ -108,6 +116,10 @@ pub const TAG_STRIP_OFFSETS: ExifTagId = ExifTagId {
 };
 pub const TAG_STRIP_BYTE_COUNTS: ExifTagId = ExifTagId {
     id: 0x0117,
+    ifd: TagGroup::Main,
+};
+pub const TAG_MIN_SAMPLE_VALUE: ExifTagId = ExifTagId {
+    id: 0x0118,
     ifd: TagGroup::Main,
 };
 pub const TAG_X_RESOLUTION: ExifTagId = ExifTagId {
@@ -148,6 +160,10 @@ pub const TAG_WHITE_POINT: ExifTagId = ExifTagId {
 };
 pub const TAG_PRIMARY_CHROMATICITIES: ExifTagId = ExifTagId {
     id: 0x013F,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SUB_IFDS: ExifTagId = ExifTagId {
+    id: 0x014A,
     ifd: TagGroup::Main,
 };
 pub const TAG_JPEG_INTERCHANGE_FORMAT: ExifTagId = ExifTagId {
@@ -197,6 +213,10 @@ pub const TAG_YCBCR_POSITIONING: ExifTagId = ExifTagId {
 };
 pub const TAG_REFERENCE_BLACK_WHITE: ExifTagId = ExifTagId {
     id: 0x0214,
+    ifd: TagGroup::Main,
+};
+pub const TAG_IPTC_NAA: ExifTagId = ExifTagId {
+    id: 0x83BB,
     ifd: TagGroup::Main,
 };
 pub const TAG_COPYRIGHT: ExifTagId = ExifTagId {
@@ -293,8 +313,16 @@ pub const TAG_FOCAL_LENGTH: ExifTagId = ExifTagId {
     id: 0x920A,
     ifd: TagGroup::Exif,
 };
+pub const TAG_IMAGE_NUMBER: ExifTagId = ExifTagId {
+    id: 0x9211,
+    ifd: TagGroup::Exif,
+};
 pub const TAG_SUBJECT_AREA: ExifTagId = ExifTagId {
     id: 0x9214,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_TIFF_EP_STANDARD_ID: ExifTagId = ExifTagId {
+    id: 0x9216,
     ifd: TagGroup::Exif,
 };
 pub const TAG_MAKER_NOTE: ExifTagId = ExifTagId {
@@ -534,11 +562,13 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     let mut map = HashMap::new();
 
     // Add tag names for common tags
+    map.insert(TAG_NEW_SUBFILE_TYPE, "NewSubfileType");
     map.insert(TAG_IMAGE_WIDTH, "ImageWidth");
     map.insert(TAG_IMAGE_LENGTH, "ImageLength");
     map.insert(TAG_BITS_PER_SAMPLE, "BitsPerSample");
     map.insert(TAG_COMPRESSION, "Compression");
     map.insert(TAG_PHOTOMETRIC_INTERPRETATION, "PhotometricInterpretation");
+    map.insert(TAG_IMAGE_DESCRIPTION, "ImageDescription");
     map.insert(TAG_MAKE, "Make");
     map.insert(TAG_MODEL, "Model");
     map.insert(TAG_ORIENTATION, "Orientation");
@@ -546,6 +576,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_ROWS_PER_STRIP, "RowsPerStrip");
     map.insert(TAG_STRIP_OFFSETS, "StripOffsets");
     map.insert(TAG_STRIP_BYTE_COUNTS, "StripByteCounts");
+    map.insert(TAG_MIN_SAMPLE_VALUE, "MinSampleValue");
     map.insert(TAG_X_RESOLUTION, "XResolution");
     map.insert(TAG_Y_RESOLUTION, "YResolution");
     map.insert(TAG_PLANAR_CONFIGURATION, "PlanarConfiguration");
@@ -572,6 +603,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_YCBCR_SUB_SAMPLING, "YCbCrSubSampling");
     map.insert(TAG_YCBCR_POSITIONING, "YCbCrPositioning");
     map.insert(TAG_REFERENCE_BLACK_WHITE, "ReferenceBlackWhite");
+    map.insert(TAG_SUB_IFDS, "SubIFDs");
+    map.insert(TAG_IPTC_NAA, "IPTC/NAA");
     map.insert(TAG_COPYRIGHT, "Copyright");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
@@ -598,7 +631,9 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_LIGHT_SOURCE, "LightSource");
     map.insert(TAG_FLASH, "Flash");
     map.insert(TAG_FOCAL_LENGTH, "FocalLength");
+    map.insert(TAG_IMAGE_NUMBER, "ImageNumber");
     map.insert(TAG_SUBJECT_AREA, "SubjectArea");
+    map.insert(TAG_TIFF_EP_STANDARD_ID, "TIFF/EPStandardID");
     map.insert(TAG_MAKER_NOTE, "MakerNote");
     map.insert(TAG_USER_COMMENT, "UserComment");
     map.insert(TAG_SUB_SEC_TIME, "SubSecTime");
