@@ -499,7 +499,13 @@ fn test_file_against_exiftool(path: &str) {
             if let Some(exiftool_flash) = exiftool_data.get("Flash").and_then(|v| v.as_str()) {
                 if let Some(fpexif_flash_value) = exif_data.get_tag_by_name("Flash") {
                     validations += 1;
-                    let exiftool_fired = exiftool_flash.to_lowercase().contains("fired");
+                    let flash_lower = exiftool_flash.to_lowercase();
+                    // Check if flash fired: must contain "fired" but NOT "did not fire" or "not fired"
+                    let exiftool_fired = flash_lower.contains("fired")
+                        && !flash_lower.contains("did not fire")
+                        && !flash_lower.contains("not fired")
+                        && !flash_lower.starts_with("off")
+                        && !flash_lower.starts_with("no flash");
                     if let fpexif::data_types::ExifValue::Short(ref vals) = fpexif_flash_value {
                         if !vals.is_empty() {
                             let fpexif_fired = (vals[0] & 0x01) != 0;
@@ -511,7 +517,9 @@ fn test_file_against_exiftool(path: &str) {
                             } else {
                                 metadata_mismatches += 1;
                                 println!(
-                                    "  ⚠ Flash mismatch: exiftool={} fpexif={}",
+                                    "  ⚠ Flash mismatch in {}: exiftool=\"{}\" ({}) fpexif={}",
+                                    path,
+                                    exiftool_flash,
                                     if exiftool_fired { "Fired" } else { "Not Fired" },
                                     if fpexif_fired { "Fired" } else { "Not Fired" }
                                 );
