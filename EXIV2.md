@@ -4,6 +4,8 @@ This document tracks progress toward matching exiv2's most commonly used feature
 
 Exiv2 is a C++ library and command-line tool focused on EXIF, IPTC, and XMP metadata. It has a different philosophy than exiftool - more focused on standards compliance and library integration.
 
+[the book](https://exiv2.org/book/)
+
 ## Reading Features
 
 ### Implemented
