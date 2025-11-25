@@ -350,6 +350,24 @@ pub const TAG_GPS_INFO: ExifTagId = ExifTagId {
     id: 0x8825,
     ifd: TagGroup::Main,
 };
+// TIFF/EP Color Filter Array tags
+pub const TAG_CFA_REPEAT_PATTERN_DIM: ExifTagId = ExifTagId {
+    id: 0x828D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CFA_PATTERN_TIFFEP: ExifTagId = ExifTagId {
+    id: 0x828E,
+    ifd: TagGroup::Main,
+};
+// JPEG tags in Main IFD (some RAW formats)
+pub const TAG_JPEG_INTERCHANGE_FORMAT_MAIN: ExifTagId = ExifTagId {
+    id: 0x0201,
+    ifd: TagGroup::Main,
+};
+pub const TAG_JPEG_INTERCHANGE_FORMAT_LENGTH_MAIN: ExifTagId = ExifTagId {
+    id: 0x0202,
+    ifd: TagGroup::Main,
+};
 
 // DNG (Adobe Digital Negative) tags
 pub const TAG_DNG_VERSION: ExifTagId = ExifTagId {
@@ -827,6 +845,15 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_COPYRIGHT, "Copyright");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
+    // TIFF/EP CFA tags
+    map.insert(TAG_CFA_REPEAT_PATTERN_DIM, "CFARepeatPatternDim");
+    map.insert(TAG_CFA_PATTERN_TIFFEP, "CFAPattern");
+    // JPEG tags in Main IFD
+    map.insert(TAG_JPEG_INTERCHANGE_FORMAT_MAIN, "JPEGInterchangeFormat");
+    map.insert(
+        TAG_JPEG_INTERCHANGE_FORMAT_LENGTH_MAIN,
+        "JPEGInterchangeFormatLength",
+    );
 
     // DNG tags
     map.insert(TAG_DNG_VERSION, "DNGVersion");
