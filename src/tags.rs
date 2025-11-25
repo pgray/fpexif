@@ -215,6 +215,10 @@ pub const TAG_REFERENCE_BLACK_WHITE: ExifTagId = ExifTagId {
     id: 0x0214,
     ifd: TagGroup::Main,
 };
+pub const TAG_XMP_METADATA: ExifTagId = ExifTagId {
+    id: 0x02BC,
+    ifd: TagGroup::Main,
+};
 pub const TAG_IPTC_NAA: ExifTagId = ExifTagId {
     id: 0x83BB,
     ifd: TagGroup::Main,
@@ -309,6 +313,10 @@ pub const TAG_ISO_SPEED_RATINGS: ExifTagId = ExifTagId {
 };
 pub const TAG_SENSITIVITY_TYPE: ExifTagId = ExifTagId {
     id: 0x8830,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SPECTRAL_SENSITIVITY: ExifTagId = ExifTagId {
+    id: 0x8832,
     ifd: TagGroup::Exif,
 };
 pub const TAG_EXIF_VERSION: ExifTagId = ExifTagId {
@@ -661,6 +669,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_YCBCR_SUB_SAMPLING, "YCbCrSubSampling");
     map.insert(TAG_YCBCR_POSITIONING, "YCbCrPositioning");
     map.insert(TAG_REFERENCE_BLACK_WHITE, "ReferenceBlackWhite");
+    map.insert(TAG_XMP_METADATA, "XMPMetadata");
     map.insert(TAG_SUB_IFDS, "SubIFDs");
     map.insert(TAG_IPTC_NAA, "IPTC/NAA");
     map.insert(TAG_COPYRIGHT, "Copyright");
@@ -689,6 +698,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_EXPOSURE_PROGRAM, "ExposureProgram");
     map.insert(TAG_ISO_SPEED_RATINGS, "ISOSpeedRatings");
     map.insert(TAG_SENSITIVITY_TYPE, "SensitivityType");
+    map.insert(TAG_SPECTRAL_SENSITIVITY, "SpectralSensitivity");
     map.insert(TAG_EXIF_VERSION, "ExifVersion");
     map.insert(TAG_DATE_TIME_ORIGINAL, "DateTimeOriginal");
     map.insert(TAG_DATE_TIME_DIGITIZED, "DateTimeDigitized");
