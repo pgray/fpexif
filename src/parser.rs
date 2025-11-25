@@ -7,8 +7,58 @@ use crate::tags::TagGroup;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 
-/// Parse EXIF data from a reader
+/// Configuration for EXIF parsing
+#[derive(Debug, Clone, Copy)]
+pub struct ParseConfig {
+    /// Whether to fail on parse errors or continue
+    pub strict: bool,
+    /// Whether to print verbose debug output
+    pub verbose: bool,
+}
+
+impl ParseConfig {
+    /// Create a new parse configuration with default settings
+    pub fn new() -> Self {
+        Self {
+            strict: true,
+            verbose: false,
+        }
+    }
+
+    /// Create a strict parsing configuration
+    pub fn strict() -> Self {
+        Self {
+            strict: true,
+            verbose: false,
+        }
+    }
+
+    /// Create a lenient parsing configuration
+    pub fn lenient() -> Self {
+        Self {
+            strict: false,
+            verbose: false,
+        }
+    }
+}
+
+impl Default for ParseConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Parse EXIF data from a reader with boolean parameters (deprecated, use parse_exif_with_config)
 pub fn parse_exif<R>(reader: R, strict: bool, verbose: bool) -> ExifResult<crate::ExifData>
+where
+    R: Read + Seek,
+{
+    let config = ParseConfig { strict, verbose };
+    parse_exif_with_config(reader, config)
+}
+
+/// Parse EXIF data from a reader with configuration
+pub fn parse_exif_with_config<R>(reader: R, config: ParseConfig) -> ExifResult<crate::ExifData>
 where
     R: Read + Seek,
 {
@@ -56,8 +106,7 @@ where
         tiff_offset,
         endian,
         TagGroup::Main,
-        strict,
-        verbose,
+        config,
     )?;
 
     // Add the parsed tags to our result
@@ -65,68 +114,33 @@ where
         exif_data.tags.insert(tag_id, value);
     }
 
-    // Check for EXIF SubIFD
-    if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(0x8769) {
-        if !offsets.is_empty() {
-            let exif_offset = offsets[0] as usize;
-            let (exif_tags, _) = parse_ifd(
-                &app1_data,
-                tiff_offset + exif_offset,
-                tiff_offset,
-                endian,
-                TagGroup::Exif,
-                strict,
-                verbose,
-            )?;
+    // Helper closure to parse and add SubIFD tags
+    let mut parse_subifd = |pointer_tag_id: u16, tag_group: TagGroup| -> ExifResult<()> {
+        if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(pointer_tag_id) {
+            if !offsets.is_empty() {
+                let subifd_offset = offsets[0] as usize;
+                let (subifd_tags, _) = parse_ifd(
+                    &app1_data,
+                    tiff_offset + subifd_offset,
+                    tiff_offset,
+                    endian,
+                    tag_group,
+                    config,
+                )?;
 
-            // Add the EXIF SubIFD tags
-            for (tag_id, value) in exif_tags {
-                exif_data.tags.insert(tag_id, value);
+                // Add the SubIFD tags
+                for (tag_id, value) in subifd_tags {
+                    exif_data.tags.insert(tag_id, value);
+                }
             }
         }
-    }
+        Ok(())
+    };
 
-    // Check for GPS SubIFD
-    if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(0x8825) {
-        if !offsets.is_empty() {
-            let gps_offset = offsets[0] as usize;
-            let (gps_tags, _) = parse_ifd(
-                &app1_data,
-                tiff_offset + gps_offset,
-                tiff_offset,
-                endian,
-                TagGroup::Gps,
-                strict,
-                verbose,
-            )?;
-
-            // Add the GPS SubIFD tags
-            for (tag_id, value) in gps_tags {
-                exif_data.tags.insert(tag_id, value);
-            }
-        }
-    }
-
-    // Check for Interoperability SubIFD
-    if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(0xA005) {
-        if !offsets.is_empty() {
-            let interop_offset = offsets[0] as usize;
-            let (interop_tags, _) = parse_ifd(
-                &app1_data,
-                tiff_offset + interop_offset,
-                tiff_offset,
-                endian,
-                TagGroup::Interop,
-                strict,
-                verbose,
-            )?;
-
-            // Add the Interoperability SubIFD tags
-            for (tag_id, value) in interop_tags {
-                exif_data.tags.insert(tag_id, value);
-            }
-        }
-    }
+    // Parse SubIFDs: EXIF, GPS, and Interoperability
+    parse_subifd(0x8769, TagGroup::Exif)?; // EXIF SubIFD
+    parse_subifd(0x8825, TagGroup::Gps)?; // GPS SubIFD
+    parse_subifd(0xA005, TagGroup::Interop)?; // Interoperability SubIFD
 
     // Parse thumbnail IFD (IFD1) if present
     if next_ifd_offset > 0 && tiff_offset + next_ifd_offset as usize + 2 <= app1_data.len() {
@@ -136,8 +150,7 @@ where
             tiff_offset,
             endian,
             TagGroup::Thumbnail,
-            strict,
-            verbose,
+            config,
         )?;
 
         // Add the thumbnail tags
@@ -176,8 +189,7 @@ fn parse_ifd(
     base_offset: usize,
     endian: Endianness,
     ifd_type: TagGroup,
-    strict: bool,
-    verbose: bool,
+    config: ParseConfig,
 ) -> ExifResult<(HashMap<ExifTagId, ExifValue>, u32)> {
     // Get number of entries in this IFD
     if offset + 2 > data.len() {
@@ -185,7 +197,7 @@ fn parse_ifd(
     }
 
     let entry_count = read_u16(&data[offset..offset + 2], endian) as usize;
-    if verbose {
+    if config.verbose {
         println!("IFD has {} entries", entry_count);
     }
 
@@ -221,11 +233,11 @@ fn parse_ifd(
                 tags.insert(exif_tag_id, value);
             }
             Err(err) => {
-                if verbose {
+                if config.verbose {
                     println!("Error parsing tag 0x{:04X}: {}", tag_id, err);
                 }
                 // If in strict mode, propagate the error
-                if strict {
+                if config.strict {
                     return Err(err);
                 }
                 // Otherwise, continue with the next tag

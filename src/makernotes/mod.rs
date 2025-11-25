@@ -1,6 +1,7 @@
 // makernotes/mod.rs - Camera manufacturer-specific maker notes parsing
 
 pub mod canon;
+pub mod fuji;
 pub mod nikon;
 pub mod sony;
 
@@ -31,6 +32,8 @@ pub fn parse_maker_notes(
         nikon::parse_nikon_maker_notes(data, endian)
     } else if make_str.contains("sony") {
         sony::parse_sony_maker_notes(data, endian)
+    } else if make_str.contains("fuji") {
+        fuji::parse_fuji_maker_notes(data, endian)
     } else {
         // Unknown maker, return empty HashMap
         Ok(HashMap::new())

@@ -44,15 +44,26 @@ enum Commands {
         #[arg(required = true)]
         tag: String,
     },
-}
 
-/// Calculate greatest common divisor
-fn gcd(a: u32, b: u32) -> u32 {
-    if b == 0 {
-        a
-    } else {
-        gcd(b, a % b)
-    }
+    /// Exiftool-compatible interface
+    #[command(name = "exiftool")]
+    Exiftool {
+        /// Output in JSON format (exiftool -j)
+        #[arg(short = 'j', long = "json")]
+        json: bool,
+
+        /// Path to the image file(s)
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
+
+    /// Exiv2-compatible interface
+    #[command(name = "exiv2")]
+    Exiv2 {
+        /// Path to the image file(s)
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -100,416 +111,220 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+        Commands::Exiftool { json, files } => {
+            let parser = ExifParser::new();
+
+            if *json {
+                // Process all files and output as JSON array
+                let mut all_results = Vec::new();
+
+                for file in files {
+                    match parser.parse_file(file) {
+                        Ok(exif_data) => {
+                            // Get the filename as a string
+                            let filename = file.to_string_lossy().to_string();
+                            let json_obj =
+                                fpexif::output::to_exiftool_json(&exif_data, Some(&filename));
+
+                            // Extract the single object from the array
+                            if let serde_json::Value::Array(mut arr) = json_obj {
+                                if let Some(obj) = arr.pop() {
+                                    all_results.push(obj);
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("Error parsing {}: {}", file.display(), err);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+
+                // Output as JSON array
+                let result = serde_json::Value::Array(all_results);
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                // Non-JSON output: exiftool-style format
+                for file in files {
+                    match parser.parse_file(file) {
+                        Ok(exif_data) => {
+                            print_exif_data_exiftool(&exif_data);
+                        }
+                        Err(err) => {
+                            eprintln!("Error parsing {}: {}", file.display(), err);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+        Commands::Exiv2 { files } => {
+            let parser = ExifParser::new();
+
+            for file in files {
+                match parser.parse_file(file) {
+                    Ok(exif_data) => {
+                        print_exif_data_exiv2(&exif_data);
+                    }
+                    Err(err) => {
+                        eprintln!("Error parsing {}: {}", file.display(), err);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Ok(())
+        }
     }
+}
+
+/// Print all EXIF data in exiftool text format: `Tag Name                        : Value`
+fn print_exif_data_exiftool(exif_data: &ExifData) {
+    for (tag_id, value) in exif_data.iter() {
+        let tag_name = tag_id.name().unwrap_or("Unknown");
+        let display_value = format_exiftool_text_value(value);
+        println!("{:<32}: {}", tag_name, display_value);
+    }
+}
+
+/// Format an ExifValue for exiftool-style text output
+fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue) -> String {
+    use fpexif::data_types::ExifValue;
+
+    match value {
+        ExifValue::Ascii(s) => s.trim_end_matches('\0').to_string(),
+        ExifValue::Byte(v) => format_values(v),
+        ExifValue::Short(v) => format_values(v),
+        ExifValue::Long(v) => format_values(v),
+        ExifValue::Rational(v) => {
+            if v.len() == 1 {
+                let (n, d) = v[0];
+                if d != 0 {
+                    let val = n as f64 / d as f64;
+                    if val == val.floor() {
+                        format!("{}", val as u32)
+                    } else {
+                        format!("{:.6}", val)
+                            .trim_end_matches('0')
+                            .trim_end_matches('.')
+                            .to_string()
+                    }
+                } else {
+                    format!("{}/{}", n, d)
+                }
+            } else {
+                v.iter()
+                    .map(|(n, d)| format!("{}/{}", n, d))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
+        }
+        ExifValue::SByte(v) => format_values(v),
+        ExifValue::SShort(v) => format_values(v),
+        ExifValue::SLong(v) => format_values(v),
+        ExifValue::SRational(v) => {
+            if v.len() == 1 {
+                let (n, d) = v[0];
+                if d != 0 {
+                    format!("{:.6}", n as f64 / d as f64)
+                        .trim_end_matches('0')
+                        .trim_end_matches('.')
+                        .to_string()
+                } else {
+                    format!("{}/{}", n, d)
+                }
+            } else {
+                v.iter()
+                    .map(|(n, d)| format!("{}/{}", n, d))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
+        }
+        ExifValue::Float(v) => format_values(v),
+        ExifValue::Double(v) => format_values(v),
+        ExifValue::Undefined(v) => format!("(Binary data {} bytes)", v.len()),
+    }
+}
+
+/// Print all EXIF data in exiv2 format: `Exif.Image.Make  Ascii  6  Canon`
+fn print_exif_data_exiv2(exif_data: &ExifData) {
+    for (tag_id, value) in exif_data.iter() {
+        let group = match tag_id.ifd {
+            tags::TagGroup::Main => "Exif.Image",
+            tags::TagGroup::Exif => "Exif.Photo",
+            tags::TagGroup::Gps => "Exif.GPSInfo",
+            tags::TagGroup::Thumbnail => "Exif.Thumbnail",
+            tags::TagGroup::Interop => "Exif.Iop",
+        };
+        let tag_name = tag_id.name().unwrap_or("Unknown");
+        let key = format!("{}.{}", group, tag_name);
+
+        let (type_name, count, display_value) = format_exiv2_value(value);
+
+        println!(
+            "{:<44} {:12} {:>4}  {}",
+            key, type_name, count, display_value
+        );
+    }
+}
+
+/// Format an ExifValue for exiv2-style output
+fn format_exiv2_value(value: &fpexif::data_types::ExifValue) -> (&'static str, usize, String) {
+    use fpexif::data_types::ExifValue;
+
+    match value {
+        ExifValue::Ascii(s) => {
+            let cleaned = s.trim_end_matches('\0');
+            ("Ascii", cleaned.len(), cleaned.to_string())
+        }
+        ExifValue::Byte(v) => ("Byte", v.len(), format_values(v)),
+        ExifValue::Short(v) => ("Short", v.len(), format_values(v)),
+        ExifValue::Long(v) => ("Long", v.len(), format_values(v)),
+        ExifValue::Rational(v) => (
+            "Rational",
+            v.len(),
+            v.iter()
+                .map(|(n, d)| format!("{}/{}", n, d))
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        ExifValue::SByte(v) => ("SByte", v.len(), format_values(v)),
+        ExifValue::SShort(v) => ("SShort", v.len(), format_values(v)),
+        ExifValue::SLong(v) => ("SLong", v.len(), format_values(v)),
+        ExifValue::SRational(v) => (
+            "SRational",
+            v.len(),
+            v.iter()
+                .map(|(n, d)| format!("{}/{}", n, d))
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        ExifValue::Float(v) => ("Float", v.len(), format_values(v)),
+        ExifValue::Double(v) => ("Double", v.len(), format_values(v)),
+        ExifValue::Undefined(v) => ("Undefined", v.len(), format!("{} bytes", v.len())),
+    }
+}
+
+fn format_values<T: std::fmt::Display>(values: &[T]) -> String {
+    values
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Print all EXIF data in JSON format (exiftool-compatible)
 fn print_exif_data_json(exif_data: &ExifData) -> Result<(), Box<dyn std::error::Error>> {
-    use serde_json::{Map, Value};
     use std::env;
 
-    let mut output = Map::new();
+    // Get the source file from command line args
+    let source_file = env::args().nth(2);
 
-    // Add SourceFile field
-    if let Some(file_arg) = env::args().nth(2) {
-        output.insert("SourceFile".to_string(), Value::String(file_arg));
-    }
+    // Use the library's output module to format as JSON
+    let json = fpexif::output::to_exiftool_json(exif_data, source_file.as_deref());
 
-    // Convert each tag to a key-value pair
-    for (tag_id, value) in exif_data.iter() {
-        let tag_name = if let Some(name) = tag_id.name() {
-            name.to_string()
-        } else {
-            format!("Tag{}", tag_id.id)
-        };
-        let json_value = format_exif_value_for_json(value, tag_id.id);
-        output.insert(tag_name, json_value);
-    }
-
-    // Add maker notes if present
-    if let Some(maker_notes) = exif_data.get_maker_notes() {
-        for (tag_id, maker_tag) in maker_notes.iter() {
-            let tag_name = maker_tag
-                .tag_name
-                .unwrap_or_else(|| Box::leak(format!("MakerNote{:04X}", tag_id).into_boxed_str()));
-            let json_value = format_exif_value_for_json(&maker_tag.value, *tag_id);
-            output.insert(tag_name.to_string(), json_value);
-        }
-    }
-
-    // Wrap in an array like exiftool does
-    let result = Value::Array(vec![Value::Object(output)]);
-
-    println!("{}", serde_json::to_string_pretty(&result)?);
+    println!("{}", serde_json::to_string_pretty(&json)?);
     Ok(())
-}
-
-/// Convert an ExifValue to a JSON value in exiftool-compatible format
-fn format_exif_value_for_json(
-    value: &fpexif::data_types::ExifValue,
-    tag_id: u16,
-) -> serde_json::Value {
-    use fpexif::data_types::ExifValue;
-    use serde_json::Value;
-
-    match value {
-        // ASCII strings - return as plain string
-        ExifValue::Ascii(s) => {
-            // Remove null terminators and trim
-            let cleaned = s.trim_end_matches('\0').trim();
-            Value::String(cleaned.to_string())
-        }
-
-        // Single-value numeric types - return as number or interpreted string
-        ExifValue::Byte(v) if v.len() == 1 => {
-            // Check for tags that need interpretation
-            match tag_id {
-                0xA300 => {
-                    // FileSource
-                    Value::String(fpexif::tags::get_file_source_description(v[0]).to_string())
-                }
-                0xA301 => {
-                    // SceneType
-                    Value::String(fpexif::tags::get_scene_type_description(v[0]).to_string())
-                }
-                _ => Value::Number(v[0].into()),
-            }
-        }
-        ExifValue::Short(v) if v.len() == 1 => {
-            // Check for tags that need human-readable interpretation
-            match tag_id {
-                0x0112 => {
-                    // Orientation
-                    Value::String(fpexif::tags::get_orientation_description(v[0]).to_string())
-                }
-                0x0103 => {
-                    // Compression
-                    Value::String(fpexif::tags::get_compression_description(v[0]).to_string())
-                }
-                0x0128 => {
-                    // ResolutionUnit
-                    Value::String(fpexif::tags::get_resolution_unit_description(v[0]).to_string())
-                }
-                0x0213 => {
-                    // YCbCrPositioning
-                    Value::String(fpexif::tags::get_ycbcr_positioning_description(v[0]).to_string())
-                }
-                0x8822 => {
-                    // ExposureProgram
-                    Value::String(fpexif::tags::get_exposure_program_description(v[0]).to_string())
-                }
-                0x9207 => {
-                    // MeteringMode
-                    Value::String(fpexif::tags::get_metering_mode_description(v[0]).to_string())
-                }
-                0x9208 => {
-                    // LightSource
-                    Value::String(fpexif::tags::get_light_source_description(v[0]).to_string())
-                }
-                0x9209 => {
-                    // Flash
-                    Value::String(fpexif::tags::get_flash_description(v[0]).to_string())
-                }
-                0xA001 => {
-                    // ColorSpace
-                    Value::String(fpexif::tags::get_color_space_description(v[0]).to_string())
-                }
-                0xA210 => {
-                    // FocalPlaneResolutionUnit
-                    Value::String(
-                        match v[0] {
-                            2 => "inches",
-                            3 => "cm",
-                            _ => "unknown",
-                        }
-                        .to_string(),
-                    )
-                }
-                0xA402 => {
-                    // ExposureMode
-                    Value::String(fpexif::tags::get_exposure_mode_description(v[0]).to_string())
-                }
-                0xA403 => {
-                    // WhiteBalance
-                    Value::String(fpexif::tags::get_white_balance_description(v[0]).to_string())
-                }
-                0xA406 => {
-                    // SceneCaptureType
-                    Value::String(
-                        fpexif::tags::get_scene_capture_type_description(v[0]).to_string(),
-                    )
-                }
-                0xA408 => {
-                    // Contrast
-                    Value::String(fpexif::tags::get_contrast_description(v[0]).to_string())
-                }
-                0xA409 => {
-                    // Saturation
-                    Value::String(fpexif::tags::get_saturation_description(v[0]).to_string())
-                }
-                0xA40A => {
-                    // Sharpness
-                    Value::String(fpexif::tags::get_sharpness_description(v[0]).to_string())
-                }
-                0xA40C => {
-                    // SubjectDistanceRange
-                    Value::String(
-                        fpexif::tags::get_subject_distance_range_description(v[0]).to_string(),
-                    )
-                }
-                0xA401 => {
-                    // CustomRendered
-                    Value::String(fpexif::tags::get_custom_rendered_description(v[0]).to_string())
-                }
-                0xA40B => {
-                    // GainControl
-                    Value::String(fpexif::tags::get_gain_control_description(v[0]).to_string())
-                }
-                0x041A => {
-                    // SensingMethod
-                    Value::String(fpexif::tags::get_sensing_method_description(v[0]).to_string())
-                }
-                _ => Value::Number(v[0].into()),
-            }
-        }
-        ExifValue::Long(v) if v.len() == 1 => Value::Number(v[0].into()),
-        ExifValue::SByte(v) if v.len() == 1 => Value::Number(v[0].into()),
-        ExifValue::SShort(v) if v.len() == 1 => Value::Number(v[0].into()),
-        ExifValue::SLong(v) if v.len() == 1 => Value::Number(v[0].into()),
-
-        // Float/Double - return as number
-        ExifValue::Float(v) if v.len() == 1 => serde_json::Number::from_f64(v[0] as f64)
-            .map(Value::Number)
-            .unwrap_or_else(|| Value::String(v[0].to_string())),
-        ExifValue::Double(v) if v.len() == 1 => serde_json::Number::from_f64(v[0])
-            .map(Value::Number)
-            .unwrap_or_else(|| Value::String(v[0].to_string())),
-
-        // Rational - format as decimal number or fraction depending on tag
-        ExifValue::Rational(v) if v.len() == 1 => {
-            let (num, den) = v[0];
-            if den == 0 {
-                Value::String("inf".to_string())
-            } else {
-                // Special handling for certain tags
-                match tag_id {
-                    0x829A => {
-                        // ExposureTime - show as simplified fraction
-                        let gcd = gcd(num, den);
-                        let simplified_num = num / gcd;
-                        let simplified_den = den / gcd;
-                        if simplified_num == 1 {
-                            Value::String(format!("1/{}", simplified_den))
-                        } else {
-                            Value::String(format!("{}/{}", simplified_num, simplified_den))
-                        }
-                    }
-                    0x9201 => {
-                        // ShutterSpeedValue (APEX) - convert to shutter speed fraction
-                        let apex_value = num as f64 / den as f64;
-                        let shutter_speed = 2f64.powf(apex_value);
-                        let denominator = shutter_speed.round() as u32;
-                        Value::String(format!("1/{}", denominator))
-                    }
-                    0x9202 | 0x9205 => {
-                        // ApertureValue, MaxApertureValue (APEX) - convert to f-number and round to 1 decimal
-                        let apex_value = num as f64 / den as f64;
-                        let f_number = 2f64.powf(apex_value / 2.0);
-                        let rounded = (f_number * 10.0).round() / 10.0;
-                        serde_json::Number::from_f64(rounded)
-                            .map(Value::Number)
-                            .unwrap_or_else(|| Value::String(rounded.to_string()))
-                    }
-                    0x920A => {
-                        // FocalLength - add mm unit
-                        let focal_length = num as f64 / den as f64;
-                        Value::String(format!("{} mm", focal_length))
-                    }
-                    0x9203 | 0x9204 => {
-                        // Other APEX values - show as decimal
-                        let decimal = num as f64 / den as f64;
-                        serde_json::Number::from_f64(decimal)
-                            .map(Value::Number)
-                            .unwrap_or_else(|| Value::String(decimal.to_string()))
-                    }
-                    _ => {
-                        // Default: show as decimal
-                        let decimal = num as f64 / den as f64;
-                        serde_json::Number::from_f64(decimal)
-                            .map(Value::Number)
-                            .unwrap_or_else(|| Value::String(decimal.to_string()))
-                    }
-                }
-            }
-        }
-
-        // Signed Rational
-        ExifValue::SRational(v) if v.len() == 1 => {
-            let (num, den) = v[0];
-            if den == 0 {
-                Value::String("inf".to_string())
-            } else {
-                // Special handling for certain tags
-                match tag_id {
-                    0x9201 => {
-                        // ShutterSpeedValue (APEX) - convert to shutter speed fraction
-                        let apex_value = num as f64 / den as f64;
-                        let shutter_speed = 2f64.powf(apex_value);
-                        let denominator = shutter_speed.round() as i32;
-                        Value::String(format!("1/{}", denominator))
-                    }
-                    _ => {
-                        let decimal = num as f64 / den as f64;
-                        serde_json::Number::from_f64(decimal)
-                            .map(Value::Number)
-                            .unwrap_or_else(|| Value::String(decimal.to_string()))
-                    }
-                }
-            }
-        }
-
-        // Multi-value arrays - return as JSON array
-        ExifValue::Byte(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-        ExifValue::Short(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-        ExifValue::Long(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-        ExifValue::SByte(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-        ExifValue::SShort(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-        ExifValue::SLong(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-        ExifValue::Float(v) => Value::Array(
-            v.iter()
-                .map(|&f| {
-                    serde_json::Number::from_f64(f as f64)
-                        .map(Value::Number)
-                        .unwrap_or_else(|| Value::String(f.to_string()))
-                })
-                .collect(),
-        ),
-        ExifValue::Double(v) => Value::Array(
-            v.iter()
-                .map(|&f| {
-                    serde_json::Number::from_f64(f)
-                        .map(Value::Number)
-                        .unwrap_or_else(|| Value::String(f.to_string()))
-                })
-                .collect(),
-        ),
-
-        // Multi-value rationals - return as array of decimals
-        ExifValue::Rational(v) => Value::Array(
-            v.iter()
-                .map(|&(num, den)| {
-                    if den == 0 {
-                        Value::String("inf".to_string())
-                    } else {
-                        let decimal = num as f64 / den as f64;
-                        serde_json::Number::from_f64(decimal)
-                            .map(Value::Number)
-                            .unwrap_or_else(|| Value::String(decimal.to_string()))
-                    }
-                })
-                .collect(),
-        ),
-        ExifValue::SRational(v) => Value::Array(
-            v.iter()
-                .map(|&(num, den)| {
-                    if den == 0 {
-                        Value::String("inf".to_string())
-                    } else {
-                        let decimal = num as f64 / den as f64;
-                        serde_json::Number::from_f64(decimal)
-                            .map(Value::Number)
-                            .unwrap_or_else(|| Value::String(decimal.to_string()))
-                    }
-                })
-                .collect(),
-        ),
-
-        // Undefined - return as base64 or hex string, or interpret special tags
-        ExifValue::Undefined(v) => {
-            // Special handling for FileSource and SceneType which are often Undefined type
-            match tag_id {
-                0x9000 | 0xA000 => {
-                    // ExifVersion, FlashpixVersion - decode ASCII bytes to string
-                    String::from_utf8(v.to_vec())
-                        .map(Value::String)
-                        .unwrap_or_else(|_| {
-                            Value::String(
-                                v.iter()
-                                    .map(|b| format!("{:02x}", b))
-                                    .collect::<Vec<_>>()
-                                    .join(" "),
-                            )
-                        })
-                }
-                0x9101 if v.len() == 4 => {
-                    // ComponentsConfiguration - decode to channel names
-                    let channels: Vec<&str> = v
-                        .iter()
-                        .map(|&b| match b {
-                            0 => "-",
-                            1 => "Y",
-                            2 => "Cb",
-                            3 => "Cr",
-                            4 => "R",
-                            5 => "G",
-                            6 => "B",
-                            _ => "?",
-                        })
-                        .collect();
-                    Value::String(channels.join(", "))
-                }
-                0xA300 if v.len() == 1 => {
-                    // FileSource
-                    Value::String(fpexif::tags::get_file_source_description(v[0]).to_string())
-                }
-                0xA301 if v.len() == 1 => {
-                    // SceneType
-                    Value::String(fpexif::tags::get_scene_type_description(v[0]).to_string())
-                }
-                _ => {
-                    if v.len() <= 32 {
-                        // For short undefined data, show as hex
-                        Value::String(
-                            v.iter()
-                                .map(|b| format!("{:02x}", b))
-                                .collect::<Vec<_>>()
-                                .join(" "),
-                        )
-                    } else {
-                        // For longer data, use base64
-                        Value::String(base64_encode(v))
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Simple base64 encoding
-fn base64_encode(data: &[u8]) -> String {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut result = String::new();
-
-    for chunk in data.chunks(3) {
-        let b1 = chunk[0];
-        let b2 = chunk.get(1).copied().unwrap_or(0);
-        let b3 = chunk.get(2).copied().unwrap_or(0);
-
-        result.push(CHARS[(b1 >> 2) as usize] as char);
-        result.push(CHARS[(((b1 & 0x03) << 4) | (b2 >> 4)) as usize] as char);
-        result.push(if chunk.len() > 1 {
-            CHARS[(((b2 & 0x0f) << 2) | (b3 >> 6)) as usize] as char
-        } else {
-            '='
-        });
-        result.push(if chunk.len() > 2 {
-            CHARS[(b3 & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-    }
-
-    result
 }
 
 /// Print all EXIF data in a human-readable format

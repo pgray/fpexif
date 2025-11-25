@@ -158,6 +158,31 @@ pub const TAG_JPEG_INTERCHANGE_FORMAT_LENGTH: ExifTagId = ExifTagId {
     id: 0x0202,
     ifd: TagGroup::Thumbnail,
 };
+// Additional Thumbnail IFD tags (same IDs as Main but in IFD1)
+pub const TAG_THUMBNAIL_COMPRESSION: ExifTagId = ExifTagId {
+    id: 0x0103,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_ORIENTATION: ExifTagId = ExifTagId {
+    id: 0x0112,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_X_RESOLUTION: ExifTagId = ExifTagId {
+    id: 0x011A,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_Y_RESOLUTION: ExifTagId = ExifTagId {
+    id: 0x011B,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_RESOLUTION_UNIT: ExifTagId = ExifTagId {
+    id: 0x0128,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_YCBCR_POSITIONING: ExifTagId = ExifTagId {
+    id: 0x0213,
+    ifd: TagGroup::Thumbnail,
+};
 pub const TAG_YCBCR_COEFFICIENTS: ExifTagId = ExifTagId {
     id: 0x0211,
     ifd: TagGroup::Main,
@@ -202,6 +227,10 @@ pub const TAG_EXPOSURE_PROGRAM: ExifTagId = ExifTagId {
 };
 pub const TAG_ISO_SPEED_RATINGS: ExifTagId = ExifTagId {
     id: 0x8827,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SENSITIVITY_TYPE: ExifTagId = ExifTagId {
+    id: 0x8830,
     ifd: TagGroup::Exif,
 };
 pub const TAG_EXIF_VERSION: ExifTagId = ExifTagId {
@@ -410,6 +439,34 @@ pub const TAG_IMAGE_UNIQUE_ID: ExifTagId = ExifTagId {
     id: 0xA420,
     ifd: TagGroup::Exif,
 };
+pub const TAG_CAMERA_OWNER_NAME: ExifTagId = ExifTagId {
+    id: 0xA430,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_BODY_SERIAL_NUMBER: ExifTagId = ExifTagId {
+    id: 0xA431,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LENS_SPECIFICATION: ExifTagId = ExifTagId {
+    id: 0xA432,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LENS_MAKE: ExifTagId = ExifTagId {
+    id: 0xA433,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LENS_MODEL: ExifTagId = ExifTagId {
+    id: 0xA434,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_LENS_SERIAL_NUMBER: ExifTagId = ExifTagId {
+    id: 0xA435,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_PRINT_IM: ExifTagId = ExifTagId {
+    id: 0xC4A5,
+    ifd: TagGroup::Main,
+};
 
 // GPS tags
 pub const TAG_GPS_VERSION_ID: ExifTagId = ExifTagId {
@@ -504,6 +561,13 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
         TAG_JPEG_INTERCHANGE_FORMAT_LENGTH,
         "JPEGInterchangeFormatLength",
     );
+    // Thumbnail IFD tags with "Thumbnail" prefix
+    map.insert(TAG_THUMBNAIL_COMPRESSION, "ThumbnailCompression");
+    map.insert(TAG_THUMBNAIL_ORIENTATION, "ThumbnailOrientation");
+    map.insert(TAG_THUMBNAIL_X_RESOLUTION, "ThumbnailXResolution");
+    map.insert(TAG_THUMBNAIL_Y_RESOLUTION, "ThumbnailYResolution");
+    map.insert(TAG_THUMBNAIL_RESOLUTION_UNIT, "ThumbnailResolutionUnit");
+    map.insert(TAG_THUMBNAIL_YCBCR_POSITIONING, "ThumbnailYCbCrPositioning");
     map.insert(TAG_YCBCR_COEFFICIENTS, "YCbCrCoefficients");
     map.insert(TAG_YCBCR_SUB_SAMPLING, "YCbCrSubSampling");
     map.insert(TAG_YCBCR_POSITIONING, "YCbCrPositioning");
@@ -511,12 +575,14 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_COPYRIGHT, "Copyright");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
+    map.insert(TAG_PRINT_IM, "PrintIM");
 
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
     map.insert(TAG_F_NUMBER, "FNumber");
     map.insert(TAG_EXPOSURE_PROGRAM, "ExposureProgram");
     map.insert(TAG_ISO_SPEED_RATINGS, "ISOSpeedRatings");
+    map.insert(TAG_SENSITIVITY_TYPE, "SensitivityType");
     map.insert(TAG_EXIF_VERSION, "ExifVersion");
     map.insert(TAG_DATE_TIME_ORIGINAL, "DateTimeOriginal");
     map.insert(TAG_DATE_TIME_DIGITIZED, "DateTimeDigitized");
@@ -550,10 +616,29 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_FOCAL_PLANE_X_RESOLUTION, "FocalPlaneXResolution");
     map.insert(TAG_FOCAL_PLANE_Y_RESOLUTION, "FocalPlaneYResolution");
     map.insert(TAG_FOCAL_PLANE_RESOLUTION_UNIT, "FocalPlaneResolutionUnit");
+    map.insert(TAG_SENSING_METHOD, "SensingMethod");
+    map.insert(TAG_FILE_SOURCE, "FileSource");
+    map.insert(TAG_SCENE_TYPE, "SceneType");
+    map.insert(TAG_CFA_PATTERN, "CFAPattern");
     map.insert(TAG_CUSTOM_RENDERED, "CustomRendered");
     map.insert(TAG_EXPOSURE_MODE, "ExposureMode");
     map.insert(TAG_WHITE_BALANCE, "WhiteBalance");
+    map.insert(TAG_DIGITAL_ZOOM_RATIO, "DigitalZoomRatio");
+    map.insert(TAG_FOCAL_LENGTH_IN_35MM_FILM, "FocalLengthIn35mmFilm");
     map.insert(TAG_SCENE_CAPTURE_TYPE, "SceneCaptureType");
+    map.insert(TAG_GAIN_CONTROL, "GainControl");
+    map.insert(TAG_CONTRAST, "Contrast");
+    map.insert(TAG_SATURATION, "Saturation");
+    map.insert(TAG_SHARPNESS, "Sharpness");
+    map.insert(TAG_DEVICE_SETTING_DESCRIPTION, "DeviceSettingDescription");
+    map.insert(TAG_SUBJECT_DISTANCE_RANGE, "SubjectDistanceRange");
+    map.insert(TAG_IMAGE_UNIQUE_ID, "ImageUniqueID");
+    map.insert(TAG_CAMERA_OWNER_NAME, "CameraOwnerName");
+    map.insert(TAG_BODY_SERIAL_NUMBER, "BodySerialNumber");
+    map.insert(TAG_LENS_SPECIFICATION, "LensSpecification");
+    map.insert(TAG_LENS_MAKE, "LensMake");
+    map.insert(TAG_LENS_MODEL, "LensModel");
+    map.insert(TAG_LENS_SERIAL_NUMBER, "LensSerialNumber");
 
     // GPS tags
     map.insert(TAG_GPS_VERSION_ID, "GPSVersionID");
@@ -602,18 +687,18 @@ pub fn get_tag_id_by_name(name: &str) -> Option<ExifTagId> {
         .copied()
 }
 
-/// Human-readable descriptions for various EXIF orientation values
+/// Human-readable descriptions for various EXIF orientation values (exiftool-compatible)
 pub fn get_orientation_description(value: u16) -> &'static str {
     match value {
-        1 => "Normal (top-left is 0,0)",
-        2 => "Mirrored horizontally (top-right is 0,0)",
-        3 => "Rotated 180° (bottom-right is 0,0)",
-        4 => "Mirrored vertically (bottom-left is 0,0)",
-        5 => "Mirrored horizontally and rotated 90° CCW (left-top is 0,0)",
-        6 => "Rotated 90° CCW (right-top is 0,0)",
-        7 => "Mirrored horizontally and rotated 90° CW (right-bottom is 0,0)",
-        8 => "Rotated 90° CW (left-bottom is 0,0)",
-        _ => "Unknown orientation",
+        1 => "Horizontal (normal)",
+        2 => "Mirror horizontal",
+        3 => "Rotate 180",
+        4 => "Mirror vertical",
+        5 => "Mirror horizontal and rotate 270 CW",
+        6 => "Rotate 90 CW",
+        7 => "Mirror horizontal and rotate 90 CW",
+        8 => "Rotate 270 CW",
+        _ => "Unknown",
     }
 }
 
@@ -851,6 +936,21 @@ pub fn get_sensing_method_description(value: u16) -> &'static str {
         5 => "Color sequential area",
         7 => "Trilinear",
         8 => "Color sequential linear",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for SensitivityType values
+pub fn get_sensitivity_type_description(value: u16) -> &'static str {
+    match value {
+        0 => "Unknown",
+        1 => "Standard Output Sensitivity",
+        2 => "Recommended Exposure Index",
+        3 => "ISO Speed",
+        4 => "Standard Output Sensitivity and Recommended Exposure Index",
+        5 => "Standard Output Sensitivity and ISO Speed",
+        6 => "Recommended Exposure Index and ISO Speed",
+        7 => "Standard Output Sensitivity, Recommended Exposure Index and ISO Speed",
         _ => "Unknown",
     }
 }
