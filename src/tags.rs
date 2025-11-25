@@ -342,6 +342,10 @@ pub const TAG_CALIBRATION_ILLUMINANT2: ExifTagId = ExifTagId {
     id: 0xC65B,
     ifd: TagGroup::Main,
 };
+pub const TAG_BEST_QUALITY_SCALE: ExifTagId = ExifTagId {
+    id: 0xC65D,
+    ifd: TagGroup::Main,
+};
 
 // EXIF SubIFD tags
 pub const TAG_EXPOSURE_TIME: ExifTagId = ExifTagId {
@@ -753,6 +757,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_SHADOW_SCALE, "ShadowScale");
     map.insert(TAG_CALIBRATION_ILLUMINANT1, "CalibrationIlluminant1");
     map.insert(TAG_CALIBRATION_ILLUMINANT2, "CalibrationIlluminant2");
+    map.insert(TAG_BEST_QUALITY_SCALE, "BestQualityScale");
 
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
