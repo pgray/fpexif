@@ -301,6 +301,43 @@ pub const TAG_TIFF_EP_STANDARD_ID_MAIN: ExifTagId = ExifTagId {
     id: 0x9216,
     ifd: TagGroup::Main,
 };
+// Some manufacturers put basic TIFF structure tags in EXIF SubIFD
+pub const TAG_IMAGE_WIDTH_EXIF: ExifTagId = ExifTagId {
+    id: 0x0100,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_IMAGE_LENGTH_EXIF: ExifTagId = ExifTagId {
+    id: 0x0101,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_BITS_PER_SAMPLE_EXIF: ExifTagId = ExifTagId {
+    id: 0x0102,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_PHOTOMETRIC_INTERPRETATION_EXIF: ExifTagId = ExifTagId {
+    id: 0x0106,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_STRIP_OFFSETS_EXIF: ExifTagId = ExifTagId {
+    id: 0x0111,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SAMPLES_PER_PIXEL_EXIF: ExifTagId = ExifTagId {
+    id: 0x0115,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_ROWS_PER_STRIP_EXIF: ExifTagId = ExifTagId {
+    id: 0x0116,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_STRIP_BYTE_COUNTS_EXIF: ExifTagId = ExifTagId {
+    id: 0x0117,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_PLANAR_CONFIGURATION_EXIF: ExifTagId = ExifTagId {
+    id: 0x011C,
+    ifd: TagGroup::Exif,
+};
 pub const TAG_COPYRIGHT: ExifTagId = ExifTagId {
     id: 0x8298,
     ifd: TagGroup::Main,
@@ -774,6 +811,19 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_SENSING_METHOD_MAIN, "SensingMethod");
     map.insert(TAG_DATE_TIME_ORIGINAL_MAIN, "DateTimeOriginal");
     map.insert(TAG_TIFF_EP_STANDARD_ID_MAIN, "TIFF/EPStandardID");
+    // Basic TIFF structure tags in EXIF SubIFD (non-standard placement)
+    map.insert(TAG_IMAGE_WIDTH_EXIF, "ImageWidth");
+    map.insert(TAG_IMAGE_LENGTH_EXIF, "ImageLength");
+    map.insert(TAG_BITS_PER_SAMPLE_EXIF, "BitsPerSample");
+    map.insert(
+        TAG_PHOTOMETRIC_INTERPRETATION_EXIF,
+        "PhotometricInterpretation",
+    );
+    map.insert(TAG_STRIP_OFFSETS_EXIF, "StripOffsets");
+    map.insert(TAG_SAMPLES_PER_PIXEL_EXIF, "SamplesPerPixel");
+    map.insert(TAG_ROWS_PER_STRIP_EXIF, "RowsPerStrip");
+    map.insert(TAG_STRIP_BYTE_COUNTS_EXIF, "StripByteCounts");
+    map.insert(TAG_PLANAR_CONFIGURATION_EXIF, "PlanarConfiguration");
     map.insert(TAG_COPYRIGHT, "Copyright");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
