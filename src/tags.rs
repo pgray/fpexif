@@ -199,6 +199,35 @@ pub const TAG_THUMBNAIL_YCBCR_POSITIONING: ExifTagId = ExifTagId {
     id: 0x0213,
     ifd: TagGroup::Thumbnail,
 };
+// Some manufacturers put Main IFD tags in Thumbnail IFD
+pub const TAG_THUMBNAIL_NEW_SUBFILE_TYPE: ExifTagId = ExifTagId {
+    id: 0x00FE,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_IMAGE_DESCRIPTION: ExifTagId = ExifTagId {
+    id: 0x010E,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_MAKE: ExifTagId = ExifTagId {
+    id: 0x010F,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_MODEL: ExifTagId = ExifTagId {
+    id: 0x0110,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_SOFTWARE: ExifTagId = ExifTagId {
+    id: 0x0131,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_DATE_TIME: ExifTagId = ExifTagId {
+    id: 0x0132,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_PRINT_IM: ExifTagId = ExifTagId {
+    id: 0xC4A5,
+    ifd: TagGroup::Thumbnail,
+};
 pub const TAG_YCBCR_COEFFICIENTS: ExifTagId = ExifTagId {
     id: 0x0211,
     ifd: TagGroup::Main,
@@ -712,12 +741,19 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
         "JPEGInterchangeFormatLength",
     );
     // Thumbnail IFD tags with "Thumbnail" prefix
+    map.insert(TAG_THUMBNAIL_NEW_SUBFILE_TYPE, "ThumbnailNewSubfileType");
+    map.insert(TAG_THUMBNAIL_IMAGE_DESCRIPTION, "ThumbnailImageDescription");
+    map.insert(TAG_THUMBNAIL_MAKE, "ThumbnailMake");
+    map.insert(TAG_THUMBNAIL_MODEL, "ThumbnailModel");
+    map.insert(TAG_THUMBNAIL_SOFTWARE, "ThumbnailSoftware");
+    map.insert(TAG_THUMBNAIL_DATE_TIME, "ThumbnailDateTime");
     map.insert(TAG_THUMBNAIL_COMPRESSION, "ThumbnailCompression");
     map.insert(TAG_THUMBNAIL_ORIENTATION, "ThumbnailOrientation");
     map.insert(TAG_THUMBNAIL_X_RESOLUTION, "ThumbnailXResolution");
     map.insert(TAG_THUMBNAIL_Y_RESOLUTION, "ThumbnailYResolution");
     map.insert(TAG_THUMBNAIL_RESOLUTION_UNIT, "ThumbnailResolutionUnit");
     map.insert(TAG_THUMBNAIL_YCBCR_POSITIONING, "ThumbnailYCbCrPositioning");
+    map.insert(TAG_THUMBNAIL_PRINT_IM, "ThumbnailPrintIM");
     map.insert(TAG_YCBCR_COEFFICIENTS, "YCbCrCoefficients");
     map.insert(TAG_YCBCR_SUB_SAMPLING, "YCbCrSubSampling");
     map.insert(TAG_YCBCR_POSITIONING, "YCbCrPositioning");
