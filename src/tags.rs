@@ -342,6 +342,10 @@ pub const TAG_COPYRIGHT: ExifTagId = ExifTagId {
     id: 0x8298,
     ifd: TagGroup::Main,
 };
+pub const TAG_ICC_PROFILE: ExifTagId = ExifTagId {
+    id: 0x8773,
+    ifd: TagGroup::Main,
+};
 pub const TAG_EXIF_OFFSET: ExifTagId = ExifTagId {
     id: 0x8769,
     ifd: TagGroup::Main,
@@ -899,6 +903,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_STRIP_BYTE_COUNTS_EXIF, "StripByteCounts");
     map.insert(TAG_PLANAR_CONFIGURATION_EXIF, "PlanarConfiguration");
     map.insert(TAG_COPYRIGHT, "Copyright");
+    map.insert(TAG_ICC_PROFILE, "ICC_Profile");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
     // TIFF/EP CFA tags
