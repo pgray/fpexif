@@ -92,14 +92,31 @@ jobs:
           VALUE_MISMATCHES=$(grep -E "mismatch:" test-output.txt | grep -v "Found.*mismatches" || true)
           CRITICAL_DIFFS=$(grep -E "Found.*critical differences" test-output.txt || true)
 
+          # Count issues
+          UNKNOWN_TAGS_COUNT=$(echo "$UNKNOWN_TAGS" | grep -c "unknown tags:" || echo "0")
+          MISSING_FIELDS_COUNT=$(echo "$MISSING_FIELDS" | wc -l)
+          VALUE_MISMATCHES_COUNT=$(echo "$VALUE_MISMATCHES" | wc -l)
+          TOTAL_ISSUES=$((UNKNOWN_TAGS_COUNT + MISSING_FIELDS_COUNT + VALUE_MISMATCHES_COUNT))
+
           HAS_ISSUES=false
 
           {
             echo "## Test Issues Report"
             echo ""
 
-            if [ -n "$UNKNOWN_TAGS" ]; then
+            # Summary section at the top
+            if [ $TOTAL_ISSUES -gt 0 ]; then
               HAS_ISSUES=true
+              echo "### 📊 Summary"
+              echo ""
+              echo "- **Total Issues:** $TOTAL_ISSUES"
+              echo "- Unknown Tag Warnings: $UNKNOWN_TAGS_COUNT"
+              echo "- Missing Fields: $MISSING_FIELDS_COUNT"
+              echo "- Value Mismatches: $VALUE_MISMATCHES_COUNT"
+              echo ""
+            fi
+
+            if [ -n "$UNKNOWN_TAGS" ]; then
               echo "### Unknown EXIF Tags"
               echo ""
               echo "The following unknown EXIF tags were encountered:"
@@ -113,7 +130,6 @@ jobs:
             fi
 
             if [ -n "$MISSING_FIELDS" ]; then
-              HAS_ISSUES=true
               echo "### Missing Fields"
               echo ""
               echo "fpexif is missing the following fields that exiftool/exiv2 support:"
@@ -128,7 +144,6 @@ jobs:
             fi
 
             if [ -n "$VALUE_MISMATCHES" ]; then
-              HAS_ISSUES=true
               echo "### Value Mismatches"
               echo ""
               echo "The following fields have mismatched values:"
@@ -143,8 +158,7 @@ jobs:
             fi
 
             if [ -n "$CRITICAL_DIFFS" ]; then
-              HAS_ISSUES=true
-              echo "### Summary"
+              echo "### Critical Differences"
               echo ""
               echo "\`\`\`"
               echo "$CRITICAL_DIFFS"
@@ -153,7 +167,9 @@ jobs:
             fi
 
             if [ "$HAS_ISSUES" = false ]; then
-              echo "✅ All tests passed! No unknown tags, missing fields, or value mismatches."
+              echo "### ✅ All Clear!"
+              echo ""
+              echo "All tests passed! No unknown tags, missing fields, or value mismatches."
             fi
           } > test-issues-report.md
 

@@ -62,6 +62,10 @@ impl fmt::Display for ExifTagId {
 }
 
 // Common EXIF tag IDs
+pub const TAG_NEW_SUBFILE_TYPE: ExifTagId = ExifTagId {
+    id: 0x00FE,
+    ifd: TagGroup::Main,
+};
 pub const TAG_IMAGE_WIDTH: ExifTagId = ExifTagId {
     id: 0x0100,
     ifd: TagGroup::Main,
@@ -80,6 +84,10 @@ pub const TAG_COMPRESSION: ExifTagId = ExifTagId {
 };
 pub const TAG_PHOTOMETRIC_INTERPRETATION: ExifTagId = ExifTagId {
     id: 0x0106,
+    ifd: TagGroup::Main,
+};
+pub const TAG_IMAGE_DESCRIPTION: ExifTagId = ExifTagId {
+    id: 0x010E,
     ifd: TagGroup::Main,
 };
 pub const TAG_MAKE: ExifTagId = ExifTagId {
@@ -108,6 +116,10 @@ pub const TAG_STRIP_OFFSETS: ExifTagId = ExifTagId {
 };
 pub const TAG_STRIP_BYTE_COUNTS: ExifTagId = ExifTagId {
     id: 0x0117,
+    ifd: TagGroup::Main,
+};
+pub const TAG_MIN_SAMPLE_VALUE: ExifTagId = ExifTagId {
+    id: 0x0118,
     ifd: TagGroup::Main,
 };
 pub const TAG_X_RESOLUTION: ExifTagId = ExifTagId {
@@ -150,6 +162,10 @@ pub const TAG_PRIMARY_CHROMATICITIES: ExifTagId = ExifTagId {
     id: 0x013F,
     ifd: TagGroup::Main,
 };
+pub const TAG_SUB_IFDS: ExifTagId = ExifTagId {
+    id: 0x014A,
+    ifd: TagGroup::Main,
+};
 pub const TAG_JPEG_INTERCHANGE_FORMAT: ExifTagId = ExifTagId {
     id: 0x0201,
     ifd: TagGroup::Thumbnail,
@@ -183,6 +199,35 @@ pub const TAG_THUMBNAIL_YCBCR_POSITIONING: ExifTagId = ExifTagId {
     id: 0x0213,
     ifd: TagGroup::Thumbnail,
 };
+// Some manufacturers put Main IFD tags in Thumbnail IFD
+pub const TAG_THUMBNAIL_NEW_SUBFILE_TYPE: ExifTagId = ExifTagId {
+    id: 0x00FE,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_IMAGE_DESCRIPTION: ExifTagId = ExifTagId {
+    id: 0x010E,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_MAKE: ExifTagId = ExifTagId {
+    id: 0x010F,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_MODEL: ExifTagId = ExifTagId {
+    id: 0x0110,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_SOFTWARE: ExifTagId = ExifTagId {
+    id: 0x0131,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_DATE_TIME: ExifTagId = ExifTagId {
+    id: 0x0132,
+    ifd: TagGroup::Thumbnail,
+};
+pub const TAG_THUMBNAIL_PRINT_IM: ExifTagId = ExifTagId {
+    id: 0xC4A5,
+    ifd: TagGroup::Thumbnail,
+};
 pub const TAG_YCBCR_COEFFICIENTS: ExifTagId = ExifTagId {
     id: 0x0211,
     ifd: TagGroup::Main,
@@ -199,8 +244,106 @@ pub const TAG_REFERENCE_BLACK_WHITE: ExifTagId = ExifTagId {
     id: 0x0214,
     ifd: TagGroup::Main,
 };
+pub const TAG_XMP_METADATA: ExifTagId = ExifTagId {
+    id: 0x02BC,
+    ifd: TagGroup::Main,
+};
+pub const TAG_IPTC_NAA: ExifTagId = ExifTagId {
+    id: 0x83BB,
+    ifd: TagGroup::Main,
+};
+// Some manufacturers put these EXIF tags in Main IFD instead of EXIF SubIFD
+pub const TAG_EXPOSURE_TIME_MAIN: ExifTagId = ExifTagId {
+    id: 0x829A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_F_NUMBER_MAIN: ExifTagId = ExifTagId {
+    id: 0x829D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_EXPOSURE_PROGRAM_MAIN: ExifTagId = ExifTagId {
+    id: 0x8822,
+    ifd: TagGroup::Main,
+};
+pub const TAG_EXPOSURE_BIAS_VALUE_MAIN: ExifTagId = ExifTagId {
+    id: 0x9204,
+    ifd: TagGroup::Main,
+};
+pub const TAG_MAX_APERTURE_VALUE_MAIN: ExifTagId = ExifTagId {
+    id: 0x9205,
+    ifd: TagGroup::Main,
+};
+pub const TAG_METERING_MODE_MAIN: ExifTagId = ExifTagId {
+    id: 0x9207,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LIGHT_SOURCE_MAIN: ExifTagId = ExifTagId {
+    id: 0x9208,
+    ifd: TagGroup::Main,
+};
+pub const TAG_FOCAL_LENGTH_MAIN: ExifTagId = ExifTagId {
+    id: 0x920A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_IMAGE_NUMBER_MAIN: ExifTagId = ExifTagId {
+    id: 0x9211,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SENSING_METHOD_MAIN: ExifTagId = ExifTagId {
+    id: 0x9217,
+    ifd: TagGroup::Main,
+};
+pub const TAG_DATE_TIME_ORIGINAL_MAIN: ExifTagId = ExifTagId {
+    id: 0x9003,
+    ifd: TagGroup::Main,
+};
+pub const TAG_TIFF_EP_STANDARD_ID_MAIN: ExifTagId = ExifTagId {
+    id: 0x9216,
+    ifd: TagGroup::Main,
+};
+// Some manufacturers put basic TIFF structure tags in EXIF SubIFD
+pub const TAG_IMAGE_WIDTH_EXIF: ExifTagId = ExifTagId {
+    id: 0x0100,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_IMAGE_LENGTH_EXIF: ExifTagId = ExifTagId {
+    id: 0x0101,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_BITS_PER_SAMPLE_EXIF: ExifTagId = ExifTagId {
+    id: 0x0102,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_PHOTOMETRIC_INTERPRETATION_EXIF: ExifTagId = ExifTagId {
+    id: 0x0106,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_STRIP_OFFSETS_EXIF: ExifTagId = ExifTagId {
+    id: 0x0111,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SAMPLES_PER_PIXEL_EXIF: ExifTagId = ExifTagId {
+    id: 0x0115,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_ROWS_PER_STRIP_EXIF: ExifTagId = ExifTagId {
+    id: 0x0116,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_STRIP_BYTE_COUNTS_EXIF: ExifTagId = ExifTagId {
+    id: 0x0117,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_PLANAR_CONFIGURATION_EXIF: ExifTagId = ExifTagId {
+    id: 0x011C,
+    ifd: TagGroup::Exif,
+};
 pub const TAG_COPYRIGHT: ExifTagId = ExifTagId {
     id: 0x8298,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ICC_PROFILE: ExifTagId = ExifTagId {
+    id: 0x8773,
     ifd: TagGroup::Main,
 };
 pub const TAG_EXIF_OFFSET: ExifTagId = ExifTagId {
@@ -209,6 +352,142 @@ pub const TAG_EXIF_OFFSET: ExifTagId = ExifTagId {
 };
 pub const TAG_GPS_INFO: ExifTagId = ExifTagId {
     id: 0x8825,
+    ifd: TagGroup::Main,
+};
+// TIFF/EP Color Filter Array tags
+pub const TAG_CFA_REPEAT_PATTERN_DIM: ExifTagId = ExifTagId {
+    id: 0x828D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CFA_PATTERN_TIFFEP: ExifTagId = ExifTagId {
+    id: 0x828E,
+    ifd: TagGroup::Main,
+};
+// JPEG tags in Main IFD (some RAW formats)
+pub const TAG_JPEG_INTERCHANGE_FORMAT_MAIN: ExifTagId = ExifTagId {
+    id: 0x0201,
+    ifd: TagGroup::Main,
+};
+pub const TAG_JPEG_INTERCHANGE_FORMAT_LENGTH_MAIN: ExifTagId = ExifTagId {
+    id: 0x0202,
+    ifd: TagGroup::Main,
+};
+
+// DNG (Adobe Digital Negative) tags
+pub const TAG_DNG_VERSION: ExifTagId = ExifTagId {
+    id: 0xC612,
+    ifd: TagGroup::Main,
+};
+pub const TAG_DNG_BACKWARD_VERSION: ExifTagId = ExifTagId {
+    id: 0xC613,
+    ifd: TagGroup::Main,
+};
+pub const TAG_UNIQUE_CAMERA_MODEL: ExifTagId = ExifTagId {
+    id: 0xC614,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LOCALIZED_CAMERA_MODEL: ExifTagId = ExifTagId {
+    id: 0xC615,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CFA_PLANE_COLOR: ExifTagId = ExifTagId {
+    id: 0xC616,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CFA_LAYOUT: ExifTagId = ExifTagId {
+    id: 0xC617,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LINEARIZATION_TABLE: ExifTagId = ExifTagId {
+    id: 0xC618,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BLACK_LEVEL_REPEAT_DIM: ExifTagId = ExifTagId {
+    id: 0xC619,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CAMERA_SERIAL_NUMBER: ExifTagId = ExifTagId {
+    id: 0xC61A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LENS_INFO: ExifTagId = ExifTagId {
+    id: 0xC61D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ORIGINAL_RAW_FILE_NAME: ExifTagId = ExifTagId {
+    id: 0xC61E,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ORIGINAL_RAW_FILE_DATA: ExifTagId = ExifTagId {
+    id: 0xC61F,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ACTIVE_AREA: ExifTagId = ExifTagId {
+    id: 0xC620,
+    ifd: TagGroup::Main,
+};
+pub const TAG_COLOR_MATRIX1: ExifTagId = ExifTagId {
+    id: 0xC621,
+    ifd: TagGroup::Main,
+};
+pub const TAG_COLOR_MATRIX2: ExifTagId = ExifTagId {
+    id: 0xC622,
+    ifd: TagGroup::Main,
+};
+pub const TAG_ANALOG_BALANCE: ExifTagId = ExifTagId {
+    id: 0xC627,
+    ifd: TagGroup::Main,
+};
+pub const TAG_AS_SHOT_NEUTRAL: ExifTagId = ExifTagId {
+    id: 0xC628,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BASELINE_EXPOSURE: ExifTagId = ExifTagId {
+    id: 0xC62A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BASELINE_NOISE: ExifTagId = ExifTagId {
+    id: 0xC62B,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BASELINE_SHARPNESS: ExifTagId = ExifTagId {
+    id: 0xC62C,
+    ifd: TagGroup::Main,
+};
+pub const TAG_PREVIEW_COLOR_SPACE: ExifTagId = ExifTagId {
+    id: 0xC62D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LINEAR_RESPONSE_LIMIT: ExifTagId = ExifTagId {
+    id: 0xC62E,
+    ifd: TagGroup::Main,
+};
+pub const TAG_RAW_DATA_UNIQUE_ID: ExifTagId = ExifTagId {
+    id: 0xC65C,
+    ifd: TagGroup::Main,
+};
+pub const TAG_MASKED_AREAS: ExifTagId = ExifTagId {
+    id: 0xC632,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SHADOW_SCALE: ExifTagId = ExifTagId {
+    id: 0xC634,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CALIBRATION_ILLUMINANT1: ExifTagId = ExifTagId {
+    id: 0xC65A,
+    ifd: TagGroup::Main,
+};
+pub const TAG_CALIBRATION_ILLUMINANT2: ExifTagId = ExifTagId {
+    id: 0xC65B,
+    ifd: TagGroup::Main,
+};
+pub const TAG_BEST_QUALITY_SCALE: ExifTagId = ExifTagId {
+    id: 0xC65D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
+    id: 0xC68D,
     ifd: TagGroup::Main,
 };
 
@@ -231,6 +510,10 @@ pub const TAG_ISO_SPEED_RATINGS: ExifTagId = ExifTagId {
 };
 pub const TAG_SENSITIVITY_TYPE: ExifTagId = ExifTagId {
     id: 0x8830,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_SPECTRAL_SENSITIVITY: ExifTagId = ExifTagId {
+    id: 0x8832,
     ifd: TagGroup::Exif,
 };
 pub const TAG_EXIF_VERSION: ExifTagId = ExifTagId {
@@ -293,8 +576,16 @@ pub const TAG_FOCAL_LENGTH: ExifTagId = ExifTagId {
     id: 0x920A,
     ifd: TagGroup::Exif,
 };
+pub const TAG_IMAGE_NUMBER: ExifTagId = ExifTagId {
+    id: 0x9211,
+    ifd: TagGroup::Exif,
+};
 pub const TAG_SUBJECT_AREA: ExifTagId = ExifTagId {
     id: 0x9214,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_TIFF_EP_STANDARD_ID: ExifTagId = ExifTagId {
+    id: 0x9216,
     ifd: TagGroup::Exif,
 };
 pub const TAG_MAKER_NOTE: ExifTagId = ExifTagId {
@@ -534,11 +825,13 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     let mut map = HashMap::new();
 
     // Add tag names for common tags
+    map.insert(TAG_NEW_SUBFILE_TYPE, "NewSubfileType");
     map.insert(TAG_IMAGE_WIDTH, "ImageWidth");
     map.insert(TAG_IMAGE_LENGTH, "ImageLength");
     map.insert(TAG_BITS_PER_SAMPLE, "BitsPerSample");
     map.insert(TAG_COMPRESSION, "Compression");
     map.insert(TAG_PHOTOMETRIC_INTERPRETATION, "PhotometricInterpretation");
+    map.insert(TAG_IMAGE_DESCRIPTION, "ImageDescription");
     map.insert(TAG_MAKE, "Make");
     map.insert(TAG_MODEL, "Model");
     map.insert(TAG_ORIENTATION, "Orientation");
@@ -546,6 +839,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_ROWS_PER_STRIP, "RowsPerStrip");
     map.insert(TAG_STRIP_OFFSETS, "StripOffsets");
     map.insert(TAG_STRIP_BYTE_COUNTS, "StripByteCounts");
+    map.insert(TAG_MIN_SAMPLE_VALUE, "MinSampleValue");
     map.insert(TAG_X_RESOLUTION, "XResolution");
     map.insert(TAG_Y_RESOLUTION, "YResolution");
     map.insert(TAG_PLANAR_CONFIGURATION, "PlanarConfiguration");
@@ -562,20 +856,96 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
         "JPEGInterchangeFormatLength",
     );
     // Thumbnail IFD tags with "Thumbnail" prefix
+    map.insert(TAG_THUMBNAIL_NEW_SUBFILE_TYPE, "ThumbnailNewSubfileType");
+    map.insert(TAG_THUMBNAIL_IMAGE_DESCRIPTION, "ThumbnailImageDescription");
+    map.insert(TAG_THUMBNAIL_MAKE, "ThumbnailMake");
+    map.insert(TAG_THUMBNAIL_MODEL, "ThumbnailModel");
+    map.insert(TAG_THUMBNAIL_SOFTWARE, "ThumbnailSoftware");
+    map.insert(TAG_THUMBNAIL_DATE_TIME, "ThumbnailDateTime");
     map.insert(TAG_THUMBNAIL_COMPRESSION, "ThumbnailCompression");
     map.insert(TAG_THUMBNAIL_ORIENTATION, "ThumbnailOrientation");
     map.insert(TAG_THUMBNAIL_X_RESOLUTION, "ThumbnailXResolution");
     map.insert(TAG_THUMBNAIL_Y_RESOLUTION, "ThumbnailYResolution");
     map.insert(TAG_THUMBNAIL_RESOLUTION_UNIT, "ThumbnailResolutionUnit");
     map.insert(TAG_THUMBNAIL_YCBCR_POSITIONING, "ThumbnailYCbCrPositioning");
+    map.insert(TAG_THUMBNAIL_PRINT_IM, "ThumbnailPrintIM");
     map.insert(TAG_YCBCR_COEFFICIENTS, "YCbCrCoefficients");
     map.insert(TAG_YCBCR_SUB_SAMPLING, "YCbCrSubSampling");
     map.insert(TAG_YCBCR_POSITIONING, "YCbCrPositioning");
     map.insert(TAG_REFERENCE_BLACK_WHITE, "ReferenceBlackWhite");
+    map.insert(TAG_XMP_METADATA, "XMPMetadata");
+    map.insert(TAG_SUB_IFDS, "SubIFDs");
+    map.insert(TAG_IPTC_NAA, "IPTC/NAA");
+    // EXIF tags in Main IFD (non-standard placement)
+    map.insert(TAG_EXPOSURE_TIME_MAIN, "ExposureTime");
+    map.insert(TAG_F_NUMBER_MAIN, "FNumber");
+    map.insert(TAG_EXPOSURE_PROGRAM_MAIN, "ExposureProgram");
+    map.insert(TAG_EXPOSURE_BIAS_VALUE_MAIN, "ExposureBiasValue");
+    map.insert(TAG_MAX_APERTURE_VALUE_MAIN, "MaxApertureValue");
+    map.insert(TAG_METERING_MODE_MAIN, "MeteringMode");
+    map.insert(TAG_LIGHT_SOURCE_MAIN, "LightSource");
+    map.insert(TAG_FOCAL_LENGTH_MAIN, "FocalLength");
+    map.insert(TAG_IMAGE_NUMBER_MAIN, "ImageNumber");
+    map.insert(TAG_SENSING_METHOD_MAIN, "SensingMethod");
+    map.insert(TAG_DATE_TIME_ORIGINAL_MAIN, "DateTimeOriginal");
+    map.insert(TAG_TIFF_EP_STANDARD_ID_MAIN, "TIFF/EPStandardID");
+    // Basic TIFF structure tags in EXIF SubIFD (non-standard placement)
+    map.insert(TAG_IMAGE_WIDTH_EXIF, "ImageWidth");
+    map.insert(TAG_IMAGE_LENGTH_EXIF, "ImageLength");
+    map.insert(TAG_BITS_PER_SAMPLE_EXIF, "BitsPerSample");
+    map.insert(
+        TAG_PHOTOMETRIC_INTERPRETATION_EXIF,
+        "PhotometricInterpretation",
+    );
+    map.insert(TAG_STRIP_OFFSETS_EXIF, "StripOffsets");
+    map.insert(TAG_SAMPLES_PER_PIXEL_EXIF, "SamplesPerPixel");
+    map.insert(TAG_ROWS_PER_STRIP_EXIF, "RowsPerStrip");
+    map.insert(TAG_STRIP_BYTE_COUNTS_EXIF, "StripByteCounts");
+    map.insert(TAG_PLANAR_CONFIGURATION_EXIF, "PlanarConfiguration");
     map.insert(TAG_COPYRIGHT, "Copyright");
+    map.insert(TAG_ICC_PROFILE, "ICC_Profile");
     map.insert(TAG_EXIF_OFFSET, "ExifOffset");
     map.insert(TAG_GPS_INFO, "GPSInfo");
-    map.insert(TAG_PRINT_IM, "PrintIM");
+    // TIFF/EP CFA tags
+    map.insert(TAG_CFA_REPEAT_PATTERN_DIM, "CFARepeatPatternDim");
+    map.insert(TAG_CFA_PATTERN_TIFFEP, "CFAPattern");
+    // JPEG tags in Main IFD
+    map.insert(TAG_JPEG_INTERCHANGE_FORMAT_MAIN, "JPEGInterchangeFormat");
+    map.insert(
+        TAG_JPEG_INTERCHANGE_FORMAT_LENGTH_MAIN,
+        "JPEGInterchangeFormatLength",
+    );
+
+    // DNG tags
+    map.insert(TAG_DNG_VERSION, "DNGVersion");
+    map.insert(TAG_DNG_BACKWARD_VERSION, "DNGBackwardVersion");
+    map.insert(TAG_UNIQUE_CAMERA_MODEL, "UniqueCameraModel");
+    map.insert(TAG_LOCALIZED_CAMERA_MODEL, "LocalizedCameraModel");
+    map.insert(TAG_CFA_PLANE_COLOR, "CFAPlaneColor");
+    map.insert(TAG_CFA_LAYOUT, "CFALayout");
+    map.insert(TAG_LINEARIZATION_TABLE, "LinearizationTable");
+    map.insert(TAG_BLACK_LEVEL_REPEAT_DIM, "BlackLevelRepeatDim");
+    map.insert(TAG_CAMERA_SERIAL_NUMBER, "CameraSerialNumber");
+    map.insert(TAG_LENS_INFO, "LensInfo");
+    map.insert(TAG_ORIGINAL_RAW_FILE_NAME, "OriginalRawFileName");
+    map.insert(TAG_ORIGINAL_RAW_FILE_DATA, "OriginalRawFileData");
+    map.insert(TAG_ACTIVE_AREA, "ActiveArea");
+    map.insert(TAG_COLOR_MATRIX1, "ColorMatrix1");
+    map.insert(TAG_COLOR_MATRIX2, "ColorMatrix2");
+    map.insert(TAG_ANALOG_BALANCE, "AnalogBalance");
+    map.insert(TAG_AS_SHOT_NEUTRAL, "AsShotNeutral");
+    map.insert(TAG_BASELINE_EXPOSURE, "BaselineExposure");
+    map.insert(TAG_BASELINE_NOISE, "BaselineNoise");
+    map.insert(TAG_BASELINE_SHARPNESS, "BaselineSharpness");
+    map.insert(TAG_PREVIEW_COLOR_SPACE, "PreviewColorSpace");
+    map.insert(TAG_LINEAR_RESPONSE_LIMIT, "LinearResponseLimit");
+    map.insert(TAG_RAW_DATA_UNIQUE_ID, "RawDataUniqueID");
+    map.insert(TAG_MASKED_AREAS, "MaskedAreas");
+    map.insert(TAG_SHADOW_SCALE, "ShadowScale");
+    map.insert(TAG_CALIBRATION_ILLUMINANT1, "CalibrationIlluminant1");
+    map.insert(TAG_CALIBRATION_ILLUMINANT2, "CalibrationIlluminant2");
+    map.insert(TAG_BEST_QUALITY_SCALE, "BestQualityScale");
+    map.insert(TAG_RAW_IMAGE_DIGEST, "RawImageDigest");
 
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
@@ -583,6 +953,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_EXPOSURE_PROGRAM, "ExposureProgram");
     map.insert(TAG_ISO_SPEED_RATINGS, "ISOSpeedRatings");
     map.insert(TAG_SENSITIVITY_TYPE, "SensitivityType");
+    map.insert(TAG_SPECTRAL_SENSITIVITY, "SpectralSensitivity");
     map.insert(TAG_EXIF_VERSION, "ExifVersion");
     map.insert(TAG_DATE_TIME_ORIGINAL, "DateTimeOriginal");
     map.insert(TAG_DATE_TIME_DIGITIZED, "DateTimeDigitized");
@@ -598,7 +969,10 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_LIGHT_SOURCE, "LightSource");
     map.insert(TAG_FLASH, "Flash");
     map.insert(TAG_FOCAL_LENGTH, "FocalLength");
+    map.insert(TAG_IMAGE_NUMBER, "ImageNumber");
     map.insert(TAG_SUBJECT_AREA, "SubjectArea");
+    map.insert(TAG_EXPOSURE_INDEX, "ExposureIndex");
+    map.insert(TAG_TIFF_EP_STANDARD_ID, "TIFF/EPStandardID");
     map.insert(TAG_MAKER_NOTE, "MakerNote");
     map.insert(TAG_USER_COMMENT, "UserComment");
     map.insert(TAG_SUB_SEC_TIME, "SubSecTime");

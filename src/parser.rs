@@ -142,6 +142,33 @@ where
     parse_subifd(0x8825, TagGroup::Gps)?; // GPS SubIFD
     parse_subifd(0xA005, TagGroup::Interop)?; // Interoperability SubIFD
 
+    // Parse SubIFDs pointed to by SubIFDs tag (0x014A)
+    // These contain RAW image data and metadata in some formats (e.g., Nikon TIFF)
+    let subifd_offsets = exif_data.get_tag_by_id(0x014A).and_then(|v| match v {
+        ExifValue::Long(offsets) => Some(offsets.clone()),
+        _ => None,
+    });
+    if let Some(offsets) = subifd_offsets {
+        for offset in offsets {
+            if offset > 0 {
+                let subifd_offset = offset as usize;
+                if let Ok((subifd_tags, _)) = parse_ifd(
+                    &app1_data,
+                    tiff_offset + subifd_offset,
+                    tiff_offset,
+                    endian,
+                    TagGroup::Main,
+                    config,
+                ) {
+                    // Add the SubIFD tags
+                    for (tag_id, value) in subifd_tags {
+                        exif_data.tags.insert(tag_id, value);
+                    }
+                }
+            }
+        }
+    }
+
     // Parse thumbnail IFD (IFD1) if present
     if next_ifd_offset > 0 && tiff_offset + next_ifd_offset as usize + 2 <= app1_data.len() {
         let (thumbnail_tags, _) = parse_ifd(
