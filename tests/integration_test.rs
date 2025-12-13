@@ -50,8 +50,9 @@ fn test_parse_jpeg_with_exif() {
     let result = parser.parse_bytes(&jpeg_data);
     assert!(result.is_ok(), "Failed to parse JPEG with EXIF");
 
-    let exif_data = result.unwrap();
-    assert!(!exif_data.is_empty(), "EXIF data should not be empty");
+    if let Ok(exif_data) = result {
+        assert!(!exif_data.is_empty(), "EXIF data should not be empty");
+    }
 }
 
 #[test]

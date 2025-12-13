@@ -35,7 +35,10 @@ fn test_parse_file(path: &Path) {
     let parser = ExifParser::new();
     let result = parser.parse_file(path);
 
-    let filename = path.file_name().unwrap().to_string_lossy();
+    let filename = path
+        .file_name()
+        .map(|f| f.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "unknown".to_string());
 
     match result {
         Ok(exif_data) => {

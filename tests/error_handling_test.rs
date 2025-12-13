@@ -19,12 +19,10 @@ fn test_format_error_for_unknown_format() {
     let result = parser.parse_bytes(&unknown_format);
     assert!(result.is_err());
 
-    match result {
-        Err(ExifError::Format(_)) => {
-            // Expected error type
-        }
-        Err(e) => panic!("Wrong error type: {:?}", e),
-        Ok(_) => panic!("Should have failed"),
+    if let Err(ExifError::Format(_)) = result {
+        // Expected error type - test passes
+    } else {
+        panic!("Expected Format error, got a different result type");
     }
 }
 
