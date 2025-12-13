@@ -2,6 +2,12 @@
 use std::path::Path;
 use std::process::Command;
 
+mod test_results;
+use test_results::{
+    is_critical_missing_field, missing_field_issue, value_mismatch_issue, FileTestResult,
+    FormatTestResult, IssueCategory, TestIssue,
+};
+
 /// Helper function to check if we're running in CI
 fn is_ci() -> bool {
     std::env::var("CI").is_ok()
@@ -71,38 +77,56 @@ fn get_fpexif_exiftool_json_output(path: &str) -> Result<serde_json::Value, Stri
         .map_err(|e| format!("Failed to parse fpexif JSON: {}", e))
 }
 
-/// Compare two JSON values, ignoring certain fields that are expected to differ
+/// Compare two JSON values, returning issues found
 fn compare_json_outputs(
     exiftool_json: &serde_json::Value,
     fpexif_json: &serde_json::Value,
-) -> Vec<String> {
-    let mut differences = Vec::new();
+) -> Vec<TestIssue> {
+    let mut issues = Vec::new();
 
     // Both should be arrays
     let exiftool_array = match exiftool_json.as_array() {
         Some(arr) => arr,
         None => {
-            differences.push("exiftool output is not an array".to_string());
-            return differences;
+            issues.push(TestIssue {
+                category: IssueCategory::ParseError,
+                message: "exiftool output is not an array".to_string(),
+                field: None,
+                expected: None,
+                actual: None,
+            });
+            return issues;
         }
     };
 
     let fpexif_array = match fpexif_json.as_array() {
         Some(arr) => arr,
         None => {
-            differences.push("fpexif output is not an array".to_string());
-            return differences;
+            issues.push(TestIssue {
+                category: IssueCategory::ParseError,
+                message: "fpexif output is not an array".to_string(),
+                field: None,
+                expected: None,
+                actual: None,
+            });
+            return issues;
         }
     };
 
     // Should have same number of elements (typically 1)
     if exiftool_array.len() != fpexif_array.len() {
-        differences.push(format!(
-            "Array length mismatch: exiftool={} fpexif={}",
-            exiftool_array.len(),
-            fpexif_array.len()
-        ));
-        return differences;
+        issues.push(TestIssue {
+            category: IssueCategory::Critical,
+            message: format!(
+                "Array length mismatch: exiftool={} fpexif={}",
+                exiftool_array.len(),
+                fpexif_array.len()
+            ),
+            field: None,
+            expected: Some(exiftool_array.len().to_string()),
+            actual: Some(fpexif_array.len().to_string()),
+        });
+        return issues;
     }
 
     // Compare first object (typically the only one)
@@ -138,7 +162,7 @@ fn compare_json_outputs(
 
             match fpexif_obj.get(key) {
                 None => {
-                    differences.push(format!("Missing field in fpexif: {}", key));
+                    issues.push(missing_field_issue(key));
                 }
                 Some(fpexif_value) => {
                     // For numeric values, allow small floating point differences
@@ -146,9 +170,10 @@ fn compare_json_outputs(
                         (exiftool_value.as_f64(), fpexif_value.as_f64())
                     {
                         if (et_num - fp_num).abs() > 0.001 {
-                            differences.push(format!(
-                                "Numeric mismatch for {}: exiftool={} fpexif={}",
-                                key, et_num, fp_num
+                            issues.push(value_mismatch_issue(
+                                key,
+                                &et_num.to_string(),
+                                &fp_num.to_string(),
                             ));
                         }
                     }
@@ -159,17 +184,15 @@ fn compare_json_outputs(
                         let et_normalized = et_str.trim();
                         let fp_normalized = fp_str.trim();
                         if et_normalized != fp_normalized {
-                            differences.push(format!(
-                                "String mismatch for {}: exiftool=\"{}\" fpexif=\"{}\"",
-                                key, et_str, fp_str
-                            ));
+                            issues.push(value_mismatch_issue(key, et_str, fp_str));
                         }
                     }
                     // Different types
                     else if exiftool_value != fpexif_value {
-                        differences.push(format!(
-                            "Value mismatch for {}: exiftool={} fpexif={}",
-                            key, exiftool_value, fpexif_value
+                        issues.push(value_mismatch_issue(
+                            key,
+                            &exiftool_value.to_string(),
+                            &fpexif_value.to_string(),
                         ));
                     }
                 }
@@ -183,28 +206,50 @@ fn compare_json_outputs(
                 && !key.starts_with("Nikon")
                 && !key.starts_with("Sony")
             {
-                // Note: Maker note tags are expected to be different
-                differences.push(format!("Extra field in fpexif (not in exiftool): {}", key));
+                issues.push(TestIssue {
+                    category: IssueCategory::ExtraField,
+                    message: format!("Extra field in fpexif (not in exiftool): {}", key),
+                    field: Some(key.clone()),
+                    expected: None,
+                    actual: None,
+                });
             }
         }
     }
 
-    differences
+    issues
 }
 
 /// Generic helper function to test exiftool JSON compatibility for a given file extension
-fn test_format_exiftool_json_compatibility(extension: &str) {
-    require_real_files_or_skip(&format!(
-        "test_exiftool_json_compatibility_{}",
-        extension.to_lowercase()
-    ));
+fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult {
+    let test_name = format!("exiftool_json_{}", extension.to_lowercase());
+    let mut result = FormatTestResult::new(extension, &test_name, "exiftool");
+
     if !real_files_exist() {
-        return;
+        if is_ci() {
+            // In CI, missing files is a critical error
+            let file_result = FileTestResult {
+                file_path: "/fpexif/raws".to_string(),
+                format: extension.to_uppercase(),
+                success: false,
+                fpexif_tag_count: 0,
+                reference_tag_count: 0,
+                issues: vec![TestIssue {
+                    category: IssueCategory::Critical,
+                    message: "Test files directory not found in CI".to_string(),
+                    field: None,
+                    expected: None,
+                    actual: None,
+                }],
+            };
+            result.add_file_result(file_result);
+        }
+        return result;
     }
 
     if !exiftool_available() {
         println!("Skipping test - exiftool not available");
-        return;
+        return result;
     }
 
     // Find a file with the given extension to test
@@ -222,7 +267,7 @@ fn test_format_exiftool_json_compatibility(extension: &str) {
         Some(entry) => entry.path(),
         None => {
             println!("No {} files found for testing", extension.to_uppercase());
-            return;
+            return result;
         }
     };
 
@@ -234,175 +279,193 @@ fn test_format_exiftool_json_compatibility(extension: &str) {
         Ok(json) => json,
         Err(e) => {
             println!("Failed to get exiftool output: {}", e);
-            return;
+            return result;
         }
     };
 
     let fpexif_json = match get_fpexif_exiftool_json_output(test_path) {
         Ok(json) => json,
         Err(e) => {
-            panic!("Failed to get fpexif output: {}", e);
+            let file_result = FileTestResult {
+                file_path: test_path.to_string(),
+                format: extension.to_uppercase(),
+                success: false,
+                fpexif_tag_count: 0,
+                reference_tag_count: 0,
+                issues: vec![TestIssue {
+                    category: IssueCategory::Critical,
+                    message: format!("Failed to get fpexif output: {}", e),
+                    field: None,
+                    expected: None,
+                    actual: None,
+                }],
+            };
+            result.add_file_result(file_result);
+            return result;
         }
     };
 
     // Compare outputs
-    let differences = compare_json_outputs(&exiftool_json, &fpexif_json);
+    let issues = compare_json_outputs(&exiftool_json, &fpexif_json);
 
-    if !differences.is_empty() {
-        println!("\nFound {} differences:", differences.len());
+    // Count tags
+    let exiftool_tag_count = exiftool_json
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|o| o.as_object())
+        .map(|m| m.len())
+        .unwrap_or(0);
 
-        // Categorize differences
-        let mut missing_fields = Vec::new();
-        let mut value_mismatches = Vec::new();
-        let mut extra_fields = Vec::new();
+    let fpexif_tag_count = fpexif_json
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|o| o.as_object())
+        .map(|m| m.len())
+        .unwrap_or(0);
 
-        for diff in &differences {
-            if diff.contains("Missing field in fpexif:") {
-                missing_fields.push(diff);
-            } else if diff.contains("Extra field in fpexif") {
-                extra_fields.push(diff);
-            } else {
-                value_mismatches.push(diff);
-            }
-        }
+    // Determine if there are critical issues
+    let has_critical = issues.iter().any(|i| {
+        matches!(i.category, IssueCategory::Critical)
+            || (matches!(i.category, IssueCategory::ValueMismatch))
+            || (matches!(i.category, IssueCategory::MissingField)
+                && i.field
+                    .as_ref()
+                    .map(|f| is_critical_missing_field(f))
+                    .unwrap_or(false))
+    });
 
-        if !missing_fields.is_empty() {
-            println!("\n--- Missing Fields ({}) ---", missing_fields.len());
-            for diff in missing_fields.iter().take(10) {
-                println!("  {}", diff);
-            }
-            if missing_fields.len() > 10 {
-                println!("  ... and {} more", missing_fields.len() - 10);
-            }
-        }
+    let file_result = FileTestResult {
+        file_path: test_path.to_string(),
+        format: extension.to_uppercase(),
+        success: !has_critical,
+        fpexif_tag_count,
+        reference_tag_count: exiftool_tag_count,
+        issues,
+    };
 
-        if !value_mismatches.is_empty() {
-            println!("\n--- Value Mismatches ({}) ---", value_mismatches.len());
-            for diff in &value_mismatches {
-                println!("  {}", diff);
-            }
-        }
+    // Print summary
+    if !file_result.issues.is_empty() {
+        println!("\nFound {} differences:", file_result.issues.len());
 
-        if !extra_fields.is_empty() {
-            println!("\n--- Extra Fields ({}) ---", extra_fields.len());
-            for diff in extra_fields.iter().take(5) {
-                println!("  {}", diff);
-            }
-            if extra_fields.len() > 5 {
-                println!("  ... and {} more", extra_fields.len() - 5);
-            }
-        }
-
-        // Filter critical differences using the same logic as the RAF test
-        let critical_differences: Vec<_> = differences
+        let missing: Vec<_> = file_result
+            .issues
             .iter()
-            .filter(|d| {
-                if d.contains("mismatch") {
-                    // All value mismatches are critical
-                    true
-                } else if d.contains("Missing field in fpexif:") {
-                    // Filter out expected missing fields (maker notes, derived fields, etc.)
-                    let field_name = d.split("Missing field in fpexif: ").nth(1).unwrap_or("");
-                    let has_brand_prefix = field_name.starts_with("Canon")
-                        || field_name.starts_with("Nikon")
-                        || field_name.starts_with("Sony")
-                        || field_name.starts_with("Olympus")
-                        || field_name.starts_with("Panasonic")
-                        || field_name.starts_with("Pentax")
-                        || field_name.starts_with("Fuji");
-
-                    let is_derived = field_name == "Aperture"
-                        || field_name == "ShutterSpeed"
-                        || field_name == "ISO"
-                        || field_name == "LightValue"
-                        || field_name == "ImageSize"
-                        || field_name == "Megapixels"
-                        || field_name == "ScaleFactor35efl"
-                        || field_name == "FOV"
-                        || field_name == "HyperfocalDistance"
-                        || field_name == "CircleOfConfusion"
-                        || field_name == "FocalLength35efl";
-
-                    let is_file_meta = field_name.starts_with("File")
-                        || field_name.starts_with("Directory")
-                        || field_name == "ExifByteOrder"
-                        || field_name == "ExifToolVersion"
-                        || field_name == "MIMEType";
-
-                    let is_thumbnail = field_name.contains("Thumbnail")
-                        || field_name.contains("Preview")
-                        || field_name == "ThumbnailImage"
-                        || field_name == "PreviewImage";
-
-                    let is_interop = field_name.starts_with("Interop");
-
-                    // Only flag as critical if it's not in any of these categories
-                    !(has_brand_prefix || is_derived || is_file_meta || is_thumbnail || is_interop)
-                } else {
-                    false
-                }
-            })
+            .filter(|i| matches!(i.category, IssueCategory::MissingField))
+            .collect();
+        let mismatches: Vec<_> = file_result
+            .issues
+            .iter()
+            .filter(|i| matches!(i.category, IssueCategory::ValueMismatch))
+            .collect();
+        let extras: Vec<_> = file_result
+            .issues
+            .iter()
+            .filter(|i| matches!(i.category, IssueCategory::ExtraField))
             .collect();
 
-        if !critical_differences.is_empty() {
-            println!(
-                "\n❌ Found {} critical differences:",
-                critical_differences.len()
-            );
-            for diff in &critical_differences {
-                println!("  {}", diff);
+        if !missing.is_empty() {
+            println!("\n--- Missing Fields ({}) ---", missing.len());
+            for issue in missing.iter().take(10) {
+                println!("  {}", issue.message);
             }
-            panic!(
-                "Found {} critical differences in JSON output for {}",
-                critical_differences.len(),
-                extension.to_uppercase()
-            );
+            if missing.len() > 10 {
+                println!("  ... and {} more", missing.len() - 10);
+            }
+        }
+
+        if !mismatches.is_empty() {
+            println!("\n--- Value Mismatches ({}) ---", mismatches.len());
+            for issue in &mismatches {
+                println!("  {}", issue.message);
+            }
+        }
+
+        if !extras.is_empty() {
+            println!("\n--- Extra Fields ({}) ---", extras.len());
+            for issue in extras.iter().take(5) {
+                println!("  {}", issue.message);
+            }
+            if extras.len() > 5 {
+                println!("  ... and {} more", extras.len() - 5);
+            }
+        }
+
+        if has_critical {
+            println!("\n!! Found critical differences");
         } else {
-            println!("\n✓ No critical differences found!");
-            println!(
-                "  (Found {} expected variations from exiftool)",
-                differences.len()
-            );
+            println!("\n* No critical differences found!");
         }
     } else {
-        println!("\n✓ JSON outputs match perfectly!");
+        println!("\n* JSON outputs match perfectly!");
+    }
+
+    result.add_file_result(file_result);
+    result
+}
+
+/// Write result to JSON and return whether test passed
+fn run_and_report(extension: &str) {
+    require_real_files_or_skip(&format!(
+        "test_exiftool_json_compatibility_{}",
+        extension.to_lowercase()
+    ));
+    if !real_files_exist() {
+        return;
+    }
+
+    let result = test_format_exiftool_json_compatibility(extension);
+
+    // Write JSON result
+    if let Err(e) = result.write_to_file() {
+        eprintln!("Failed to write test results: {}", e);
+    }
+
+    // Fail test if there are critical issues
+    if result.has_critical_failures() {
+        panic!(
+            "Found {} critical issues in {} test",
+            result.critical_issues,
+            extension.to_uppercase()
+        );
     }
 }
 
 #[test]
 fn test_exiftool_json_compatibility_cr2() {
-    test_format_exiftool_json_compatibility("cr2");
+    run_and_report("cr2");
 }
 
 #[test]
 fn test_exiftool_json_compatibility_nef() {
-    test_format_exiftool_json_compatibility("nef");
+    run_and_report("nef");
 }
 
 #[test]
 fn test_exiftool_json_compatibility_arw() {
-    test_format_exiftool_json_compatibility("arw");
+    run_and_report("arw");
 }
 
 #[test]
 fn test_exiftool_json_compatibility_orf() {
-    test_format_exiftool_json_compatibility("orf");
+    run_and_report("orf");
 }
 
 #[test]
 fn test_exiftool_json_compatibility_dng() {
-    test_format_exiftool_json_compatibility("dng");
+    run_and_report("dng");
 }
 
 #[test]
 fn test_exiftool_json_compatibility_rw2() {
-    test_format_exiftool_json_compatibility("rw2");
+    run_and_report("rw2");
 }
 
 #[test]
 fn test_exiftool_json_compatibility_dscf_raf() {
     // Test using the test-data/DSCF0062.RAF file
     let test_path = "test-data/DSCF0062.RAF";
+    let test_name = "exiftool_json_raf";
+    let mut result = FormatTestResult::new("RAF", test_name, "exiftool");
 
     if !Path::new(test_path).exists() {
         println!("Skipping test - {} not available", test_path);
@@ -420,6 +483,24 @@ fn test_exiftool_json_compatibility_dscf_raf() {
     let exiftool_json = match get_exiftool_json_output(test_path) {
         Ok(json) => json,
         Err(e) => {
+            let file_result = FileTestResult {
+                file_path: test_path.to_string(),
+                format: "RAF".to_string(),
+                success: false,
+                fpexif_tag_count: 0,
+                reference_tag_count: 0,
+                issues: vec![TestIssue {
+                    category: IssueCategory::Critical,
+                    message: format!("Failed to get exiftool output: {}", e),
+                    field: None,
+                    expected: None,
+                    actual: None,
+                }],
+            };
+            result.add_file_result(file_result);
+            if let Err(e) = result.write_to_file() {
+                eprintln!("Failed to write test results: {}", e);
+            }
             panic!("Failed to get exiftool output: {}", e);
         }
     };
@@ -427,6 +508,24 @@ fn test_exiftool_json_compatibility_dscf_raf() {
     let fpexif_json = match get_fpexif_exiftool_json_output(test_path) {
         Ok(json) => json,
         Err(e) => {
+            let file_result = FileTestResult {
+                file_path: test_path.to_string(),
+                format: "RAF".to_string(),
+                success: false,
+                fpexif_tag_count: 0,
+                reference_tag_count: 0,
+                issues: vec![TestIssue {
+                    category: IssueCategory::Critical,
+                    message: format!("Failed to get fpexif output: {}", e),
+                    field: None,
+                    expected: None,
+                    actual: None,
+                }],
+            };
+            result.add_file_result(file_result);
+            if let Err(e) = result.write_to_file() {
+                eprintln!("Failed to write test results: {}", e);
+            }
             panic!("Failed to get fpexif output: {}", e);
         }
     };
@@ -455,200 +554,108 @@ fn test_exiftool_json_compatibility_dscf_raf() {
     }
 
     // Compare outputs
-    let differences = compare_json_outputs(&exiftool_json, &fpexif_json);
+    let issues = compare_json_outputs(&exiftool_json, &fpexif_json);
 
-    if !differences.is_empty() {
-        println!("\nFound {} differences:", differences.len());
+    // Count tags
+    let exiftool_tag_count = exiftool_json
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|o| o.as_object())
+        .map(|m| m.len())
+        .unwrap_or(0);
 
-        // Categorize differences
-        let mut missing_fields = Vec::new();
-        let mut extra_fields = Vec::new();
-        let mut value_mismatches = Vec::new();
+    let fpexif_tag_count = fpexif_json
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|o| o.as_object())
+        .map(|m| m.len())
+        .unwrap_or(0);
 
-        for diff in &differences {
-            if diff.contains("Missing field in fpexif:") {
-                missing_fields.push(diff);
-            } else if diff.contains("Extra field in fpexif") {
-                extra_fields.push(diff);
-            } else {
-                value_mismatches.push(diff);
-            }
-        }
+    // Determine if there are critical issues
+    let has_critical = issues.iter().any(|i| {
+        matches!(i.category, IssueCategory::Critical)
+            || (matches!(i.category, IssueCategory::ValueMismatch))
+            || (matches!(i.category, IssueCategory::MissingField)
+                && i.field
+                    .as_ref()
+                    .map(|f| is_critical_missing_field(f))
+                    .unwrap_or(false))
+    });
 
-        if !missing_fields.is_empty() {
-            println!("\n--- Missing Fields ({}) ---", missing_fields.len());
-            for diff in &missing_fields {
-                println!("  {}", diff);
-            }
-        }
+    let file_result = FileTestResult {
+        file_path: test_path.to_string(),
+        format: "RAF".to_string(),
+        success: !has_critical,
+        fpexif_tag_count,
+        reference_tag_count: exiftool_tag_count,
+        issues: issues.clone(),
+    };
 
-        if !value_mismatches.is_empty() {
-            println!("\n--- Value Mismatches ({}) ---", value_mismatches.len());
-            for diff in &value_mismatches {
-                println!("  {}", diff);
-            }
-        }
+    if !issues.is_empty() {
+        println!("\nFound {} differences:", issues.len());
 
-        if !extra_fields.is_empty() {
-            println!("\n--- Extra Fields ({}) ---", extra_fields.len());
-            for diff in extra_fields.iter().take(10) {
-                println!("  {}", diff);
-            }
-            if extra_fields.len() > 10 {
-                println!("  ... and {} more", extra_fields.len() - 10);
-            }
-        }
-
-        // Only fail on critical differences
-        // Critical = core EXIF fields that we claim to support are missing or have wrong values
-        let critical_differences: Vec<_> = differences
+        let missing: Vec<_> = issues
             .iter()
-            .filter(|d| {
-                // Ignore missing fields that are:
-                // - Maker note fields (brand prefixes or known maker note fields)
-                // - Calculated/derived fields (FOV, HyperfocalDistance, LightValue, etc.)
-                // - File metadata (Image{Width,Height,Size}, Thumbnail*, Preview*, Strip*)
-                // - Alternative field names that exiftool adds (CreateDate, ModifyDate vs DateTime)
-                // - Format-specific fields (RAFVersion, XTransLayout, PrintIMVersion)
-                // - Camera settings from maker notes (most of these)
-                if d.contains("Missing field in fpexif:") {
-                    // Brand-prefixed maker note fields
-                    let has_brand_prefix = d.contains("Fuji")
-                        || d.contains("Canon")
-                        || d.contains("Nikon")
-                        || d.contains("Sony")
-                        || d.contains("Olympus")
-                        || d.contains("Panasonic");
-
-                    // Derived/calculated fields that exiftool adds
-                    let is_derived = d.contains("FOV")
-                        || d.contains("HyperfocalDistance")
-                        || d.contains("LightValue")
-                        || d.contains("Megapixels")
-                        || d.contains("CircleOfConfusion")
-                        || d.contains("ScaleFactor")
-                        || d.contains("Missing field in fpexif: Aperture")
-                        || d.contains("Missing field in fpexif: ShutterSpeed")
-                        || d.contains("FocalLength35efl");
-
-                    // File/image metadata
-                    let is_file_meta = d.contains("Image")
-                        && (d.contains("Width") || d.contains("Height") || d.contains("Size"))
-                        || d.contains("Thumbnail")
-                        || d.contains("Preview")
-                        || d.contains("Strip")
-                        || d.contains("BitsPerSample")
-                        || d.contains("ColorComponents")
-                        || d.contains("EncodingProcess")
-                        || d.contains("YCbCrSubSampling")
-                        || d.contains("Missing field in fpexif: Compression");
-
-                    // Alternative field names (CreateDate = DateTime, etc.)
-                    let is_alias = d.contains("CreateDate")
-                        || d.contains("ModifyDate")
-                        || d.contains("Missing field in fpexif: ISO")
-                        || d.contains("Missing field in fpexif: ExposureCompensation");
-
-                    // Format-specific technical fields
-                    let is_format_specific = d.contains("RAFVersion")
-                        || d.contains("XTransLayout")
-                        || d.contains("PrintIMVersion")
-                        || d.contains("GeometricDistortion")
-                        || d.contains("VignettingParams")
-                        || d.contains("ChromaticAberration")
-                        || d.contains("RawImage")
-                        || d.contains("RawExposure");
-
-                    // Interoperability IFD fields
-                    let is_interop = d.contains("Interop");
-
-                    // Camera-specific maker note fields (not brand-prefixed but still maker notes)
-                    let is_maker_note_setting = d.contains("AFMode")
-                        || d.contains("AutoBracketing")
-                        || d.contains("BlurWarning")
-                        || d.contains("FocusWarning")
-                        || d.contains("ExposureWarning")
-                        || d.contains("FocusMode")
-                        || d.contains("FocusPixel")
-                        || d.contains("FilmMode")
-                        || d.contains("PictureMode")
-                        || d.contains("Missing field in fpexif: Quality")
-                        || d.contains("ImageGeneration")
-                        || d.contains("Missing field in fpexif: Version")
-                        || d.contains("InternalSerialNumber")
-                        || d.contains("SequenceNumber")
-                        || d.contains("DynamicRange")
-                        || d.contains("NoiseReduction")
-                        || d.contains("Sharpness")
-                        || d.contains("HighlightTone")
-                        || d.contains("ShadowTone")
-                        || d.contains("DigitalZoom")
-                        || d.contains("ShutterType")
-                        || d.contains("SlowSync")
-                        || d.contains("FlashExposureComp")
-                        || d.contains("LensModulation")
-                        || d.contains("ExposureCount")
-                        || d.contains("FacesDetected")
-                        || d.contains("NumFaceElements");
-
-                    // Color/WB data from maker notes
-                    let is_wb_color_data = d.contains("BlackLevel")
-                        || d.contains("RedBalance")
-                        || d.contains("BlueBalance")
-                        || d.contains("WB_")
-                        || d.contains("WhiteBalanceFineTune");
-
-                    // Minor/non-critical standard fields we might be missing
-                    let is_minor_standard = d.contains("SubSecTime")
-                        || d.contains("Rating")
-                        || d.contains("ExifByteOrder")
-                        || d.contains("FileSource")
-                        || d.contains("SceneType")
-                        || d.contains("SensingMethod")
-                        || d.contains("SensitivityType")
-                        || d.contains("SubjectDistanceRange")
-                        || d.contains("Saturation");
-
-                    return !(has_brand_prefix
-                        || is_derived
-                        || is_file_meta
-                        || is_alias
-                        || is_format_specific
-                        || is_interop
-                        || is_maker_note_setting
-                        || is_wb_color_data
-                        || is_minor_standard);
-                }
-
-                // All value mismatches are critical
-                if d.contains("mismatch") {
-                    return true;
-                }
-
-                false
-            })
+            .filter(|i| matches!(i.category, IssueCategory::MissingField))
+            .collect();
+        let extras: Vec<_> = issues
+            .iter()
+            .filter(|i| matches!(i.category, IssueCategory::ExtraField))
+            .collect();
+        let mismatches: Vec<_> = issues
+            .iter()
+            .filter(|i| matches!(i.category, IssueCategory::ValueMismatch))
             .collect();
 
-        if !critical_differences.is_empty() {
-            println!(
-                "\n❌ Found {} critical differences",
-                critical_differences.len()
-            );
-            for diff in &critical_differences {
-                println!("   {}", diff);
+        if !missing.is_empty() {
+            println!("\n--- Missing Fields ({}) ---", missing.len());
+            for issue in &missing {
+                println!("  {}", issue.message);
             }
-            panic!(
-                "Found {} critical differences in JSON output",
-                critical_differences.len()
-            );
+        }
+
+        if !mismatches.is_empty() {
+            println!("\n--- Value Mismatches ({}) ---", mismatches.len());
+            for issue in &mismatches {
+                println!("  {}", issue.message);
+            }
+        }
+
+        if !extras.is_empty() {
+            println!("\n--- Extra Fields ({}) ---", extras.len());
+            for issue in extras.iter().take(10) {
+                println!("  {}", issue.message);
+            }
+            if extras.len() > 10 {
+                println!("  ... and {} more", extras.len() - 10);
+            }
+        }
+
+        if has_critical {
+            println!("\n!! Found critical differences");
         } else {
-            println!("\n✓ No critical differences found!");
+            println!("\n* No critical differences found!");
             println!(
                 "  (Found {} expected variations from exiftool)",
-                differences.len()
+                issues.len()
             );
         }
     } else {
-        println!("\n✓ JSON outputs match perfectly!");
+        println!("\n* JSON outputs match perfectly!");
+    }
+
+    result.add_file_result(file_result);
+
+    // Write JSON result
+    if let Err(e) = result.write_to_file() {
+        eprintln!("Failed to write test results: {}", e);
+    }
+
+    // Fail test if there are critical issues
+    if result.has_critical_failures() {
+        panic!(
+            "Found {} critical differences in JSON output",
+            result.critical_issues
+        );
     }
 }
