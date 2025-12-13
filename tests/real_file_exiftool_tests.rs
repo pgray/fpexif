@@ -683,15 +683,7 @@ fn find_files_by_extension(extension: &str) -> Vec<String> {
     }
 
     let mut files = Vec::new();
-    if let Ok(entries) = fs::read_dir(base_path) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                // Recursively search subdirectories
-                collect_files_recursive(&path, extension, &mut files);
-            }
-        }
-    }
+    collect_files_recursive(Path::new(base_path), extension, &mut files);
     files
 }
 
