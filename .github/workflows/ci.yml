@@ -1,467 +1,479 @@
 name: CI
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+    pull_request:
+        branches:
+            - main
+    push:
+        branches:
+            - main
 
 permissions:
-  contents: read
-  pull-requests: write
-  issues: write
+    contents: read
+    pull-requests: write
+    issues: write
 
 env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
+    CARGO_TERM_COLOR: always
+    RUST_BACKTRACE: 1
 
 jobs:
-  build:
-    name: Build and Test
-    runs-on: self-hosted
+    build:
+        name: Build and Test
+        runs-on: self-hosted
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Check if test files exist
-        id: check_files
-        run: |
-          if [ -f /fpexif/raws/welcome.html ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Test files found at /fpexif/raws"
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Test files not found - real file tests will fail"
-          fi
+            - name: Check if test files exist
+              id: check_files
+              run: |
+                  if [ -f /fpexif/raws/welcome.html ]; then
+                    echo "exists=true" >> $GITHUB_OUTPUT
+                    echo "Test files found at /fpexif/raws"
+                  else
+                    echo "exists=false" >> $GITHUB_OUTPUT
+                    echo "Test files not found - real file tests will fail"
+                  fi
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt, clippy
 
-      - name: Check exiftool and exiv2
-        run: |
-          exiftool -ver
-          exiv2 --version | head -1
+            - name: Check exiftool and exiv2
+              run: |
+                  exiftool -ver
+                  exiv2 --version | head -1
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+            - name: Cache cargo registry
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/registry
+                  key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-registry-
 
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-git-
+            - name: Cache cargo index
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/git
+                  key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-git-
 
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-target-
+            - name: Cache cargo build
+              uses: actions/cache@v4
+              with:
+                  path: target
+                  key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-build-target-
 
-      - name: Build
-        run: nice -n 19 cargo build --verbose
+            - name: Build
+              run: nice -n 19 cargo build --verbose
 
-      - name: Run tests
-        run: |
-          set -eo pipefail
-          nice -n 19 cargo test --verbose 2>&1 | tee test-output.txt
-        env:
-          CI: true
-          FPEXIF_TEST_FILES: /fpexif/raws
+            - name: Run tests
+              run: |
+                  set -eo pipefail
+                  nice -n 19 cargo test --verbose 2>&1 | tee test-output.txt
+              env:
+                  CI: true
+                  FPEXIF_TEST_FILES: /fpexif/raws
 
-      - name: Extract test issues report
-        if: always() && github.event_name == 'pull_request'
-        id: test_issues
-        run: |
-          # Create a Python script to parse test output and group by filetype
-          cat > parse_test_output.py << 'PYTHON_SCRIPT'
-          import re
-          import sys
-          from collections import defaultdict
+            - name: Extract test issues report
+              if: always() && github.event_name == 'pull_request'
+              id: test_issues
+              run: |
+                  # Create a Python script to parse test output and group by filetype
+                  cat > parse_test_output.py << 'PYTHON_SCRIPT'
+                  import re
+                  import sys
+                  from collections import defaultdict
 
-          # Read test output
-          with open('test-output.txt', 'r') as f:
-              content = f.read()
+                  # Read test output
+                  with open('test-output.txt', 'r') as f:
+                      content = f.read()
 
-          # Track current test/filetype context
-          current_filetype = None
-          issues_by_type = defaultdict(lambda: {'unknown_tags': [], 'missing_fields': [], 'mismatches': [], 'critical': []})
+                  # Track current test/filetype context
+                  current_filetype = None
+                  issues_by_type = defaultdict(lambda: {'unknown_tags': [], 'missing_fields': [], 'mismatches': [], 'critical': []})
 
-          # Patterns to detect test context
-          test_pattern = re.compile(r'test\s+(\w+)::(test_\w+)')
-          # Pattern to extract filetype from test name (e.g., test_cr2_files, test_exiftool_json_compatibility_cr2)
-          filetype_from_test = re.compile(r'test_(?:exiftool_json_compatibility_|exiv2_comparison_)?(\w+?)(?:_files)?$', re.IGNORECASE)
-          # Pattern to extract filetype from file path in output
-          filepath_pattern = re.compile(r'\.([A-Za-z0-9]{2,4})(?:\s|$|:|\))')
-          # Pattern for "Testing with file:" lines
-          testing_file_pattern = re.compile(r'Testing with file:.*\.(\w+)')
+                  # Patterns to detect test context
+                  test_pattern = re.compile(r'test\s+(\w+)::(test_\w+)')
+                  # Pattern to extract filetype from test name (e.g., test_cr2_files, test_exiftool_json_compatibility_cr2)
+                  filetype_from_test = re.compile(r'test_(?:exiftool_json_compatibility_|exiv2_comparison_)?(\w+?)(?:_files)?$', re.IGNORECASE)
+                  # Pattern to extract filetype from file path in output
+                  filepath_pattern = re.compile(r'\.([A-Za-z0-9]{2,4})(?:\s|$|:|\))')
+                  # Pattern for "Testing with file:" lines
+                  testing_file_pattern = re.compile(r'Testing with file:.*\.(\w+)')
 
-          # Issue patterns
-          unknown_tags_pattern = re.compile(r'unknown tags:.*')
-          missing_field_pattern = re.compile(r'Missing field in fpexif:\s*(\S+)')
-          mismatch_pattern = re.compile(r'(\w+)\s+mismatch.*?(?:exiftool|exiv2).*?fpexif', re.IGNORECASE)
-          critical_diff_pattern = re.compile(r'Found.*critical differences')
+                  # Issue patterns
+                  unknown_tags_pattern = re.compile(r'unknown tags:.*')
+                  missing_field_pattern = re.compile(r'Missing field in fpexif:\s*(\S+)')
+                  mismatch_pattern = re.compile(r'(\w+)\s+mismatch.*?(?:exiftool|exiv2).*?fpexif', re.IGNORECASE)
+                  critical_diff_pattern = re.compile(r'Found.*critical differences')
 
-          # Known file extensions
-          known_extensions = {'cr2', 'nef', 'arw', 'orf', 'dng', 'rw2', 'raf', 'pef', 'crw', 'mrw',
-                              'x3f', 'srw', 'kdc', 'nrw', '3fr', 'sr2', 'erf', 'dcr', 'mos', 'srf',
-                              'mef', 'mdc', 'raw', 'tiff', 'tif', 'jpeg', 'jpg', 'heic', 'heif'}
+                  # Known file extensions
+                  known_extensions = {'cr2', 'nef', 'arw', 'orf', 'dng', 'rw2', 'raf', 'pef', 'crw', 'mrw',
+                                      'x3f', 'srw', 'kdc', 'nrw', '3fr', 'sr2', 'erf', 'dcr', 'mos', 'srf',
+                                      'mef', 'mdc', 'raw', 'tiff', 'tif', 'jpeg', 'jpg', 'heic', 'heif'}
 
-          def extract_filetype(line, current):
-              """Try to extract filetype from a line."""
-              # Check for "Testing with file:" pattern
-              match = testing_file_pattern.search(line)
-              if match:
-                  ext = match.group(1).lower()
-                  if ext in known_extensions:
-                      return ext.upper()
+                  def extract_filetype(line, current):
+                      """Try to extract filetype from a line."""
+                      # Check for "Testing with file:" pattern
+                      match = testing_file_pattern.search(line)
+                      if match:
+                          ext = match.group(1).lower()
+                          if ext in known_extensions:
+                              return ext.upper()
 
-              # Check for file path pattern
-              match = filepath_pattern.search(line)
-              if match:
-                  ext = match.group(1).lower()
-                  if ext in known_extensions:
-                      return ext.upper()
+                      # Check for file path pattern
+                      match = filepath_pattern.search(line)
+                      if match:
+                          ext = match.group(1).lower()
+                          if ext in known_extensions:
+                              return ext.upper()
 
-              return current
+                      return current
 
-          for line in content.split('\n'):
-              # Check for test start
-              test_match = test_pattern.search(line)
-              if test_match:
-                  test_name = test_match.group(2)
-                  ft_match = filetype_from_test.search(test_name)
-                  if ft_match:
-                      ft = ft_match.group(1).upper()
-                      # Handle special cases
-                      if ft == 'DSCF':
-                          ft = 'RAF'
-                      elif ft in [ext.upper() for ext in known_extensions]:
-                          current_filetype = ft
-                      else:
-                          current_filetype = ft
+                  for line in content.split('\n'):
+                      # Check for test start
+                      test_match = test_pattern.search(line)
+                      if test_match:
+                          test_name = test_match.group(2)
+                          ft_match = filetype_from_test.search(test_name)
+                          if ft_match:
+                              ft = ft_match.group(1).upper()
+                              # Handle special cases
+                              if ft == 'DSCF':
+                                  ft = 'RAF'
+                              elif ft in [ext.upper() for ext in known_extensions]:
+                                  current_filetype = ft
+                              else:
+                                  current_filetype = ft
 
-              # Try to extract filetype from the line itself
-              current_filetype = extract_filetype(line, current_filetype)
+                      # Try to extract filetype from the line itself
+                      current_filetype = extract_filetype(line, current_filetype)
 
-              # Use 'UNKNOWN' if we still don't have a filetype
-              ft = current_filetype or 'UNKNOWN'
+                      # Use 'UNKNOWN' if we still don't have a filetype
+                      ft = current_filetype or 'UNKNOWN'
 
-              # Check for issues
-              if 'unknown tags:' in line:
-                  issues_by_type[ft]['unknown_tags'].append(line.strip())
+                      # Check for issues
+                      if 'unknown tags:' in line:
+                          issues_by_type[ft]['unknown_tags'].append(line.strip())
 
-              missing_match = missing_field_pattern.search(line)
-              if missing_match:
-                  field = missing_match.group(1)
-                  issues_by_type[ft]['missing_fields'].append(field)
+                      missing_match = missing_field_pattern.search(line)
+                      if missing_match:
+                          field = missing_match.group(1)
+                          issues_by_type[ft]['missing_fields'].append(field)
 
-              if 'mismatch' in line.lower() and 'Found' not in line:
-                  issues_by_type[ft]['mismatches'].append(line.strip())
+                      if 'mismatch' in line.lower() and 'Found' not in line:
+                          issues_by_type[ft]['mismatches'].append(line.strip())
 
-              if critical_diff_pattern.search(line):
-                  issues_by_type[ft]['critical'].append(line.strip())
+                      if critical_diff_pattern.search(line):
+                          issues_by_type[ft]['critical'].append(line.strip())
 
-          # Generate report
-          total_unknown = sum(len(v['unknown_tags']) for v in issues_by_type.values())
-          total_missing = sum(len(v['missing_fields']) for v in issues_by_type.values())
-          total_mismatches = sum(len(v['mismatches']) for v in issues_by_type.values())
-          total_issues = total_unknown + total_missing + total_mismatches
+                  # Generate report
+                  total_unknown = sum(len(v['unknown_tags']) for v in issues_by_type.values())
+                  total_missing = sum(len(v['missing_fields']) for v in issues_by_type.values())
+                  total_mismatches = sum(len(v['mismatches']) for v in issues_by_type.values())
+                  total_issues = total_unknown + total_missing + total_mismatches
 
-          print("## Test Issues Report")
-          print()
-
-          if total_issues > 0:
-              print("### 📊 Summary")
-              print()
-              print(f"- **Total Issues:** {total_issues}")
-              print(f"- Unknown Tag Warnings: {total_unknown}")
-              print(f"- Missing Fields: {total_missing}")
-              print(f"- Value Mismatches: {total_mismatches}")
-              print()
-
-              # Summary by filetype
-              print("#### Issues by File Type")
-              print()
-              print("| Format | Unknown Tags | Missing Fields | Mismatches |")
-              print("|--------|--------------|----------------|------------|")
-              for ft in sorted(issues_by_type.keys()):
-                  data = issues_by_type[ft]
-                  if any([data['unknown_tags'], data['missing_fields'], data['mismatches']]):
-                      print(f"| {ft} | {len(data['unknown_tags'])} | {len(data['missing_fields'])} | {len(data['mismatches'])} |")
-              print()
-
-          # Detailed sections by filetype
-          filetypes_with_issues = [ft for ft in sorted(issues_by_type.keys())
-                                   if any([issues_by_type[ft]['unknown_tags'],
-                                          issues_by_type[ft]['missing_fields'],
-                                          issues_by_type[ft]['mismatches']])]
-
-          if filetypes_with_issues:
-              print("### Detailed Issues by Format")
-              print()
-
-              for ft in filetypes_with_issues:
-                  data = issues_by_type[ft]
-                  print(f"<details>")
-                  print(f"<summary><b>{ft}</b> - {len(data['unknown_tags'])} unknown, {len(data['missing_fields'])} missing, {len(data['mismatches'])} mismatches</summary>")
+                  print("## Test Issues Report")
                   print()
 
-                  if data['unknown_tags']:
-                      print("**Unknown Tags:**")
+                  if total_issues > 0:
+                      print("### 📊 Summary")
+                      print()
+                      print(f"- **Total Issues:** {total_issues}")
+                      print(f"- Unknown Tag Warnings: {total_unknown}")
+                      print(f"- Missing Fields: {total_missing}")
+                      print(f"- Value Mismatches: {total_mismatches}")
+                      print()
+
+                      # Summary by filetype
+                      print("#### Issues by File Type")
+                      print()
+                      print("| Format | Unknown Tags | Missing Fields | Mismatches |")
+                      print("|--------|--------------|----------------|------------|")
+                      for ft in sorted(issues_by_type.keys()):
+                          data = issues_by_type[ft]
+                          if any([data['unknown_tags'], data['missing_fields'], data['mismatches']]):
+                              print(f"| {ft} | {len(data['unknown_tags'])} | {len(data['missing_fields'])} | {len(data['mismatches'])} |")
+                      print()
+
+                  # Detailed sections by filetype
+                  filetypes_with_issues = [ft for ft in sorted(issues_by_type.keys())
+                                           if any([issues_by_type[ft]['unknown_tags'],
+                                                  issues_by_type[ft]['missing_fields'],
+                                                  issues_by_type[ft]['mismatches']])]
+
+                  if filetypes_with_issues:
+                      print("### Detailed Issues by Format")
+                      print()
+
+                      for ft in filetypes_with_issues:
+                          data = issues_by_type[ft]
+                          print(f"<details>")
+                          print(f"<summary><b>{ft}</b> - {len(data['unknown_tags'])} unknown, {len(data['missing_fields'])} missing, {len(data['mismatches'])} mismatches</summary>")
+                          print()
+
+                          if data['unknown_tags']:
+                              print("**Unknown Tags:**")
+                              print("```")
+                              for tag in data['unknown_tags'][:10]:
+                                  print(tag)
+                              if len(data['unknown_tags']) > 10:
+                                  print(f"... and {len(data['unknown_tags']) - 10} more")
+                              print("```")
+                              print()
+
+                          if data['missing_fields']:
+                              print("**Missing Fields:**")
+                              print("```")
+                              for field in sorted(set(data['missing_fields']))[:15]:
+                                  print(f"  {field}")
+                              if len(set(data['missing_fields'])) > 15:
+                                  print(f"  ... and {len(set(data['missing_fields'])) - 15} more")
+                              print("```")
+                              print()
+
+                          if data['mismatches']:
+                              print("**Value Mismatches:**")
+                              print("```")
+                              for m in data['mismatches'][:10]:
+                                  print(m)
+                              if len(data['mismatches']) > 10:
+                                  print(f"... and {len(data['mismatches']) - 10} more")
+                              print("```")
+                              print()
+
+                          print("</details>")
+                          print()
+
+                      print()
+                      print("To add support for unknown tags, add definitions to `src/tags.rs`.")
+                      print()
+
+                  # Critical differences
+                  all_critical = []
+                  for ft, data in issues_by_type.items():
+                      for c in data['critical']:
+                          all_critical.append(f"[{ft}] {c}")
+
+                  if all_critical:
+                      print("### Critical Differences")
+                      print()
                       print("```")
-                      for tag in data['unknown_tags'][:10]:
-                          print(tag)
-                      if len(data['unknown_tags']) > 10:
-                          print(f"... and {len(data['unknown_tags']) - 10} more")
+                      for c in all_critical:
+                          print(c)
                       print("```")
                       print()
 
-                  if data['missing_fields']:
-                      print("**Missing Fields:**")
-                      print("```")
-                      for field in sorted(set(data['missing_fields']))[:15]:
-                          print(f"  {field}")
-                      if len(set(data['missing_fields'])) > 15:
-                          print(f"  ... and {len(set(data['missing_fields'])) - 15} more")
-                      print("```")
+                  if total_issues == 0:
+                      print("### All Clear!")
                       print()
+                      print("All tests passed with no issues detected.")
 
-                  if data['mismatches']:
-                      print("**Value Mismatches:**")
-                      print("```")
-                      for m in data['mismatches'][:10]:
-                          print(m)
-                      if len(data['mismatches']) > 10:
-                          print(f"... and {len(data['mismatches']) - 10} more")
-                      print("```")
-                      print()
+                  # Output for GitHub Actions
+                  if total_issues > 0:
+                      print("HAS_ISSUES=true", file=sys.stderr)
+                  else:
+                      print("HAS_ISSUES=false", file=sys.stderr)
+                  PYTHON_SCRIPT
 
-                  print("</details>")
-                  print()
+                  # Run the Python script
+                  python3 parse_test_output.py > test-issues-report.md 2> issues_status.txt
 
-              print()
-              print("To add support for unknown tags, add definitions to `src/tags.rs`.")
-              print()
+                  # Ensure the report file is not empty
+                  if [ ! -s test-issues-report.md ]; then
+                    echo "## Test Issues Report" > test-issues-report.md
+                    echo "" >> test-issues-report.md
+                    echo "### All Clear!" >> test-issues-report.md
+                    echo "" >> test-issues-report.md
+                    echo "All tests passed with no issues detected." >> test-issues-report.md
+                  fi
 
-          # Critical differences
-          all_critical = []
-          for ft, data in issues_by_type.items():
-              for c in data['critical']:
-                  all_critical.append(f"[{ft}] {c}")
+                  # Read the status
+                  if grep -q "HAS_ISSUES=true" issues_status.txt 2>/dev/null; then
+                    echo "found=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "found=false" >> $GITHUB_OUTPUT
+                  fi
 
-          if all_critical:
-              print("### Critical Differences")
-              print()
-              print("```")
-              for c in all_critical:
-                  print(c)
-              print("```")
-              print()
+                  # Cleanup
+                  rm -f parse_test_output.py issues_status.txt
 
-          if total_issues == 0:
-              print("### All Clear!")
-              print()
-              print("All tests passed with no issues detected.")
+            - name: Post test issues comment on PR
+              if: always() && github.event_name == 'pull_request'
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const fs = require('fs');
+                      const report = fs.readFileSync('test-issues-report.md', 'utf8');
 
-          # Output for GitHub Actions
-          if total_issues > 0:
-              print("HAS_ISSUES=true", file=sys.stderr)
-          else:
-              print("HAS_ISSUES=false", file=sys.stderr)
-          PYTHON_SCRIPT
+                      // Find existing comment
+                      const { data: comments } = await github.rest.issues.listComments({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: context.issue.number,
+                      });
 
-          # Run the Python script
-          python3 parse_test_output.py > test-issues-report.md 2> issues_status.txt
+                      const botComment = comments.find(c =>
+                        c.user.type === 'Bot' && c.body.includes('## Test Issues Report')
+                      );
 
-          # Ensure the report file is not empty
-          if [ ! -s test-issues-report.md ]; then
-            echo "## Test Issues Report" > test-issues-report.md
-            echo "" >> test-issues-report.md
-            echo "### All Clear!" >> test-issues-report.md
-            echo "" >> test-issues-report.md
-            echo "All tests passed with no issues detected." >> test-issues-report.md
-          fi
+                      if (botComment) {
+                        await github.rest.issues.updateComment({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          comment_id: botComment.id,
+                          body: report
+                        });
+                      } else {
+                        await github.rest.issues.createComment({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: context.issue.number,
+                          body: report
+                        });
+                      }
 
-          # Read the status
-          if grep -q "HAS_ISSUES=true" issues_status.txt 2>/dev/null; then
-            echo "found=true" >> $GITHUB_OUTPUT
-          else
-            echo "found=false" >> $GITHUB_OUTPUT
-          fi
+            - name: Run clippy
+              run: ./bin/ccc
 
-          # Cleanup
-          rm -f parse_test_output.py issues_status.txt
+            - name: Build examples
+              run: nice -n 19 cargo build --examples --verbose
 
-      - name: Post test issues comment on PR
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('test-issues-report.md', 'utf8');
+    wasm:
+        name: WebAssembly Build and Test
+        runs-on: self-hosted
 
-            // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-            const botComment = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('## Test Issues Report')
-            );
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: wasm32-unknown-unknown
 
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: report
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: report
-              });
-            }
+            - name: Cache cargo registry
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/registry
+                  key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-registry-
 
-      - name: Run clippy
-        run: ./bin/ccc
+            - name: Cache cargo index
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/git
+                  key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-git-
 
-      - name: Build examples
-        run: nice -n 19 cargo build --examples --verbose
+            - name: Cache cargo build
+              uses: actions/cache@v4
+              with:
+                  path: target
+                  key: ${{ runner.os }}-cargo-wasm-build-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-wasm-build-
 
-  wasm:
-    name: WebAssembly Build and Test
-    runs-on: self-hosted
+            - name: Install wasm-bindgen-cli
+              run: cargo install wasm-bindgen-cli
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+            - name: Build WASM package
+              run: ./build-wasm.sh
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+            - name: Check if Deno exists
+              id: check_deno
+              run: |
+                  if command -v deno &> /dev/null; then
+                    echo "exists=true" >> $GITHUB_OUTPUT
+                    echo "Deno found: $(deno --version | head -1)"
+                  else
+                    echo "exists=false" >> $GITHUB_OUTPUT
+                    echo "Deno not found, will install"
+                  fi
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+            - name: Setup Deno
+              if: steps.check_deno.outputs.exists != 'true'
+              uses: denoland/setup-deno@v2
+              with:
+                  deno-version: v2.x
 
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-git-
+            - name: Run WASM tests with Deno
+              run: deno test --allow-read tests/wasm_test.ts
 
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-wasm-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-wasm-build-
+    release-binaries:
+        name: Build Release Binaries
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      target: x86_64-unknown-linux-gnu
+                      artifact_name: fpexif
+                      asset_name: fpexif-linux-x86_64
+                    - os: macos-latest
+                      target: x86_64-apple-darwin
+                      artifact_name: fpexif
+                      asset_name: fpexif-macos-x86_64
+                    - os: macos-latest
+                      target: aarch64-apple-darwin
+                      artifact_name: fpexif
+                      asset_name: fpexif-macos-aarch64
 
-      - name: Install wasm-bindgen-cli
-        run: cargo install wasm-bindgen-cli
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Build WASM package
-        run: ./build-wasm.sh
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.target }}
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
+            - name: Cache cargo registry
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/registry
+                  key: ${{ runner.os }}-${{ matrix.target }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ matrix.target }}-cargo-registry-
 
-      - name: Run WASM tests with Deno
-        run: deno test --allow-read tests/wasm_test.ts
+            - name: Cache cargo index
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/git
+                  key: ${{ runner.os }}-${{ matrix.target }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ matrix.target }}-cargo-git-
 
-  release-binaries:
-    name: Build Release Binaries
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: fpexif
-            asset_name: fpexif-linux-x86_64
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact_name: fpexif
-            asset_name: fpexif-macos-x86_64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact_name: fpexif
-            asset_name: fpexif-macos-aarch64
+            - name: Cache cargo build
+              uses: actions/cache@v4
+              with:
+                  path: target
+                  key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ matrix.target }}-cargo-release-
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+            - name: Build release binary
+              run: nice -n 19 cargo build --release --features cli --target ${{ matrix.target }}
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+            - name: Rename binary
+              run: |
+                  mkdir -p artifacts
+                  cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} artifacts/${{ matrix.asset_name }}
+                  chmod +x artifacts/${{ matrix.asset_name }}
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-registry-
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-git-
-
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-release-
-
-      - name: Build release binary
-        run: nice -n 19 cargo build --release --features cli --target ${{ matrix.target }}
-
-      - name: Rename binary
-        run: |
-          mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} artifacts/${{ matrix.asset_name }}
-          chmod +x artifacts/${{ matrix.asset_name }}
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.asset_name }}
-          path: artifacts/${{ matrix.asset_name }}
-          if-no-files-found: error
+            - name: Upload binary artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ matrix.asset_name }}
+                  path: artifacts/${{ matrix.asset_name }}
+                  if-no-files-found: error
