@@ -163,15 +163,35 @@ See [`PLAN_IFD_MULTI_SUPPORT.md`](../PLAN_IFD_MULTI_SUPPORT.md) for implementati
 
 | Format | Sample File | IFD Count | Test Status |
 |--------|-------------|-----------|-------------|
-| CR2 | ✅ Yes | 2-3 | ⚠️ Mismatches |
+| CR2 | ✅ Yes | 2-3 | ❌ **FAILING** - Value mismatches |
+| ORF | ✅ Yes | 2+ | ❌ **FAILING** - 1 critical issue |
+| RW2 | ✅ Yes | 2+ | ❌ **FAILING** - 1 critical issue |
 | NEF | ❓ Need sample | 2+ | ❓ Untested |
 | DNG | ❓ Need sample | 2-3 | ❓ Untested |
 | ARW | ❓ Need sample | 2+ | ❓ Untested |
-| ORF | ❓ Need sample | 2+ | ❓ Untested |
-| RW2 | ❓ Need sample | 2+ | ❓ Untested |
 | PEF | ❓ Need sample | 2+ | ❓ Untested |
 | SRW | ❓ Need sample | 2+ | ❓ Untested |
 | TIFF | ✅ Yes | 1+ | ✅ Working |
+
+### Confirmed Failures (as of 2025-12-13)
+
+**ORF (Olympus)** - 🔴 FAILING
+- Test: `test_exiftool_json_compatibility_orf`
+- File: `/fpexif/raws/RAW_OLYMPUS_C5050Z.ORF`
+- Error: "Found 1 critical issues in ORF test"
+- Root cause: Likely StripByteCounts/StripOffsets from IFD0 instead of IFD1
+
+**RW2 (Panasonic)** - 🔴 FAILING
+- Test: `test_exiftool_json_compatibility_rw2`
+- File: `/fpexif/raws/RAW_PANASONIC_G1.RW2`
+- Error: "Found 1 critical issues in RW2 test"
+- Root cause: Likely StripByteCounts/StripOffsets from IFD0 instead of IFD1
+
+**CR2 (Canon)** - 🔴 FAILING
+- Multiple value mismatches documented
+- StripByteCounts: expected 9845180, actual 842753
+- StripOffsets: expected 1834108, actual 46568
+- Root cause: Reading from IFD0 (preview) instead of IFD1 (RAW data)
 
 ---
 
