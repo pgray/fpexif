@@ -86,98 +86,216 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         id: test_issues
         run: |
-          # Extract various test issues from test output
-          UNKNOWN_TAGS=$(grep -E "unknown tags:" test-output.txt || true)
-          MISSING_FIELDS=$(grep -E "Missing field in fpexif:" test-output.txt || true)
-          VALUE_MISMATCHES=$(grep -E "mismatch:" test-output.txt | grep -v "Found.*mismatches" || true)
-          CRITICAL_DIFFS=$(grep -E "Found.*critical differences" test-output.txt || true)
+          # Create a Python script to parse test output and group by filetype
+          cat > parse_test_output.py << 'PYTHON_SCRIPT'
+          import re
+          import sys
+          from collections import defaultdict
 
-          # Count issues
-          UNKNOWN_TAGS_COUNT=$(echo "$UNKNOWN_TAGS" | grep -c "unknown tags:" || echo "0")
-          MISSING_FIELDS_COUNT=$(echo "$MISSING_FIELDS" | wc -l)
-          VALUE_MISMATCHES_COUNT=$(echo "$VALUE_MISMATCHES" | wc -l)
-          TOTAL_ISSUES=$((UNKNOWN_TAGS_COUNT + MISSING_FIELDS_COUNT + VALUE_MISMATCHES_COUNT))
+          # Read test output
+          with open('test-output.txt', 'r') as f:
+              content = f.read()
 
-          HAS_ISSUES=false
+          # Track current test/filetype context
+          current_filetype = None
+          issues_by_type = defaultdict(lambda: {'unknown_tags': [], 'missing_fields': [], 'mismatches': [], 'critical': []})
 
-          {
-            echo "## Test Issues Report"
-            echo ""
+          # Patterns to detect test context
+          test_pattern = re.compile(r'test\s+(\w+)::(test_\w+)')
+          # Pattern to extract filetype from test name (e.g., test_cr2_files, test_exiftool_json_compatibility_cr2)
+          filetype_from_test = re.compile(r'test_(?:exiftool_json_compatibility_|exiv2_comparison_)?(\w+?)(?:_files)?$', re.IGNORECASE)
+          # Pattern to extract filetype from file path in output
+          filepath_pattern = re.compile(r'\.([A-Za-z0-9]{2,4})(?:\s|$|:|\))')
+          # Pattern for "Testing with file:" lines
+          testing_file_pattern = re.compile(r'Testing with file:.*\.(\w+)')
 
-            # Summary section at the top
-            if [ $TOTAL_ISSUES -gt 0 ]; then
-              HAS_ISSUES=true
-              echo "### 📊 Summary"
-              echo ""
-              echo "- **Total Issues:** $TOTAL_ISSUES"
-              echo "- Unknown Tag Warnings: $UNKNOWN_TAGS_COUNT"
-              echo "- Missing Fields: $MISSING_FIELDS_COUNT"
-              echo "- Value Mismatches: $VALUE_MISMATCHES_COUNT"
-              echo ""
-            fi
+          # Issue patterns
+          unknown_tags_pattern = re.compile(r'unknown tags:.*')
+          missing_field_pattern = re.compile(r'Missing field in fpexif:\s*(\S+)')
+          mismatch_pattern = re.compile(r'(\w+)\s+mismatch.*?(?:exiftool|exiv2).*?fpexif', re.IGNORECASE)
+          critical_diff_pattern = re.compile(r'Found.*critical differences')
 
-            if [ -n "$UNKNOWN_TAGS" ]; then
-              echo "### Unknown EXIF Tags"
-              echo ""
-              echo "The following unknown EXIF tags were encountered:"
-              echo ""
-              echo "\`\`\`"
-              echo "$UNKNOWN_TAGS"
-              echo "\`\`\`"
-              echo ""
-              echo "To add support, add definitions to \`src/tags.rs\`."
-              echo ""
-            fi
+          # Known file extensions
+          known_extensions = {'cr2', 'nef', 'arw', 'orf', 'dng', 'rw2', 'raf', 'pef', 'crw', 'mrw',
+                              'x3f', 'srw', 'kdc', 'nrw', '3fr', 'sr2', 'erf', 'dcr', 'mos', 'srf',
+                              'mef', 'mdc', 'raw', 'tiff', 'tif', 'jpeg', 'jpg', 'heic', 'heif'}
 
-            if [ -n "$MISSING_FIELDS" ]; then
-              echo "### Missing Fields"
-              echo ""
-              echo "fpexif is missing the following fields that exiftool/exiv2 support:"
-              echo ""
-              echo "\`\`\`"
-              echo "$MISSING_FIELDS" | head -20
-              if [ $(echo "$MISSING_FIELDS" | wc -l) -gt 20 ]; then
-                echo "... and $(( $(echo "$MISSING_FIELDS" | wc -l) - 20 )) more"
-              fi
-              echo "\`\`\`"
-              echo ""
-            fi
+          def extract_filetype(line, current):
+              """Try to extract filetype from a line."""
+              # Check for "Testing with file:" pattern
+              match = testing_file_pattern.search(line)
+              if match:
+                  ext = match.group(1).lower()
+                  if ext in known_extensions:
+                      return ext.upper()
 
-            if [ -n "$VALUE_MISMATCHES" ]; then
-              echo "### Value Mismatches"
-              echo ""
-              echo "The following fields have mismatched values:"
-              echo ""
-              echo "\`\`\`"
-              echo "$VALUE_MISMATCHES" | head -20
-              if [ $(echo "$VALUE_MISMATCHES" | wc -l) -gt 20 ]; then
-                echo "... and $(( $(echo "$VALUE_MISMATCHES" | wc -l) - 20 )) more"
-              fi
-              echo "\`\`\`"
-              echo ""
-            fi
+              # Check for file path pattern
+              match = filepath_pattern.search(line)
+              if match:
+                  ext = match.group(1).lower()
+                  if ext in known_extensions:
+                      return ext.upper()
 
-            if [ -n "$CRITICAL_DIFFS" ]; then
-              echo "### Critical Differences"
-              echo ""
-              echo "\`\`\`"
-              echo "$CRITICAL_DIFFS"
-              echo "\`\`\`"
-              echo ""
-            fi
+              return current
 
-            if [ "$HAS_ISSUES" = false ]; then
-              echo "### ✅ All Clear!"
-              echo ""
-              echo "All tests passed! No unknown tags, missing fields, or value mismatches."
-            fi
-          } > test-issues-report.md
+          for line in content.split('\n'):
+              # Check for test start
+              test_match = test_pattern.search(line)
+              if test_match:
+                  test_name = test_match.group(2)
+                  ft_match = filetype_from_test.search(test_name)
+                  if ft_match:
+                      ft = ft_match.group(1).upper()
+                      # Handle special cases
+                      if ft == 'DSCF':
+                          ft = 'RAF'
+                      elif ft in [ext.upper() for ext in known_extensions]:
+                          current_filetype = ft
+                      else:
+                          current_filetype = ft
 
-          if [ "$HAS_ISSUES" = true ]; then
+              # Try to extract filetype from the line itself
+              current_filetype = extract_filetype(line, current_filetype)
+
+              # Use 'UNKNOWN' if we still don't have a filetype
+              ft = current_filetype or 'UNKNOWN'
+
+              # Check for issues
+              if 'unknown tags:' in line:
+                  issues_by_type[ft]['unknown_tags'].append(line.strip())
+
+              missing_match = missing_field_pattern.search(line)
+              if missing_match:
+                  field = missing_match.group(1)
+                  issues_by_type[ft]['missing_fields'].append(field)
+
+              if 'mismatch' in line.lower() and 'Found' not in line:
+                  issues_by_type[ft]['mismatches'].append(line.strip())
+
+              if critical_diff_pattern.search(line):
+                  issues_by_type[ft]['critical'].append(line.strip())
+
+          # Generate report
+          total_unknown = sum(len(v['unknown_tags']) for v in issues_by_type.values())
+          total_missing = sum(len(v['missing_fields']) for v in issues_by_type.values())
+          total_mismatches = sum(len(v['mismatches']) for v in issues_by_type.values())
+          total_issues = total_unknown + total_missing + total_mismatches
+
+          print("## Test Issues Report")
+          print()
+
+          if total_issues > 0:
+              print("### 📊 Summary")
+              print()
+              print(f"- **Total Issues:** {total_issues}")
+              print(f"- Unknown Tag Warnings: {total_unknown}")
+              print(f"- Missing Fields: {total_missing}")
+              print(f"- Value Mismatches: {total_mismatches}")
+              print()
+
+              # Summary by filetype
+              print("#### Issues by File Type")
+              print()
+              print("| Format | Unknown Tags | Missing Fields | Mismatches |")
+              print("|--------|--------------|----------------|------------|")
+              for ft in sorted(issues_by_type.keys()):
+                  data = issues_by_type[ft]
+                  if any([data['unknown_tags'], data['missing_fields'], data['mismatches']]):
+                      print(f"| {ft} | {len(data['unknown_tags'])} | {len(data['missing_fields'])} | {len(data['mismatches'])} |")
+              print()
+
+          # Detailed sections by filetype
+          filetypes_with_issues = [ft for ft in sorted(issues_by_type.keys())
+                                   if any([issues_by_type[ft]['unknown_tags'],
+                                          issues_by_type[ft]['missing_fields'],
+                                          issues_by_type[ft]['mismatches']])]
+
+          if filetypes_with_issues:
+              print("### Detailed Issues by Format")
+              print()
+
+              for ft in filetypes_with_issues:
+                  data = issues_by_type[ft]
+                  print(f"<details>")
+                  print(f"<summary><b>{ft}</b> - {len(data['unknown_tags'])} unknown, {len(data['missing_fields'])} missing, {len(data['mismatches'])} mismatches</summary>")
+                  print()
+
+                  if data['unknown_tags']:
+                      print("**Unknown Tags:**")
+                      print("```")
+                      for tag in data['unknown_tags'][:10]:
+                          print(tag)
+                      if len(data['unknown_tags']) > 10:
+                          print(f"... and {len(data['unknown_tags']) - 10} more")
+                      print("```")
+                      print()
+
+                  if data['missing_fields']:
+                      print("**Missing Fields:**")
+                      print("```")
+                      for field in sorted(set(data['missing_fields']))[:15]:
+                          print(f"  {field}")
+                      if len(set(data['missing_fields'])) > 15:
+                          print(f"  ... and {len(set(data['missing_fields'])) - 15} more")
+                      print("```")
+                      print()
+
+                  if data['mismatches']:
+                      print("**Value Mismatches:**")
+                      print("```")
+                      for m in data['mismatches'][:10]:
+                          print(m)
+                      if len(data['mismatches']) > 10:
+                          print(f"... and {len(data['mismatches']) - 10} more")
+                      print("```")
+                      print()
+
+                  print("</details>")
+                  print()
+
+              print()
+              print("To add support for unknown tags, add definitions to `src/tags.rs`.")
+              print()
+
+          # Critical differences
+          all_critical = []
+          for ft, data in issues_by_type.items():
+              for c in data['critical']:
+                  all_critical.append(f"[{ft}] {c}")
+
+          if all_critical:
+              print("### Critical Differences")
+              print()
+              print("```")
+              for c in all_critical:
+                  print(c)
+              print("```")
+              print()
+
+          if total_issues == 0:
+              print("### ✅ All Clear!")
+              print()
+              print("All tests passed! No unknown tags, missing fields, or value mismatches.")
+
+          # Output for GitHub Actions
+          if total_issues > 0:
+              print("HAS_ISSUES=true", file=sys.stderr)
+          else:
+              print("HAS_ISSUES=false", file=sys.stderr)
+          PYTHON_SCRIPT
+
+          # Run the Python script
+          python3 parse_test_output.py > test-issues-report.md 2> issues_status.txt
+
+          # Read the status
+          if grep -q "HAS_ISSUES=true" issues_status.txt; then
             echo "found=true" >> $GITHUB_OUTPUT
           else
             echo "found=false" >> $GITHUB_OUTPUT
           fi
+
+          # Cleanup
+          rm -f parse_test_output.py issues_status.txt
 
       - name: Post test issues comment on PR
         if: always() && github.event_name == 'pull_request'
