@@ -297,12 +297,32 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
             // Handle UserComment and other undefined tags
             match tag_id {
                 0x9286 => {
-                    // UserComment - check if it's all nulls/whitespace
-                    let is_empty = v.iter().all(|&b| b == 0 || b == b' ');
-                    if is_empty {
-                        String::new()
+                    // UserComment - EXIF spec says first 8 bytes are character code
+                    // followed by the actual comment. Common codes: "ASCII\0\0\0", "UNICODE\0", etc.
+                    if v.len() >= 8 {
+                        // Skip the 8-byte character code
+                        let comment_data = &v[8..];
+                        // Check if the comment is empty (all nulls, spaces, or a repeated fill pattern)
+                        let is_empty = comment_data
+                            .iter()
+                            .all(|&b| b == 0 || b == b' ' || b == b'A');
+                        if is_empty {
+                            String::new()
+                        } else {
+                            // Try to decode as ASCII/UTF-8
+                            let cleaned = comment_data
+                                .iter()
+                                .copied()
+                                .take_while(|&b| b != 0)
+                                .collect::<Vec<u8>>();
+                            String::from_utf8(cleaned)
+                                .ok()
+                                .filter(|s| !s.trim().is_empty())
+                                .unwrap_or_default()
+                        }
                     } else {
-                        format!("(Binary data {} bytes)", v.len())
+                        // Malformed UserComment or empty
+                        String::new()
                     }
                 }
                 _ => format!("(Binary data {} bytes)", v.len()),
