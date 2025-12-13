@@ -182,32 +182,83 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn print_exif_data_exiftool(exif_data: &ExifData) {
     for (tag_id, value) in exif_data.iter() {
         let tag_name = tag_id.name().unwrap_or("Unknown");
-        let display_value = format_exiftool_text_value(value);
+        let display_value = format_exiftool_text_value(value, tag_id.id);
         println!("{:<32}: {}", tag_name, display_value);
     }
 }
 
 /// Format an ExifValue for exiftool-style text output
-fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue) -> String {
+fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16) -> String {
     use fpexif::data_types::ExifValue;
 
     match value {
-        ExifValue::Ascii(s) => s.trim_end_matches('\0').to_string(),
-        ExifValue::Byte(v) => format_values(v),
-        ExifValue::Short(v) => format_values(v),
-        ExifValue::Long(v) => format_values(v),
+        ExifValue::Ascii(s) => {
+            let cleaned = s.trim_end_matches('\0').trim();
+            // Return empty string if it's all null/whitespace
+            if cleaned.is_empty() {
+                String::new()
+            } else {
+                cleaned.to_string()
+            }
+        }
+        ExifValue::Byte(v) => format_values_space(v),
+        ExifValue::Short(v) => {
+            // Use tag-specific descriptions for known tags
+            if v.len() == 1 {
+                match tag_id {
+                    0x0112 => tags::get_orientation_description(v[0]).to_string(),
+                    0x0103 => tags::get_compression_description(v[0]).to_string(),
+                    0x0128 => tags::get_resolution_unit_description(v[0]).to_string(),
+                    0x0213 => tags::get_ycbcr_positioning_description(v[0]).to_string(),
+                    0x8822 => tags::get_exposure_program_description(v[0]).to_string(),
+                    0x9207 => tags::get_metering_mode_description(v[0]).to_string(),
+                    0x9208 => tags::get_light_source_description(v[0]).to_string(),
+                    0x9209 => tags::get_flash_description(v[0]).to_string(),
+                    0xA001 => tags::get_color_space_description(v[0]).to_string(),
+                    0xA210 => match v[0] {
+                        2 => "inches".to_string(),
+                        3 => "cm".to_string(),
+                        _ => v[0].to_string(),
+                    },
+                    0xA402 => tags::get_exposure_mode_description(v[0]).to_string(),
+                    0xA403 => tags::get_white_balance_description(v[0]).to_string(),
+                    0xA406 => tags::get_scene_capture_type_description(v[0]).to_string(),
+                    0xA408 => tags::get_contrast_description(v[0]).to_string(),
+                    0xA409 => tags::get_saturation_description(v[0]).to_string(),
+                    0xA40A => tags::get_sharpness_description(v[0]).to_string(),
+                    0xA40C => tags::get_subject_distance_range_description(v[0]).to_string(),
+                    0xA401 => tags::get_custom_rendered_description(v[0]).to_string(),
+                    0xA40B => tags::get_gain_control_description(v[0]).to_string(),
+                    0xA217 => tags::get_sensing_method_description(v[0]).to_string(),
+                    0x8830 => tags::get_sensitivity_type_description(v[0]).to_string(),
+                    _ => format_values_space(v),
+                }
+            } else {
+                format_values_space(v)
+            }
+        }
+        ExifValue::Long(v) => format_values_space(v),
         ExifValue::Rational(v) => {
             if v.len() == 1 {
                 let (n, d) = v[0];
                 if d != 0 {
-                    let val = n as f64 / d as f64;
-                    if val == val.floor() {
-                        format!("{}", val as u32)
-                    } else {
-                        format!("{:.6}", val)
-                            .trim_end_matches('0')
-                            .trim_end_matches('.')
-                            .to_string()
+                    match tag_id {
+                        0x920A => {
+                            // FocalLength - format with decimal and mm unit
+                            let focal_length = n as f64 / d as f64;
+                            format!("{:.1} mm", focal_length)
+                        }
+                        _ => {
+                            let val = n as f64 / d as f64;
+                            if val == val.floor() {
+                                format!("{}", val as u32)
+                            } else {
+                                format!("{:.6}", val)
+                                    .trim_end_matches('0')
+                                    .trim_end_matches('.')
+                                    .to_string()
+                            }
+                        }
                     }
                 } else {
                     format!("{}/{}", n, d)
@@ -219,9 +270,9 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue) -> String {
                     .join(" ")
             }
         }
-        ExifValue::SByte(v) => format_values(v),
-        ExifValue::SShort(v) => format_values(v),
-        ExifValue::SLong(v) => format_values(v),
+        ExifValue::SByte(v) => format_values_space(v),
+        ExifValue::SShort(v) => format_values_space(v),
+        ExifValue::SLong(v) => format_values_space(v),
         ExifValue::SRational(v) => {
             if v.len() == 1 {
                 let (n, d) = v[0];
@@ -240,10 +291,52 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue) -> String {
                     .join(" ")
             }
         }
-        ExifValue::Float(v) => format_values(v),
-        ExifValue::Double(v) => format_values(v),
-        ExifValue::Undefined(v) => format!("(Binary data {} bytes)", v.len()),
+        ExifValue::Float(v) => format_values_space(v),
+        ExifValue::Double(v) => format_values_space(v),
+        ExifValue::Undefined(v) => {
+            // Handle UserComment and other undefined tags
+            match tag_id {
+                0x9286 => {
+                    // UserComment - EXIF spec says first 8 bytes are character code
+                    // followed by the actual comment. Common codes: "ASCII\0\0\0", "UNICODE\0", etc.
+                    if v.len() >= 8 {
+                        // Skip the 8-byte character code
+                        let comment_data = &v[8..];
+                        // Check if the comment is empty (all nulls, spaces, or a repeated fill pattern)
+                        let is_empty = comment_data
+                            .iter()
+                            .all(|&b| b == 0 || b == b' ' || b == b'A');
+                        if is_empty {
+                            String::new()
+                        } else {
+                            // Try to decode as ASCII/UTF-8
+                            let cleaned = comment_data
+                                .iter()
+                                .copied()
+                                .take_while(|&b| b != 0)
+                                .collect::<Vec<u8>>();
+                            String::from_utf8(cleaned)
+                                .ok()
+                                .filter(|s| !s.trim().is_empty())
+                                .unwrap_or_default()
+                        }
+                    } else {
+                        // Malformed UserComment or empty
+                        String::new()
+                    }
+                }
+                _ => format!("(Binary data {} bytes)", v.len()),
+            }
+        }
     }
+}
+
+fn format_values_space<T: std::fmt::Display>(values: &[T]) -> String {
+    values
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Print all EXIF data in exiv2 format: `Exif.Image.Make  Ascii  6  Canon`
@@ -277,9 +370,9 @@ fn format_exiv2_value(value: &fpexif::data_types::ExifValue) -> (&'static str, u
             let cleaned = s.trim_end_matches('\0');
             ("Ascii", cleaned.len(), cleaned.to_string())
         }
-        ExifValue::Byte(v) => ("Byte", v.len(), format_values(v)),
-        ExifValue::Short(v) => ("Short", v.len(), format_values(v)),
-        ExifValue::Long(v) => ("Long", v.len(), format_values(v)),
+        ExifValue::Byte(v) => ("Byte", v.len(), format_values_space(v)),
+        ExifValue::Short(v) => ("Short", v.len(), format_values_space(v)),
+        ExifValue::Long(v) => ("Long", v.len(), format_values_space(v)),
         ExifValue::Rational(v) => (
             "Rational",
             v.len(),
@@ -288,9 +381,9 @@ fn format_exiv2_value(value: &fpexif::data_types::ExifValue) -> (&'static str, u
                 .collect::<Vec<_>>()
                 .join(" "),
         ),
-        ExifValue::SByte(v) => ("SByte", v.len(), format_values(v)),
-        ExifValue::SShort(v) => ("SShort", v.len(), format_values(v)),
-        ExifValue::SLong(v) => ("SLong", v.len(), format_values(v)),
+        ExifValue::SByte(v) => ("SByte", v.len(), format_values_space(v)),
+        ExifValue::SShort(v) => ("SShort", v.len(), format_values_space(v)),
+        ExifValue::SLong(v) => ("SLong", v.len(), format_values_space(v)),
         ExifValue::SRational(v) => (
             "SRational",
             v.len(),
@@ -299,18 +392,10 @@ fn format_exiv2_value(value: &fpexif::data_types::ExifValue) -> (&'static str, u
                 .collect::<Vec<_>>()
                 .join(" "),
         ),
-        ExifValue::Float(v) => ("Float", v.len(), format_values(v)),
-        ExifValue::Double(v) => ("Double", v.len(), format_values(v)),
+        ExifValue::Float(v) => ("Float", v.len(), format_values_space(v)),
+        ExifValue::Double(v) => ("Double", v.len(), format_values_space(v)),
         ExifValue::Undefined(v) => ("Undefined", v.len(), format!("{} bytes", v.len())),
     }
-}
-
-fn format_values<T: std::fmt::Display>(values: &[T]) -> String {
-    values
-        .iter()
-        .map(|v| v.to_string())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 /// Print all EXIF data in JSON format (exiftool-compatible)

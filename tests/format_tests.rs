@@ -206,3 +206,98 @@ fn test_x3f_format_detection() {
     // but signature should be recognized
     assert!(result.is_err());
 }
+
+#[test]
+fn test_raf_signature_validation() {
+    // Invalid RAF signature
+    let mut raf = Vec::new();
+    raf.extend_from_slice(b"INVALID_SIGNATU"); // Invalid (should be FUJIFILMCCD-RAW)
+    raf.extend_from_slice(&[0u8; 100]);
+
+    let cursor = Cursor::new(raf);
+    let result = formats::extract_exif_segment(cursor);
+
+    assert!(result.is_err(), "Should reject invalid RAF signature");
+}
+
+#[test]
+fn test_raf_format_detection() {
+    // Valid RAF signature but no embedded JPEG with EXIF
+    let mut raf = Vec::new();
+    raf.extend_from_slice(b"FUJIFILMCCD-RAW"); // Valid RAF signature
+    raf.extend_from_slice(&[0u8; 1000]); // Padding without JPEG markers
+
+    let cursor = Cursor::new(raf);
+    let result = formats::extract_exif_segment(cursor);
+
+    // Should fail because we don't have embedded JPEG with EXIF,
+    // but signature should be recognized
+    assert!(result.is_err());
+    match result {
+        Err(fpexif::errors::ExifError::Format(msg)) => {
+            assert!(msg.contains("No embedded EXIF data found"));
+        }
+        _ => panic!("Expected Format error"),
+    }
+}
+
+#[test]
+fn test_raf_with_jpeg_but_no_exif() {
+    // RAF with embedded JPEG but no EXIF APP1 marker
+    let mut raf = Vec::new();
+    raf.extend_from_slice(b"FUJIFILMCCD-RAW"); // Valid RAF signature
+    raf.extend_from_slice(&[0u8; 100]); // Some padding
+                                        // Add JPEG SOI and EOI without APP1
+    raf.extend_from_slice(&[0xFF, 0xD8]); // JPEG SOI
+    raf.extend_from_slice(&[0xFF, 0xD9]); // JPEG EOI (no APP1)
+    raf.extend_from_slice(&[0u8; 100]); // More padding
+
+    let cursor = Cursor::new(raf);
+    let result = formats::extract_exif_segment(cursor);
+
+    // Should fail because there's no APP1 marker after SOI
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_raf_real_file() {
+    // Test with the actual RAF file in test-data
+    use std::path::Path;
+
+    let test_path = Path::new("test-data/DSCF0062.RAF");
+    if !test_path.exists() {
+        println!("Skipping RAF real file test - file not found");
+        return;
+    }
+
+    let parser = fpexif::ExifParser::new();
+    let result = parser.parse_file(test_path);
+
+    match result {
+        Ok(exif_data) => {
+            assert!(!exif_data.is_empty(), "EXIF data should not be empty");
+
+            // Verify key EXIF fields that should be present
+            assert!(
+                exif_data.get_tag_by_name("Make").is_some(),
+                "Make field should be present"
+            );
+            assert!(
+                exif_data.get_tag_by_name("Model").is_some(),
+                "Model field should be present"
+            );
+
+            // Verify Make is FUJIFILM
+            if let Some(fpexif::data_types::ExifValue::Ascii(make)) =
+                exif_data.get_tag_by_name("Make")
+            {
+                assert!(make.contains("FUJIFILM"), "Make should be FUJIFILM");
+            }
+
+            println!("RAF file parsed successfully with {} tags", exif_data.len());
+        }
+        Err(e) => {
+            panic!("Failed to parse RAF file: {:?}", e);
+        }
+    }
+}
