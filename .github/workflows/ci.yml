@@ -74,11 +74,60 @@ jobs:
       - name: Build
         run: nice -n 19 cargo build --verbose
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
           set -eo pipefail
           mkdir -p test-results
-          nice -n 19 cargo test --verbose -- --nocapture 2>&1 | tee test-output.txt
+          nice -n 19 cargo test --lib --verbose -- --nocapture 2>&1 | tee test-output.txt
+        env:
+          CI: true
+
+      - name: Test CR2 format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_cr2 -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test NEF format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_nef -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test ARW format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_arw -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test ORF format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_orf -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test DNG format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_dng -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test RW2 format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_rw2 -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test RAF format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_dscf_raf -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Run remaining integration tests
+        run: |
+          set -eo pipefail
+          nice -n 19 cargo test --verbose -- --nocapture --skip test_exiftool_json_compatibility 2>&1 | tee -a test-output.txt
         env:
           CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
