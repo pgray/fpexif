@@ -347,7 +347,11 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
 
     // Print summary
     if !file_result.issues.is_empty() {
-        println!("\nFound {} differences:", file_result.issues.len());
+        println!(
+            "\n[{}] Found {} differences:",
+            test_path,
+            file_result.issues.len()
+        );
 
         let missing: Vec<_> = file_result
             .issues
@@ -366,7 +370,11 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
             .collect();
 
         if !missing.is_empty() {
-            println!("\n--- Missing Fields ({}) ---", missing.len());
+            println!(
+                "\n[{}] --- Missing Fields ({}) ---",
+                test_path,
+                missing.len()
+            );
             for issue in missing.iter().take(10) {
                 println!("  {}", issue.message);
             }
@@ -376,14 +384,18 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
         }
 
         if !mismatches.is_empty() {
-            println!("\n--- Value Mismatches ({}) ---", mismatches.len());
+            println!(
+                "\n[{}] --- Value Mismatches ({}) ---",
+                test_path,
+                mismatches.len()
+            );
             for issue in &mismatches {
                 println!("  {}", issue.message);
             }
         }
 
         if !extras.is_empty() {
-            println!("\n--- Extra Fields ({}) ---", extras.len());
+            println!("\n[{}] --- Extra Fields ({}) ---", test_path, extras.len());
             for issue in extras.iter().take(5) {
                 println!("  {}", issue.message);
             }
@@ -393,12 +405,12 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
         }
 
         if has_critical {
-            println!("\n!! Found critical differences");
+            println!("\n[{}] !! Found critical differences", test_path);
         } else {
-            println!("\n* No critical differences found!");
+            println!("\n[{}] * No critical differences found!", test_path);
         }
     } else {
-        println!("\n* JSON outputs match perfectly!");
+        println!("\n[{}] * JSON outputs match perfectly!", test_path);
     }
 
     result.add_file_result(file_result);
@@ -594,7 +606,7 @@ fn test_exiftool_json_compatibility_dscf_raf() {
     };
 
     if !issues.is_empty() {
-        println!("\nFound {} differences:", issues.len());
+        println!("\n[{}] Found {} differences:", test_path, issues.len());
 
         let missing: Vec<_> = issues
             .iter()
@@ -610,21 +622,29 @@ fn test_exiftool_json_compatibility_dscf_raf() {
             .collect();
 
         if !missing.is_empty() {
-            println!("\n--- Missing Fields ({}) ---", missing.len());
+            println!(
+                "\n[{}] --- Missing Fields ({}) ---",
+                test_path,
+                missing.len()
+            );
             for issue in &missing {
                 println!("  {}", issue.message);
             }
         }
 
         if !mismatches.is_empty() {
-            println!("\n--- Value Mismatches ({}) ---", mismatches.len());
+            println!(
+                "\n[{}] --- Value Mismatches ({}) ---",
+                test_path,
+                mismatches.len()
+            );
             for issue in &mismatches {
                 println!("  {}", issue.message);
             }
         }
 
         if !extras.is_empty() {
-            println!("\n--- Extra Fields ({}) ---", extras.len());
+            println!("\n[{}] --- Extra Fields ({}) ---", test_path, extras.len());
             for issue in extras.iter().take(10) {
                 println!("  {}", issue.message);
             }
@@ -634,16 +654,16 @@ fn test_exiftool_json_compatibility_dscf_raf() {
         }
 
         if has_critical {
-            println!("\n!! Found critical differences");
+            println!("\n[{}] !! Found critical differences", test_path);
         } else {
-            println!("\n* No critical differences found!");
+            println!("\n[{}] * No critical differences found!", test_path);
             println!(
                 "  (Found {} expected variations from exiftool)",
                 issues.len()
             );
         }
     } else {
-        println!("\n* JSON outputs match perfectly!");
+        println!("\n[{}] * JSON outputs match perfectly!", test_path);
     }
 
     result.add_file_result(file_result);
