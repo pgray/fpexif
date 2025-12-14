@@ -10,7 +10,7 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            max-width: 900px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
             background: #f5f5f5;
@@ -51,19 +51,44 @@
         #results {
             margin-top: 20px;
         }
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .results-container {
+                grid-template-columns: 1fr;
+            }
+        }
         .result-card {
             background: #fff;
             border-radius: 8px;
             padding: 20px;
-            margin-bottom: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .result-card h2 {
             margin-top: 0;
             color: #333;
-            font-size: 1.2em;
+            font-size: 1.1em;
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
+        }
+        .file-info {
+            background: #fff;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .file-info h2 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 1.2em;
+        }
+        .file-info p {
+            margin: 5px 0;
+            color: #666;
         }
         .tag-count {
             color: #4a90d9;
@@ -72,17 +97,20 @@
         .tags-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
+            margin-top: 10px;
+            font-size: 0.9em;
         }
         .tags-table th, .tags-table td {
             text-align: left;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-bottom: 1px solid #eee;
         }
         .tags-table th {
             background: #f9f9f9;
             color: #666;
             font-weight: 600;
+            position: sticky;
+            top: 0;
         }
         .tags-table tr:hover {
             background: #f5f9ff;
@@ -90,12 +118,58 @@
         .tag-name {
             font-family: monospace;
             color: #c7254e;
+            font-size: 0.85em;
         }
         .tag-value {
             font-family: monospace;
             color: #333;
             word-break: break-all;
-            max-width: 400px;
+            font-size: 0.85em;
+        }
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .json-container {
+            max-height: 600px;
+            overflow: auto;
+            background: #1e1e1e;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .json-container pre {
+            margin: 0;
+            color: #d4d4d4;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8em;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .json-container .key {
+            color: #9cdcfe;
+        }
+        .json-container .string {
+            color: #ce9178;
+        }
+        .json-container .number {
+            color: #b5cea8;
+        }
+        .json-container .null {
+            color: #569cd6;
+        }
+        .copy-btn {
+            background: #4a90d9;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            float: right;
+        }
+        .copy-btn:hover {
+            background: #3a7bc8;
         }
         .error {
             background: #fff5f5;
@@ -125,7 +199,7 @@
     <div id="results"></div>
 
     <script type="module">
-        import init, { parse_exif, version } from './pkg/fpexif.js';
+        import init, { parse_exif, parse_exif_json, version } from './pkg/fpexif.js';
 
         let wasmReady = false;
 
@@ -141,13 +215,11 @@
         }
 
         function formatTagName(name) {
-            // Clean up debug format like "Make" from "TagId(Make)"
             return name.replace(/TagId\((\w+)\)/, '$1')
                        .replace(/^Unknown\(0x([0-9a-fA-F]+)\)$/, 'Unknown (0x$1)');
         }
 
         function formatTagValue(value) {
-            // Clean up debug format values
             let cleaned = value
                 .replace(/^Ascii\("(.*)"\)$/, '$1')
                 .replace(/^Rational\((\d+)\/(\d+)\)$/, (_, n, d) => {
@@ -167,6 +239,30 @@
             return cleaned;
         }
 
+        function syntaxHighlight(json) {
+            return json
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+                    let cls = 'number';
+                    if (/^"/.test(match)) {
+                        if (/:$/.test(match)) {
+                            cls = 'key';
+                        } else {
+                            cls = 'string';
+                        }
+                    } else if (/true|false/.test(match)) {
+                        cls = 'null';
+                    } else if (/null/.test(match)) {
+                        cls = 'null';
+                    }
+                    return '<span class="' + cls + '">' + match + '</span>';
+                });
+        }
+
+        let currentJson = '';
+
         async function processFile(file) {
             const resultsDiv = document.getElementById('results');
 
@@ -181,14 +277,23 @@
                 const buffer = await file.arrayBuffer();
                 const data = new Uint8Array(buffer);
 
+                // Get both formats
                 const resultJson = parse_exif(data);
                 const result = JSON.parse(resultJson);
 
+                const exiftoolJson = parse_exif_json(data);
+                currentJson = exiftoolJson;
+                const exiftoolData = JSON.parse(exiftoolJson);
+
                 let html = `
-                    <div class="result-card">
+                    <div class="file-info">
                         <h2>${file.name}</h2>
-                        <p>File size: ${(file.size / 1024).toFixed(2)} KB</p>
-                        <p>Tags found: <span class="tag-count">${result.tag_count}</span></p>
+                        <p>File size: ${(file.size / 1024).toFixed(2)} KB | Tags found: <span class="tag-count">${result.tag_count}</span></p>
+                    </div>
+                    <div class="results-container">
+                        <div class="result-card">
+                            <h2>Parsed Tags</h2>
+                            <div class="table-container">
                 `;
 
                 if (result.tags && Object.keys(result.tags).length > 0) {
@@ -203,7 +308,6 @@
                             <tbody>
                     `;
 
-                    // Sort tags alphabetically
                     const sortedTags = Object.entries(result.tags).sort((a, b) =>
                         formatTagName(a[0]).localeCompare(formatTagName(b[0]))
                     );
@@ -223,7 +327,18 @@
                     `;
                 }
 
-                html += '</div>';
+                html += `
+                            </div>
+                        </div>
+                        <div class="result-card">
+                            <h2>Exiftool-Compatible JSON <button class="copy-btn" onclick="copyJson()">Copy</button></h2>
+                            <div class="json-container">
+                                <pre>${syntaxHighlight(exiftoolJson)}</pre>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
                 resultsDiv.innerHTML = html;
 
             } catch (e) {
@@ -231,6 +346,14 @@
                 console.error('Parse error:', e);
             }
         }
+
+        window.copyJson = function() {
+            navigator.clipboard.writeText(currentJson).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            });
+        };
 
         // Initialize WASM
         initWasm();
