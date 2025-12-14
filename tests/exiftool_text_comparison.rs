@@ -177,7 +177,9 @@ fn test_format_exiftool_text_compatibility(extension: &str) {
         }
     };
 
-    let test_path = test_file.to_str().unwrap();
+    let test_path = test_file
+        .to_str()
+        .expect("Failed to convert path to string");
     println!("Testing with file: {}", test_path);
 
     // Get outputs from both tools

@@ -162,14 +162,15 @@ fn test_mrw_format_detection() {
     // Should fail because we don't have valid PRD block,
     // but signature should be recognized
     assert!(result.is_err());
-    match result {
-        Err(fpexif::errors::ExifError::Format(msg)) => {
-            // Either "No EXIF data found" or "Invalid MRW block structure"
-            assert!(
-                msg.contains("No EXIF data found") || msg.contains("Invalid MRW block structure")
-            );
-        }
-        _ => panic!("Expected Format error"),
+    if let Err(fpexif::errors::ExifError::Format(msg)) = result {
+        // Either "No EXIF data found" or "Invalid MRW block structure"
+        assert!(
+            msg.contains("No EXIF data found") || msg.contains("Invalid MRW block structure"),
+            "Unexpected error message: {}",
+            msg
+        );
+    } else {
+        panic!("Expected Format error");
     }
 }
 
@@ -204,7 +205,10 @@ fn test_x3f_format_detection() {
 
     // Should fail because we don't have valid directory structure,
     // but signature should be recognized
-    assert!(result.is_err());
+    assert!(
+        result.is_err(),
+        "Should fail without valid directory structure"
+    );
 }
 
 #[test]
@@ -233,11 +237,14 @@ fn test_raf_format_detection() {
     // Should fail because we don't have embedded JPEG with EXIF,
     // but signature should be recognized
     assert!(result.is_err());
-    match result {
-        Err(fpexif::errors::ExifError::Format(msg)) => {
-            assert!(msg.contains("No embedded EXIF data found"));
-        }
-        _ => panic!("Expected Format error"),
+    if let Err(fpexif::errors::ExifError::Format(msg)) = result {
+        assert!(
+            msg.contains("No embedded EXIF data found"),
+            "Unexpected error message: {}",
+            msg
+        );
+    } else {
+        panic!("Expected Format error");
     }
 }
 

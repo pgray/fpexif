@@ -1,284 +1,334 @@
 name: CI
 
 on:
-    pull_request:
-        branches:
-            - main
-    push:
-        branches:
-            - main
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
 
 permissions:
-    contents: read
-    pull-requests: write
-    issues: write
+  contents: read
+  pull-requests: write
+  issues: write
 
 env:
-    CARGO_TERM_COLOR: always
-    RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-    build:
-        name: Build and Test
-        runs-on: self-hosted
+  build:
+    name: Build and Test
+    runs-on: self-hosted
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Check if test files exist
-              id: check_files
-              run: |
-                  if [ -f /fpexif/raws/welcome.html ]; then
-                    echo "exists=true" >> $GITHUB_OUTPUT
-                    echo "Test files found at /fpexif/raws"
-                  else
-                    echo "exists=false" >> $GITHUB_OUTPUT
-                    echo "Test files not found - real file tests will fail"
-                  fi
+      - name: Check if test files exist
+        id: check_files
+        run: |
+          if [ -f /fpexif/raws/welcome.html ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Test files found at /fpexif/raws"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Test files not found - real file tests will fail"
+          fi
 
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
-              with:
-                  components: rustfmt, clippy
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-            - name: Check exiftool and exiv2
-              run: |
-                  exiftool -ver
-                  exiv2 --version | head -1
+      - name: Check exiftool and exiv2
+        run: |
+          exiftool -ver
+          exiv2 --version | head -1
 
-            - name: Cache cargo registry
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cargo/registry
-                  key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-registry-
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
 
-            - name: Cache cargo index
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cargo/git
-                  key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-git-
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
 
-            - name: Cache cargo build
-              uses: actions/cache@v4
-              with:
-                  path: target
-                  key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-build-target-
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-target-
 
-            - name: Build
-              run: nice -n 19 cargo build --verbose
+      - name: Build
+        run: nice -n 19 cargo build --verbose
 
-            - name: Run tests
-              run: |
-                  set -eo pipefail
-                  mkdir -p test-results
-                  nice -n 19 cargo test --verbose 2>&1 | tee test-output.txt
-              env:
-                  CI: true
-                  FPEXIF_TEST_FILES: /fpexif/raws
+      - name: Run unit tests
+        run: |
+          set -eo pipefail
+          mkdir -p test-results
+          nice -n 19 cargo test --lib --verbose -- --nocapture 2>&1 | tee test-output.txt
+        env:
+          CI: true
 
-            - name: Generate test issues report
-              if: always() && github.event_name == 'pull_request'
-              run: |
-                  # Check if Deno exists
-                  if command -v deno &> /dev/null; then
-                    deno run --allow-read --allow-write scripts/pr-comment.ts test-issues-report.md
-                  else
-                    # Fallback: create a simple report from JSON files
-                    echo "## Test Issues Report" > test-issues-report.md
-                    echo "" >> test-issues-report.md
-                    if [ -d test-results ] && [ "$(ls -A test-results 2>/dev/null)" ]; then
-                      echo "### Results" >> test-issues-report.md
-                      echo "" >> test-issues-report.md
-                      echo '```json' >> test-issues-report.md
-                      cat test-results/*.json >> test-issues-report.md 2>/dev/null || echo "No JSON files found"
-                      echo '```' >> test-issues-report.md
-                    else
-                      echo "### All Clear!" >> test-issues-report.md
-                      echo "" >> test-issues-report.md
-                      echo "No test issues detected." >> test-issues-report.md
-                    fi
-                  fi
+      - name: Test CR2 format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_cr2 -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
-            - name: Post test issues comment on PR
-              if: always() && github.event_name == 'pull_request'
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      const fs = require('fs');
-                      let report = '## Test Issues Report\n\nNo report generated.';
-                      try {
-                        report = fs.readFileSync('test-issues-report.md', 'utf8');
-                      } catch (e) {
-                        console.log('No report file found:', e.message);
-                      }
+      - name: Test NEF format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_nef -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
-                      // Find existing comment
-                      const { data: comments } = await github.rest.issues.listComments({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        issue_number: context.issue.number,
-                      });
+      - name: Test ARW format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_arw -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
-                      const botComment = comments.find(c =>
-                        c.user.type === 'Bot' && c.body.includes('## Test Issues Report')
-                      );
+      - name: Test ORF format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_orf -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
-                      if (botComment) {
-                        await github.rest.issues.updateComment({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          comment_id: botComment.id,
-                          body: report
-                        });
-                      } else {
-                        await github.rest.issues.createComment({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          issue_number: context.issue.number,
-                          body: report
-                        });
-                      }
+      - name: Test DNG format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_dng -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
-            - name: Run clippy
-              run: ./bin/ccc
+      - name: Test RW2 format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_rw2 -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
-            - name: Build examples
-              run: nice -n 19 cargo build --examples --verbose
+      - name: Test RAF format
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_raf -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
-    wasm:
-        name: WebAssembly Build and Test
-        runs-on: self-hosted
+      - name: Run remaining integration tests
+        run: |
+          set -eo pipefail
+          nice -n 19 cargo test --verbose -- --nocapture --skip test_exiftool_json_compatibility 2>&1 | tee -a test-output.txt
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+      - name: Generate test issues report
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          # Check if Deno exists
+          if command -v deno &> /dev/null; then
+            deno run --allow-read --allow-write scripts/pr-comment.ts test-issues-report.md
+          else
+            # Fallback: create a simple report from JSON files
+            echo "## Test Issues Report" > test-issues-report.md
+            echo "" >> test-issues-report.md
+            if [ -d test-results ] && [ "$(ls -A test-results 2>/dev/null)" ]; then
+              echo "### Results" >> test-issues-report.md
+              echo "" >> test-issues-report.md
+              echo '```json' >> test-issues-report.md
+              cat test-results/*.json >> test-issues-report.md 2>/dev/null || echo "No JSON files found"
+              echo '```' >> test-issues-report.md
+            else
+              echo "### All Clear!" >> test-issues-report.md
+              echo "" >> test-issues-report.md
+              echo "No test issues detected." >> test-issues-report.md
+            fi
+          fi
 
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
-              with:
-                  targets: wasm32-unknown-unknown
+      - name: Post test issues comment on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = '## Test Issues Report\n\nNo report generated.';
+            try {
+              report = fs.readFileSync('test-issues-report.md', 'utf8');
+            } catch (e) {
+              console.log('No report file found:', e.message);
+            }
 
-            - name: Cache cargo registry
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cargo/registry
-                  key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-registry-
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
 
-            - name: Cache cargo index
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cargo/git
-                  key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-git-
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('## Test Issues Report')
+            );
 
-            - name: Cache cargo build
-              uses: actions/cache@v4
-              with:
-                  path: target
-                  key: ${{ runner.os }}-cargo-wasm-build-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-wasm-build-
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: report
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: report
+              });
+            }
 
-            - name: Install wasm-bindgen-cli
-              run: cargo install wasm-bindgen-cli
+      - name: Run clippy
+        run: ./bin/ccc
 
-            - name: Build WASM package
-              run: ./build-wasm.sh
+      - name: Build examples
+        run: nice -n 19 cargo build --examples --verbose
 
-            - name: Check if Deno exists
-              id: check_deno
-              run: |
-                  if command -v deno &> /dev/null; then
-                    echo "exists=true" >> $GITHUB_OUTPUT
-                    echo "Deno found: $(deno --version | head -1)"
-                  else
-                    echo "exists=false" >> $GITHUB_OUTPUT
-                    echo "Deno not found, will install"
-                  fi
+  wasm:
+    name: WebAssembly Build and Test
+    runs-on: self-hosted
 
-            - name: Setup Deno
-              if: steps.check_deno.outputs.exists != 'true'
-              uses: denoland/setup-deno@v2
-              with:
-                  deno-version: v2.x
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Run WASM tests with Deno
-              run: deno test --allow-read tests/wasm_test.ts
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
-    release-binaries:
-        name: Build Release Binaries
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                include:
-                    - os: ubuntu-latest
-                      target: x86_64-unknown-linux-gnu
-                      artifact_name: fpexif
-                      asset_name: fpexif-linux-x86_64
-                    - os: macos-latest
-                      target: x86_64-apple-darwin
-                      artifact_name: fpexif
-                      asset_name: fpexif-macos-x86_64
-                    - os: macos-latest
-                      target: aarch64-apple-darwin
-                      artifact_name: fpexif
-                      asset_name: fpexif-macos-aarch64
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
 
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
-              with:
-                  targets: ${{ matrix.target }}
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-wasm-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-build-
 
-            - name: Cache cargo registry
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cargo/registry
-                  key: ${{ runner.os }}-${{ matrix.target }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-${{ matrix.target }}-cargo-registry-
+      - name: Install wasm-bindgen-cli
+        run: cargo install wasm-bindgen-cli
 
-            - name: Cache cargo index
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cargo/git
-                  key: ${{ runner.os }}-${{ matrix.target }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-${{ matrix.target }}-cargo-git-
+      - name: Build WASM package
+        run: ./build-wasm.sh
 
-            - name: Cache cargo build
-              uses: actions/cache@v4
-              with:
-                  path: target
-                  key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-${{ matrix.target }}-cargo-release-
+      - name: Check if Deno exists
+        id: check_deno
+        run: |
+          if command -v deno &> /dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Deno found: $(deno --version | head -1)"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Deno not found, will install"
+          fi
 
-            - name: Build release binary
-              run: nice -n 19 cargo build --release --features cli --target ${{ matrix.target }}
+      - name: Setup Deno
+        if: steps.check_deno.outputs.exists != 'true'
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
-            - name: Rename binary
-              run: |
-                  mkdir -p artifacts
-                  cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} artifacts/${{ matrix.asset_name }}
-                  chmod +x artifacts/${{ matrix.asset_name }}
+      - name: Run WASM tests with Deno
+        run: deno test --allow-read tests/wasm_test.ts
 
-            - name: Upload binary artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ${{ matrix.asset_name }}
-                  path: artifacts/${{ matrix.asset_name }}
-                  if-no-files-found: error
+  release-binaries:
+    name: Build Release Binaries
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: fpexif
+            asset_name: fpexif-linux-x86_64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: fpexif
+            asset_name: fpexif-macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: fpexif
+            asset_name: fpexif-macos-aarch64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-git-
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-release-
+
+      - name: Build release binary
+        run: nice -n 19 cargo build --release --features cli --target ${{ matrix.target }}
+
+      - name: Rename binary
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} artifacts/${{ matrix.asset_name }}
+          chmod +x artifacts/${{ matrix.asset_name }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: artifacts/${{ matrix.asset_name }}
+          if-no-files-found: error
