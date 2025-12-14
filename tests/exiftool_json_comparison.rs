@@ -252,168 +252,182 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
         return result;
     }
 
-    // Find a file with the given extension to test
-    let test_files = std::fs::read_dir("/fpexif/raws").ok().and_then(|entries| {
-        entries.filter_map(|e| e.ok()).find(|e| {
-            e.path()
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| ext.eq_ignore_ascii_case(extension))
-                .unwrap_or(false)
+    // Find ALL files with the given extension to test
+    let test_files: Vec<_> = std::fs::read_dir("/fpexif/raws")
+        .ok()
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| {
+                    e.path()
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(|ext| ext.eq_ignore_ascii_case(extension))
+                        .unwrap_or(false)
+                })
+                .map(|e| e.path())
+                .collect()
         })
-    });
+        .unwrap_or_default();
 
-    let test_file = match test_files {
-        Some(entry) => entry.path(),
-        None => {
-            println!("No {} files found for testing", extension.to_uppercase());
-            return result;
-        }
-    };
-
-    let test_path = test_file
-        .to_str()
-        .expect("Failed to convert path to string");
-    println!("Testing with file: {}", test_path);
-
-    // Get outputs from both tools
-    let exiftool_json = match get_exiftool_json_output(test_path) {
-        Ok(json) => json,
-        Err(e) => {
-            println!("Failed to get exiftool output: {}", e);
-            return result;
-        }
-    };
-
-    let fpexif_json = match get_fpexif_exiftool_json_output(test_path) {
-        Ok(json) => json,
-        Err(e) => {
-            let file_result = FileTestResult {
-                file_path: test_path.to_string(),
-                format: extension.to_uppercase(),
-                success: false,
-                fpexif_tag_count: 0,
-                reference_tag_count: 0,
-                issues: vec![TestIssue {
-                    category: IssueCategory::Critical,
-                    message: format!("Failed to get fpexif output: {}", e),
-                    field: None,
-                    expected: None,
-                    actual: None,
-                }],
-            };
-            result.add_file_result(file_result);
-            return result;
-        }
-    };
-
-    // Compare outputs
-    let issues = compare_json_outputs(&exiftool_json, &fpexif_json);
-
-    // Count tags
-    let exiftool_tag_count = exiftool_json
-        .as_array()
-        .and_then(|a| a.first())
-        .and_then(|o| o.as_object())
-        .map(|m| m.len())
-        .unwrap_or(0);
-
-    let fpexif_tag_count = fpexif_json
-        .as_array()
-        .and_then(|a| a.first())
-        .and_then(|o| o.as_object())
-        .map(|m| m.len())
-        .unwrap_or(0);
-
-    // Determine if there are critical issues
-    let has_critical = issues.iter().any(|i| {
-        matches!(i.category, IssueCategory::Critical)
-            || (matches!(i.category, IssueCategory::ValueMismatch))
-            || (matches!(i.category, IssueCategory::MissingField)
-                && i.field
-                    .as_ref()
-                    .map(|f| is_critical_missing_field(f))
-                    .unwrap_or(false))
-    });
-
-    let file_result = FileTestResult {
-        file_path: test_path.to_string(),
-        format: extension.to_uppercase(),
-        success: !has_critical,
-        fpexif_tag_count,
-        reference_tag_count: exiftool_tag_count,
-        issues,
-    };
-
-    // Print summary
-    if !file_result.issues.is_empty() {
-        println!(
-            "\n[{}] Found {} differences:",
-            test_path,
-            file_result.issues.len()
-        );
-
-        let missing: Vec<_> = file_result
-            .issues
-            .iter()
-            .filter(|i| matches!(i.category, IssueCategory::MissingField))
-            .collect();
-        let mismatches: Vec<_> = file_result
-            .issues
-            .iter()
-            .filter(|i| matches!(i.category, IssueCategory::ValueMismatch))
-            .collect();
-        let extras: Vec<_> = file_result
-            .issues
-            .iter()
-            .filter(|i| matches!(i.category, IssueCategory::ExtraField))
-            .collect();
-
-        if !missing.is_empty() {
-            println!(
-                "\n[{}] --- Missing Fields ({}) ---",
-                test_path,
-                missing.len()
-            );
-            for issue in missing.iter().take(10) {
-                println!("  {}", issue.message);
-            }
-            if missing.len() > 10 {
-                println!("  ... and {} more", missing.len() - 10);
-            }
-        }
-
-        if !mismatches.is_empty() {
-            println!(
-                "\n[{}] --- Value Mismatches ({}) ---",
-                test_path,
-                mismatches.len()
-            );
-            for issue in &mismatches {
-                println!("  {}", issue.message);
-            }
-        }
-
-        if !extras.is_empty() {
-            println!("\n[{}] --- Extra Fields ({}) ---", test_path, extras.len());
-            for issue in extras.iter().take(5) {
-                println!("  {}", issue.message);
-            }
-            if extras.len() > 5 {
-                println!("  ... and {} more", extras.len() - 5);
-            }
-        }
-
-        if has_critical {
-            println!("\n[{}] !! Found critical differences", test_path);
-        } else {
-            println!("\n[{}] * No critical differences found!", test_path);
-        }
-    } else {
-        println!("\n[{}] * JSON outputs match perfectly!", test_path);
+    if test_files.is_empty() {
+        println!("No {} files found for testing", extension.to_uppercase());
+        return result;
     }
 
-    result.add_file_result(file_result);
+    println!(
+        "Found {} {} file(s) to test",
+        test_files.len(),
+        extension.to_uppercase()
+    );
+
+    // Test each file
+    for test_file in test_files {
+        let test_path = test_file
+            .to_str()
+            .expect("Failed to convert path to string");
+        println!("\n--- Testing file: {} ---", test_path);
+
+        // Get outputs from both tools
+        let exiftool_json = match get_exiftool_json_output(test_path) {
+            Ok(json) => json,
+            Err(e) => {
+                println!("[{}] Failed to get exiftool output: {}", test_path, e);
+                continue;
+            }
+        };
+
+        let fpexif_json = match get_fpexif_exiftool_json_output(test_path) {
+            Ok(json) => json,
+            Err(e) => {
+                let file_result = FileTestResult {
+                    file_path: test_path.to_string(),
+                    format: extension.to_uppercase(),
+                    success: false,
+                    fpexif_tag_count: 0,
+                    reference_tag_count: 0,
+                    issues: vec![TestIssue {
+                        category: IssueCategory::Critical,
+                        message: format!("Failed to get fpexif output: {}", e),
+                        field: None,
+                        expected: None,
+                        actual: None,
+                    }],
+                };
+                result.add_file_result(file_result);
+                continue;
+            }
+        };
+
+        // Compare outputs
+        let issues = compare_json_outputs(&exiftool_json, &fpexif_json);
+
+        // Count tags
+        let exiftool_tag_count = exiftool_json
+            .as_array()
+            .and_then(|a| a.first())
+            .and_then(|o| o.as_object())
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        let fpexif_tag_count = fpexif_json
+            .as_array()
+            .and_then(|a| a.first())
+            .and_then(|o| o.as_object())
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        // Determine if there are critical issues
+        let has_critical = issues.iter().any(|i| {
+            matches!(i.category, IssueCategory::Critical)
+                || (matches!(i.category, IssueCategory::ValueMismatch))
+                || (matches!(i.category, IssueCategory::MissingField)
+                    && i.field
+                        .as_ref()
+                        .map(|f| is_critical_missing_field(f))
+                        .unwrap_or(false))
+        });
+
+        let file_result = FileTestResult {
+            file_path: test_path.to_string(),
+            format: extension.to_uppercase(),
+            success: !has_critical,
+            fpexif_tag_count,
+            reference_tag_count: exiftool_tag_count,
+            issues,
+        };
+
+        // Print summary
+        if !file_result.issues.is_empty() {
+            println!(
+                "\n[{}] Found {} differences:",
+                test_path,
+                file_result.issues.len()
+            );
+
+            let missing: Vec<_> = file_result
+                .issues
+                .iter()
+                .filter(|i| matches!(i.category, IssueCategory::MissingField))
+                .collect();
+            let mismatches: Vec<_> = file_result
+                .issues
+                .iter()
+                .filter(|i| matches!(i.category, IssueCategory::ValueMismatch))
+                .collect();
+            let extras: Vec<_> = file_result
+                .issues
+                .iter()
+                .filter(|i| matches!(i.category, IssueCategory::ExtraField))
+                .collect();
+
+            if !missing.is_empty() {
+                println!(
+                    "\n[{}] --- Missing Fields ({}) ---",
+                    test_path,
+                    missing.len()
+                );
+                for issue in missing.iter().take(10) {
+                    println!("  {}", issue.message);
+                }
+                if missing.len() > 10 {
+                    println!("  ... and {} more", missing.len() - 10);
+                }
+            }
+
+            if !mismatches.is_empty() {
+                println!(
+                    "\n[{}] --- Value Mismatches ({}) ---",
+                    test_path,
+                    mismatches.len()
+                );
+                for issue in &mismatches {
+                    println!("  {}", issue.message);
+                }
+            }
+
+            if !extras.is_empty() {
+                println!("\n[{}] --- Extra Fields ({}) ---", test_path, extras.len());
+                for issue in extras.iter().take(5) {
+                    println!("  {}", issue.message);
+                }
+                if extras.len() > 5 {
+                    println!("  ... and {} more", extras.len() - 5);
+                }
+            }
+
+            if has_critical {
+                println!("\n[{}] !! Found critical differences", test_path);
+            } else {
+                println!("\n[{}] * No critical differences found!", test_path);
+            }
+        } else {
+            println!("[{}] * JSON outputs match perfectly!", test_path);
+        }
+
+        result.add_file_result(file_result);
+    }
+
     result
 }
 
@@ -475,209 +489,6 @@ fn test_exiftool_json_compatibility_rw2() {
 }
 
 #[test]
-fn test_exiftool_json_compatibility_dscf_raf() {
-    // Test using the test-data/DSCF0062.RAF file
-    let test_path = "test-data/DSCF0062.RAF";
-    let test_name = "exiftool_json_raf";
-    let mut result = FormatTestResult::new("RAF", test_name, "exiftool");
-
-    if !Path::new(test_path).exists() {
-        println!("Skipping test - {} not available", test_path);
-        return;
-    }
-
-    if !exiftool_available() {
-        println!("Skipping test - exiftool not available");
-        return;
-    }
-
-    println!("Testing with file: {}", test_path);
-
-    // Get outputs from both tools
-    let exiftool_json = match get_exiftool_json_output(test_path) {
-        Ok(json) => json,
-        Err(e) => {
-            let file_result = FileTestResult {
-                file_path: test_path.to_string(),
-                format: "RAF".to_string(),
-                success: false,
-                fpexif_tag_count: 0,
-                reference_tag_count: 0,
-                issues: vec![TestIssue {
-                    category: IssueCategory::Critical,
-                    message: format!("Failed to get exiftool output: {}", e),
-                    field: None,
-                    expected: None,
-                    actual: None,
-                }],
-            };
-            result.add_file_result(file_result);
-            if let Err(e) = result.write_to_file() {
-                eprintln!("Failed to write test results: {}", e);
-            }
-            panic!("Failed to get exiftool output: {}", e);
-        }
-    };
-
-    let fpexif_json = match get_fpexif_exiftool_json_output(test_path) {
-        Ok(json) => json,
-        Err(e) => {
-            let file_result = FileTestResult {
-                file_path: test_path.to_string(),
-                format: "RAF".to_string(),
-                success: false,
-                fpexif_tag_count: 0,
-                reference_tag_count: 0,
-                issues: vec![TestIssue {
-                    category: IssueCategory::Critical,
-                    message: format!("Failed to get fpexif output: {}", e),
-                    field: None,
-                    expected: None,
-                    actual: None,
-                }],
-            };
-            result.add_file_result(file_result);
-            if let Err(e) = result.write_to_file() {
-                eprintln!("Failed to write test results: {}", e);
-            }
-            panic!("Failed to get fpexif output: {}", e);
-        }
-    };
-
-    // Save outputs for manual inspection if needed
-    println!("\n=== Exiftool Output Sample ===");
-    if let Some(arr) = exiftool_json.as_array() {
-        if let Some(obj) = arr.first() {
-            if let Some(obj_map) = obj.as_object() {
-                let sample_keys: Vec<_> = obj_map.keys().take(5).collect();
-                println!("Sample keys (first 5): {:?}", sample_keys);
-                println!("Total keys: {}", obj_map.len());
-            }
-        }
-    }
-
-    println!("\n=== Fpexif Output Sample ===");
-    if let Some(arr) = fpexif_json.as_array() {
-        if let Some(obj) = arr.first() {
-            if let Some(obj_map) = obj.as_object() {
-                let sample_keys: Vec<_> = obj_map.keys().take(5).collect();
-                println!("Sample keys (first 5): {:?}", sample_keys);
-                println!("Total keys: {}", obj_map.len());
-            }
-        }
-    }
-
-    // Compare outputs
-    let issues = compare_json_outputs(&exiftool_json, &fpexif_json);
-
-    // Count tags
-    let exiftool_tag_count = exiftool_json
-        .as_array()
-        .and_then(|a| a.first())
-        .and_then(|o| o.as_object())
-        .map(|m| m.len())
-        .unwrap_or(0);
-
-    let fpexif_tag_count = fpexif_json
-        .as_array()
-        .and_then(|a| a.first())
-        .and_then(|o| o.as_object())
-        .map(|m| m.len())
-        .unwrap_or(0);
-
-    // Determine if there are critical issues
-    let has_critical = issues.iter().any(|i| {
-        matches!(i.category, IssueCategory::Critical)
-            || (matches!(i.category, IssueCategory::ValueMismatch))
-            || (matches!(i.category, IssueCategory::MissingField)
-                && i.field
-                    .as_ref()
-                    .map(|f| is_critical_missing_field(f))
-                    .unwrap_or(false))
-    });
-
-    let file_result = FileTestResult {
-        file_path: test_path.to_string(),
-        format: "RAF".to_string(),
-        success: !has_critical,
-        fpexif_tag_count,
-        reference_tag_count: exiftool_tag_count,
-        issues: issues.clone(),
-    };
-
-    if !issues.is_empty() {
-        println!("\n[{}] Found {} differences:", test_path, issues.len());
-
-        let missing: Vec<_> = issues
-            .iter()
-            .filter(|i| matches!(i.category, IssueCategory::MissingField))
-            .collect();
-        let extras: Vec<_> = issues
-            .iter()
-            .filter(|i| matches!(i.category, IssueCategory::ExtraField))
-            .collect();
-        let mismatches: Vec<_> = issues
-            .iter()
-            .filter(|i| matches!(i.category, IssueCategory::ValueMismatch))
-            .collect();
-
-        if !missing.is_empty() {
-            println!(
-                "\n[{}] --- Missing Fields ({}) ---",
-                test_path,
-                missing.len()
-            );
-            for issue in &missing {
-                println!("  {}", issue.message);
-            }
-        }
-
-        if !mismatches.is_empty() {
-            println!(
-                "\n[{}] --- Value Mismatches ({}) ---",
-                test_path,
-                mismatches.len()
-            );
-            for issue in &mismatches {
-                println!("  {}", issue.message);
-            }
-        }
-
-        if !extras.is_empty() {
-            println!("\n[{}] --- Extra Fields ({}) ---", test_path, extras.len());
-            for issue in extras.iter().take(10) {
-                println!("  {}", issue.message);
-            }
-            if extras.len() > 10 {
-                println!("  ... and {} more", extras.len() - 10);
-            }
-        }
-
-        if has_critical {
-            println!("\n[{}] !! Found critical differences", test_path);
-        } else {
-            println!("\n[{}] * No critical differences found!", test_path);
-            println!(
-                "  (Found {} expected variations from exiftool)",
-                issues.len()
-            );
-        }
-    } else {
-        println!("\n[{}] * JSON outputs match perfectly!", test_path);
-    }
-
-    result.add_file_result(file_result);
-
-    // Write JSON result
-    if let Err(e) = result.write_to_file() {
-        eprintln!("Failed to write test results: {}", e);
-    }
-
-    // Fail test if there are critical issues
-    if result.has_critical_failures() {
-        panic!(
-            "Found {} critical differences in JSON output",
-            result.critical_issues
-        );
-    }
+fn test_exiftool_json_compatibility_raf() {
+    run_and_report("raf");
 }

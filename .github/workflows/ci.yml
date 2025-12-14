@@ -119,7 +119,7 @@ jobs:
           FPEXIF_TEST_FILES: /fpexif/raws
 
       - name: Test RAF format
-        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_dscf_raf -- --nocapture
+        run: nice -n 19 cargo test --test exiftool_json_comparison test_exiftool_json_compatibility_raf -- --nocapture
         env:
           CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
