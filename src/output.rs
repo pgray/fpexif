@@ -363,6 +363,13 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
+    // ISO is an alias for ISOSpeedRatings (tag 0x8827)
+    if let Some(ExifValue::Short(v)) = exif_data.get_tag_by_id(0x8827) {
+        if !v.is_empty() {
+            output.insert("ISO".to_string(), Value::Number(v[0].into()));
+        }
+    }
+
     // Add maker notes if present
     if let Some(maker_notes) = exif_data.get_maker_notes() {
         for (tag_id, maker_tag) in maker_notes.iter() {

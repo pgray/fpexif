@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>fpexif WASM Demo</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .version {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .drop-zone {
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: #fff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #4a90d9;
+            background: #f0f7ff;
+        }
+        .drop-zone input[type="file"] {
+            display: none;
+        }
+        .drop-zone p {
+            margin: 0;
+            color: #666;
+        }
+        .drop-zone .hint {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 10px;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .results-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        .result-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result-card h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.1em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .file-info {
+            background: #fff;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .file-info h2 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 1.2em;
+        }
+        .file-info p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .tag-count {
+            color: #4a90d9;
+            font-weight: bold;
+        }
+        .tags-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        .tags-table th, .tags-table td {
+            text-align: left;
+            padding: 6px 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .tags-table th {
+            background: #f9f9f9;
+            color: #666;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        .tags-table tr:hover {
+            background: #f5f9ff;
+        }
+        .tag-name {
+            font-family: monospace;
+            color: #c7254e;
+            font-size: 0.85em;
+        }
+        .tag-value {
+            font-family: monospace;
+            color: #333;
+            word-break: break-all;
+            font-size: 0.85em;
+        }
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .json-container {
+            max-height: 600px;
+            overflow: auto;
+            background: #1e1e1e;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .json-container pre {
+            margin: 0;
+            color: #d4d4d4;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8em;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .json-container .key {
+            color: #9cdcfe;
+        }
+        .json-container .string {
+            color: #ce9178;
+        }
+        .json-container .number {
+            color: #b5cea8;
+        }
+        .json-container .null {
+            color: #569cd6;
+        }
+        .copy-btn {
+            background: #4a90d9;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            float: right;
+        }
+        .copy-btn:hover {
+            background: #3a7bc8;
+        }
+        .error {
+            background: #fff5f5;
+            border: 1px solid #ffcdd2;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>fpexif WASM Demo</h1>
+    <p class="version">Version: <span id="version">loading...</span></p>
+
+    <div class="drop-zone" id="dropZone">
+        <p>Drop an image file here or click to select</p>
+        <p class="hint">Supports JPEG, PNG, WebP, AVIF, HEIC, RAF, and 20+ other formats</p>
+        <input type="file" id="fileInput" accept="image/*,.raf,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.pef,.srw">
+    </div>
+
+    <div id="results"></div>
+
+    <script type="module">
+        import init, { parse_exif, parse_exif_json, version } from './pkg/fpexif.js';
+
+        let wasmReady = false;
+
+        async function initWasm() {
+            try {
+                await init();
+                wasmReady = true;
+                document.getElementById('version').textContent = version();
+            } catch (e) {
+                document.getElementById('version').textContent = 'Failed to load WASM';
+                console.error('WASM init error:', e);
+            }
+        }
+
+        function formatTagName(name) {
+            return name.replace(/TagId\((\w+)\)/, '$1')
+                       .replace(/^Unknown\(0x([0-9a-fA-F]+)\)$/, 'Unknown (0x$1)');
+        }
+
+        function formatTagValue(value) {
+            let cleaned = value
+                .replace(/^Ascii\("(.*)"\)$/, '$1')
+                .replace(/^Rational\((\d+)\/(\d+)\)$/, (_, n, d) => {
+                    const num = parseInt(n), den = parseInt(d);
+                    if (den === 1) return num.toString();
+                    return `${num}/${den} (${(num/den).toFixed(4)})`;
+                })
+                .replace(/^SRational\((-?\d+)\/(\d+)\)$/, (_, n, d) => {
+                    const num = parseInt(n), den = parseInt(d);
+                    if (den === 1) return num.toString();
+                    return `${num}/${den} (${(num/den).toFixed(4)})`;
+                })
+                .replace(/^Short\((\d+)\)$/, '$1')
+                .replace(/^Long\((\d+)\)$/, '$1')
+                .replace(/^Undefined\((\d+) bytes\)$/, '[$1 bytes]')
+                .replace(/^Byte\((\d+)\)$/, '$1');
+            return cleaned;
+        }
+
+        function syntaxHighlight(json) {
+            return json
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+                    let cls = 'number';
+                    if (/^"/.test(match)) {
+                        if (/:$/.test(match)) {
+                            cls = 'key';
+                        } else {
+                            cls = 'string';
+                        }
+                    } else if (/true|false/.test(match)) {
+                        cls = 'null';
+                    } else if (/null/.test(match)) {
+                        cls = 'null';
+                    }
+                    return '<span class="' + cls + '">' + match + '</span>';
+                });
+        }
+
+        let currentJson = '';
+
+        async function processFile(file) {
+            const resultsDiv = document.getElementById('results');
+
+            if (!wasmReady) {
+                resultsDiv.innerHTML = '<div class="error">WASM module not loaded yet. Please wait...</div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = '<div class="loading">Parsing EXIF data...</div>';
+
+            try {
+                const buffer = await file.arrayBuffer();
+                const data = new Uint8Array(buffer);
+
+                // Get both formats
+                const resultJson = parse_exif(data);
+                const result = JSON.parse(resultJson);
+
+                const exiftoolJson = parse_exif_json(data);
+                currentJson = exiftoolJson;
+                const exiftoolData = JSON.parse(exiftoolJson);
+
+                let html = `
+                    <div class="file-info">
+                        <h2>${file.name}</h2>
+                        <p>File size: ${(file.size / 1024).toFixed(2)} KB | Tags found: <span class="tag-count">${result.tag_count}</span></p>
+                    </div>
+                    <div class="results-container">
+                        <div class="result-card">
+                            <h2>Parsed Tags</h2>
+                            <div class="table-container">
+                `;
+
+                if (result.tags && Object.keys(result.tags).length > 0) {
+                    html += `
+                        <table class="tags-table">
+                            <thead>
+                                <tr>
+                                    <th>Tag</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    const sortedTags = Object.entries(result.tags).sort((a, b) =>
+                        formatTagName(a[0]).localeCompare(formatTagName(b[0]))
+                    );
+
+                    for (const [tag, value] of sortedTags) {
+                        html += `
+                            <tr>
+                                <td class="tag-name">${formatTagName(tag)}</td>
+                                <td class="tag-value">${formatTagValue(value)}</td>
+                            </tr>
+                        `;
+                    }
+
+                    html += `
+                            </tbody>
+                        </table>
+                    `;
+                }
+
+                html += `
+                            </div>
+                        </div>
+                        <div class="result-card">
+                            <h2>Exiftool-Compatible JSON <button class="copy-btn" onclick="copyJson()">Copy</button></h2>
+                            <div class="json-container">
+                                <pre>${syntaxHighlight(exiftoolJson)}</pre>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                resultsDiv.innerHTML = html;
+
+            } catch (e) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${e.message || e}</div>`;
+                console.error('Parse error:', e);
+            }
+        }
+
+        window.copyJson = function() {
+            navigator.clipboard.writeText(currentJson).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            });
+        };
+
+        // Initialize WASM
+        initWasm();
+
+        // Setup drag and drop
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                processFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                processFile(e.target.files[0]);
+            }
+        });
+    </script>
+</body>
+</html>

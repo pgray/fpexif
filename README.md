@@ -100,6 +100,7 @@ fpexif extract path/to/image.jpg DateTimeOriginal
 ## Supported Image Formats
 
 ### Modern Web Formats
+
 - **JPEG** (.jpg, .jpeg) - Joint Photographic Experts Group
 - **PNG** (.png) - Portable Network Graphics (with eXIf chunk)
 - **WebP** (.webp) - Google WebP format
@@ -108,6 +109,7 @@ fpexif extract path/to/image.jpg DateTimeOriginal
 - **JPEG XL** (.jxl) - Next-generation JPEG format
 
 ### RAW Camera Formats
+
 - **CR2** (.cr2) - Canon RAW 2
 - **CR3** (.cr3) - Canon RAW 3
 - **CRW** (.crw) - Canon RAW v1 (CIFF format)
@@ -125,6 +127,7 @@ fpexif extract path/to/image.jpg DateTimeOriginal
 - **RW2** (.rw2) - Panasonic RAW Format
 
 ### Standard Formats
+
 - **TIFF** (.tif, .tiff) - Tagged Image File Format
 
 ## Architecture
@@ -169,7 +172,6 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 - [x] Support for modern web formats (PNG, HEIC, WebP, AVIF, JPEG XL) ✅
 - [x] Support for major RAW formats (ARW, PEF, NRW, RWL, etc.) ✅
 - [x] Support for legacy RAW formats (CRW, MRW, X3F) ✅
-- [ ] Complete TIFF writer implementation
 - [ ] Support for non-standard maker notes (Canon, Nikon, etc.)
 - [ ] Support for XMP and IPTC metadata
 - [ ] Performance optimizations
@@ -195,4 +197,5 @@ This project draws inspiration from:
 
 ## Authors
 
-- Your Name (@yourusername) - Initial work and maintenance
+- pgray (@pgray) - Initial work and maintenance
+- claude.ai
