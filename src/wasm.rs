@@ -40,6 +40,29 @@ pub fn parse_exif(data: &[u8]) -> Result<String, JsValue> {
     }
 }
 
+/// Parse EXIF data and return exiftool-compatible JSON format
+///
+/// This format matches exiftool's `-json` output for easy comparison.
+///
+/// # Arguments
+/// * `data` - The image file data as a byte array
+///
+/// # Returns
+/// A JSON string in exiftool format (array with single object containing tags)
+#[wasm_bindgen]
+pub fn parse_exif_json(data: &[u8]) -> Result<String, JsValue> {
+    let parser = crate::ExifParser::new();
+
+    match parser.parse_bytes(data) {
+        Ok(exif_data) => {
+            let json_value = crate::output::to_exiftool_json(&exif_data, None);
+            serde_json::to_string_pretty(&json_value)
+                .map_err(|e| JsValue::from_str(&format!("JSON serialization error: {}", e)))
+        }
+        Err(e) => Err(JsValue::from_str(&format!("EXIF parsing error: {}", e))),
+    }
+}
+
 /// Get the version of the fpexif library
 #[wasm_bindgen]
 pub fn version() -> String {

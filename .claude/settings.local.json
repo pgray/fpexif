@@ -12,7 +12,8 @@
       "Bash(nice -n 19 cargo fmt:*)",
       "Bash(nice -n 19 cargo clippy:*)",
       "Bash(gh run:*)",
-      "Bash(./bin/ccc:*)"
+      "Bash(./bin/ccc:*)",
+      "Bash(./build-wasm.sh:*)"
     ],
     "deny": [],
     "ask": []
