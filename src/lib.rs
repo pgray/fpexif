@@ -90,8 +90,23 @@ impl ExifData {
     }
 
     /// Get a tag value by its numeric ID
+    /// Searches all IFD groups (Main, Exif, GPS, Thumbnail, Interop)
     pub fn get_tag_by_id(&self, id: u16) -> Option<&data_types::ExifValue> {
-        self.tags.get(&tags::ExifTagId::from(id))
+        // Try each IFD group to find the tag
+        let groups = [
+            tags::TagGroup::Main,
+            tags::TagGroup::Exif,
+            tags::TagGroup::Gps,
+            tags::TagGroup::Thumbnail,
+            tags::TagGroup::Interop,
+        ];
+        for group in groups {
+            let tag_id = tags::ExifTagId::new(id, group);
+            if let Some(value) = self.tags.get(&tag_id) {
+                return Some(value);
+            }
+        }
+        None
     }
 
     /// Get a tag value by its name

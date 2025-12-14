@@ -84,9 +84,15 @@ where
     // Store the endianness in the result
     exif_data.endian = endian;
 
-    // Read TIFF header version (should be 0x002A for TIFF)
+    // Read TIFF header version
+    // Accept standard TIFF (0x002A), BigTIFF (0x002B), ORF (0x4F52), SRW (0x5352), RW2 (0x0055)
     let tiff_version = read_u16(&app1_data[tiff_offset + 2..tiff_offset + 4], endian);
-    if tiff_version != 0x002A {
+    if tiff_version != 0x002A
+        && tiff_version != 0x002B
+        && tiff_version != 0x4F52
+        && tiff_version != 0x5352
+        && tiff_version != 0x0055
+    {
         return Err(ExifError::Format(format!(
             "Invalid TIFF version: 0x{:04X}",
             tiff_version

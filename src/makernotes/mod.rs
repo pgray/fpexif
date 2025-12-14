@@ -3,6 +3,7 @@
 pub mod canon;
 pub mod fuji;
 pub mod nikon;
+pub mod olympus;
 pub mod sony;
 
 use crate::data_types::{Endianness, ExifValue};
@@ -34,6 +35,8 @@ pub fn parse_maker_notes(
         sony::parse_sony_maker_notes(data, endian)
     } else if make_str.contains("fuji") {
         fuji::parse_fuji_maker_notes(data, endian)
+    } else if make_str.contains("olympus") {
+        olympus::parse_olympus_maker_notes(data, endian)
     } else {
         // Unknown maker, return empty HashMap
         Ok(HashMap::new())
