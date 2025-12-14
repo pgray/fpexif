@@ -203,9 +203,14 @@ where
             });
 
         // Parse the maker notes
-        if let Ok(parsed_maker_notes) =
-            crate::makernotes::parse_maker_notes(maker_note_data, make, endian)
-        {
+        // Pass the full app1_data and tiff_offset for manufacturers that use TIFF-relative offsets (e.g., Canon)
+        if let Ok(parsed_maker_notes) = crate::makernotes::parse_maker_notes_with_tiff_data(
+            maker_note_data,
+            make,
+            endian,
+            Some(&app1_data),
+            tiff_offset,
+        ) {
             if !parsed_maker_notes.is_empty() {
                 exif_data.maker_notes = Some(parsed_maker_notes);
             }

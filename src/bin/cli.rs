@@ -472,4 +472,17 @@ fn print_exif_data(exif_data: &ExifData, verbose: bool) {
             }
         }
     }
+
+    // Print maker notes if available
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        if !maker_notes.is_empty() {
+            println!("\nMaker Notes ({} tags):", maker_notes.len());
+            let mut sorted_notes: Vec<_> = maker_notes.iter().collect();
+            sorted_notes.sort_by_key(|(id, _)| *id);
+            for (tag_id, tag) in sorted_notes {
+                let tag_name = tag.tag_name.unwrap_or("Unknown");
+                println!("  {} (0x{:04X}): {}", tag_name, tag_id, tag.value);
+            }
+        }
+    }
 }

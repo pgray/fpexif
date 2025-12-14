@@ -3,9 +3,7 @@
 use crate::data_types::{Endianness, ExifValue};
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
-use std::io::Cursor;
 
 // Canon MakerNote tag IDs
 pub const CANON_CAMERA_SETTINGS: u16 = 0x0001;
@@ -97,29 +95,281 @@ pub fn get_canon_tag_name(tag_id: u16) -> Option<&'static str> {
         CANON_PANORAMA => Some("CanonPanorama"),
         CANON_IMAGE_TYPE => Some("CanonImageType"),
         CANON_FIRMWARE_VERSION => Some("CanonFirmwareVersion"),
-        CANON_FILE_NUMBER => Some("CanonFileNumber"),
+        CANON_FILE_NUMBER => Some("FileNumber"),
         CANON_OWNER_NAME => Some("OwnerName"),
-        CANON_SERIAL_NUMBER => Some("InternalSerialNumber"),
+        CANON_SERIAL_NUMBER => Some("SerialNumber"),
         CANON_CAMERA_INFO => Some("CanonCameraInfo"),
-        CANON_FILE_LENGTH => Some("CanonFileLength"),
+        CANON_FILE_LENGTH => Some("FileLength"),
         CANON_CUSTOM_FUNCTIONS => Some("CanonCustomFunctions"),
         CANON_MODEL_ID => Some("CanonModelID"),
         CANON_MOVIE_INFO => Some("CanonMovieInfo"),
         CANON_AF_INFO => Some("CanonAFInfo"),
+        CANON_THUMBNAIL_IMAGE_VALID_AREA => Some("ThumbnailImageValidArea"),
+        CANON_SERIAL_NUMBER_FORMAT => Some("SerialNumberFormat"),
+        CANON_SUPER_MACRO => Some("SuperMacro"),
+        CANON_DATE_STAMP_MODE => Some("DateStampMode"),
+        CANON_MY_COLORS => Some("MyColors"),
+        CANON_FIRMWARE_REVISION => Some("FirmwareRevision"),
+        CANON_CATEGORIES => Some("Categories"),
+        CANON_FACE_DETECT => Some("FaceDetect1"),
+        CANON_FACE_DETECT_2 => Some("FaceDetect2"),
+        CANON_AF_INFO_2 => Some("AFInfo2"),
+        CANON_CONTRAST_INFO => Some("ContrastInfo"),
+        CANON_IMAGE_UNIQUE_ID => Some("ImageUniqueID"),
+        CANON_WB_INFO => Some("WBInfo"),
+        CANON_FACE_DETECT_3 => Some("FaceDetect3"),
+        CANON_TIME_INFO => Some("TimeInfo"),
+        CANON_BATTERY_TYPE => Some("BatteryType"),
+        CANON_AF_INFO_3 => Some("AFInfo3"),
+        CANON_RAW_DATA_OFFSET => Some("RawDataOffset"),
+        CANON_ORIGINAL_DECISION_DATA_OFFSET => Some("OriginalDecisionDataOffset"),
+        CANON_PERSONAL_FUNCTIONS => Some("PersonalFunctions"),
+        CANON_PERSONAL_FUNCTION_VALUES => Some("PersonalFunctionValues"),
+        CANON_FILE_INFO => Some("FileInfo"),
+        CANON_AF_POINTS_IN_FOCUS_1D => Some("AFPointsInFocus1D"),
         CANON_LENS_MODEL => Some("LensModel"),
-        CANON_SERIAL_INFO => Some("SerialNumberFormat"),
+        CANON_SERIAL_INFO => Some("InternalSerialNumber"),
+        CANON_DUST_REMOVAL_DATA => Some("DustRemovalData"),
+        CANON_CROP_INFO => Some("CropInfo"),
+        CANON_CUSTOM_FUNCTIONS_2 => Some("CustomFunctions2"),
+        CANON_ASPECT_INFO => Some("AspectInfo"),
+        CANON_PROCESSING_INFO => Some("ProcessingInfo"),
+        CANON_TONE_CURVE_TABLE => Some("ToneCurveTable"),
+        CANON_SHARPNESS_TABLE => Some("SharpnessTable"),
+        CANON_SHARPNESS_FREQ_TABLE => Some("SharpnessFreqTable"),
+        CANON_WHITE_BALANCE_TABLE => Some("WhiteBalanceTable"),
+        CANON_COLOR_BALANCE => Some("ColorBalance"),
+        CANON_MEASURED_COLOR => Some("MeasuredColor"),
+        CANON_COLOR_TEMPERATURE => Some("ColorTemperature"),
+        CANON_CANON_FLAGS => Some("CanonFlags"),
+        CANON_MODIFIED_INFO => Some("ModifiedInfo"),
+        CANON_TONE_CURVE_MATCHING => Some("ToneCurveMatching"),
+        CANON_WHITE_BALANCE_MATCHING => Some("WhiteBalanceMatching"),
+        CANON_COLOR_SPACE => Some("ColorSpace"),
+        CANON_PREVIEW_IMAGE_INFO => Some("PreviewImageInfo"),
+        CANON_VRD_OFFSET => Some("VRDOffset"),
+        CANON_SENSOR_INFO => Some("SensorInfo"),
+        CANON_COLOR_DATA => Some("ColorData"),
+        CANON_CRWPARAM => Some("CRWParam"),
+        CANON_COLOR_INFO => Some("ColorInfo"),
+        CANON_FLAVOR => Some("Flavor"),
         CANON_PICTURE_STYLE_USER_DEF => Some("PictureStyleUserDef"),
         CANON_PICTURE_STYLE_PC => Some("PictureStylePC"),
+        CANON_CUSTOM_PICTURE_STYLE_FILE_NAME => Some("CustomPictureStyleFileName"),
+        CANON_AF_MICRO_ADJ => Some("AFMicroAdj"),
+        CANON_VIGNETTING_CORR => Some("VignettingCorr"),
+        CANON_VIGNETTING_CORR_2 => Some("VignettingCorr2"),
+        CANON_LIGHTING_OPT => Some("LightingOpt"),
         CANON_LENS_INFO => Some("LensInfo"),
-        CANON_COLOR_SPACE => Some("CanonColorSpace"),
+        CANON_AMBIANCE_INFO => Some("AmbianceInfo"),
+        CANON_MULTI_EXP => Some("MultiExp"),
+        CANON_FILTER_INFO => Some("FilterInfo"),
+        CANON_HDR_INFO => Some("HDRInfo"),
+        CANON_AF_CONFIG => Some("AFConfig"),
         _ => None,
     }
 }
 
+/// Read u16 with given endianness
+fn read_u16(data: &[u8], endian: Endianness) -> u16 {
+    match endian {
+        Endianness::Little => u16::from_le_bytes([data[0], data[1]]),
+        Endianness::Big => u16::from_be_bytes([data[0], data[1]]),
+    }
+}
+
+/// Read u32 with given endianness
+fn read_u32(data: &[u8], endian: Endianness) -> u32 {
+    match endian {
+        Endianness::Little => u32::from_le_bytes([data[0], data[1], data[2], data[3]]),
+        Endianness::Big => u32::from_be_bytes([data[0], data[1], data[2], data[3]]),
+    }
+}
+
+/// Read i16 with given endianness
+fn read_i16(data: &[u8], endian: Endianness) -> i16 {
+    match endian {
+        Endianness::Little => i16::from_le_bytes([data[0], data[1]]),
+        Endianness::Big => i16::from_be_bytes([data[0], data[1]]),
+    }
+}
+
+/// Read i32 with given endianness
+fn read_i32(data: &[u8], endian: Endianness) -> i32 {
+    match endian {
+        Endianness::Little => i32::from_le_bytes([data[0], data[1], data[2], data[3]]),
+        Endianness::Big => i32::from_be_bytes([data[0], data[1], data[2], data[3]]),
+    }
+}
+
+/// Parse a single IFD entry and return the tag value
+///
+/// Canon maker notes use offsets relative to the TIFF header, not the MakerNote data.
+/// If tiff_data is provided, we use it to resolve offsets; otherwise we try the MakerNote data.
+fn parse_ifd_entry(
+    data: &[u8],
+    entry_offset: usize,
+    endian: Endianness,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
+) -> Option<(u16, ExifValue)> {
+    if entry_offset + 12 > data.len() {
+        return None;
+    }
+
+    let tag_id = read_u16(&data[entry_offset..], endian);
+    let tag_type = read_u16(&data[entry_offset + 2..], endian);
+    let count = read_u32(&data[entry_offset + 4..], endian) as usize;
+    let value_offset_bytes = &data[entry_offset + 8..entry_offset + 12];
+
+    // Calculate the size of the data
+    let type_size = match tag_type {
+        1 | 2 | 6 | 7 => 1, // BYTE, ASCII, SBYTE, UNDEFINED
+        3 | 8 => 2,         // SHORT, SSHORT
+        4 | 9 | 11 => 4,    // LONG, SLONG, FLOAT
+        5 | 10 | 12 => 8,   // RATIONAL, SRATIONAL, DOUBLE
+        _ => return None,
+    };
+
+    let total_size = count * type_size;
+
+    // Get the actual data location
+    // Canon maker notes use offsets relative to the TIFF header
+    let value_data: &[u8] = if total_size <= 4 {
+        value_offset_bytes
+    } else {
+        let offset = read_u32(value_offset_bytes, endian) as usize;
+
+        // Try to use TIFF data first (Canon uses TIFF-relative offsets)
+        if let Some(tiff) = tiff_data {
+            let abs_offset = tiff_offset + offset;
+            if abs_offset + total_size <= tiff.len() {
+                &tiff[abs_offset..abs_offset + total_size]
+            } else {
+                // Fall back to MakerNote-relative offset
+                if offset + total_size <= data.len() {
+                    &data[offset..offset + total_size]
+                } else {
+                    return None;
+                }
+            }
+        } else {
+            // No TIFF data, try MakerNote-relative offset
+            if offset + total_size <= data.len() {
+                &data[offset..offset + total_size]
+            } else {
+                return None;
+            }
+        }
+    };
+
+    // Parse based on type
+    let value = match tag_type {
+        1 => {
+            // BYTE
+            ExifValue::Byte(value_data[..count.min(value_data.len())].to_vec())
+        }
+        2 => {
+            // ASCII
+            let s = value_data[..count.min(value_data.len())]
+                .iter()
+                .take_while(|&&b| b != 0)
+                .map(|&b| b as char)
+                .collect::<String>();
+            ExifValue::Ascii(s)
+        }
+        3 => {
+            // SHORT
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 2 + 2 <= value_data.len() {
+                    values.push(read_u16(&value_data[i * 2..], endian));
+                }
+            }
+            ExifValue::Short(values)
+        }
+        4 => {
+            // LONG
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 4 + 4 <= value_data.len() {
+                    values.push(read_u32(&value_data[i * 4..], endian));
+                }
+            }
+            ExifValue::Long(values)
+        }
+        5 => {
+            // RATIONAL
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 8 + 8 <= value_data.len() {
+                    let num = read_u32(&value_data[i * 8..], endian);
+                    let den = read_u32(&value_data[i * 8 + 4..], endian);
+                    values.push((num, den));
+                }
+            }
+            ExifValue::Rational(values)
+        }
+        6 => {
+            // SBYTE
+            ExifValue::SByte(
+                value_data[..count.min(value_data.len())]
+                    .iter()
+                    .map(|&b| b as i8)
+                    .collect(),
+            )
+        }
+        7 => {
+            // UNDEFINED
+            ExifValue::Undefined(value_data[..count.min(value_data.len())].to_vec())
+        }
+        8 => {
+            // SSHORT
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 2 + 2 <= value_data.len() {
+                    values.push(read_i16(&value_data[i * 2..], endian));
+                }
+            }
+            ExifValue::SShort(values)
+        }
+        9 => {
+            // SLONG
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 4 + 4 <= value_data.len() {
+                    values.push(read_i32(&value_data[i * 4..], endian));
+                }
+            }
+            ExifValue::SLong(values)
+        }
+        10 => {
+            // SRATIONAL
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 8 + 8 <= value_data.len() {
+                    let num = read_i32(&value_data[i * 8..], endian);
+                    let den = read_i32(&value_data[i * 8 + 4..], endian);
+                    values.push((num, den));
+                }
+            }
+            ExifValue::SRational(values)
+        }
+        _ => return None,
+    };
+
+    Some((tag_id, value))
+}
+
 /// Parse Canon maker notes
+///
+/// Canon maker notes use TIFF-relative offsets, so we need access to the full
+/// TIFF/EXIF data to properly resolve string and array values.
 pub fn parse_canon_maker_notes(
     data: &[u8],
     endian: Endianness,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -127,68 +377,29 @@ pub fn parse_canon_maker_notes(
         return Ok(tags);
     }
 
-    let mut cursor = Cursor::new(data);
-
+    // Canon maker notes use standard TIFF IFD format starting immediately
     // Read number of entries
-    let num_entries = match endian {
-        Endianness::Little => cursor
-            .read_u16::<LittleEndian>()
-            .map_err(|_| ExifError::Format("Failed to read Canon maker note count".to_string()))?,
-        Endianness::Big => cursor
-            .read_u16::<BigEndian>()
-            .map_err(|_| ExifError::Format("Failed to read Canon maker note count".to_string()))?,
-    };
+    let num_entries = read_u16(&data[0..2], endian) as usize;
 
-    // Canon maker notes use standard TIFF IFD format
-    for _ in 0..num_entries {
-        if cursor.position() as usize + 12 > data.len() {
-            break;
-        }
+    // Sanity check
+    if num_entries > 500 || 2 + num_entries * 12 > data.len() {
+        return Ok(tags);
+    }
 
-        let tag_id = match endian {
-            Endianness::Little => cursor.read_u16::<LittleEndian>(),
-            Endianness::Big => cursor.read_u16::<BigEndian>(),
-        }
-        .ok();
+    // Parse each IFD entry (12 bytes each)
+    for i in 0..num_entries {
+        let entry_offset = 2 + i * 12;
 
-        let tag_type = match endian {
-            Endianness::Little => cursor.read_u16::<LittleEndian>(),
-            Endianness::Big => cursor.read_u16::<BigEndian>(),
-        }
-        .ok();
-
-        let count = match endian {
-            Endianness::Little => cursor.read_u32::<LittleEndian>(),
-            Endianness::Big => cursor.read_u32::<BigEndian>(),
-        }
-        .ok();
-
-        let value_offset = match endian {
-            Endianness::Little => cursor.read_u32::<LittleEndian>(),
-            Endianness::Big => cursor.read_u32::<BigEndian>(),
-        }
-        .ok();
-
-        if let (Some(tag_id), Some(tag_type), Some(count), Some(_value_offset)) =
-            (tag_id, tag_type, count, value_offset)
+        if let Some((tag_id, value)) =
+            parse_ifd_entry(data, entry_offset, endian, tiff_data, tiff_offset)
         {
-            // For now, we'll store basic info
-            // Full parsing of nested structures would go here
-            let value = match tag_type {
-                2 => {
-                    // ASCII string
-                    ExifValue::Ascii(format!("Canon tag 0x{:04X}", tag_id))
-                }
-                3 => {
-                    // SHORT
-                    ExifValue::Short(vec![0])
-                }
-                4 => {
-                    // LONG
-                    ExifValue::Long(vec![count])
-                }
-                _ => ExifValue::Undefined(vec![]),
-            };
+            // Skip large binary blobs to save memory (camera info, dust removal, color data)
+            if matches!(
+                tag_id,
+                CANON_CAMERA_INFO | CANON_DUST_REMOVAL_DATA | CANON_COLOR_DATA
+            ) {
+                continue;
+            }
 
             tags.insert(
                 tag_id,

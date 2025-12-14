@@ -19,16 +19,42 @@ pub struct MakerNoteTag {
 }
 
 /// Parse maker notes based on camera make
+///
+/// # Arguments
+/// * `data` - The maker note data (contents of MakerNote tag)
+/// * `make` - Camera make string
+/// * `endian` - Byte order
 pub fn parse_maker_notes(
     data: &[u8],
     make: Option<&str>,
     endian: Endianness,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
+    parse_maker_notes_with_tiff_data(data, make, endian, None, 0)
+}
+
+/// Parse maker notes with access to the full TIFF data
+///
+/// Some manufacturers (like Canon) use offsets relative to the TIFF header,
+/// so we need access to the full TIFF data to resolve those offsets.
+///
+/// # Arguments
+/// * `data` - The maker note data (contents of MakerNote tag)
+/// * `make` - Camera make string
+/// * `endian` - Byte order
+/// * `tiff_data` - Optional full TIFF/EXIF data for resolving absolute offsets
+/// * `tiff_offset` - Offset of TIFF header within the full data
+pub fn parse_maker_notes_with_tiff_data(
+    data: &[u8],
+    make: Option<&str>,
+    endian: Endianness,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
+) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let make_lower = make.map(|s| s.to_lowercase());
     let make_str = make_lower.as_deref().unwrap_or("");
 
     if make_str.contains("canon") {
-        canon::parse_canon_maker_notes(data, endian)
+        canon::parse_canon_maker_notes(data, endian, tiff_data, tiff_offset)
     } else if make_str.contains("nikon") {
         nikon::parse_nikon_maker_notes(data, endian)
     } else if make_str.contains("sony") {
