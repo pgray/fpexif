@@ -1,0 +1,286 @@
+// Canon maker notes tests
+
+use fpexif::data_types::ExifValue;
+use fpexif::makernotes::canon::{
+    decode_camera_settings, decode_file_info, decode_focal_length, decode_shot_info,
+};
+use fpexif::ExifParser;
+use std::path::Path;
+
+#[test]
+fn test_decode_camera_settings() {
+    // Sample CameraSettings array from Canon PowerShot S90
+    let camera_settings = vec![
+        96, 2, 0, 4, 0, 1, 0, 4, 65535, 7, 65535, 1, 0, 0, 0, 0, 16464, 3, 1, 8197, 3, 32767,
+        65535, 22500, 6000, 1000, 95, 192, 65535, 0, 0, 0, 0, 0, 2, 0, 3648, 3648, 0, 0, 65535, 0,
+        32767, 32767, 0, 0, 0, 100,
+    ];
+
+    let decoded = decode_camera_settings(&camera_settings);
+
+    // Check macro mode
+    assert!(decoded.contains_key("MacroMode"));
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("MacroMode") {
+        assert_eq!(mode, "Normal");
+    } else {
+        panic!("MacroMode should be Ascii");
+    }
+
+    // Check quality
+    assert!(decoded.contains_key("Quality"));
+    if let Some(ExifValue::Ascii(quality)) = decoded.get("Quality") {
+        assert_eq!(quality, "RAW");
+    } else {
+        panic!("Quality should be Ascii");
+    }
+
+    // Check flash mode
+    assert!(decoded.contains_key("FlashMode"));
+    if let Some(ExifValue::Ascii(flash)) = decoded.get("FlashMode") {
+        assert_eq!(flash, "Flash Not Fired");
+    } else {
+        panic!("FlashMode should be Ascii");
+    }
+
+    // Check drive mode
+    assert!(decoded.contains_key("DriveMode"));
+    if let Some(ExifValue::Ascii(drive)) = decoded.get("DriveMode") {
+        assert_eq!(drive, "Continuous");
+    } else {
+        panic!("DriveMode should be Ascii");
+    }
+
+    // Check focus mode
+    assert!(decoded.contains_key("FocusMode"));
+
+    // Check metering mode
+    assert!(decoded.contains_key("MeteringMode"));
+    if let Some(ExifValue::Ascii(metering)) = decoded.get("MeteringMode") {
+        assert_eq!(metering, "Evaluative");
+    } else {
+        panic!("MeteringMode should be Ascii");
+    }
+
+    // Check focus range
+    assert!(decoded.contains_key("FocusRange"));
+
+    // Check exposure mode
+    assert!(decoded.contains_key("ExposureMode"));
+
+    // Check focal length values
+    assert!(decoded.contains_key("MaxFocalLength"));
+    assert!(decoded.contains_key("MinFocalLength"));
+    assert!(decoded.contains_key("FocalUnitsPerMM"));
+}
+
+#[test]
+fn test_decode_shot_info() {
+    // Sample ShotInfo array
+    let shot_info = vec![
+        68, 0, 149, 266, 159, 223, 12, 0, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 1, 612, 0, 160, 219, 0, 0,
+        65535, 250, 0, 0, 0, 0, 0, 0, 0,
+    ];
+
+    let decoded = decode_shot_info(&shot_info);
+
+    // Check that we got some decoded values
+    assert!(decoded.contains_key("AutoISO"));
+    assert!(decoded.contains_key("BaseISO"));
+    assert!(decoded.contains_key("MeasuredEV"));
+    assert!(decoded.contains_key("TargetAperture"));
+    assert!(decoded.contains_key("TargetExposureTime"));
+    assert!(decoded.contains_key("WhiteBalance"));
+
+    // Check white balance value
+    if let Some(ExifValue::Ascii(wb)) = decoded.get("WhiteBalance") {
+        assert_eq!(wb, "Auto");
+    } else {
+        panic!("WhiteBalance should be Ascii");
+    }
+
+    // Check sequence number
+    assert!(decoded.contains_key("SequenceNumber"));
+    if let Some(ExifValue::Short(seq)) = decoded.get("SequenceNumber") {
+        assert_eq!(seq[0], 1);
+    } else {
+        panic!("SequenceNumber should be Short");
+    }
+}
+
+#[test]
+fn test_decode_focal_length() {
+    // Sample FocalLength array
+    let focal_length = vec![2, 8557, 299, 224];
+
+    let decoded = decode_focal_length(&focal_length);
+
+    // Check focal type
+    assert!(decoded.contains_key("FocalType"));
+    if let Some(ExifValue::Ascii(focal_type)) = decoded.get("FocalType") {
+        assert_eq!(focal_type, "Zoom");
+    } else {
+        panic!("FocalType should be Ascii");
+    }
+
+    // Check focal length value
+    assert!(decoded.contains_key("FocalLength"));
+    if let Some(ExifValue::Short(fl)) = decoded.get("FocalLength") {
+        assert_eq!(fl[0], 8557);
+    } else {
+        panic!("FocalLength should be Short");
+    }
+
+    // Check focal plane sizes
+    assert!(decoded.contains_key("FocalPlaneXSize"));
+    assert!(decoded.contains_key("FocalPlaneYSize"));
+}
+
+#[test]
+fn test_decode_file_info() {
+    // Sample FileInfo array
+    let file_info = vec![0, 123, 0, 0, 0, 0];
+
+    let decoded = decode_file_info(&file_info);
+
+    // Check file number
+    assert!(decoded.contains_key("FileNumber"));
+    if let Some(ExifValue::Short(num)) = decoded.get("FileNumber") {
+        assert_eq!(num[0], 123);
+    } else {
+        panic!("FileNumber should be Short");
+    }
+
+    // Check bracket mode
+    assert!(decoded.contains_key("BracketMode"));
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("BracketMode") {
+        assert_eq!(mode, "Off");
+    } else {
+        panic!("BracketMode should be Ascii");
+    }
+}
+
+#[test]
+fn test_canon_s90_real_file() {
+    let test_file = Path::new("test-data/RAW_CANON_S90.CR2");
+    if !test_file.exists() {
+        eprintln!("Skipping test: test file not found");
+        return;
+    }
+
+    let parser = ExifParser::new();
+    let exif_data = parser.parse_file(test_file).expect("Failed to parse file");
+
+    // Check that we have basic Canon maker notes
+    let maker_notes = exif_data
+        .get_maker_notes()
+        .expect("Should have maker notes");
+    assert!(!maker_notes.is_empty(), "Should have Canon maker notes");
+
+    // Check for specific Canon tags
+    let has_camera_settings = maker_notes
+        .values()
+        .any(|tag| tag.tag_name == Some("CanonCameraSettings"));
+    assert!(has_camera_settings, "Should have CanonCameraSettings tag");
+
+    let has_focal_length = maker_notes
+        .values()
+        .any(|tag| tag.tag_name == Some("CanonFocalLength"));
+    assert!(has_focal_length, "Should have CanonFocalLength tag");
+
+    let has_shot_info = maker_notes
+        .values()
+        .any(|tag| tag.tag_name == Some("CanonShotInfo"));
+    assert!(has_shot_info, "Should have CanonShotInfo tag");
+}
+
+#[test]
+fn test_canon_50d_real_file() {
+    let test_file = Path::new("test-data/RAW_CANON_50D.CR2");
+    if !test_file.exists() {
+        eprintln!("Skipping test: test file not found");
+        return;
+    }
+
+    let parser = ExifParser::new();
+    let exif_data = parser.parse_file(test_file).expect("Failed to parse file");
+
+    // Check that we have basic Canon maker notes
+    let maker_notes = exif_data
+        .get_maker_notes()
+        .expect("Should have maker notes");
+    assert!(!maker_notes.is_empty(), "Should have Canon maker notes");
+
+    // Check for model ID
+    let has_model_id = maker_notes
+        .values()
+        .any(|tag| tag.tag_name == Some("CanonModelID"));
+    assert!(has_model_id, "Should have CanonModelID tag");
+}
+
+#[test]
+fn test_decode_camera_settings_exposure_modes() {
+    // Test different exposure modes
+    let mut settings = vec![0u16; 25];
+
+    // Program AE
+    settings[20] = 1;
+    let decoded = decode_camera_settings(&settings);
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+        assert_eq!(mode, "Program AE");
+    }
+
+    // Shutter priority
+    settings[20] = 2;
+    let decoded = decode_camera_settings(&settings);
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+        assert_eq!(mode, "Shutter speed priority AE");
+    }
+
+    // Aperture priority
+    settings[20] = 3;
+    let decoded = decode_camera_settings(&settings);
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+        assert_eq!(mode, "Aperture-priority AE");
+    }
+
+    // Manual
+    settings[20] = 4;
+    let decoded = decode_camera_settings(&settings);
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+        assert_eq!(mode, "Manual");
+    }
+}
+
+#[test]
+fn test_decode_shot_info_white_balance_modes() {
+    // Test different white balance modes
+    let mut shot_info = vec![0u16; 10];
+
+    // Daylight
+    shot_info[7] = 1;
+    let decoded = decode_shot_info(&shot_info);
+    if let Some(ExifValue::Ascii(wb)) = decoded.get("WhiteBalance") {
+        assert_eq!(wb, "Daylight");
+    }
+
+    // Cloudy
+    shot_info[7] = 2;
+    let decoded = decode_shot_info(&shot_info);
+    if let Some(ExifValue::Ascii(wb)) = decoded.get("WhiteBalance") {
+        assert_eq!(wb, "Cloudy");
+    }
+
+    // Tungsten
+    shot_info[7] = 3;
+    let decoded = decode_shot_info(&shot_info);
+    if let Some(ExifValue::Ascii(wb)) = decoded.get("WhiteBalance") {
+        assert_eq!(wb, "Tungsten");
+    }
+
+    // Flash
+    shot_info[7] = 5;
+    let decoded = decode_shot_info(&shot_info);
+    if let Some(ExifValue::Ascii(wb)) = decoded.get("WhiteBalance") {
+        assert_eq!(wb, "Flash");
+    }
+}

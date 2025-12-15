@@ -361,6 +361,387 @@ fn parse_ifd_entry(
     Some((tag_id, value))
 }
 
+/// Decode Canon CameraSettings array sub-fields
+///
+/// This function decodes the CanonCameraSettings array into individual fields
+/// that can be easily interpreted.
+pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Macro mode (index 1)
+    if data.len() > 1 {
+        let macro_mode = match data[1] {
+            1 => "Macro",
+            2 => "Normal",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "MacroMode".to_string(),
+            ExifValue::Ascii(macro_mode.to_string()),
+        );
+    }
+
+    // Self timer (index 2)
+    if data.len() > 2 {
+        decoded.insert("SelfTimer".to_string(), ExifValue::Short(vec![data[2]]));
+    }
+
+    // Quality (index 3)
+    if data.len() > 3 {
+        let quality = match data[3] {
+            1 => "Economy",
+            2 => "Normal",
+            3 => "Fine",
+            4 => "RAW",
+            5 => "Superfine",
+            130 => "Normal Movie",
+            _ => "Unknown",
+        };
+        decoded.insert("Quality".to_string(), ExifValue::Ascii(quality.to_string()));
+    }
+
+    // Flash mode (index 4)
+    if data.len() > 4 {
+        let flash_mode = match data[4] {
+            0 => "Flash Not Fired",
+            1 => "Auto",
+            2 => "On",
+            3 => "Red-eye reduction",
+            4 => "Slow-sync",
+            5 => "Auto + Red-eye reduction",
+            6 => "On + Red-eye reduction",
+            16 => "External flash",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FlashMode".to_string(),
+            ExifValue::Ascii(flash_mode.to_string()),
+        );
+    }
+
+    // Drive mode (index 5)
+    if data.len() > 5 {
+        let drive_mode = match data[5] {
+            0 => "Single",
+            1 => "Continuous",
+            2 => "Movie",
+            3 => "Continuous, Speed Priority",
+            4 => "Continuous, Low",
+            5 => "Continuous, High",
+            6 => "Silent Single",
+            9 => "Single, Silent",
+            10 => "Continuous, Silent",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "DriveMode".to_string(),
+            ExifValue::Ascii(drive_mode.to_string()),
+        );
+    }
+
+    // Focus mode (index 7)
+    if data.len() > 7 {
+        let focus_mode = match data[7] {
+            0 => "One-shot AF",
+            1 => "AI Servo AF",
+            2 => "AI Focus AF",
+            3 => "Manual Focus",
+            4 => "Single",
+            5 => "Continuous",
+            6 => "Manual Focus",
+            16 => "Pan Focus",
+            256 => "Manual",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FocusMode".to_string(),
+            ExifValue::Ascii(focus_mode.to_string()),
+        );
+    }
+
+    // Metering mode (index 17)
+    if data.len() > 17 {
+        let metering_mode = match data[17] {
+            3 => "Evaluative",
+            4 => "Partial",
+            5 => "Center-weighted average",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "MeteringMode".to_string(),
+            ExifValue::Ascii(metering_mode.to_string()),
+        );
+    }
+
+    // Focus range (index 18)
+    if data.len() > 18 {
+        let focus_range = match data[18] {
+            0 => "Manual",
+            1 => "Auto",
+            2 => "Not Known",
+            3 => "Macro",
+            7 => "Very Close",
+            8 => "Close",
+            9 => "Middle Range",
+            10 => "Far Range",
+            11 => "Pan Focus",
+            14 => "Super Macro",
+            15 => "Infinity",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FocusRange".to_string(),
+            ExifValue::Ascii(focus_range.to_string()),
+        );
+    }
+
+    // Exposure mode (index 20)
+    if data.len() > 20 {
+        let exposure_mode = match data[20] {
+            0 => "Easy",
+            1 => "Program AE",
+            2 => "Shutter speed priority AE",
+            3 => "Aperture-priority AE",
+            4 => "Manual",
+            5 => "Depth-of-field AE",
+            6 => "M-Dep",
+            7 => "Bulb",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "ExposureMode".to_string(),
+            ExifValue::Ascii(exposure_mode.to_string()),
+        );
+    }
+
+    // Max focal length (index 23)
+    if data.len() > 23 {
+        decoded.insert(
+            "MaxFocalLength".to_string(),
+            ExifValue::Short(vec![data[23]]),
+        );
+    }
+
+    // Min focal length (index 24)
+    if data.len() > 24 {
+        decoded.insert(
+            "MinFocalLength".to_string(),
+            ExifValue::Short(vec![data[24]]),
+        );
+    }
+
+    // Focal units per mm (index 25)
+    if data.len() > 25 {
+        decoded.insert(
+            "FocalUnitsPerMM".to_string(),
+            ExifValue::Short(vec![data[25]]),
+        );
+    }
+
+    // Max aperture (index 26)
+    if data.len() > 26 {
+        decoded.insert("MaxAperture".to_string(), ExifValue::Short(vec![data[26]]));
+    }
+
+    // Min aperture (index 27)
+    if data.len() > 27 {
+        decoded.insert("MinAperture".to_string(), ExifValue::Short(vec![data[27]]));
+    }
+
+    decoded
+}
+
+/// Decode Canon ShotInfo array sub-fields
+///
+/// This function decodes the CanonShotInfo array into individual fields
+/// that can be easily interpreted.
+pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Auto ISO (index 1)
+    if data.len() > 1 {
+        decoded.insert("AutoISO".to_string(), ExifValue::Short(vec![data[1]]));
+    }
+
+    // Base ISO (index 2)
+    if data.len() > 2 {
+        decoded.insert("BaseISO".to_string(), ExifValue::Short(vec![data[2]]));
+    }
+
+    // Measured EV (index 3)
+    if data.len() > 3 {
+        decoded.insert("MeasuredEV".to_string(), ExifValue::Short(vec![data[3]]));
+    }
+
+    // Target aperture (index 4)
+    if data.len() > 4 {
+        decoded.insert(
+            "TargetAperture".to_string(),
+            ExifValue::Short(vec![data[4]]),
+        );
+    }
+
+    // Target exposure time (index 5)
+    if data.len() > 5 {
+        decoded.insert(
+            "TargetExposureTime".to_string(),
+            ExifValue::Short(vec![data[5]]),
+        );
+    }
+
+    // White balance (index 7)
+    if data.len() > 7 {
+        let wb = match data[7] {
+            0 => "Auto",
+            1 => "Daylight",
+            2 => "Cloudy",
+            3 => "Tungsten",
+            4 => "Fluorescent",
+            5 => "Flash",
+            6 => "Custom",
+            7 => "Black & White",
+            8 => "Shade",
+            9 => "Manual Temperature",
+            10 => "PC Set1",
+            11 => "PC Set2",
+            12 => "PC Set3",
+            14 => "Daylight Fluorescent",
+            15 => "Custom 1",
+            16 => "Custom 2",
+            17 => "Underwater",
+            _ => "Unknown",
+        };
+        decoded.insert("WhiteBalance".to_string(), ExifValue::Ascii(wb.to_string()));
+    }
+
+    // Sequence number (index 9)
+    if data.len() > 9 {
+        decoded.insert(
+            "SequenceNumber".to_string(),
+            ExifValue::Short(vec![data[9]]),
+        );
+    }
+
+    // Flash exposure compensation (index 15)
+    if data.len() > 15 {
+        decoded.insert(
+            "FlashExposureComp".to_string(),
+            ExifValue::Short(vec![data[15]]),
+        );
+    }
+
+    // Auto exposure bracketing (index 16)
+    if data.len() > 16 {
+        let aeb = match data[16] {
+            0xFFFF | 0 => "Off",
+            1 => "On",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "AEBBracketValue".to_string(),
+            ExifValue::Ascii(aeb.to_string()),
+        );
+    }
+
+    // Subject distance (index 19)
+    if data.len() > 19 {
+        decoded.insert(
+            "SubjectDistance".to_string(),
+            ExifValue::Short(vec![data[19]]),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon FocalLength array sub-fields
+///
+/// This function decodes the CanonFocalLength array into individual fields
+/// that can be easily interpreted.
+pub fn decode_focal_length(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Focal type (index 0)
+    if !data.is_empty() {
+        let focal_type = match data[0] {
+            1 => "Fixed",
+            2 => "Zoom",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FocalType".to_string(),
+            ExifValue::Ascii(focal_type.to_string()),
+        );
+    }
+
+    // Focal length (index 1)
+    if data.len() > 1 {
+        decoded.insert("FocalLength".to_string(), ExifValue::Short(vec![data[1]]));
+    }
+
+    // Focal plane X size (index 2)
+    if data.len() > 2 {
+        decoded.insert(
+            "FocalPlaneXSize".to_string(),
+            ExifValue::Short(vec![data[2]]),
+        );
+    }
+
+    // Focal plane Y size (index 3)
+    if data.len() > 3 {
+        decoded.insert(
+            "FocalPlaneYSize".to_string(),
+            ExifValue::Short(vec![data[3]]),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon FileInfo array sub-fields
+///
+/// This function decodes the CanonFileInfo array into individual fields
+/// that can be easily interpreted.
+pub fn decode_file_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // File number (index 1)
+    if data.len() > 1 {
+        decoded.insert("FileNumber".to_string(), ExifValue::Short(vec![data[1]]));
+    }
+
+    // Bracket mode (index 3)
+    if data.len() > 3 {
+        let bracket_mode = match data[3] {
+            0 => "Off",
+            1 => "AEB",
+            2 => "FEB",
+            3 => "ISO",
+            4 => "WB",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "BracketMode".to_string(),
+            ExifValue::Ascii(bracket_mode.to_string()),
+        );
+    }
+
+    // Bracket value (index 4)
+    if data.len() > 4 {
+        decoded.insert("BracketValue".to_string(), ExifValue::Short(vec![data[4]]));
+    }
+
+    // Bracket shot number (index 5)
+    if data.len() > 5 {
+        decoded.insert(
+            "BracketShotNumber".to_string(),
+            ExifValue::Short(vec![data[5]]),
+        );
+    }
+
+    decoded
+}
+
 /// Parse Canon maker notes
 ///
 /// Canon maker notes use TIFF-relative offsets, so we need access to the full
