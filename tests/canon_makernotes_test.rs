@@ -180,21 +180,40 @@ fn test_canon_s90_real_file() {
         .expect("Should have maker notes");
     assert!(!maker_notes.is_empty(), "Should have Canon maker notes");
 
-    // Check for specific Canon tags
-    let has_camera_settings = maker_notes
+    // Check for decoded sub-fields from CameraSettings
+    let has_quality = maker_notes
         .values()
-        .any(|tag| tag.tag_name == Some("CanonCameraSettings"));
-    assert!(has_camera_settings, "Should have CanonCameraSettings tag");
+        .any(|tag| tag.tag_name == Some("Quality"));
+    assert!(
+        has_quality,
+        "Should have Quality tag (decoded from CameraSettings)"
+    );
 
-    let has_focal_length = maker_notes
+    let has_drive_mode = maker_notes
         .values()
-        .any(|tag| tag.tag_name == Some("CanonFocalLength"));
-    assert!(has_focal_length, "Should have CanonFocalLength tag");
+        .any(|tag| tag.tag_name == Some("DriveMode"));
+    assert!(
+        has_drive_mode,
+        "Should have DriveMode tag (decoded from CameraSettings)"
+    );
 
-    let has_shot_info = maker_notes
+    // Check for decoded sub-fields from FocalLength
+    let has_focal_type = maker_notes
         .values()
-        .any(|tag| tag.tag_name == Some("CanonShotInfo"));
-    assert!(has_shot_info, "Should have CanonShotInfo tag");
+        .any(|tag| tag.tag_name == Some("FocalType"));
+    assert!(
+        has_focal_type,
+        "Should have FocalType tag (decoded from FocalLength)"
+    );
+
+    // Check for decoded sub-fields from ShotInfo
+    let has_white_balance = maker_notes
+        .values()
+        .any(|tag| tag.tag_name == Some("WhiteBalance"));
+    assert!(
+        has_white_balance,
+        "Should have WhiteBalance tag (decoded from ShotInfo)"
+    );
 }
 
 #[test]

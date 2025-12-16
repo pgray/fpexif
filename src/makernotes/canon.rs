@@ -867,6 +867,9 @@ pub fn parse_canon_maker_notes(
     }
 
     // Parse each IFD entry (12 bytes each)
+    // We use a counter for synthetic tag IDs for decoded sub-fields
+    let mut synthetic_tag_id = 0xF000u16;
+
     for i in 0..num_entries {
         let entry_offset = 2 + i * 12;
 
@@ -879,6 +882,44 @@ pub fn parse_canon_maker_notes(
                 CANON_CAMERA_INFO | CANON_DUST_REMOVAL_DATA | CANON_COLOR_DATA
             ) {
                 continue;
+            }
+
+            // Check if this is a tag we can decode into sub-fields
+            let should_decode = matches!(
+                tag_id,
+                CANON_CAMERA_SETTINGS
+                    | CANON_SHOT_INFO
+                    | CANON_FOCAL_LENGTH
+                    | CANON_FILE_INFO
+                    | CANON_AF_INFO_2
+            );
+
+            if should_decode {
+                if let ExifValue::Short(ref shorts) = value {
+                    let decoded = match tag_id {
+                        CANON_CAMERA_SETTINGS => decode_camera_settings(shorts),
+                        CANON_SHOT_INFO => decode_shot_info(shorts),
+                        CANON_FOCAL_LENGTH => decode_focal_length(shorts),
+                        CANON_FILE_INFO => decode_file_info(shorts),
+                        CANON_AF_INFO_2 => decode_af_info2(shorts),
+                        _ => HashMap::new(),
+                    };
+
+                    // Insert each decoded sub-field as a separate tag
+                    for (field_name, field_value) in decoded {
+                        tags.insert(
+                            synthetic_tag_id,
+                            MakerNoteTag {
+                                tag_id: synthetic_tag_id,
+                                tag_name: Some(Box::leak(field_name.into_boxed_str())),
+                                value: field_value,
+                            },
+                        );
+                        synthetic_tag_id = synthetic_tag_id.wrapping_add(1);
+                    }
+                    // Skip inserting the raw array
+                    continue;
+                }
             }
 
             tags.insert(
