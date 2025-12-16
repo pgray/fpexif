@@ -2,7 +2,8 @@
 
 use fpexif::data_types::ExifValue;
 use fpexif::makernotes::canon::{
-    decode_camera_settings, decode_file_info, decode_focal_length, decode_shot_info,
+    decode_af_info2, decode_camera_settings, decode_file_info, decode_focal_length,
+    decode_shot_info,
 };
 use fpexif::ExifParser;
 use std::path::Path;
@@ -52,6 +53,9 @@ fn test_decode_camera_settings() {
 
     // Check focus mode
     assert!(decoded.contains_key("FocusMode"));
+
+    // Check AF assist beam
+    assert!(decoded.contains_key("AFAssistBeam"));
 
     // Check metering mode
     assert!(decoded.contains_key("MeteringMode"));
@@ -282,5 +286,127 @@ fn test_decode_shot_info_white_balance_modes() {
     let decoded = decode_shot_info(&shot_info);
     if let Some(ExifValue::Ascii(wb)) = decoded.get("WhiteBalance") {
         assert_eq!(wb, "Flash");
+    }
+}
+
+#[test]
+fn test_decode_af_info2() {
+    // Sample AFInfo2 array with 3 AF points
+    let af_info = vec![
+        2, // AF area mode: Single-point AF
+        3, // Number of AF points
+        10, 12, 14, // Widths for 3 points
+        20, 22, 24, // Heights for 3 points
+        100, 110, 120, // X positions for 3 points
+        200, 210, 220, // Y positions for 3 points
+    ];
+
+    let decoded = decode_af_info2(&af_info);
+
+    // Check AF area mode
+    assert!(decoded.contains_key("AFAreaMode"));
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("AFAreaMode") {
+        assert_eq!(mode, "Single-point AF");
+    } else {
+        panic!("AFAreaMode should be Ascii");
+    }
+
+    // Check number of AF points
+    assert!(decoded.contains_key("NumAFPoints"));
+    if let Some(ExifValue::Short(num)) = decoded.get("NumAFPoints") {
+        assert_eq!(num[0], 3);
+    } else {
+        panic!("NumAFPoints should be Short");
+    }
+
+    // Check AF area widths
+    assert!(decoded.contains_key("AFAreaWidths"));
+    if let Some(ExifValue::Short(widths)) = decoded.get("AFAreaWidths") {
+        assert_eq!(widths.len(), 3);
+        assert_eq!(widths[0], 10);
+        assert_eq!(widths[1], 12);
+        assert_eq!(widths[2], 14);
+    } else {
+        panic!("AFAreaWidths should be Short array");
+    }
+
+    // Check AF area heights
+    assert!(decoded.contains_key("AFAreaHeights"));
+    if let Some(ExifValue::Short(heights)) = decoded.get("AFAreaHeights") {
+        assert_eq!(heights.len(), 3);
+        assert_eq!(heights[0], 20);
+        assert_eq!(heights[1], 22);
+        assert_eq!(heights[2], 24);
+    } else {
+        panic!("AFAreaHeights should be Short array");
+    }
+
+    // Check AF area X positions
+    assert!(decoded.contains_key("AFAreaXPositions"));
+    if let Some(ExifValue::Short(x_pos)) = decoded.get("AFAreaXPositions") {
+        assert_eq!(x_pos.len(), 3);
+        assert_eq!(x_pos[0], 100);
+        assert_eq!(x_pos[1], 110);
+        assert_eq!(x_pos[2], 120);
+    } else {
+        panic!("AFAreaXPositions should be Short array");
+    }
+
+    // Check AF area Y positions
+    assert!(decoded.contains_key("AFAreaYPositions"));
+    if let Some(ExifValue::Short(y_pos)) = decoded.get("AFAreaYPositions") {
+        assert_eq!(y_pos.len(), 3);
+        assert_eq!(y_pos[0], 200);
+        assert_eq!(y_pos[1], 210);
+        assert_eq!(y_pos[2], 220);
+    } else {
+        panic!("AFAreaYPositions should be Short array");
+    }
+}
+
+#[test]
+fn test_decode_af_info2_different_modes() {
+    // Test different AF area modes
+    let mut af_info = vec![0u16; 2];
+
+    // Manual focus
+    af_info[0] = 0;
+    let decoded = decode_af_info2(&af_info);
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("AFAreaMode") {
+        assert_eq!(mode, "Off (Manual Focus)");
+    }
+
+    // Face Detect AF
+    af_info[0] = 5;
+    let decoded = decode_af_info2(&af_info);
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("AFAreaMode") {
+        assert_eq!(mode, "Face Detect AF");
+    }
+
+    // Zone AF
+    af_info[0] = 7;
+    let decoded = decode_af_info2(&af_info);
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("AFAreaMode") {
+        assert_eq!(mode, "Zone AF");
+    }
+}
+
+#[test]
+fn test_camera_settings_af_assist_beam() {
+    // Test AF assist beam settings
+    let mut settings = vec![0u16; 12];
+
+    // AF assist beam off
+    settings[10] = 0;
+    let decoded = decode_camera_settings(&settings);
+    if let Some(ExifValue::Ascii(af_assist)) = decoded.get("AFAssistBeam") {
+        assert_eq!(af_assist, "Off");
+    }
+
+    // AF assist beam on
+    settings[10] = 1;
+    let decoded = decode_camera_settings(&settings);
+    if let Some(ExifValue::Ascii(af_assist)) = decoded.get("AFAssistBeam") {
+        assert_eq!(af_assist, "On");
     }
 }

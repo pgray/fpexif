@@ -459,6 +459,19 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // AF assist beam (index 10)
+    if data.len() > 10 {
+        let af_assist = match data[10] {
+            0 => "Off",
+            1 => "On",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "AFAssistBeam".to_string(),
+            ExifValue::Ascii(af_assist.to_string()),
+        );
+    }
+
     // Metering mode (index 17)
     if data.len() > 17 {
         let metering_mode = match data[17] {
@@ -737,6 +750,92 @@ pub fn decode_file_info(data: &[u16]) -> HashMap<String, ExifValue> {
             "BracketShotNumber".to_string(),
             ExifValue::Short(vec![data[5]]),
         );
+    }
+
+    decoded
+}
+
+/// Decode Canon AFInfo2 array sub-fields
+///
+/// This function decodes the CanonAFInfo2 array which contains AF area information.
+pub fn decode_af_info2(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // AF area mode (index 0)
+    if !data.is_empty() {
+        let af_mode = match data[0] {
+            0 => "Off (Manual Focus)",
+            1 => "AF Point Expansion (surround)",
+            2 => "Single-point AF",
+            4 => "Auto",
+            5 => "Face Detect AF",
+            6 => "Face + Tracking",
+            7 => "Zone AF",
+            8 => "AF Point Expansion (4 point)",
+            9 => "Spot AF",
+            10 => "AF Point Expansion (8 point)",
+            11 => "Flexizone Multi",
+            13 => "Flexizone Single",
+            14 => "Large Zone AF",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "AFAreaMode".to_string(),
+            ExifValue::Ascii(af_mode.to_string()),
+        );
+    }
+
+    // Number of AF points (index 1)
+    if data.len() > 1 {
+        let num_af_points = data[1];
+        decoded.insert(
+            "NumAFPoints".to_string(),
+            ExifValue::Short(vec![num_af_points]),
+        );
+
+        // AF area widths (index 2 onwards, based on num_af_points)
+        let mut widths = Vec::new();
+        let mut heights = Vec::new();
+        let mut x_positions = Vec::new();
+        let mut y_positions = Vec::new();
+
+        for i in 0..num_af_points as usize {
+            // Widths start at index 2
+            if data.len() > 2 + i {
+                widths.push(data[2 + i]);
+            }
+            // Heights start after widths
+            if data.len() > 2 + num_af_points as usize + i {
+                heights.push(data[2 + num_af_points as usize + i]);
+            }
+            // X positions start after heights
+            if data.len() > 2 + 2 * num_af_points as usize + i {
+                x_positions.push(data[2 + 2 * num_af_points as usize + i]);
+            }
+            // Y positions start after X positions
+            if data.len() > 2 + 3 * num_af_points as usize + i {
+                y_positions.push(data[2 + 3 * num_af_points as usize + i]);
+            }
+        }
+
+        if !widths.is_empty() {
+            decoded.insert("AFAreaWidths".to_string(), ExifValue::Short(widths));
+        }
+        if !heights.is_empty() {
+            decoded.insert("AFAreaHeights".to_string(), ExifValue::Short(heights));
+        }
+        if !x_positions.is_empty() {
+            decoded.insert(
+                "AFAreaXPositions".to_string(),
+                ExifValue::Short(x_positions),
+            );
+        }
+        if !y_positions.is_empty() {
+            decoded.insert(
+                "AFAreaYPositions".to_string(),
+                ExifValue::Short(y_positions),
+            );
+        }
     }
 
     decoded
