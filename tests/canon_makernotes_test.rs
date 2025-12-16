@@ -422,8 +422,15 @@ fn test_camera_settings_af_assist_beam() {
         assert_eq!(af_assist, "Off");
     }
 
-    // AF assist beam on
+    // AF assist beam on (auto)
     settings[10] = 1;
+    let decoded = decode_camera_settings(&settings);
+    if let Some(ExifValue::Ascii(af_assist)) = decoded.get("AFAssistBeam") {
+        assert_eq!(af_assist, "On (Auto)");
+    }
+
+    // AF assist beam on
+    settings[10] = 2;
     let decoded = decode_camera_settings(&settings);
     if let Some(ExifValue::Ascii(af_assist)) = decoded.get("AFAssistBeam") {
         assert_eq!(af_assist, "On");

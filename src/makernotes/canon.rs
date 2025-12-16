@@ -463,7 +463,9 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 10 {
         let af_assist = match data[10] {
             0 => "Off",
-            1 => "On",
+            1 => "On (Auto)",
+            2 => "On",
+            0xFFFF => "n/a",
             _ => "Unknown",
         };
         decoded.insert(
@@ -677,6 +679,7 @@ pub fn decode_focal_length(data: &[u16]) -> HashMap<String, ExifValue> {
     // Focal type (index 0)
     if !data.is_empty() {
         let focal_type = match data[0] {
+            0 => "n/a",
             1 => "Fixed",
             2 => "Zoom",
             _ => "Unknown",
@@ -777,6 +780,12 @@ pub fn decode_af_info2(data: &[u16]) -> HashMap<String, ExifValue> {
             11 => "Flexizone Multi",
             13 => "Flexizone Single",
             14 => "Large Zone AF",
+            // Compact camera modes
+            0x0060 => "Face AiAF",
+            0x1001 => "Single-point AF (Compact)",
+            0x1002 => "Tracking AF (Compact)",
+            0x1003 => "Face + Tracking (Compact)",
+            0xFFFF => "n/a",
             _ => "Unknown",
         };
         decoded.insert(
