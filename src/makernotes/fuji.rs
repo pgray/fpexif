@@ -36,6 +36,23 @@ pub const FUJI_DYNAMIC_RANGE: u16 = 0x1400;
 pub const FUJI_FILM_MODE: u16 = 0x1401;
 pub const FUJI_DYNAMIC_RANGE_SETTING: u16 = 0x1402;
 pub const FUJI_DEVELOPMENT_DYNAMIC_RANGE: u16 = 0x1403;
+pub const FUJI_MIN_FOCAL_LENGTH: u16 = 0x1404;
+pub const FUJI_MAX_FOCAL_LENGTH: u16 = 0x1405;
+pub const FUJI_MAX_APERTURE_AT_MIN_FOCAL: u16 = 0x1406;
+pub const FUJI_MAX_APERTURE_AT_MAX_FOCAL: u16 = 0x1407;
+pub const FUJI_FILE_SOURCE: u16 = 0x8000;
+pub const FUJI_ORDER_NUMBER: u16 = 0x8002;
+pub const FUJI_FRAME_NUMBER: u16 = 0x8003;
+pub const FUJI_FACES_DETECTED: u16 = 0x4100;
+pub const FUJI_FACE_POSITIONS: u16 = 0x4103;
+pub const FUJI_FACE_REC_INFO: u16 = 0x4282;
+pub const FUJI_RAW_IMAGE_FULL_SIZE: u16 = 0x0100;
+pub const FUJI_RAW_IMAGE_CROP_TOP_LEFT: u16 = 0x0110;
+pub const FUJI_RAW_IMAGE_CROPPED_SIZE: u16 = 0x0111;
+pub const FUJI_RAW_IMAGE_ASPECT_RATIO: u16 = 0x0115;
+pub const FUJI_LENS_MOUNT_TYPE: u16 = 0x1600;
+pub const FUJI_RATINGS_INFO: u16 = 0xB211;
+pub const FUJI_GE_IMAGE_SIZE: u16 = 0xB212;
 
 /// Get the name of a Fujifilm MakerNote tag
 pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -68,6 +85,23 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_FILM_MODE => Some("FilmMode"),
         FUJI_DYNAMIC_RANGE_SETTING => Some("DynamicRangeSetting"),
         FUJI_DEVELOPMENT_DYNAMIC_RANGE => Some("DevelopmentDynamicRange"),
+        FUJI_MIN_FOCAL_LENGTH => Some("MinFocalLength"),
+        FUJI_MAX_FOCAL_LENGTH => Some("MaxFocalLength"),
+        FUJI_MAX_APERTURE_AT_MIN_FOCAL => Some("MaxApertureAtMinFocal"),
+        FUJI_MAX_APERTURE_AT_MAX_FOCAL => Some("MaxApertureAtMaxFocal"),
+        FUJI_FILE_SOURCE => Some("FileSource"),
+        FUJI_ORDER_NUMBER => Some("OrderNumber"),
+        FUJI_FRAME_NUMBER => Some("FrameNumber"),
+        FUJI_FACES_DETECTED => Some("FacesDetected"),
+        FUJI_FACE_POSITIONS => Some("FacePositions"),
+        FUJI_FACE_REC_INFO => Some("FaceRecInfo"),
+        FUJI_RAW_IMAGE_FULL_SIZE => Some("RawImageFullSize"),
+        FUJI_RAW_IMAGE_CROP_TOP_LEFT => Some("RawImageCropTopLeft"),
+        FUJI_RAW_IMAGE_CROPPED_SIZE => Some("RawImageCroppedSize"),
+        FUJI_RAW_IMAGE_ASPECT_RATIO => Some("RawImageAspectRatio"),
+        FUJI_LENS_MOUNT_TYPE => Some("LensMountType"),
+        FUJI_RATINGS_INFO => Some("RatingsInfo"),
+        FUJI_GE_IMAGE_SIZE => Some("GEImageSize"),
         _ => None,
     }
 }

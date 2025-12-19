@@ -704,11 +704,12 @@ pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
         decoded.insert("BaseISO".to_string(), ExifValue::Short(vec![data[2]]));
     }
 
-    // Measured EV (index 3) - Canon APEX value, stored as value/32
+    // Measured EV (index 3) - Canon APEX value, stored as value/32 with +5.0 offset
     // MeasuredEV represents the metered exposure value
+    // ExifTool uses: MeasuredEV = (raw / 32.0) + 5.0
     if data.len() > 3 {
         let raw = data[3] as i16; // Treat as signed for negative EV values
-        let ev = raw as f64 / 32.0;
+        let ev = (raw as f64 / 32.0) + 5.0;
         decoded.insert(
             "MeasuredEV".to_string(),
             ExifValue::Ascii(format!("{:.2}", ev)),
