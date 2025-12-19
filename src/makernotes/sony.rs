@@ -3,9 +3,7 @@
 use crate::data_types::{Endianness, ExifValue};
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
-use std::io::Cursor;
 
 // Common Sony MakerNote tag IDs
 pub const SONY_CAMERA_INFO: u16 = 0x0010;
@@ -118,6 +116,127 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
+/// Read u16 with given endianness
+fn read_u16(data: &[u8], endian: Endianness) -> u16 {
+    match endian {
+        Endianness::Little => u16::from_le_bytes([data[0], data[1]]),
+        Endianness::Big => u16::from_be_bytes([data[0], data[1]]),
+    }
+}
+
+/// Read u32 with given endianness
+fn read_u32(data: &[u8], endian: Endianness) -> u32 {
+    match endian {
+        Endianness::Little => u32::from_le_bytes([data[0], data[1], data[2], data[3]]),
+        Endianness::Big => u32::from_be_bytes([data[0], data[1], data[2], data[3]]),
+    }
+}
+
+/// Parse a single IFD entry from Sony maker notes
+fn parse_ifd_entry(
+    data: &[u8],
+    entry_offset: usize,
+    endian: Endianness,
+    base_offset: usize,
+) -> Option<(u16, ExifValue)> {
+    if entry_offset + 12 > data.len() {
+        return None;
+    }
+
+    let tag_id = read_u16(&data[entry_offset..], endian);
+    let tag_type = read_u16(&data[entry_offset + 2..], endian);
+    let count = read_u32(&data[entry_offset + 4..], endian) as usize;
+    let value_offset_bytes = &data[entry_offset + 8..entry_offset + 12];
+
+    // Calculate the size of the data
+    let type_size = match tag_type {
+        1 | 2 | 6 | 7 => 1, // BYTE, ASCII, SBYTE, UNDEFINED
+        3 | 8 => 2,         // SHORT, SSHORT
+        4 | 9 | 11 => 4,    // LONG, SLONG, FLOAT
+        5 | 10 | 12 => 8,   // RATIONAL, SRATIONAL, DOUBLE
+        _ => return None,
+    };
+
+    let total_size = count * type_size;
+
+    // Get the actual data location
+    // Sony maker notes use offsets relative to the maker note start
+    let value_data: &[u8] = if total_size <= 4 {
+        value_offset_bytes
+    } else {
+        let offset = read_u32(value_offset_bytes, endian) as usize;
+        // Try maker note-relative offset
+        let abs_offset = if offset >= base_offset {
+            offset - base_offset
+        } else {
+            offset
+        };
+        if abs_offset + total_size <= data.len() {
+            &data[abs_offset..abs_offset + total_size]
+        } else if offset + total_size <= data.len() {
+            &data[offset..offset + total_size]
+        } else {
+            return None;
+        }
+    };
+
+    // Parse based on type
+    let value = match tag_type {
+        1 | 6 => {
+            // BYTE or SBYTE
+            ExifValue::Byte(value_data[..count.min(value_data.len())].to_vec())
+        }
+        2 => {
+            // ASCII
+            let s = value_data[..count.min(value_data.len())]
+                .iter()
+                .take_while(|&&b| b != 0)
+                .map(|&b| b as char)
+                .collect::<String>();
+            ExifValue::Ascii(s)
+        }
+        3 | 8 => {
+            // SHORT or SSHORT
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 2 + 2 <= value_data.len() {
+                    values.push(read_u16(&value_data[i * 2..], endian));
+                }
+            }
+            ExifValue::Short(values)
+        }
+        4 | 9 => {
+            // LONG or SLONG
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 4 + 4 <= value_data.len() {
+                    values.push(read_u32(&value_data[i * 4..], endian));
+                }
+            }
+            ExifValue::Long(values)
+        }
+        5 | 10 => {
+            // RATIONAL or SRATIONAL
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 8 + 8 <= value_data.len() {
+                    let num = read_u32(&value_data[i * 8..], endian);
+                    let den = read_u32(&value_data[i * 8 + 4..], endian);
+                    values.push((num, den));
+                }
+            }
+            ExifValue::Rational(values)
+        }
+        7 => {
+            // UNDEFINED
+            ExifValue::Undefined(value_data[..total_size.min(value_data.len())].to_vec())
+        }
+        _ => ExifValue::Undefined(vec![]),
+    };
+
+    Some((tag_id, value))
+}
+
 /// Parse Sony maker notes
 pub fn parse_sony_maker_notes(
     data: &[u8],
@@ -127,6 +246,7 @@ pub fn parse_sony_maker_notes(
 
     // Sony maker notes can start with "SONY DSC " or be in standard TIFF IFD format
     let mut offset = 0;
+    let base_offset = 0usize;
 
     if data.len() >= 12 && data.starts_with(b"SONY DSC ") {
         offset = 12;
@@ -136,58 +256,18 @@ pub fn parse_sony_maker_notes(
         return Ok(tags);
     }
 
-    let mut cursor = Cursor::new(&data[offset..]);
-
     // Read number of entries
-    let num_entries = match endian {
-        Endianness::Little => cursor
-            .read_u16::<LittleEndian>()
-            .map_err(|_| ExifError::Format("Failed to read Sony maker note count".to_string()))?,
-        Endianness::Big => cursor
-            .read_u16::<BigEndian>()
-            .map_err(|_| ExifError::Format("Failed to read Sony maker note count".to_string()))?,
-    };
+    let num_entries = read_u16(&data[offset..], endian);
+    offset += 2;
 
     // Parse IFD entries
-    for _ in 0..num_entries {
-        if cursor.position() as usize + 12 > data[offset..].len() {
+    for i in 0..num_entries as usize {
+        let entry_offset = offset + i * 12;
+        if entry_offset + 12 > data.len() {
             break;
         }
 
-        let tag_id = match endian {
-            Endianness::Little => cursor.read_u16::<LittleEndian>(),
-            Endianness::Big => cursor.read_u16::<BigEndian>(),
-        }
-        .ok();
-
-        let tag_type = match endian {
-            Endianness::Little => cursor.read_u16::<LittleEndian>(),
-            Endianness::Big => cursor.read_u16::<BigEndian>(),
-        }
-        .ok();
-
-        let count = match endian {
-            Endianness::Little => cursor.read_u32::<LittleEndian>(),
-            Endianness::Big => cursor.read_u32::<BigEndian>(),
-        }
-        .ok();
-
-        let value_offset = match endian {
-            Endianness::Little => cursor.read_u32::<LittleEndian>(),
-            Endianness::Big => cursor.read_u32::<BigEndian>(),
-        }
-        .ok();
-
-        if let (Some(tag_id), Some(tag_type), Some(count), Some(_value_offset)) =
-            (tag_id, tag_type, count, value_offset)
-        {
-            let value = match tag_type {
-                2 => ExifValue::Ascii(format!("Sony tag 0x{:04X}", tag_id)),
-                3 => ExifValue::Short(vec![0]),
-                4 => ExifValue::Long(vec![count]),
-                _ => ExifValue::Undefined(vec![]),
-            };
-
+        if let Some((tag_id, value)) = parse_ifd_entry(data, entry_offset, endian, base_offset) {
             tags.insert(
                 tag_id,
                 MakerNoteTag {

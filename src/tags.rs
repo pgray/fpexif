@@ -1081,7 +1081,7 @@ pub fn get_exposure_program_description(value: u16) -> &'static str {
     match value {
         0 => "Not defined",
         1 => "Manual",
-        2 => "Normal program",
+        2 => "Program AE",
         3 => "Aperture-priority AE",
         4 => "Shutter speed priority AE",
         5 => "Creative program (biased toward depth of field)",
@@ -1100,10 +1100,10 @@ pub fn get_metering_mode_description(value: u16) -> &'static str {
         2 => "Center-weighted average",
         3 => "Spot",
         4 => "Multi-spot",
-        5 => "Evaluative",
+        5 => "Multi-segment",
         6 => "Partial",
         255 => "Other",
-        _ => "Reserved",
+        _ => "Unknown",
     }
 }
 

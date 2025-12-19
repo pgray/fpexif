@@ -85,6 +85,108 @@ pub const CANON_FILTER_INFO: u16 = 0x4024;
 pub const CANON_HDR_INFO: u16 = 0x4025;
 pub const CANON_AF_CONFIG: u16 = 0x4028;
 
+/// Get the Canon model name from model ID
+pub fn get_canon_model_name(model_id: u32) -> Option<&'static str> {
+    match model_id {
+        // EOS DSLRs
+        0x80000001 => Some("EOS-1D"),
+        0x80000167 => Some("EOS-1DS"),
+        0x80000168 => Some("EOS 10D"),
+        0x80000169 => Some("EOS-1D Mark III"),
+        0x80000170 => Some("EOS Digital Rebel / 300D / Kiss Digital"),
+        0x80000174 => Some("EOS-1D Mark II"),
+        0x80000175 => Some("EOS 20D"),
+        0x80000176 => Some("EOS Digital Rebel XSi / 450D / Kiss X2"),
+        0x80000188 => Some("EOS-1Ds Mark II"),
+        0x80000189 => Some("EOS Digital Rebel XT / 350D / Kiss Digital N"),
+        0x80000190 => Some("EOS 40D"),
+        0x80000213 => Some("EOS 5D"),
+        0x80000215 => Some("EOS-1Ds Mark III"),
+        0x80000218 => Some("EOS 5D Mark II"),
+        0x80000232 => Some("EOS-1D Mark II N"),
+        0x80000234 => Some("EOS 30D"),
+        0x80000236 => Some("EOS Digital Rebel XTi / 400D / Kiss Digital X"),
+        0x80000250 => Some("EOS 7D"),
+        0x80000252 => Some("EOS Rebel T1i / 500D / Kiss X3"),
+        0x80000254 => Some("EOS Rebel XS / 1000D / Kiss F"),
+        0x80000261 => Some("EOS 50D"),
+        0x80000269 => Some("EOS-1D X"),
+        0x80000270 => Some("EOS Rebel T2i / 550D / Kiss X4"),
+        0x80000271 => Some("EOS-1D Mark IV"),
+        0x80000281 => Some("EOS 5D Mark III"),
+        0x80000285 => Some("EOS Rebel T3i / 600D / Kiss X5"),
+        0x80000286 => Some("EOS 60D"),
+        0x80000287 => Some("EOS Rebel T3 / 1100D / Kiss X50"),
+        0x80000288 => Some("EOS 7D Mark II"),
+        0x80000289 => Some("EOS 5D Mark IV"),
+        0x80000301 => Some("EOS Rebel T4i / 650D / Kiss X6i"),
+        0x80000302 => Some("EOS 6D"),
+        0x80000324 => Some("EOS-1D C"),
+        0x80000325 => Some("EOS 70D"),
+        0x80000326 => Some("EOS Rebel T5i / 700D / Kiss X7i"),
+        0x80000327 => Some("EOS Rebel T5 / 1200D / Kiss X70"),
+        0x80000328 => Some("EOS-1D X Mark II"),
+        0x80000331 => Some("EOS M"),
+        0x80000346 => Some("EOS Rebel SL1 / 100D / Kiss X7"),
+        0x80000347 => Some("EOS Rebel T6s / 760D / 8000D"),
+        0x80000349 => Some("EOS 5DS"),
+        0x80000350 => Some("EOS 5DS R"),
+        0x80000355 => Some("EOS M2"),
+        0x80000382 => Some("EOS 80D"),
+        0x80000393 => Some("EOS Rebel T6i / 750D / Kiss X8i"),
+        0x80000401 => Some("EOS Rebel T6 / 1300D / Kiss X80"),
+        0x80000404 => Some("EOS M3"),
+        0x80000405 => Some("EOS M10"),
+        0x80000406 => Some("EOS Rebel T7i / 800D / Kiss X9i"),
+        0x80000408 => Some("EOS 77D / 9000D"),
+        0x80000417 => Some("EOS Rebel SL2 / 200D / Kiss X9"),
+        0x80000421 => Some("EOS 6D Mark II"),
+        0x80000422 => Some("EOS Rebel T7 / 2000D / Kiss X90"),
+        0x80000424 => Some("EOS M50 / Kiss M"),
+        0x80000428 => Some("EOS R"),
+        0x80000432 => Some("EOS RP"),
+        0x80000435 => Some("EOS Rebel SL3 / 250D / Kiss X10"),
+        0x80000436 => Some("EOS 90D"),
+        0x80000437 => Some("EOS M6 Mark II"),
+        0x80000450 => Some("EOS R5"),
+        0x80000453 => Some("EOS R6"),
+        0x80000464 => Some("EOS-1D X Mark III"),
+        0x80000468 => Some("EOS M50 Mark II / Kiss M2"),
+        // PowerShot models
+        0x01140000 => Some("PowerShot S30"),
+        0x01668000 => Some("PowerShot G2"),
+        0x01720000 => Some("PowerShot S40"),
+        0x01840000 => Some("PowerShot G3"),
+        0x02230000 => Some("PowerShot G5"),
+        0x02290000 => Some("PowerShot S50"),
+        0x02460000 => Some("PowerShot A75"),
+        0x02700000 => Some("PowerShot G6"),
+        0x02720000 => Some("PowerShot S70"),
+        0x02890000 => Some("PowerShot A620"),
+        0x02950000 => Some("PowerShot G7"),
+        0x03110000 => Some("PowerShot G9"),
+        0x03190000 => Some("PowerShot G10"),
+        0x03320000 => Some("PowerShot G11"),
+        0x03340000 => Some("PowerShot S90"),
+        0x03390000 => Some("PowerShot SX1 IS"),
+        0x03540000 => Some("PowerShot G12"),
+        0x03640000 => Some("PowerShot G1 X"),
+        0x03950000 => Some("PowerShot S110"),
+        0x04040000 => Some("PowerShot G15"),
+        0x04060000 => Some("PowerShot G16"),
+        0x04180000 => Some("PowerShot G1 X Mark II"),
+        0x04350000 => Some("PowerShot G7 X"),
+        0x04370000 => Some("PowerShot G3 X"),
+        0x04380000 => Some("PowerShot G9 X"),
+        0x04420000 => Some("PowerShot G5 X"),
+        0x04470000 => Some("PowerShot G7 X Mark II"),
+        0x04510000 => Some("PowerShot G1 X Mark III"),
+        0x04560000 => Some("PowerShot G9 X Mark II"),
+        0x04620000 => Some("PowerShot SX60 HS"),
+        _ => None,
+    }
+}
+
 /// Get the name of a Canon MakerNote tag
 pub fn get_canon_tag_name(tag_id: u16) -> Option<&'static str> {
     match tag_id {
@@ -145,7 +247,7 @@ pub fn get_canon_tag_name(tag_id: u16) -> Option<&'static str> {
         CANON_MODIFIED_INFO => Some("ModifiedInfo"),
         CANON_TONE_CURVE_MATCHING => Some("ToneCurveMatching"),
         CANON_WHITE_BALANCE_MATCHING => Some("WhiteBalanceMatching"),
-        CANON_COLOR_SPACE => Some("ColorSpace"),
+        CANON_COLOR_SPACE => Some("CanonColorSpace"),
         CANON_PREVIEW_IMAGE_INFO => Some("PreviewImageInfo"),
         CANON_VRD_OFFSET => Some("VRDOffset"),
         CANON_SENSOR_INFO => Some("SensorInfo"),
@@ -361,6 +463,529 @@ fn parse_ifd_entry(
     Some((tag_id, value))
 }
 
+/// Decode Canon CameraSettings array sub-fields
+///
+/// This function decodes the CanonCameraSettings array into individual fields
+/// that can be easily interpreted.
+pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Macro mode (index 1)
+    if data.len() > 1 {
+        let macro_mode = match data[1] {
+            1 => "Macro",
+            2 => "Normal",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "MacroMode".to_string(),
+            ExifValue::Ascii(macro_mode.to_string()),
+        );
+    }
+
+    // Self timer (index 2)
+    if data.len() > 2 {
+        let self_timer = if data[2] == 0 {
+            "Off".to_string()
+        } else {
+            // Value is in 1/10 seconds
+            format!("{} s", data[2] as f64 / 10.0)
+        };
+        decoded.insert("SelfTimer".to_string(), ExifValue::Ascii(self_timer));
+    }
+
+    // Quality (index 3)
+    if data.len() > 3 {
+        let quality = match data[3] {
+            1 => "Economy",
+            2 => "Normal",
+            3 => "Fine",
+            4 => "RAW",
+            5 => "Superfine",
+            130 => "Normal Movie",
+            _ => "Unknown",
+        };
+        decoded.insert("Quality".to_string(), ExifValue::Ascii(quality.to_string()));
+    }
+
+    // Flash mode (index 4)
+    if data.len() > 4 {
+        let flash_mode = match data[4] {
+            0 => "Flash Not Fired",
+            1 => "Auto",
+            2 => "On",
+            3 => "Red-eye reduction",
+            4 => "Slow-sync",
+            5 => "Auto + Red-eye reduction",
+            6 => "On + Red-eye reduction",
+            16 => "External flash",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FlashMode".to_string(),
+            ExifValue::Ascii(flash_mode.to_string()),
+        );
+    }
+
+    // Drive mode (index 5)
+    if data.len() > 5 {
+        let drive_mode = match data[5] {
+            0 => "Single-frame Shooting",
+            1 => "Continuous Shooting",
+            2 => "Movie",
+            3 => "Continuous, Speed Priority",
+            4 => "Continuous, Low",
+            5 => "Continuous, High",
+            6 => "Silent Single Shooting",
+            9 => "Single-frame Shooting, Silent",
+            10 => "Continuous Shooting, Silent",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "DriveMode".to_string(),
+            ExifValue::Ascii(drive_mode.to_string()),
+        );
+    }
+
+    // Focus mode (index 7)
+    if data.len() > 7 {
+        let focus_mode = match data[7] {
+            0 => "One-shot AF",
+            1 => "AI Servo AF",
+            2 => "AI Focus AF",
+            3 => "Manual Focus",
+            4 => "Single",
+            5 => "Continuous",
+            6 => "Manual Focus",
+            16 => "Pan Focus",
+            256 => "Manual",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FocusMode".to_string(),
+            ExifValue::Ascii(focus_mode.to_string()),
+        );
+    }
+
+    // AF assist beam (index 10)
+    if data.len() > 10 {
+        let af_assist = match data[10] {
+            0 => "Off",
+            1 => "On (Auto)",
+            2 => "On",
+            0xFFFF => "n/a",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "AFAssistBeam".to_string(),
+            ExifValue::Ascii(af_assist.to_string()),
+        );
+    }
+
+    // Metering mode (index 17)
+    if data.len() > 17 {
+        let metering_mode = match data[17] {
+            3 => "Evaluative",
+            4 => "Partial",
+            5 => "Center-weighted average",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "MeteringMode".to_string(),
+            ExifValue::Ascii(metering_mode.to_string()),
+        );
+    }
+
+    // Focus range (index 18)
+    if data.len() > 18 {
+        let focus_range = match data[18] {
+            0 => "Manual",
+            1 => "Auto",
+            2 => "Not Known",
+            3 => "Macro",
+            7 => "Very Close",
+            8 => "Close",
+            9 => "Middle Range",
+            10 => "Far Range",
+            11 => "Pan Focus",
+            14 => "Super Macro",
+            15 => "Infinity",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FocusRange".to_string(),
+            ExifValue::Ascii(focus_range.to_string()),
+        );
+    }
+
+    // Exposure mode (index 20)
+    if data.len() > 20 {
+        let exposure_mode = match data[20] {
+            0 => "Easy",
+            1 => "Program AE",
+            2 => "Shutter speed priority AE",
+            3 => "Aperture-priority AE",
+            4 => "Manual",
+            5 => "Depth-of-field AE",
+            6 => "M-Dep",
+            7 => "Bulb",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "ExposureMode".to_string(),
+            ExifValue::Ascii(exposure_mode.to_string()),
+        );
+    }
+
+    // Focal units per mm (index 25) - needed for calculating actual focal lengths
+    let focal_units = if data.len() > 25 && data[25] > 0 {
+        data[25] as f64
+    } else {
+        1.0
+    };
+
+    // Max focal length (index 23)
+    if data.len() > 23 {
+        let fl = data[23] as f64 / focal_units;
+        decoded.insert(
+            "MaxFocalLength".to_string(),
+            ExifValue::Ascii(format!("{} mm", fl as u32)),
+        );
+    }
+
+    // Min focal length (index 24)
+    if data.len() > 24 {
+        let fl = data[24] as f64 / focal_units;
+        decoded.insert(
+            "MinFocalLength".to_string(),
+            ExifValue::Ascii(format!("{} mm", fl as u32)),
+        );
+    }
+
+    // Max aperture (index 26) - Convert Canon aperture value to f-number
+    if data.len() > 26 && data[26] > 0 {
+        let apex = data[26] as f64 / 32.0;
+        let f_number = 2f64.powf(apex / 2.0);
+        let rounded = (f_number * 10.0).round() / 10.0;
+        decoded.insert(
+            "MaxAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
+        );
+    }
+
+    // Min aperture (index 27) - Convert Canon aperture value to f-number
+    if data.len() > 27 && data[27] > 0 {
+        let apex = data[27] as f64 / 32.0;
+        let f_number = 2f64.powf(apex / 2.0);
+        let rounded = (f_number * 10.0).round() / 10.0;
+        decoded.insert(
+            "MinAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon ShotInfo array sub-fields
+///
+/// This function decodes the CanonShotInfo array into individual fields
+/// that can be easily interpreted.
+pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Auto ISO (index 1)
+    if data.len() > 1 {
+        decoded.insert("AutoISO".to_string(), ExifValue::Short(vec![data[1]]));
+    }
+
+    // Base ISO (index 2)
+    if data.len() > 2 {
+        decoded.insert("BaseISO".to_string(), ExifValue::Short(vec![data[2]]));
+    }
+
+    // Measured EV (index 3) - Canon APEX value, stored as value/32 with +5.0 offset
+    // MeasuredEV represents the metered exposure value
+    // ExifTool uses: MeasuredEV = (raw / 32.0) + 5.0
+    if data.len() > 3 {
+        let raw = data[3] as i16; // Treat as signed for negative EV values
+        let ev = (raw as f64 / 32.0) + 5.0;
+        decoded.insert(
+            "MeasuredEV".to_string(),
+            ExifValue::Ascii(format!("{:.2}", ev)),
+        );
+    }
+
+    // Target aperture (index 4) - Canon APEX aperture value
+    // f-number = 2^(value/64)
+    if data.len() > 4 && data[4] > 0 {
+        let apex = data[4] as f64 / 64.0;
+        let f_number = 2f64.powf(apex);
+        let rounded = (f_number * 10.0).round() / 10.0;
+        decoded.insert(
+            "TargetAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
+        );
+    }
+
+    // Target exposure time (index 5) - Canon APEX time value
+    // exposure time = 2^(-value/32), displayed as fraction
+    if data.len() > 5 && data[5] > 0 {
+        let apex = data[5] as f64 / 32.0;
+        let time = 2f64.powf(-apex);
+        // Format as fraction if less than 1 second
+        let formatted = if time < 1.0 {
+            let denominator = (1.0 / time).round() as u32;
+            format!("1/{}", denominator)
+        } else {
+            format!("{}", time.round() as u32)
+        };
+        decoded.insert(
+            "TargetExposureTime".to_string(),
+            ExifValue::Ascii(formatted),
+        );
+    }
+
+    // White balance (index 7)
+    if data.len() > 7 {
+        let wb = match data[7] {
+            0 => "Auto",
+            1 => "Daylight",
+            2 => "Cloudy",
+            3 => "Tungsten",
+            4 => "Fluorescent",
+            5 => "Flash",
+            6 => "Custom",
+            7 => "Black & White",
+            8 => "Shade",
+            9 => "Manual Temperature",
+            10 => "PC Set1",
+            11 => "PC Set2",
+            12 => "PC Set3",
+            14 => "Daylight Fluorescent",
+            15 => "Custom 1",
+            16 => "Custom 2",
+            17 => "Underwater",
+            _ => "Unknown",
+        };
+        decoded.insert("WhiteBalance".to_string(), ExifValue::Ascii(wb.to_string()));
+    }
+
+    // Sequence number (index 9)
+    if data.len() > 9 {
+        decoded.insert(
+            "SequenceNumber".to_string(),
+            ExifValue::Short(vec![data[9]]),
+        );
+    }
+
+    // Flash exposure compensation (index 15)
+    if data.len() > 15 {
+        decoded.insert(
+            "FlashExposureComp".to_string(),
+            ExifValue::Short(vec![data[15]]),
+        );
+    }
+
+    // Auto exposure bracketing (index 16)
+    if data.len() > 16 {
+        let aeb = match data[16] {
+            0xFFFF | 0 => "Off",
+            1 => "On",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "AEBBracketValue".to_string(),
+            ExifValue::Ascii(aeb.to_string()),
+        );
+    }
+
+    // Subject distance (index 19)
+    if data.len() > 19 {
+        decoded.insert(
+            "SubjectDistance".to_string(),
+            ExifValue::Short(vec![data[19]]),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon FocalLength array sub-fields
+///
+/// This function decodes the CanonFocalLength array into individual fields
+/// that can be easily interpreted.
+pub fn decode_focal_length(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Focal type (index 0)
+    if !data.is_empty() {
+        let focal_type = match data[0] {
+            0 => "n/a",
+            1 => "Fixed",
+            2 => "Zoom",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FocalType".to_string(),
+            ExifValue::Ascii(focal_type.to_string()),
+        );
+    }
+
+    // Focal length (index 1)
+    // Canon stores focal length multiplied by FocalUnits (typically 1)
+    // Exiftool shows this as "55.0 mm" format
+    if data.len() > 1 {
+        let fl = data[1] as f64;
+        decoded.insert(
+            "FocalLength".to_string(),
+            ExifValue::Ascii(format!("{:.1} mm", fl)),
+        );
+    }
+
+    // Note: FocalPlaneXSize and FocalPlaneYSize are derived fields that exiftool
+    // calculates from sensor dimensions and FocalPlaneResolution, not from this array.
+    // We skip indices 2 and 3 as their raw values don't match exiftool's output format.
+
+    decoded
+}
+
+/// Decode Canon FileInfo array sub-fields
+///
+/// This function decodes the CanonFileInfo array into individual fields
+/// that can be easily interpreted.
+pub fn decode_file_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // File number (index 1)
+    if data.len() > 1 {
+        decoded.insert("FileNumber".to_string(), ExifValue::Short(vec![data[1]]));
+    }
+
+    // Bracket mode (index 3)
+    if data.len() > 3 {
+        let bracket_mode = match data[3] {
+            0 => "Off",
+            1 => "AEB",
+            2 => "FEB",
+            3 => "ISO",
+            4 => "WB",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "BracketMode".to_string(),
+            ExifValue::Ascii(bracket_mode.to_string()),
+        );
+    }
+
+    // Bracket value (index 4)
+    if data.len() > 4 {
+        decoded.insert("BracketValue".to_string(), ExifValue::Short(vec![data[4]]));
+    }
+
+    // Bracket shot number (index 5)
+    if data.len() > 5 {
+        decoded.insert(
+            "BracketShotNumber".to_string(),
+            ExifValue::Short(vec![data[5]]),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon AFInfo2 array sub-fields
+///
+/// This function decodes the CanonAFInfo2 array which contains AF area information.
+pub fn decode_af_info2(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // AF area mode (index 0)
+    if !data.is_empty() {
+        let af_mode = match data[0] {
+            0 => "Off (Manual Focus)",
+            1 => "AF Point Expansion (surround)",
+            2 => "Single-point AF",
+            4 => "Auto",
+            5 => "Face Detect AF",
+            6 => "Face + Tracking",
+            7 => "Zone AF",
+            8 => "AF Point Expansion (4 point)",
+            9 => "Spot AF",
+            10 => "AF Point Expansion (8 point)",
+            11 => "Flexizone Multi",
+            13 => "Flexizone Single",
+            14 => "Large Zone AF",
+            // Compact camera modes
+            0x0060 => "Face AiAF",
+            0x1001 => "Single-point AF (Compact)",
+            0x1002 => "Tracking AF (Compact)",
+            0x1003 => "Face + Tracking (Compact)",
+            0xFFFF => "n/a",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "AFAreaMode".to_string(),
+            ExifValue::Ascii(af_mode.to_string()),
+        );
+    }
+
+    // Number of AF points (index 1)
+    if data.len() > 1 {
+        let num_af_points = data[1];
+        decoded.insert(
+            "NumAFPoints".to_string(),
+            ExifValue::Short(vec![num_af_points]),
+        );
+
+        // AF area widths (index 2 onwards, based on num_af_points)
+        let mut widths = Vec::new();
+        let mut heights = Vec::new();
+        let mut x_positions = Vec::new();
+        let mut y_positions = Vec::new();
+
+        for i in 0..num_af_points as usize {
+            // Widths start at index 2
+            if data.len() > 2 + i {
+                widths.push(data[2 + i]);
+            }
+            // Heights start after widths
+            if data.len() > 2 + num_af_points as usize + i {
+                heights.push(data[2 + num_af_points as usize + i]);
+            }
+            // X positions start after heights
+            if data.len() > 2 + 2 * num_af_points as usize + i {
+                x_positions.push(data[2 + 2 * num_af_points as usize + i]);
+            }
+            // Y positions start after X positions
+            if data.len() > 2 + 3 * num_af_points as usize + i {
+                y_positions.push(data[2 + 3 * num_af_points as usize + i]);
+            }
+        }
+
+        if !widths.is_empty() {
+            decoded.insert("AFAreaWidths".to_string(), ExifValue::Short(widths));
+        }
+        if !heights.is_empty() {
+            decoded.insert("AFAreaHeights".to_string(), ExifValue::Short(heights));
+        }
+        if !x_positions.is_empty() {
+            decoded.insert(
+                "AFAreaXPositions".to_string(),
+                ExifValue::Short(x_positions),
+            );
+        }
+        if !y_positions.is_empty() {
+            decoded.insert(
+                "AFAreaYPositions".to_string(),
+                ExifValue::Short(y_positions),
+            );
+        }
+    }
+
+    decoded
+}
+
 /// Parse Canon maker notes
 ///
 /// Canon maker notes use TIFF-relative offsets, so we need access to the full
@@ -387,6 +1012,9 @@ pub fn parse_canon_maker_notes(
     }
 
     // Parse each IFD entry (12 bytes each)
+    // We use a counter for synthetic tag IDs for decoded sub-fields
+    let mut synthetic_tag_id = 0xF000u16;
+
     for i in 0..num_entries {
         let entry_offset = 2 + i * 12;
 
@@ -401,12 +1029,126 @@ pub fn parse_canon_maker_notes(
                 continue;
             }
 
+            // Check if this is a tag we can decode into sub-fields
+            let should_decode = matches!(
+                tag_id,
+                CANON_CAMERA_SETTINGS
+                    | CANON_SHOT_INFO
+                    | CANON_FOCAL_LENGTH
+                    | CANON_FILE_INFO
+                    | CANON_AF_INFO_2
+            );
+
+            if should_decode {
+                if let ExifValue::Short(ref shorts) = value {
+                    let decoded = match tag_id {
+                        CANON_CAMERA_SETTINGS => decode_camera_settings(shorts),
+                        CANON_SHOT_INFO => decode_shot_info(shorts),
+                        CANON_FOCAL_LENGTH => decode_focal_length(shorts),
+                        CANON_FILE_INFO => decode_file_info(shorts),
+                        CANON_AF_INFO_2 => decode_af_info2(shorts),
+                        _ => HashMap::new(),
+                    };
+
+                    // Insert each decoded sub-field as a separate tag
+                    for (field_name, field_value) in decoded {
+                        tags.insert(
+                            synthetic_tag_id,
+                            MakerNoteTag {
+                                tag_id: synthetic_tag_id,
+                                tag_name: Some(Box::leak(field_name.into_boxed_str())),
+                                value: field_value,
+                            },
+                        );
+                        synthetic_tag_id = synthetic_tag_id.wrapping_add(1);
+                    }
+                    // Skip inserting the raw array
+                    continue;
+                }
+            }
+
+            // Special handling for specific tags
+            let final_value = match tag_id {
+                // CanonModelID - convert to model name string
+                CANON_MODEL_ID => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            if let Some(name) = get_canon_model_name(longs[0]) {
+                                ExifValue::Ascii(name.to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // FirmwareRevision - decode version bytes: 0xAABBCCDD -> "A.BB rev C.DD"
+                CANON_FIRMWARE_REVISION => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            let v = longs[0];
+                            let major = (v >> 24) & 0xFF;
+                            let minor = (v >> 16) & 0xFF;
+                            let rev = (v >> 8) & 0xFF;
+                            let sub_rev = v & 0xFF;
+                            ExifValue::Ascii(format!(
+                                "{}.{:02} rev {}.{:02}",
+                                major, minor, rev, sub_rev
+                            ))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // ImageUniqueID - convert byte array to hex string
+                CANON_IMAGE_UNIQUE_ID => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        if bytes.len() == 16 {
+                            let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                            ExifValue::Ascii(hex)
+                        } else {
+                            value
+                        }
+                    } else if let ExifValue::Byte(ref bytes) = value {
+                        if bytes.len() == 16 {
+                            let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                            ExifValue::Ascii(hex)
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // FileNumber - format as "XXX-YYYY" from numeric value
+                CANON_FILE_NUMBER => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            let v = longs[0];
+                            let dir = v / 10000;
+                            let file = v % 10000;
+                            ExifValue::Ascii(format!("{}-{:04}", dir, file))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                _ => value,
+            };
+
             tags.insert(
                 tag_id,
                 MakerNoteTag {
                     tag_id,
                     tag_name: get_canon_tag_name(tag_id),
-                    value,
+                    value: final_value,
                 },
             );
         }

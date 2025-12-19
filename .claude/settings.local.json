@@ -13,7 +13,16 @@
       "Bash(nice -n 19 cargo clippy:*)",
       "Bash(gh run:*)",
       "Bash(./bin/ccc:*)",
-      "Bash(./build-wasm.sh:*)"
+      "Bash(./build-wasm.sh:*)",
+      "Bash(cargo run:*)",
+      "Bash(xxd:*)",
+      "Bash(find:*)",
+      "Bash(/home/pgray/fpexif/target/debug/fpexif exiftool:*)",
+      "Bash(python3:*)",
+      "Bash(ls:*)",
+      "Bash(timeout 15 cargo test:*)",
+      "Bash(FPEXIF_TEST_FILES=/fpexif/raws cargo test:*)",
+      "Bash(tee:*)"
     ],
     "deny": [],
     "ask": []
