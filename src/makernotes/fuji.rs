@@ -3,7 +3,7 @@
 use crate::data_types::{Endianness, ExifValue};
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -118,12 +118,12 @@ pub fn parse_fuji_maker_notes(
     }
 
     // Fuji maker notes start with "FUJIFILM" header (8 bytes)
-    // followed by offset to IFD (4 bytes, big-endian)
+    // followed by offset to IFD (4 bytes, little-endian)
     if data.len() >= 12 && &data[0..8] == b"FUJIFILM" {
-        // Read IFD offset (big-endian)
+        // Read IFD offset (little-endian)
         let mut cursor = Cursor::new(&data[8..12]);
         let ifd_offset = cursor
-            .read_u32::<BigEndian>()
+            .read_u32::<LittleEndian>()
             .map_err(|_| ExifError::Format("Failed to read Fuji IFD offset".to_string()))?
             as usize;
 
@@ -140,9 +140,9 @@ pub fn parse_fuji_maker_notes(
 
         let mut cursor = Cursor::new(ifd_data);
 
-        // Read number of entries (always big-endian for Fuji)
+        // Read number of entries (always little-endian for Fuji)
         let num_entries = cursor
-            .read_u16::<BigEndian>()
+            .read_u16::<LittleEndian>()
             .map_err(|_| ExifError::Format("Failed to read Fuji maker note count".to_string()))?;
 
         // Parse each entry
@@ -151,22 +151,22 @@ pub fn parse_fuji_maker_notes(
                 break;
             }
 
-            let tag_id = match cursor.read_u16::<BigEndian>() {
+            let tag_id = match cursor.read_u16::<LittleEndian>() {
                 Ok(id) => id,
                 Err(_) => break,
             };
 
-            let data_type = match cursor.read_u16::<BigEndian>() {
+            let data_type = match cursor.read_u16::<LittleEndian>() {
                 Ok(dt) => dt,
                 Err(_) => break,
             };
 
-            let count = match cursor.read_u32::<BigEndian>() {
+            let count = match cursor.read_u32::<LittleEndian>() {
                 Ok(c) => c,
                 Err(_) => break,
             };
 
-            let value_offset = match cursor.read_u32::<BigEndian>() {
+            let value_offset = match cursor.read_u32::<LittleEndian>() {
                 Ok(o) => o,
                 Err(_) => break,
             };
@@ -219,7 +219,7 @@ pub fn parse_fuji_maker_notes(
                             let mut values = Vec::new();
                             let mut cursor = Cursor::new(&data[offset..]);
                             for _ in 0..count {
-                                if let Ok(v) = cursor.read_u16::<BigEndian>() {
+                                if let Ok(v) = cursor.read_u16::<LittleEndian>() {
                                     values.push(v);
                                 } else {
                                     break;
@@ -241,7 +241,7 @@ pub fn parse_fuji_maker_notes(
                             let mut values = Vec::new();
                             let mut cursor = Cursor::new(&data[offset..]);
                             for _ in 0..count {
-                                if let Ok(v) = cursor.read_u32::<BigEndian>() {
+                                if let Ok(v) = cursor.read_u32::<LittleEndian>() {
                                     values.push(v);
                                 } else {
                                     break;

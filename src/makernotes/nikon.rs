@@ -79,6 +79,56 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
+/// Decode Nikon ASCII tag values to human-readable strings
+fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
+    match tag_id {
+        NIKON_QUALITY => match value.trim() {
+            "RAW" => "RAW",
+            "FINE" => "Fine",
+            "NORMAL" => "Normal",
+            "BASIC" => "Basic",
+            "RAW+FINE" | "RAW + FINE" => "RAW + Fine",
+            "RAW+NORMAL" | "RAW + NORMAL" => "RAW + Normal",
+            "RAW+BASIC" | "RAW + BASIC" => "RAW + Basic",
+            _ => value.trim(),
+        }
+        .to_string(),
+        NIKON_WHITE_BALANCE => match value.trim() {
+            "AUTO" | "AUTO1" | "AUTO2" => "Auto",
+            "SUNNY" | "DIRECT SUNLIGHT" => "Daylight",
+            "SHADE" => "Shade",
+            "CLOUDY" => "Cloudy",
+            "TUNGSTEN" | "INCANDESCENT" => "Tungsten",
+            "FLUORESCENT" => "Fluorescent",
+            "FLASH" => "Flash",
+            "PRESET" => "Preset",
+            _ => value.trim(),
+        }
+        .to_string(),
+        NIKON_FOCUS_MODE => match value.trim() {
+            "AF-S" => "AF-S",
+            "AF-C" => "AF-C",
+            "AF-A" => "AF-A",
+            "MF" | "MANUAL" => "Manual",
+            _ => value.trim(),
+        }
+        .to_string(),
+        NIKON_SHARPNESS => match value.trim() {
+            "AUTO" => "Auto",
+            "NORMAL" => "Normal",
+            "LOW" => "Low",
+            "MED.L" | "MEDIUM LOW" => "Medium Low",
+            "MED.H" | "MEDIUM HIGH" => "Medium High",
+            "HIGH" => "High",
+            "NONE" => "None",
+            _ => value.trim(),
+        }
+        .to_string(),
+        NIKON_COLOR_MODE => value.trim().to_string(),
+        _ => value.trim().to_string(),
+    }
+}
+
 /// Parse Nikon maker notes
 pub fn parse_nikon_maker_notes(
     data: &[u8],
@@ -144,14 +194,98 @@ pub fn parse_nikon_maker_notes(
         }
         .ok();
 
-        if let (Some(tag_id), Some(tag_type), Some(count), Some(_value_offset)) =
+        if let (Some(tag_id), Some(tag_type), Some(count), Some(value_offset)) =
             (tag_id, tag_type, count, value_offset)
         {
+            // Calculate value size in bytes
+            let value_size = match tag_type {
+                1 => count as usize,     // BYTE
+                2 => count as usize,     // ASCII
+                3 => count as usize * 2, // SHORT
+                4 => count as usize * 4, // LONG
+                5 => count as usize * 8, // RATIONAL
+                7 => count as usize,     // UNDEFINED
+                _ => 0,
+            };
+
+            // Determine if value is inline or at offset
+            let value_bytes = if value_size <= 4 {
+                // Inline value in the value_offset field
+                match endian {
+                    Endianness::Little => value_offset.to_le_bytes().to_vec(),
+                    Endianness::Big => value_offset.to_be_bytes().to_vec(),
+                }
+            } else {
+                // Value at offset
+                let abs_offset = offset + value_offset as usize;
+                if abs_offset + value_size <= data.len() {
+                    data[abs_offset..abs_offset + value_size].to_vec()
+                } else {
+                    continue;
+                }
+            };
+
+            // Parse the value based on type
             let value = match tag_type {
-                2 => ExifValue::Ascii(format!("Nikon tag 0x{:04X}", tag_id)),
-                3 => ExifValue::Short(vec![0]),
-                4 => ExifValue::Long(vec![count]),
-                _ => ExifValue::Undefined(vec![]),
+                1 => {
+                    // BYTE
+                    ExifValue::Byte(value_bytes[..count as usize].to_vec())
+                }
+                2 => {
+                    // ASCII
+                    let s = String::from_utf8_lossy(&value_bytes[..count as usize])
+                        .trim_end_matches('\0')
+                        .to_string();
+                    // Apply value decoders for specific tags
+                    let decoded = decode_nikon_ascii_value(tag_id, &s);
+                    ExifValue::Ascii(decoded)
+                }
+                3 => {
+                    // SHORT
+                    let mut values = Vec::new();
+                    let mut cursor = Cursor::new(&value_bytes);
+                    for _ in 0..count {
+                        if let Ok(v) = match endian {
+                            Endianness::Little => cursor.read_u16::<LittleEndian>(),
+                            Endianness::Big => cursor.read_u16::<BigEndian>(),
+                        } {
+                            values.push(v);
+                        } else {
+                            break;
+                        }
+                    }
+                    // Special handling for ISO tag
+                    if tag_id == NIKON_ISO_SETTING && values.len() >= 2 {
+                        let iso = if values[1] > 0 { values[1] } else { values[0] };
+                        ExifValue::Ascii(iso.to_string())
+                    } else {
+                        ExifValue::Short(values)
+                    }
+                }
+                4 => {
+                    // LONG
+                    let mut values = Vec::new();
+                    let mut cursor = Cursor::new(&value_bytes);
+                    for _ in 0..count {
+                        if let Ok(v) = match endian {
+                            Endianness::Little => cursor.read_u32::<LittleEndian>(),
+                            Endianness::Big => cursor.read_u32::<BigEndian>(),
+                        } {
+                            values.push(v);
+                        } else {
+                            break;
+                        }
+                    }
+                    ExifValue::Long(values)
+                }
+                7 => {
+                    // UNDEFINED - keep as binary
+                    ExifValue::Undefined(value_bytes)
+                }
+                _ => {
+                    // Unsupported type
+                    continue;
+                }
             };
 
             tags.insert(
