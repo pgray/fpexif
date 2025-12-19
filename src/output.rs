@@ -222,6 +222,15 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
     }
 }
 
+/// Tags that should be formatted as space-separated strings instead of JSON arrays
+fn should_format_as_space_separated(tag_id: u16) -> bool {
+    matches!(
+        tag_id,
+        0x0102 // BitsPerSample
+        | 0x0013 // ThumbnailImageValidArea (Canon)
+    )
+}
+
 /// Convert an ExifValue to a JSON value in exiftool-compatible format
 #[cfg(feature = "serde")]
 pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
@@ -269,11 +278,47 @@ pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
         }
 
         // Multi-value arrays
-        ExifValue::Byte(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-        ExifValue::Short(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
+        ExifValue::Byte(v) => {
+            // GPSVersionID (0x0000) should be formatted as "2.2.0.0"
+            if tag_id == 0x0000 && v.len() == 4 {
+                Value::String(format!("{}.{}.{}.{}", v[0], v[1], v[2], v[3]))
+            } else if should_format_as_space_separated(tag_id) {
+                Value::String(
+                    v.iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
+            } else {
+                Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
+            }
+        }
+        ExifValue::Short(v) => {
+            if should_format_as_space_separated(tag_id) {
+                Value::String(
+                    v.iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
+            } else {
+                Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
+            }
+        }
         ExifValue::Long(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
         ExifValue::SByte(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-        ExifValue::SShort(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
+        ExifValue::SShort(v) => {
+            if should_format_as_space_separated(tag_id) {
+                Value::String(
+                    v.iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
+            } else {
+                Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
+            }
+        }
         ExifValue::SLong(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
 
         // Multi-value Float/Double

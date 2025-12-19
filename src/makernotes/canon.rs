@@ -85,6 +85,108 @@ pub const CANON_FILTER_INFO: u16 = 0x4024;
 pub const CANON_HDR_INFO: u16 = 0x4025;
 pub const CANON_AF_CONFIG: u16 = 0x4028;
 
+/// Get the Canon model name from model ID
+pub fn get_canon_model_name(model_id: u32) -> Option<&'static str> {
+    match model_id {
+        // EOS DSLRs
+        0x80000001 => Some("EOS-1D"),
+        0x80000167 => Some("EOS-1DS"),
+        0x80000168 => Some("EOS 10D"),
+        0x80000169 => Some("EOS-1D Mark III"),
+        0x80000170 => Some("EOS Digital Rebel / 300D / Kiss Digital"),
+        0x80000174 => Some("EOS-1D Mark II"),
+        0x80000175 => Some("EOS 20D"),
+        0x80000176 => Some("EOS Digital Rebel XSi / 450D / Kiss X2"),
+        0x80000188 => Some("EOS-1Ds Mark II"),
+        0x80000189 => Some("EOS Digital Rebel XT / 350D / Kiss Digital N"),
+        0x80000190 => Some("EOS 40D"),
+        0x80000213 => Some("EOS 5D"),
+        0x80000215 => Some("EOS-1Ds Mark III"),
+        0x80000218 => Some("EOS 5D Mark II"),
+        0x80000232 => Some("EOS-1D Mark II N"),
+        0x80000234 => Some("EOS 30D"),
+        0x80000236 => Some("EOS Digital Rebel XTi / 400D / Kiss Digital X"),
+        0x80000250 => Some("EOS 7D"),
+        0x80000252 => Some("EOS Rebel T1i / 500D / Kiss X3"),
+        0x80000254 => Some("EOS Rebel XS / 1000D / Kiss F"),
+        0x80000261 => Some("EOS 50D"),
+        0x80000269 => Some("EOS-1D X"),
+        0x80000270 => Some("EOS Rebel T2i / 550D / Kiss X4"),
+        0x80000271 => Some("EOS-1D Mark IV"),
+        0x80000281 => Some("EOS 5D Mark III"),
+        0x80000285 => Some("EOS Rebel T3i / 600D / Kiss X5"),
+        0x80000286 => Some("EOS 60D"),
+        0x80000287 => Some("EOS Rebel T3 / 1100D / Kiss X50"),
+        0x80000288 => Some("EOS 7D Mark II"),
+        0x80000289 => Some("EOS 5D Mark IV"),
+        0x80000301 => Some("EOS Rebel T4i / 650D / Kiss X6i"),
+        0x80000302 => Some("EOS 6D"),
+        0x80000324 => Some("EOS-1D C"),
+        0x80000325 => Some("EOS 70D"),
+        0x80000326 => Some("EOS Rebel T5i / 700D / Kiss X7i"),
+        0x80000327 => Some("EOS Rebel T5 / 1200D / Kiss X70"),
+        0x80000328 => Some("EOS-1D X Mark II"),
+        0x80000331 => Some("EOS M"),
+        0x80000346 => Some("EOS Rebel SL1 / 100D / Kiss X7"),
+        0x80000347 => Some("EOS Rebel T6s / 760D / 8000D"),
+        0x80000349 => Some("EOS 5DS"),
+        0x80000350 => Some("EOS 5DS R"),
+        0x80000355 => Some("EOS M2"),
+        0x80000382 => Some("EOS 80D"),
+        0x80000393 => Some("EOS Rebel T6i / 750D / Kiss X8i"),
+        0x80000401 => Some("EOS Rebel T6 / 1300D / Kiss X80"),
+        0x80000404 => Some("EOS M3"),
+        0x80000405 => Some("EOS M10"),
+        0x80000406 => Some("EOS Rebel T7i / 800D / Kiss X9i"),
+        0x80000408 => Some("EOS 77D / 9000D"),
+        0x80000417 => Some("EOS Rebel SL2 / 200D / Kiss X9"),
+        0x80000421 => Some("EOS 6D Mark II"),
+        0x80000422 => Some("EOS Rebel T7 / 2000D / Kiss X90"),
+        0x80000424 => Some("EOS M50 / Kiss M"),
+        0x80000428 => Some("EOS R"),
+        0x80000432 => Some("EOS RP"),
+        0x80000435 => Some("EOS Rebel SL3 / 250D / Kiss X10"),
+        0x80000436 => Some("EOS 90D"),
+        0x80000437 => Some("EOS M6 Mark II"),
+        0x80000450 => Some("EOS R5"),
+        0x80000453 => Some("EOS R6"),
+        0x80000464 => Some("EOS-1D X Mark III"),
+        0x80000468 => Some("EOS M50 Mark II / Kiss M2"),
+        // PowerShot models
+        0x01140000 => Some("PowerShot S30"),
+        0x01668000 => Some("PowerShot G2"),
+        0x01720000 => Some("PowerShot S40"),
+        0x01840000 => Some("PowerShot G3"),
+        0x02230000 => Some("PowerShot G5"),
+        0x02290000 => Some("PowerShot S50"),
+        0x02460000 => Some("PowerShot A75"),
+        0x02700000 => Some("PowerShot G6"),
+        0x02720000 => Some("PowerShot S70"),
+        0x02890000 => Some("PowerShot A620"),
+        0x02950000 => Some("PowerShot G7"),
+        0x03110000 => Some("PowerShot G9"),
+        0x03190000 => Some("PowerShot G10"),
+        0x03320000 => Some("PowerShot G11"),
+        0x03340000 => Some("PowerShot S90"),
+        0x03390000 => Some("PowerShot SX1 IS"),
+        0x03540000 => Some("PowerShot G12"),
+        0x03640000 => Some("PowerShot G1 X"),
+        0x03950000 => Some("PowerShot S110"),
+        0x04040000 => Some("PowerShot G15"),
+        0x04060000 => Some("PowerShot G16"),
+        0x04180000 => Some("PowerShot G1 X Mark II"),
+        0x04350000 => Some("PowerShot G7 X"),
+        0x04370000 => Some("PowerShot G3 X"),
+        0x04380000 => Some("PowerShot G9 X"),
+        0x04420000 => Some("PowerShot G5 X"),
+        0x04470000 => Some("PowerShot G7 X Mark II"),
+        0x04510000 => Some("PowerShot G1 X Mark III"),
+        0x04560000 => Some("PowerShot G9 X Mark II"),
+        0x04620000 => Some("PowerShot SX60 HS"),
+        _ => None,
+    }
+}
+
 /// Get the name of a Canon MakerNote tag
 pub fn get_canon_tag_name(tag_id: u16) -> Option<&'static str> {
     match tag_id {
@@ -145,7 +247,7 @@ pub fn get_canon_tag_name(tag_id: u16) -> Option<&'static str> {
         CANON_MODIFIED_INFO => Some("ModifiedInfo"),
         CANON_TONE_CURVE_MATCHING => Some("ToneCurveMatching"),
         CANON_WHITE_BALANCE_MATCHING => Some("WhiteBalanceMatching"),
-        CANON_COLOR_SPACE => Some("ColorSpace"),
+        CANON_COLOR_SPACE => Some("CanonColorSpace"),
         CANON_PREVIEW_IMAGE_INFO => Some("PreviewImageInfo"),
         CANON_VRD_OFFSET => Some("VRDOffset"),
         CANON_SENSOR_INFO => Some("SensorInfo"),
@@ -383,7 +485,13 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // Self timer (index 2)
     if data.len() > 2 {
-        decoded.insert("SelfTimer".to_string(), ExifValue::Short(vec![data[2]]));
+        let self_timer = if data[2] == 0 {
+            "Off".to_string()
+        } else {
+            // Value is in 1/10 seconds
+            format!("{} s", data[2] as f64 / 10.0)
+        };
+        decoded.insert("SelfTimer".to_string(), ExifValue::Ascii(self_timer));
     }
 
     // Quality (index 3)
@@ -422,15 +530,15 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
     // Drive mode (index 5)
     if data.len() > 5 {
         let drive_mode = match data[5] {
-            0 => "Single",
-            1 => "Continuous",
+            0 => "Single-frame Shooting",
+            1 => "Continuous Shooting",
             2 => "Movie",
             3 => "Continuous, Speed Priority",
             4 => "Continuous, Low",
             5 => "Continuous, High",
-            6 => "Silent Single",
-            9 => "Single, Silent",
-            10 => "Continuous, Silent",
+            6 => "Silent Single Shooting",
+            9 => "Single-frame Shooting, Silent",
+            10 => "Continuous Shooting, Silent",
             _ => "Unknown",
         };
         decoded.insert(
@@ -529,38 +637,51 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // Focal units per mm (index 25) - needed for calculating actual focal lengths
+    let focal_units = if data.len() > 25 && data[25] > 0 {
+        data[25] as f64
+    } else {
+        1.0
+    };
+
     // Max focal length (index 23)
     if data.len() > 23 {
+        let fl = data[23] as f64 / focal_units;
         decoded.insert(
             "MaxFocalLength".to_string(),
-            ExifValue::Short(vec![data[23]]),
+            ExifValue::Ascii(format!("{} mm", fl as u32)),
         );
     }
 
     // Min focal length (index 24)
     if data.len() > 24 {
+        let fl = data[24] as f64 / focal_units;
         decoded.insert(
             "MinFocalLength".to_string(),
-            ExifValue::Short(vec![data[24]]),
+            ExifValue::Ascii(format!("{} mm", fl as u32)),
         );
     }
 
-    // Focal units per mm (index 25)
-    if data.len() > 25 {
+    // Max aperture (index 26) - Convert Canon aperture value to f-number
+    if data.len() > 26 && data[26] > 0 {
+        let apex = data[26] as f64 / 32.0;
+        let f_number = 2f64.powf(apex / 2.0);
+        let rounded = (f_number * 10.0).round() / 10.0;
         decoded.insert(
-            "FocalUnitsPerMM".to_string(),
-            ExifValue::Short(vec![data[25]]),
+            "MaxAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
         );
     }
 
-    // Max aperture (index 26)
-    if data.len() > 26 {
-        decoded.insert("MaxAperture".to_string(), ExifValue::Short(vec![data[26]]));
-    }
-
-    // Min aperture (index 27)
-    if data.len() > 27 {
-        decoded.insert("MinAperture".to_string(), ExifValue::Short(vec![data[27]]));
+    // Min aperture (index 27) - Convert Canon aperture value to f-number
+    if data.len() > 27 && data[27] > 0 {
+        let apex = data[27] as f64 / 32.0;
+        let f_number = 2f64.powf(apex / 2.0);
+        let rounded = (f_number * 10.0).round() / 10.0;
+        decoded.insert(
+            "MinAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
+        );
     }
 
     decoded
@@ -691,25 +812,19 @@ pub fn decode_focal_length(data: &[u16]) -> HashMap<String, ExifValue> {
     }
 
     // Focal length (index 1)
+    // Canon stores focal length multiplied by FocalUnits (typically 1)
+    // Exiftool shows this as "55.0 mm" format
     if data.len() > 1 {
-        decoded.insert("FocalLength".to_string(), ExifValue::Short(vec![data[1]]));
-    }
-
-    // Focal plane X size (index 2)
-    if data.len() > 2 {
+        let fl = data[1] as f64;
         decoded.insert(
-            "FocalPlaneXSize".to_string(),
-            ExifValue::Short(vec![data[2]]),
+            "FocalLength".to_string(),
+            ExifValue::Ascii(format!("{:.1} mm", fl)),
         );
     }
 
-    // Focal plane Y size (index 3)
-    if data.len() > 3 {
-        decoded.insert(
-            "FocalPlaneYSize".to_string(),
-            ExifValue::Short(vec![data[3]]),
-        );
-    }
+    // Note: FocalPlaneXSize and FocalPlaneYSize are derived fields that exiftool
+    // calculates from sensor dimensions and FocalPlaneResolution, not from this array.
+    // We skip indices 2 and 3 as their raw values don't match exiftool's output format.
 
     decoded
 }
@@ -931,12 +1046,31 @@ pub fn parse_canon_maker_notes(
                 }
             }
 
+            // Special handling for CanonModelID - convert to model name string
+            let final_value = if tag_id == CANON_MODEL_ID {
+                if let ExifValue::Long(ref longs) = value {
+                    if !longs.is_empty() {
+                        if let Some(name) = get_canon_model_name(longs[0]) {
+                            ExifValue::Ascii(name.to_string())
+                        } else {
+                            value // Keep raw value if not in lookup table
+                        }
+                    } else {
+                        value
+                    }
+                } else {
+                    value
+                }
+            } else {
+                value
+            };
+
             tags.insert(
                 tag_id,
                 MakerNoteTag {
                     tag_id,
                     tag_name: get_canon_tag_name(tag_id),
-                    value,
+                    value: final_value,
                 },
             );
         }

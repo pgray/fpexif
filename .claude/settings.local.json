@@ -13,7 +13,9 @@
       "Bash(nice -n 19 cargo clippy:*)",
       "Bash(gh run:*)",
       "Bash(./bin/ccc:*)",
-      "Bash(./build-wasm.sh:*)"
+      "Bash(./build-wasm.sh:*)",
+      "Bash(cargo run:*)",
+      "Bash(xxd:*)"
     ],
     "deny": [],
     "ask": []
