@@ -704,24 +704,44 @@ pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
         decoded.insert("BaseISO".to_string(), ExifValue::Short(vec![data[2]]));
     }
 
-    // Measured EV (index 3)
+    // Measured EV (index 3) - Canon APEX value, stored as value/32
+    // MeasuredEV represents the metered exposure value
     if data.len() > 3 {
-        decoded.insert("MeasuredEV".to_string(), ExifValue::Short(vec![data[3]]));
-    }
-
-    // Target aperture (index 4)
-    if data.len() > 4 {
+        let raw = data[3] as i16; // Treat as signed for negative EV values
+        let ev = raw as f64 / 32.0;
         decoded.insert(
-            "TargetAperture".to_string(),
-            ExifValue::Short(vec![data[4]]),
+            "MeasuredEV".to_string(),
+            ExifValue::Ascii(format!("{:.2}", ev)),
         );
     }
 
-    // Target exposure time (index 5)
-    if data.len() > 5 {
+    // Target aperture (index 4) - Canon APEX aperture value
+    // f-number = 2^(value/64)
+    if data.len() > 4 && data[4] > 0 {
+        let apex = data[4] as f64 / 64.0;
+        let f_number = 2f64.powf(apex);
+        let rounded = (f_number * 10.0).round() / 10.0;
+        decoded.insert(
+            "TargetAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
+        );
+    }
+
+    // Target exposure time (index 5) - Canon APEX time value
+    // exposure time = 2^(-value/32), displayed as fraction
+    if data.len() > 5 && data[5] > 0 {
+        let apex = data[5] as f64 / 32.0;
+        let time = 2f64.powf(-apex);
+        // Format as fraction if less than 1 second
+        let formatted = if time < 1.0 {
+            let denominator = (1.0 / time).round() as u32;
+            format!("1/{}", denominator)
+        } else {
+            format!("{}", time.round() as u32)
+        };
         decoded.insert(
             "TargetExposureTime".to_string(),
-            ExifValue::Short(vec![data[5]]),
+            ExifValue::Ascii(formatted),
         );
     }
 
@@ -1046,23 +1066,80 @@ pub fn parse_canon_maker_notes(
                 }
             }
 
-            // Special handling for CanonModelID - convert to model name string
-            let final_value = if tag_id == CANON_MODEL_ID {
-                if let ExifValue::Long(ref longs) = value {
-                    if !longs.is_empty() {
-                        if let Some(name) = get_canon_model_name(longs[0]) {
-                            ExifValue::Ascii(name.to_string())
+            // Special handling for specific tags
+            let final_value = match tag_id {
+                // CanonModelID - convert to model name string
+                CANON_MODEL_ID => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            if let Some(name) = get_canon_model_name(longs[0]) {
+                                ExifValue::Ascii(name.to_string())
+                            } else {
+                                value
+                            }
                         } else {
-                            value // Keep raw value if not in lookup table
+                            value
                         }
                     } else {
                         value
                     }
-                } else {
-                    value
                 }
-            } else {
-                value
+                // FirmwareRevision - decode version bytes: 0xAABBCCDD -> "A.BB rev C.DD"
+                CANON_FIRMWARE_REVISION => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            let v = longs[0];
+                            let major = (v >> 24) & 0xFF;
+                            let minor = (v >> 16) & 0xFF;
+                            let rev = (v >> 8) & 0xFF;
+                            let sub_rev = v & 0xFF;
+                            ExifValue::Ascii(format!(
+                                "{}.{:02} rev {}.{:02}",
+                                major, minor, rev, sub_rev
+                            ))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // ImageUniqueID - convert byte array to hex string
+                CANON_IMAGE_UNIQUE_ID => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        if bytes.len() == 16 {
+                            let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                            ExifValue::Ascii(hex)
+                        } else {
+                            value
+                        }
+                    } else if let ExifValue::Byte(ref bytes) = value {
+                        if bytes.len() == 16 {
+                            let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                            ExifValue::Ascii(hex)
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // FileNumber - format as "XXX-YYYY" from numeric value
+                CANON_FILE_NUMBER => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            let v = longs[0];
+                            let dir = v / 10000;
+                            let file = v % 10000;
+                            ExifValue::Ascii(format!("{}-{:04}", dir, file))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                _ => value,
             };
 
             tags.insert(
