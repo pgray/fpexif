@@ -22,7 +22,9 @@
       "Bash(ls:*)",
       "Bash(timeout 15 cargo test:*)",
       "Bash(FPEXIF_TEST_FILES=/fpexif/raws cargo test:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(wc:*)",
+      "WebFetch(domain:exiftool.org)"
     ],
     "deny": [],
     "ask": []
