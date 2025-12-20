@@ -1,0 +1,5 @@
+# Baseline data files (generated, should not be committed)
+*.json
+
+# Keep the directory structure
+!.gitignore

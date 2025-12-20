@@ -684,6 +684,123 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // Camera ISO (index 16)
+    // Canon uses a special encoding: if bit 0x4000 is set, the lower 14 bits are the ISO value
+    // Otherwise it's a lookup table value (15=Auto, 16=50, 17=100, 18=200, 19=400, 20=800)
+    if data.len() > 16 && data[16] != 0x7FFF {
+        let raw_iso = data[16];
+        let iso_value = if raw_iso & 0x4000 != 0 {
+            // Direct ISO value in lower 14 bits
+            raw_iso & 0x3FFF
+        } else {
+            // Lookup table value
+            match raw_iso {
+                0 => 0,  // n/a
+                14 => 0, // Auto High (show as 0)
+                15 => 0, // Auto (show as 0)
+                16 => 50,
+                17 => 100,
+                18 => 200,
+                19 => 400,
+                20 => 800,
+                _ => raw_iso, // Unknown, return raw value
+            }
+        };
+        decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![iso_value]));
+    }
+
+    // Focal units per mm (index 25) - already calculated above as focal_units
+    if data.len() > 25 && data[25] > 0 {
+        decoded.insert(
+            "FocalUnits".to_string(),
+            ExifValue::Ascii(format!("{}/mm", data[25])),
+        );
+    }
+
+    // Flash activity (index 28)
+    if data.len() > 28 {
+        decoded.insert(
+            "FlashActivity".to_string(),
+            ExifValue::Short(vec![data[28]]),
+        );
+    }
+
+    // Flash bits (index 29)
+    if data.len() > 29 {
+        let bits = data[29];
+        let flash_bits_desc = if bits == 0 {
+            "(none)".to_string()
+        } else {
+            let mut descriptions = Vec::new();
+            if bits & 0x0001 != 0 {
+                descriptions.push("Manual");
+            }
+            if bits & 0x0002 != 0 {
+                descriptions.push("TTL");
+            }
+            if bits & 0x0004 != 0 {
+                descriptions.push("A-TTL");
+            }
+            if bits & 0x0008 != 0 {
+                descriptions.push("E-TTL");
+            }
+            if bits & 0x0010 != 0 {
+                descriptions.push("FP sync enabled");
+            }
+            if bits & 0x0080 != 0 {
+                descriptions.push("External");
+            } else if bits & 0x0040 != 0 {
+                descriptions.push("Internal");
+            }
+            if descriptions.is_empty() {
+                format!("Unknown (0x{:04x})", bits)
+            } else {
+                descriptions.join(", ")
+            }
+        };
+        decoded.insert("FlashBits".to_string(), ExifValue::Ascii(flash_bits_desc));
+    }
+
+    // Image stabilization (index 34)
+    if data.len() > 34 {
+        let is_value = data[34];
+        let is_desc = match is_value {
+            0 => "Off",
+            1 => "On",
+            2 => "Shoot Only",
+            3 => "Panning",
+            4 => "Dynamic",
+            256 => "Off (2)",
+            257 => "On (2)",
+            258 => "Shoot Only (2)",
+            259 => "Panning (2)",
+            260 => "Dynamic (2)",
+            0xFFFF => "n/a",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "ImageStabilization".to_string(),
+            ExifValue::Ascii(is_desc.to_string()),
+        );
+    }
+
+    // Manual flash output (index 41)
+    if data.len() > 41 {
+        let mfo = data[41];
+        let mfo_desc = match mfo {
+            0x0000 => "n/a",
+            0x0500 => "Full",
+            0x0502 => "Medium",
+            0x0504 => "Low",
+            0x7FFF => "n/a",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "ManualFlashOutput".to_string(),
+            ExifValue::Ascii(mfo_desc.to_string()),
+        );
+    }
+
     decoded
 }
 
@@ -800,6 +917,37 @@ pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // Exposure compensation (index 6)
+    if data.len() > 6 {
+        // Canon stores exposure compensation as a signed value
+        // The value needs to be divided by 32 to get the actual EV compensation
+        let raw = data[6] as i16;
+        let ev_comp = raw as f64 / 32.0;
+        decoded.insert(
+            "ExposureCompensation".to_string(),
+            ExifValue::Ascii(format!("{:+.1}", ev_comp)),
+        );
+    }
+
+    // Flash guide number (index 13)
+    if data.len() > 13 {
+        decoded.insert(
+            "FlashGuideNumber".to_string(),
+            ExifValue::Short(vec![data[13]]),
+        );
+    }
+
+    // Flash exposure compensation (index 15)
+    if data.len() > 15 {
+        // Similar to exposure compensation, divide by 32
+        let raw = data[15] as i16;
+        let flash_comp = raw as f64 / 32.0;
+        decoded.insert(
+            "FlashExposureComp".to_string(),
+            ExifValue::Ascii(format!("{:+.1}", flash_comp)),
+        );
+    }
+
     // Subject distance (index 19)
     if data.len() > 19 {
         decoded.insert(
@@ -843,9 +991,27 @@ pub fn decode_focal_length(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
-    // Note: FocalPlaneXSize and FocalPlaneYSize are derived fields that exiftool
-    // calculates from sensor dimensions and FocalPlaneResolution, not from this array.
-    // We skip indices 2 and 3 as their raw values don't match exiftool's output format.
+    // FocalPlaneXSize (index 2) - sensor width in mm
+    // Note: Only valid for some models, affected by digital zoom
+    // Value is stored in 1/1000 inch units, convert to mm using: value * 25.4 / 1000
+    if data.len() > 2 && data[2] > 0 {
+        let size_mm = data[2] as f64 * 25.4 / 1000.0;
+        decoded.insert(
+            "FocalPlaneXSize".to_string(),
+            ExifValue::Ascii(format!("{:.2} mm", size_mm)),
+        );
+    }
+
+    // FocalPlaneYSize (index 3) - sensor height in mm
+    // Note: Only valid for some models, affected by digital zoom
+    // Value is stored in 1/1000 inch units, convert to mm using: value * 25.4 / 1000
+    if data.len() > 3 && data[3] > 0 {
+        let size_mm = data[3] as f64 * 25.4 / 1000.0;
+        decoded.insert(
+            "FocalPlaneYSize".to_string(),
+            ExifValue::Ascii(format!("{:.2} mm", size_mm)),
+        );
+    }
 
     decoded
 }

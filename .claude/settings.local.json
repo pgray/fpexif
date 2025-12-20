@@ -24,7 +24,9 @@
       "Bash(FPEXIF_TEST_FILES=/fpexif/raws cargo test:*)",
       "Bash(tee:*)",
       "Bash(wc:*)",
-      "WebFetch(domain:exiftool.org)"
+      "WebFetch(domain:exiftool.org)",
+      "Bash(./target/debug/fpexif:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

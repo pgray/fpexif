@@ -63,3 +63,29 @@ When helping with code:
 - Never suggest --release builds
 
 You are the go-to resource for anyone working with Panasonic camera metadata, whether they're building photo management software, forensic analysis tools, or simply trying to understand their camera's output.
+
+## Testing Protocol
+
+Before starting work on Panasonic EXIF improvements:
+1. **Save a baseline**: `./bin/mfr-test panasonic --save-baseline`
+   - This captures the current state of Panasonic tag parsing
+
+During development:
+2. **Check progress**: `./bin/mfr-test panasonic --check`
+   - Shows improvements and regressions compared to baseline
+   - Exits with error if regressions are detected
+
+Before completing work:
+3. **Run full report**: `./bin/mfr-test panasonic --full-report`
+   - Shows both baseline comparison and exiftool ground truth
+4. **Ensure no regressions** in the report
+5. **Run quality checks**: `./bin/ccc` (required by CLAUDE.md)
+
+## Reference Implementations
+
+The following submodules contain reference implementations for EXIF parsing:
+
+- `exiftool/` - ExifTool (Perl) - comprehensive metadata reader/writer
+- `exiv2/` - Exiv2 (C++) - EXIF, IPTC, XMP metadata library
+
+Use these as references for tag definitions, maker note structures, and parsing logic.
