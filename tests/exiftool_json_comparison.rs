@@ -77,12 +77,25 @@ fn get_fpexif_exiftool_json_output(path: &str) -> Result<serde_json::Value, Stri
         .map_err(|e| format!("Failed to parse fpexif JSON: {}", e))
 }
 
-/// Compare two JSON values, returning issues found
+/// Result of comparing two JSON outputs
+struct ComparisonResult {
+    issues: Vec<TestIssue>,
+    matching_tags: usize,
+    mismatched_tags: usize,
+    missing_tags: usize,
+    extra_tags: usize,
+}
+
+/// Compare two JSON values, returning issues found and tag counts
 fn compare_json_outputs(
     exiftool_json: &serde_json::Value,
     fpexif_json: &serde_json::Value,
-) -> Vec<TestIssue> {
+) -> ComparisonResult {
     let mut issues = Vec::new();
+    let mut matching_tags = 0;
+    let mut mismatched_tags = 0;
+    let mut missing_tags = 0;
+    let mut extra_tags = 0;
 
     // Both should be arrays
     let exiftool_array = match exiftool_json.as_array() {
@@ -95,7 +108,13 @@ fn compare_json_outputs(
                 expected: None,
                 actual: None,
             });
-            return issues;
+            return ComparisonResult {
+                issues,
+                matching_tags,
+                mismatched_tags,
+                missing_tags,
+                extra_tags,
+            };
         }
     };
 
@@ -109,7 +128,13 @@ fn compare_json_outputs(
                 expected: None,
                 actual: None,
             });
-            return issues;
+            return ComparisonResult {
+                issues,
+                matching_tags,
+                mismatched_tags,
+                missing_tags,
+                extra_tags,
+            };
         }
     };
 
@@ -126,7 +151,13 @@ fn compare_json_outputs(
             expected: Some(exiftool_array.len().to_string()),
             actual: Some(fpexif_array.len().to_string()),
         });
-        return issues;
+        return ComparisonResult {
+            issues,
+            matching_tags,
+            mismatched_tags,
+            missing_tags,
+            extra_tags,
+        };
     }
 
     // Compare first object (typically the only one)
@@ -162,6 +193,7 @@ fn compare_json_outputs(
 
             match fpexif_obj.get(key) {
                 None => {
+                    missing_tags += 1;
                     issues.push(missing_field_issue(key));
                 }
                 Some(fpexif_value) => {
@@ -170,11 +202,14 @@ fn compare_json_outputs(
                         (exiftool_value.as_f64(), fpexif_value.as_f64())
                     {
                         if (et_num - fp_num).abs() > 0.001 {
+                            mismatched_tags += 1;
                             issues.push(value_mismatch_issue(
                                 key,
                                 &et_num.to_string(),
                                 &fp_num.to_string(),
                             ));
+                        } else {
+                            matching_tags += 1;
                         }
                     }
                     // For strings, compare normalized values
@@ -184,16 +219,22 @@ fn compare_json_outputs(
                         let et_normalized = et_str.trim();
                         let fp_normalized = fp_str.trim();
                         if et_normalized != fp_normalized {
+                            mismatched_tags += 1;
                             issues.push(value_mismatch_issue(key, et_str, fp_str));
+                        } else {
+                            matching_tags += 1;
                         }
                     }
                     // Different types
                     else if exiftool_value != fpexif_value {
+                        mismatched_tags += 1;
                         issues.push(value_mismatch_issue(
                             key,
                             &exiftool_value.to_string(),
                             &fpexif_value.to_string(),
                         ));
+                    } else {
+                        matching_tags += 1;
                     }
                 }
             }
@@ -206,6 +247,7 @@ fn compare_json_outputs(
                 && !key.starts_with("Nikon")
                 && !key.starts_with("Sony")
             {
+                extra_tags += 1;
                 issues.push(TestIssue {
                     category: IssueCategory::ExtraField,
                     message: format!("Extra field in fpexif (not in exiftool): {}", key),
@@ -217,7 +259,13 @@ fn compare_json_outputs(
         }
     }
 
-    issues
+    ComparisonResult {
+        issues,
+        matching_tags,
+        mismatched_tags,
+        missing_tags,
+        extra_tags,
+    }
 }
 
 /// Generic helper function to test exiftool JSON compatibility for a given file extension
@@ -234,6 +282,10 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
                 success: false,
                 fpexif_tag_count: 0,
                 reference_tag_count: 0,
+                matching_tags: 0,
+                mismatched_tags: 0,
+                missing_tags: 0,
+                extra_tags: 0,
                 issues: vec![TestIssue {
                     category: IssueCategory::Critical,
                     message: "Test files directory not found in CI".to_string(),
@@ -306,6 +358,10 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
                     success: false,
                     fpexif_tag_count: 0,
                     reference_tag_count: 0,
+                    matching_tags: 0,
+                    mismatched_tags: 0,
+                    missing_tags: 0,
+                    extra_tags: 0,
                     issues: vec![TestIssue {
                         category: IssueCategory::Critical,
                         message: format!("Failed to get fpexif output: {}", e),
@@ -320,7 +376,7 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
         };
 
         // Compare outputs
-        let issues = compare_json_outputs(&exiftool_json, &fpexif_json);
+        let comparison = compare_json_outputs(&exiftool_json, &fpexif_json);
 
         // Count tags
         let exiftool_tag_count = exiftool_json
@@ -338,7 +394,7 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
             .unwrap_or(0);
 
         // Determine if there are critical issues
-        let has_critical = issues.iter().any(|i| {
+        let has_critical = comparison.issues.iter().any(|i| {
             matches!(i.category, IssueCategory::Critical)
                 || (matches!(i.category, IssueCategory::ValueMismatch))
                 || (matches!(i.category, IssueCategory::MissingField)
@@ -354,7 +410,11 @@ fn test_format_exiftool_json_compatibility(extension: &str) -> FormatTestResult 
             success: !has_critical,
             fpexif_tag_count,
             reference_tag_count: exiftool_tag_count,
-            issues,
+            matching_tags: comparison.matching_tags,
+            mismatched_tags: comparison.mismatched_tags,
+            missing_tags: comparison.missing_tags,
+            extra_tags: comparison.extra_tags,
+            issues: comparison.issues,
         };
 
         // Print summary

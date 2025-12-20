@@ -132,6 +132,140 @@ fn read_u32(data: &[u8], endian: Endianness) -> u32 {
     }
 }
 
+/// Decode CreativeStyle value (tag 0xB020)
+pub fn decode_creative_style(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Standard",
+        2 => "Vivid",
+        3 => "Portrait",
+        4 => "Landscape",
+        5 => "Sunset",
+        6 => "Night",
+        8 => "B&W",
+        9 => "Clear",
+        10 => "Deep",
+        11 => "Light",
+        12 => "Autumn",
+        13 => "Neutral",
+        14 => "Sepia",
+        15 => "Night View/Portrait",
+        16 => "Soft",
+        17 => "Spring",
+        18 => "Summer",
+        19 => "Winter",
+        20 => "Portrait (Adobe RGB)",
+        21 => "Landscape (Adobe RGB)",
+        22 => "Night Scene",
+        23 => "Flowers",
+        24 => "Saloon",
+        25 => "Illustration",
+        26 => "High Contrast Mono",
+        27 => "Retro Photo",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ExposureMode value (tag 0xB041)
+pub fn decode_exposure_mode(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Portrait",
+        2 => "Landscape",
+        3 => "Macro",
+        4 => "Sports",
+        5 => "Sunset",
+        6 => "Night Scene",
+        7 => "Beach/Snow",
+        8 => "Fireworks",
+        9 => "Anti Motion Blur",
+        10 => "Pet",
+        11 => "Backlight Correction HDR",
+        12 => "Superior Auto",
+        13 => "High Sensitivity",
+        14 => "Night Portrait",
+        15 => "Hand-held Twilight",
+        16 => "Sweep Panorama",
+        17 => "3D Sweep Panorama",
+        18 => "Background Defocus",
+        19 => "Soft Skin",
+        20 => "Portrait (with Smile Shutter)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFMode value (tag 0xB043)
+pub fn decode_af_mode(value: u16) -> &'static str {
+    match value {
+        0 => "Default",
+        1 => "Multi",
+        2 => "Center",
+        3 => "Spot",
+        4 => "Flexible Spot",
+        5 => "Touch",
+        6 => "Continuous",
+        7 => "Face Detected",
+        8 => "Tracking",
+        9 => "Zone",
+        10 => "Expand Flexible Spot",
+        11 => "Flexible Spot (S)",
+        12 => "Flexible Spot (M)",
+        13 => "Flexible Spot (L)",
+        14 => "Eye AF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DynamicRangeOptimizer value (tag 0xB025)
+/// Note: This tag can be either SHORT or LONG depending on camera model
+pub fn decode_dynamic_range_optimizer(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Standard",
+        2 => "Advanced Auto",
+        3 => "Auto",
+        4 => "Advanced Lv1",
+        5 => "Advanced Lv2",
+        6 => "Advanced Lv3",
+        7 => "Advanced Lv4",
+        8 => "Advanced Lv5",
+        9 => "Lv1",
+        10 => "Lv2",
+        11 => "Lv3",
+        12 => "Lv4",
+        13 => "Lv5",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusMode value (tag 0x201B)
+/// Note: This tag can be BYTE or SHORT depending on camera model
+pub fn decode_focus_mode(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        1 => "AF-S",
+        2 => "AF-C",
+        3 => "AF-A",
+        4 => "DMF",
+        5 => "AF-D",
+        6 => "Single-shot AF",
+        7 => "Automatic AF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageStabilization value (tag 0xB026)
+/// Note: This tag can be either SHORT or LONG depending on camera model
+pub fn decode_image_stabilization(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "On (2)",
+        3 => "On (Shooting)",
+        _ => "Unknown",
+    }
+}
+
 /// Parse a single IFD entry from Sony maker notes
 fn parse_ifd_entry(
     data: &[u8],
@@ -184,7 +318,24 @@ fn parse_ifd_entry(
     let value = match tag_type {
         1 | 6 => {
             // BYTE or SBYTE
-            ExifValue::Byte(value_data[..count.min(value_data.len())].to_vec())
+            let bytes = value_data[..count.min(value_data.len())].to_vec();
+
+            // Apply value decoders for single-byte tags
+            if bytes.len() == 1 {
+                let v = bytes[0] as u16;
+                let decoded = match tag_id {
+                    SONY_FOCUS_MODE => Some(decode_focus_mode(v).to_string()),
+                    _ => None,
+                };
+
+                if let Some(s) = decoded {
+                    ExifValue::Ascii(s)
+                } else {
+                    ExifValue::Byte(bytes)
+                }
+            } else {
+                ExifValue::Byte(bytes)
+            }
         }
         2 => {
             // ASCII
@@ -203,7 +354,30 @@ fn parse_ifd_entry(
                     values.push(read_u16(&value_data[i * 2..], endian));
                 }
             }
-            ExifValue::Short(values)
+
+            // Apply value decoders for single-value tags
+            if values.len() == 1 {
+                let v = values[0];
+                let decoded = match tag_id {
+                    SONY_CREATIVE_STYLE => Some(decode_creative_style(v).to_string()),
+                    SONY_EXPOSURE_MODE => Some(decode_exposure_mode(v).to_string()),
+                    SONY_AF_MODE => Some(decode_af_mode(v).to_string()),
+                    SONY_DYNAMIC_RANGE_OPTIMIZER => {
+                        Some(decode_dynamic_range_optimizer(v).to_string())
+                    }
+                    SONY_FOCUS_MODE => Some(decode_focus_mode(v).to_string()),
+                    SONY_IMAGE_STABILIZATION => Some(decode_image_stabilization(v).to_string()),
+                    _ => None,
+                };
+
+                if let Some(s) = decoded {
+                    ExifValue::Ascii(s)
+                } else {
+                    ExifValue::Short(values)
+                }
+            } else {
+                ExifValue::Short(values)
+            }
         }
         4 | 9 => {
             // LONG or SLONG
@@ -213,7 +387,26 @@ fn parse_ifd_entry(
                     values.push(read_u32(&value_data[i * 4..], endian));
                 }
             }
-            ExifValue::Long(values)
+
+            // Apply value decoders for single-value LONG tags
+            if values.len() == 1 && values[0] <= u16::MAX as u32 {
+                let v = values[0] as u16;
+                let decoded = match tag_id {
+                    SONY_DYNAMIC_RANGE_OPTIMIZER => {
+                        Some(decode_dynamic_range_optimizer(v).to_string())
+                    }
+                    SONY_IMAGE_STABILIZATION => Some(decode_image_stabilization(v).to_string()),
+                    _ => None,
+                };
+
+                if let Some(s) = decoded {
+                    ExifValue::Ascii(s)
+                } else {
+                    ExifValue::Long(values)
+                }
+            } else {
+                ExifValue::Long(values)
+            }
         }
         5 | 10 => {
             // RATIONAL or SRATIONAL

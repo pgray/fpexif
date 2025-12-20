@@ -10,6 +10,9 @@ pub mod tags;
 #[cfg(feature = "serde")]
 pub mod output;
 
+#[cfg(feature = "cli")]
+pub mod mfr_test;
+
 #[cfg(feature = "wasm")]
 pub mod wasm;
 

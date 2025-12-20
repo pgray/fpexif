@@ -44,6 +44,18 @@ pub struct FileTestResult {
     pub success: bool,
     pub fpexif_tag_count: usize,
     pub reference_tag_count: usize,
+    /// Number of tags that matched exactly between fpexif and reference tool
+    #[serde(default)]
+    pub matching_tags: usize,
+    /// Number of tags with value mismatches
+    #[serde(default)]
+    pub mismatched_tags: usize,
+    /// Number of tags missing from fpexif output
+    #[serde(default)]
+    pub missing_tags: usize,
+    /// Number of extra tags in fpexif not in reference
+    #[serde(default)]
+    pub extra_tags: usize,
     pub issues: Vec<TestIssue>,
 }
 
@@ -60,6 +72,18 @@ pub struct FormatTestResult {
     pub missing_fields: usize,
     pub value_mismatches: usize,
     pub critical_issues: usize,
+    /// Total matching tags across all files
+    #[serde(default)]
+    pub total_matching_tags: usize,
+    /// Total mismatched tags across all files
+    #[serde(default)]
+    pub total_mismatched_tags: usize,
+    /// Total missing tags across all files
+    #[serde(default)]
+    pub total_missing_tags: usize,
+    /// Total extra tags across all files
+    #[serde(default)]
+    pub total_extra_tags: usize,
     pub file_results: Vec<FileTestResult>,
 }
 
@@ -76,6 +100,10 @@ impl FormatTestResult {
             missing_fields: 0,
             value_mismatches: 0,
             critical_issues: 0,
+            total_matching_tags: 0,
+            total_mismatched_tags: 0,
+            total_missing_tags: 0,
+            total_extra_tags: 0,
             file_results: Vec::new(),
         }
     }
@@ -85,6 +113,12 @@ impl FormatTestResult {
         if result.success {
             self.files_passed += 1;
         }
+
+        // Aggregate per-file tag counts
+        self.total_matching_tags += result.matching_tags;
+        self.total_mismatched_tags += result.mismatched_tags;
+        self.total_missing_tags += result.missing_tags;
+        self.total_extra_tags += result.extra_tags;
 
         for issue in &result.issues {
             self.total_issues += 1;
@@ -121,6 +155,7 @@ impl FormatTestResult {
     }
 
     /// Check if there are critical failures that should fail the test
+    #[allow(dead_code)]
     pub fn has_critical_failures(&self) -> bool {
         self.critical_issues > 0
     }

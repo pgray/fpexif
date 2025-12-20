@@ -60,3 +60,29 @@ When presenting metadata:
 - Include both raw values and interpreted/human-readable versions where applicable
 - Group related metadata fields logically (camera info, lens info, exposure settings, etc.)
 - Note any fields that could not be parsed or have uncertain interpretations
+
+## Testing Protocol
+
+Before starting work on Canon EXIF improvements:
+1. **Save a baseline**: `./bin/mfr-test canon --save-baseline`
+   - This captures the current state of Canon tag parsing
+
+During development:
+2. **Check progress**: `./bin/mfr-test canon --check`
+   - Shows improvements and regressions compared to baseline
+   - Exits with error if regressions are detected
+
+Before completing work:
+3. **Run full report**: `./bin/mfr-test canon --full-report`
+   - Shows both baseline comparison and exiftool ground truth
+4. **Ensure no regressions** in the report
+5. **Run quality checks**: `./bin/ccc` (required by CLAUDE.md)
+
+## Reference Implementations
+
+The following submodules contain reference implementations for EXIF parsing:
+
+- `exiftool/` - ExifTool (Perl) - comprehensive metadata reader/writer
+- `exiv2/` - Exiv2 (C++) - EXIF, IPTC, XMP metadata library
+
+Use these as references for tag definitions, maker note structures, and parsing logic.

@@ -178,6 +178,28 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 - [ ] Support for medium format RAW (3FR, FFF, DCR, KDC, MEF, MOS)
 - [ ] Integration with popular Rust image processing libraries
 
+## TODO: Manufacturer MakerNotes Support
+
+The following manufacturers have test images available and need MakerNote parsing implementation:
+
+### Implemented
+- [x] Canon (CR2, CR3, CRW)
+- [x] Nikon (NEF, NRW)
+- [x] Sony (ARW, SRF, SR2)
+- [x] Fujifilm (RAF)
+- [x] Panasonic (RW2)
+- [x] Olympus (ORF)
+
+### TODO
+- [ ] Pentax (PEF) - 17 test images
+- [ ] Samsung (SRW) - 7 test images
+- [ ] Sigma/Foveon (X3F) - 8 test images
+- [ ] Minolta (MRW) - 9 test images
+- [ ] Kodak (KDC, DCR) - 6 test images
+- [ ] Hasselblad (3FR) - 3 test images
+- [ ] Leaf/Mamiya (MOS, MEF) - 3 test images
+- [ ] Epson (ERF) - 1 test image
+
 ## License
 
 This project is licensed under either of:

@@ -71,3 +71,29 @@ When explaining metadata:
 4. Note any camera-specific variations or caveats
 
 You are the definitive resource for understanding what Nikon cameras embed in their files and how to correctly parse, interpret, and utilize that information.
+
+## Testing Protocol
+
+Before starting work on Nikon EXIF improvements:
+1. **Save a baseline**: `./bin/mfr-test nikon --save-baseline`
+   - This captures the current state of Nikon tag parsing
+
+During development:
+2. **Check progress**: `./bin/mfr-test nikon --check`
+   - Shows improvements and regressions compared to baseline
+   - Exits with error if regressions are detected
+
+Before completing work:
+3. **Run full report**: `./bin/mfr-test nikon --full-report`
+   - Shows both baseline comparison and exiftool ground truth
+4. **Ensure no regressions** in the report
+5. **Run quality checks**: `./bin/ccc` (required by CLAUDE.md)
+
+## Reference Implementations
+
+The following submodules contain reference implementations for EXIF parsing:
+
+- `exiftool/` - ExifTool (Perl) - comprehensive metadata reader/writer
+- `exiv2/` - Exiv2 (C++) - EXIF, IPTC, XMP metadata library
+
+Use these as references for tag definitions, maker note structures, and parsing logic.

@@ -88,6 +88,10 @@ fn test_file_against_exiftool(path: &str) -> FileTestResult {
                 success: true, // Skip is not a failure
                 fpexif_tag_count: 0,
                 reference_tag_count: 0,
+                matching_tags: 0,
+                mismatched_tags: 0,
+                missing_tags: 0,
+                extra_tags: 0,
                 issues: vec![],
             };
         }
@@ -234,12 +238,31 @@ fn test_file_against_exiftool(path: &str) -> FileTestResult {
                 .iter()
                 .any(|i| matches!(i.category, IssueCategory::ValueMismatch));
 
+            // Count issue types for per-file stats
+            let mismatched_tags = issues
+                .iter()
+                .filter(|i| matches!(i.category, IssueCategory::ValueMismatch))
+                .count();
+            let unknown_tags = issues
+                .iter()
+                .filter(|i| matches!(i.category, IssueCategory::UnknownTag))
+                .count();
+
+            // This test checks 6 specific fields (Make, Model, ISO, FNumber, FocalLength, DateTimeOriginal)
+            // matching_tags = fields checked - mismatches
+            let fields_checked: usize = 6;
+            let matching_tags = fields_checked.saturating_sub(mismatched_tags);
+
             FileTestResult {
                 file_path: path.to_string(),
                 format,
                 success: !has_critical,
                 fpexif_tag_count: exif_data.len(),
                 reference_tag_count,
+                matching_tags,
+                mismatched_tags,
+                missing_tags: 0,          // This test doesn't track missing fields
+                extra_tags: unknown_tags, // Report unknown tags as "extra"
                 issues,
             }
         }
@@ -251,6 +274,10 @@ fn test_file_against_exiftool(path: &str) -> FileTestResult {
                 success: true, // Parse failures are logged but not critical for this test
                 fpexif_tag_count: 0,
                 reference_tag_count: 0,
+                matching_tags: 0,
+                mismatched_tags: 0,
+                missing_tags: 0,
+                extra_tags: 0,
                 issues: vec![TestIssue {
                     category: IssueCategory::ParseError,
                     message: format!("Parse error: {:?}", e),

@@ -3,7 +3,7 @@
 use crate::data_types::{Endianness, ExifValue};
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -106,6 +106,127 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
+/// Decode FilmMode value (tag 0x1401)
+fn decode_film_mode(value: u16) -> &'static str {
+    match value {
+        0 => "F0/Standard (Provia)",
+        256 => "F1/Studio Portrait (Astia)",
+        512 => "F2/Fujichrome (Velvia)",
+        768 => "F3/Studio Portrait Ex (Astia Ex)",
+        1024 => "F4/Velvia",
+        1280 => "F5/PRO Neg. Std",
+        1281 => "F5a/PRO Neg. Hi",
+        1536 => "F6/Classic Chrome",
+        2048 => "F7/Acros",
+        2304 => "F7a/Acros+Ye Filter",
+        2305 => "F7b/Acros+R Filter",
+        2306 => "F7c/Acros+G Filter",
+        2560 => "F8/Classic Neg.",
+        2816 => "F9/Bleach Bypass",
+        3072 => "F10/Eterna",
+        3328 => "F11/Eterna Bleach Bypass",
+        3584 => "F12/Nostalgic Neg.",
+        3840 => "F13/Reala Ace",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DynamicRange value (tag 0x1400)
+fn decode_dynamic_range(value: u16) -> &'static str {
+    match value {
+        1 => "Standard (100%)",
+        3 => "Wide 1 (DR200)",
+        4 => "Wide 2 (DR400)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode WhiteBalance value (tag 0x1002)
+fn decode_white_balance(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Auto (White Priority)",
+        2 => "Auto (Ambience Priority)",
+        256 => "Daylight",
+        512 => "Cloudy",
+        768 => "Daylight Fluorescent",
+        769 => "Day White Fluorescent",
+        770 => "White Fluorescent",
+        771 => "Warm White Fluorescent",
+        772 => "Living Room Warm White Fluorescent",
+        1024 => "Incandescent",
+        1280 => "Flash",
+        1536 => "Underwater",
+        3840 => "Custom",
+        3841 => "Custom2",
+        3842 => "Custom3",
+        3843 => "Custom4",
+        3844 => "Custom5",
+        6144 => "Kelvin",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Sharpness value (tag 0x1001)
+fn decode_sharpness(value: u16) -> &'static str {
+    match value {
+        1 => "Soft (-2)",
+        2 => "Soft (-1)",
+        3 => "Normal",
+        4 => "Hard (+1)",
+        5 => "Hard (+2)",
+        130 => "Medium Soft",
+        132 => "Medium Hard",
+        256 => "Film Simulation",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusMode value (tag 0x1021)
+fn decode_focus_mode(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Manual",
+        2 => "AF-S",
+        3 => "AF-C",
+        _ => "Unknown",
+    }
+}
+
+/// Decode PictureMode value (tag 0x1031)
+fn decode_picture_mode(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Portrait",
+        2 => "Landscape",
+        3 => "Macro",
+        4 => "Sports",
+        5 => "Night Scene",
+        6 => "Program AE",
+        7 => "Natural Light",
+        8 => "Anti-blur",
+        9 => "Beach & Snow",
+        10 => "Sunset",
+        11 => "Museum",
+        12 => "Party",
+        13 => "Flower",
+        14 => "Text",
+        256 => "Aperture Priority",
+        512 => "Shutter Priority",
+        768 => "Manual",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DynamicRangeSetting value (tag 0x1402)
+fn decode_dynamic_range_setting(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Manual",
+        _ => "Unknown",
+    }
+}
+
 /// Parse Fujifilm maker notes
 pub fn parse_fuji_maker_notes(
     data: &[u8],
@@ -118,12 +239,12 @@ pub fn parse_fuji_maker_notes(
     }
 
     // Fuji maker notes start with "FUJIFILM" header (8 bytes)
-    // followed by offset to IFD (4 bytes, big-endian)
+    // followed by offset to IFD (4 bytes, little-endian)
     if data.len() >= 12 && &data[0..8] == b"FUJIFILM" {
-        // Read IFD offset (big-endian)
+        // Read IFD offset (little-endian)
         let mut cursor = Cursor::new(&data[8..12]);
         let ifd_offset = cursor
-            .read_u32::<BigEndian>()
+            .read_u32::<LittleEndian>()
             .map_err(|_| ExifError::Format("Failed to read Fuji IFD offset".to_string()))?
             as usize;
 
@@ -140,9 +261,9 @@ pub fn parse_fuji_maker_notes(
 
         let mut cursor = Cursor::new(ifd_data);
 
-        // Read number of entries (always big-endian for Fuji)
+        // Read number of entries (always little-endian for Fuji)
         let num_entries = cursor
-            .read_u16::<BigEndian>()
+            .read_u16::<LittleEndian>()
             .map_err(|_| ExifError::Format("Failed to read Fuji maker note count".to_string()))?;
 
         // Parse each entry
@@ -151,22 +272,22 @@ pub fn parse_fuji_maker_notes(
                 break;
             }
 
-            let tag_id = match cursor.read_u16::<BigEndian>() {
+            let tag_id = match cursor.read_u16::<LittleEndian>() {
                 Ok(id) => id,
                 Err(_) => break,
             };
 
-            let data_type = match cursor.read_u16::<BigEndian>() {
+            let data_type = match cursor.read_u16::<LittleEndian>() {
                 Ok(dt) => dt,
                 Err(_) => break,
             };
 
-            let count = match cursor.read_u32::<BigEndian>() {
+            let count = match cursor.read_u32::<LittleEndian>() {
                 Ok(c) => c,
                 Err(_) => break,
             };
 
-            let value_offset = match cursor.read_u32::<BigEndian>() {
+            let value_offset = match cursor.read_u32::<LittleEndian>() {
                 Ok(o) => o,
                 Err(_) => break,
             };
@@ -203,32 +324,54 @@ pub fn parse_fuji_maker_notes(
                 }
                 3 => {
                     // SHORT
+                    let mut values = Vec::new();
                     if count == 1 {
                         // Value is in the offset field (first 2 bytes)
-                        ExifValue::Short(vec![(value_offset >> 16) as u16])
+                        values.push((value_offset >> 16) as u16);
                     } else if count == 2 {
                         // Both values are in the offset field
-                        ExifValue::Short(vec![
-                            (value_offset >> 16) as u16,
-                            (value_offset & 0xFFFF) as u16,
-                        ])
+                        values.push((value_offset >> 16) as u16);
+                        values.push((value_offset & 0xFFFF) as u16);
                     } else {
                         // Value is at offset
                         let offset = value_offset as usize;
                         if offset + (count as usize * 2) <= data.len() {
-                            let mut values = Vec::new();
                             let mut cursor = Cursor::new(&data[offset..]);
                             for _ in 0..count {
-                                if let Ok(v) = cursor.read_u16::<BigEndian>() {
+                                if let Ok(v) = cursor.read_u16::<LittleEndian>() {
                                     values.push(v);
                                 } else {
                                     break;
                                 }
                             }
-                            ExifValue::Short(values)
                         } else {
                             continue;
                         }
+                    }
+
+                    // Apply value decoders for single-value SHORT tags
+                    if values.len() == 1 {
+                        let v = values[0];
+                        let decoded = match tag_id {
+                            FUJI_FILM_MODE => Some(decode_film_mode(v).to_string()),
+                            FUJI_DYNAMIC_RANGE => Some(decode_dynamic_range(v).to_string()),
+                            FUJI_WHITE_BALANCE => Some(decode_white_balance(v).to_string()),
+                            FUJI_SHARPNESS => Some(decode_sharpness(v).to_string()),
+                            FUJI_FOCUS_MODE => Some(decode_focus_mode(v).to_string()),
+                            FUJI_PICTURE_MODE => Some(decode_picture_mode(v).to_string()),
+                            FUJI_DYNAMIC_RANGE_SETTING => {
+                                Some(decode_dynamic_range_setting(v).to_string())
+                            }
+                            _ => None,
+                        };
+
+                        if let Some(s) = decoded {
+                            ExifValue::Ascii(s)
+                        } else {
+                            ExifValue::Short(values)
+                        }
+                    } else {
+                        ExifValue::Short(values)
                     }
                 }
                 4 => {
@@ -241,7 +384,7 @@ pub fn parse_fuji_maker_notes(
                             let mut values = Vec::new();
                             let mut cursor = Cursor::new(&data[offset..]);
                             for _ in 0..count {
-                                if let Ok(v) = cursor.read_u32::<BigEndian>() {
+                                if let Ok(v) = cursor.read_u32::<LittleEndian>() {
                                     values.push(v);
                                 } else {
                                     break;

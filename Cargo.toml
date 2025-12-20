@@ -36,6 +36,11 @@ name = "fpexif"
 path = "src/bin/cli.rs"
 required-features = ["cli"]
 
+[[bin]]
+name = "mfr-test"
+path = "src/bin/mfr_test.rs"
+required-features = ["cli"]
+
 [lib]
 name = "fpexif"
 path = "src/lib.rs"

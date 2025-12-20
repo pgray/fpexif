@@ -1,0 +1,6 @@
+[submodule "exiftool"]
+	path = exiftool
+	url = git@github.com:exiftool/exiftool.git
+[submodule "exiv2"]
+	path = exiv2
+	url = git@github.com:Exiv2/exiv2.git

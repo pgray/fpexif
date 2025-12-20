@@ -88,3 +88,29 @@ When explaining tags or metadata structures:
 4. List known values and their meanings
 5. Note any quirks, camera-specific behaviors, or common pitfalls
 6. Provide code examples when implementation is being discussed
+
+## Testing Protocol
+
+Before starting work on Fujifilm EXIF improvements:
+1. **Save a baseline**: `./bin/mfr-test fujifilm --save-baseline`
+   - This captures the current state of Fujifilm tag parsing
+
+During development:
+2. **Check progress**: `./bin/mfr-test fujifilm --check`
+   - Shows improvements and regressions compared to baseline
+   - Exits with error if regressions are detected
+
+Before completing work:
+3. **Run full report**: `./bin/mfr-test fujifilm --full-report`
+   - Shows both baseline comparison and exiftool ground truth
+4. **Ensure no regressions** in the report
+5. **Run quality checks**: `./bin/ccc` (required by CLAUDE.md)
+
+## Reference Implementations
+
+The following submodules contain reference implementations for EXIF parsing:
+
+- `exiftool/` - ExifTool (Perl) - comprehensive metadata reader/writer
+- `exiv2/` - Exiv2 (C++) - EXIF, IPTC, XMP metadata library
+
+Use these as references for tag definitions, maker note structures, and parsing logic.
