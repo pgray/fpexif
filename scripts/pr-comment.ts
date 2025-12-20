@@ -21,6 +21,10 @@ interface FileTestResult {
   success: boolean;
   fpexif_tag_count: number;
   reference_tag_count: number;
+  matching_tags: number;
+  mismatched_tags: number;
+  missing_tags: number;
+  extra_tags: number;
   issues: TestIssue[];
 }
 
@@ -35,6 +39,10 @@ interface FormatTestResult {
   missing_fields: number;
   value_mismatches: number;
   critical_issues: number;
+  total_matching_tags: number;
+  total_mismatched_tags: number;
+  total_missing_tags: number;
+  total_extra_tags: number;
   file_results: FileTestResult[];
 }
 
@@ -62,6 +70,10 @@ async function loadResults(): Promise<FormatTestResult[]> {
   return results.sort((a, b) => a.format.localeCompare(b.format));
 }
 
+function getFileName(path: string): string {
+  return path.split("/").pop() || path;
+}
+
 function generateReport(results: FormatTestResult[]): string {
   const lines: string[] = [];
 
@@ -84,107 +96,120 @@ function generateReport(results: FormatTestResult[]): string {
   const totalIssues = totalUnknown + totalMissing + totalMismatches;
   const totalFiles = results.reduce((sum, r) => sum + r.files_tested, 0);
   const totalPassed = results.reduce((sum, r) => sum + r.files_passed, 0);
+  const totalMatching = results.reduce((sum, r) => sum + (r.total_matching_tags || 0), 0);
+  const totalMismatchedTags = results.reduce((sum, r) => sum + (r.total_mismatched_tags || 0), 0);
+  const totalMissingTags = results.reduce((sum, r) => sum + (r.total_missing_tags || 0), 0);
+  const totalExtraTags = results.reduce((sum, r) => sum + (r.total_extra_tags || 0), 0);
+  const totalComparableTags = totalMatching + totalMismatchedTags + totalMissingTags;
+  const matchRate = totalComparableTags > 0 ? ((totalMatching / totalComparableTags) * 100).toFixed(1) : "N/A";
 
   // Summary
   lines.push("### Summary");
   lines.push("");
-  lines.push(`- **Files Tested:** ${totalFiles} (${totalPassed} passed)`);
-  lines.push(`- **Total Issues:** ${totalIssues}`);
-  lines.push(`  - Unknown Tags: ${totalUnknown}`);
-  lines.push(`  - Missing Fields: ${totalMissing}`);
-  lines.push(`  - Value Mismatches: ${totalMismatches}`);
+  lines.push(`| Metric | Count |`);
+  lines.push(`|--------|-------|`);
+  lines.push(`| Files Tested | ${totalFiles} (${totalPassed} passed) |`);
+  lines.push(`| **Match Rate** | **${matchRate}%** |`);
+  lines.push(`| Matching Tags | ${totalMatching} |`);
+  lines.push(`| Mismatched Tags | ${totalMismatchedTags} |`);
+  lines.push(`| Missing Tags | ${totalMissingTags} |`);
+  lines.push(`| Extra Tags | ${totalExtraTags} |`);
   if (totalCritical > 0) {
-    lines.push(`  - **Critical:** ${totalCritical}`);
+    lines.push(`| **Critical Issues** | **${totalCritical}** |`);
   }
   lines.push("");
 
   // Summary table by format
-  const formatsWithIssues = results.filter(
-    (r) => r.unknown_tags > 0 || r.missing_fields > 0 || r.value_mismatches > 0
-  );
+  lines.push("### Results by Format");
+  lines.push("");
+  lines.push("| Format | Files | Match % | ✓ Match | ✗ Mismatch | ⚠ Missing | + Extra |");
+  lines.push("|--------|-------|---------|---------|------------|-----------|---------|");
 
-  if (formatsWithIssues.length > 0) {
-    lines.push("### Issues by Format");
-    lines.push("");
-    lines.push("| Format | Files | Unknown Tags | Missing Fields | Mismatches |");
-    lines.push("|--------|-------|--------------|----------------|------------|");
-
-    for (const r of formatsWithIssues) {
-      lines.push(
-        `| ${r.format} | ${r.files_tested} | ${r.unknown_tags} | ${r.missing_fields} | ${r.value_mismatches} |`
-      );
-    }
-    lines.push("");
+  for (const r of results) {
+    const matching = r.total_matching_tags || 0;
+    const mismatched = r.total_mismatched_tags || 0;
+    const missing = r.total_missing_tags || 0;
+    const extra = r.total_extra_tags || 0;
+    const comparable = matching + mismatched + missing;
+    const rate = comparable > 0 ? ((matching / comparable) * 100).toFixed(1) : "N/A";
+    lines.push(
+      `| ${r.format} | ${r.files_tested} | ${rate}% | ${matching} | ${mismatched} | ${missing} | ${extra} |`
+    );
   }
+  lines.push("");
 
-  // Detailed sections by format
-  if (formatsWithIssues.length > 0) {
-    lines.push("### Details by Format");
+  // Per-file details for each format
+  lines.push("### Per-File Results");
+  lines.push("");
+
+  for (const r of results) {
+    if (r.file_results.length === 0) continue;
+
+    lines.push("<details>");
+    const formatMatching = r.total_matching_tags || 0;
+    const formatMismatched = r.total_mismatched_tags || 0;
+    const formatMissing = r.total_missing_tags || 0;
+    const formatComparable = formatMatching + formatMismatched + formatMissing;
+    const formatRate = formatComparable > 0 ? ((formatMatching / formatComparable) * 100).toFixed(1) : "N/A";
+    lines.push(
+      `<summary><b>${r.format}</b> - ${r.files_tested} files, ${formatRate}% match rate</summary>`
+    );
     lines.push("");
 
-    for (const r of formatsWithIssues) {
-      const unknownIssues = r.file_results.flatMap((f) =>
-        f.issues.filter((i) => i.category === "unknown_tag")
-      );
-      const missingIssues = r.file_results.flatMap((f) =>
-        f.issues.filter((i) => i.category === "missing_field")
-      );
-      const mismatchIssues = r.file_results.flatMap((f) =>
-        f.issues.filter((i) => i.category === "value_mismatch")
-      );
+    // Per-file table
+    lines.push("| File | ✓ Match | ✗ Mismatch | ⚠ Missing | + Extra | Status |");
+    lines.push("|------|---------|------------|-----------|---------|--------|");
 
-      lines.push("<details>");
+    for (const f of r.file_results) {
+      const fileName = getFileName(f.file_path);
+      const matching = f.matching_tags || 0;
+      const mismatched = f.mismatched_tags || 0;
+      const missing = f.missing_tags || 0;
+      const extra = f.extra_tags || 0;
+      const status = f.success ? "✓" : "✗";
       lines.push(
-        `<summary><b>${r.format}</b> - ${r.unknown_tags} unknown, ${r.missing_fields} missing, ${r.value_mismatches} mismatches</summary>`
+        `| \`${fileName}\` | ${matching} | ${mismatched} | ${missing} | ${extra} | ${status} |`
       );
-      lines.push("");
+    }
+    lines.push("");
 
-      if (unknownIssues.length > 0) {
-        lines.push("**Unknown Tags:**");
-        lines.push("```");
-        const uniqueTags = [...new Set(unknownIssues.map((i) => i.field).filter(Boolean))];
-        for (const tag of uniqueTags.slice(0, 10)) {
-          lines.push(`  ${tag}`);
-        }
-        if (uniqueTags.length > 10) {
-          lines.push(`  ... and ${uniqueTags.length - 10} more`);
-        }
-        lines.push("```");
-        lines.push("");
+    // Show detailed issues for this format
+    const mismatchIssues = r.file_results.flatMap((f) =>
+      f.issues.filter((i) => i.category === "value_mismatch")
+    );
+
+    if (mismatchIssues.length > 0) {
+      lines.push("**Value Mismatches:**");
+      lines.push("```");
+      for (const issue of mismatchIssues.slice(0, 10)) {
+        lines.push(`  ${issue.message}`);
       }
-
-      if (missingIssues.length > 0) {
-        lines.push("**Missing Fields:**");
-        lines.push("```");
-        const uniqueFields = [...new Set(missingIssues.map((i) => i.field).filter(Boolean))];
-        for (const field of uniqueFields.slice(0, 15)) {
-          lines.push(`  ${field}`);
-        }
-        if (uniqueFields.length > 15) {
-          lines.push(`  ... and ${uniqueFields.length - 15} more`);
-        }
-        lines.push("```");
-        lines.push("");
+      if (mismatchIssues.length > 10) {
+        lines.push(`  ... and ${mismatchIssues.length - 10} more`);
       }
-
-      if (mismatchIssues.length > 0) {
-        lines.push("**Value Mismatches:**");
-        lines.push("```");
-        for (const issue of mismatchIssues.slice(0, 10)) {
-          lines.push(`  ${issue.message}`);
-        }
-        if (mismatchIssues.length > 10) {
-          lines.push(`  ... and ${mismatchIssues.length - 10} more`);
-        }
-        lines.push("```");
-        lines.push("");
-      }
-
-      lines.push("</details>");
+      lines.push("```");
       lines.push("");
     }
 
-    lines.push("To add support for unknown tags, add definitions to `src/tags.rs`.");
+    const missingIssues = r.file_results.flatMap((f) =>
+      f.issues.filter((i) => i.category === "missing_field")
+    );
+
+    if (missingIssues.length > 0) {
+      lines.push("**Missing Fields:**");
+      lines.push("```");
+      const uniqueFields = [...new Set(missingIssues.map((i) => i.field).filter(Boolean))];
+      for (const field of uniqueFields.slice(0, 15)) {
+        lines.push(`  ${field}`);
+      }
+      if (uniqueFields.length > 15) {
+        lines.push(`  ... and ${uniqueFields.length - 15} more`);
+      }
+      lines.push("```");
+      lines.push("");
+    }
+
+    lines.push("</details>");
     lines.push("");
   }
 
