@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Supported manufacturers and their file formats
+/// Note: "dng" is a format, not a manufacturer, but is included for testing DNG-specific parsing
 pub const MANUFACTURER_FORMATS: &[(&str, &[&str])] = &[
     ("canon", &["CR2", "CR3", "CRW"]),
     ("nikon", &["NEF", "NRW"]),
@@ -21,6 +22,7 @@ pub const MANUFACTURER_FORMATS: &[(&str, &[&str])] = &[
     ("fujifilm", &["RAF"]),
     ("panasonic", &["RW2"]),
     ("olympus", &["ORF"]),
+    ("dng", &["DNG"]),
 ];
 
 /// Get formats for a manufacturer (case-insensitive)

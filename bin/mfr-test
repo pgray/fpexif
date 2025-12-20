@@ -8,6 +8,6 @@
 #   ./bin/mfr-test <manufacturer> --full-report    # Full comparison report
 #   ./bin/mfr-test --list-baselines                # List saved baselines
 #
-# Supported manufacturers: canon, nikon, sony, fujifilm, panasonic, olympus
+# Supported manufacturers: canon, nikon, sony, fujifilm, panasonic, olympus, dng
 
 exec cargo run --features cli --bin mfr-test -- "$@"
