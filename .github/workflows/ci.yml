@@ -16,6 +16,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  PATH: /home/gha/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl
 
 jobs:
   build:
@@ -37,7 +38,19 @@ jobs:
             echo "Test files not found - real file tests will fail"
           fi
 
+      - name: Check if Rust is installed
+        id: check_rust
+        run: |
+          if command -v cargo &> /dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Rust found: $(rustc --version)"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Rust not found, will install"
+          fi
+
       - name: Install Rust toolchain
+        if: steps.check_rust.outputs.exists != 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -209,7 +222,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check if Rust is installed
+        id: check_rust
+        run: |
+          if command -v cargo &> /dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Rust found: $(rustc --version)"
+            # Ensure wasm target is installed
+            rustup target add wasm32-unknown-unknown 2>/dev/null || true
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Rust not found, will install"
+          fi
+
       - name: Install Rust toolchain
+        if: steps.check_rust.outputs.exists != 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
