@@ -116,6 +116,260 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
+/// Get Sony camera model name from model ID (tag 0xB001)
+/// Based on ExifTool's SonyModelID database
+pub fn get_sony_model_name(model_id: u16) -> Option<&'static str> {
+    match model_id {
+        // DSC compact cameras
+        2 => Some("DSC-R1"),
+        297 => Some("DSC-RX100"),
+        298 => Some("DSC-RX1"),
+        308 => Some("DSC-RX100M2"),
+        309 => Some("DSC-RX10"),
+        310 => Some("DSC-RX1R"),
+        317 => Some("DSC-RX100M3"),
+        341 => Some("DSC-RX100M4"),
+        342 => Some("DSC-RX10M2"),
+        344 => Some("DSC-RX1RM2"),
+        355 => Some("DSC-RX10M3"),
+        356 => Some("DSC-RX100M5"),
+        364 => Some("DSC-RX0"),
+        365 => Some("DSC-RX10M4"),
+        366 => Some("DSC-RX100M6"),
+        367 => Some("DSC-HX99"),
+        369 => Some("DSC-RX100M5A"),
+        372 => Some("DSC-RX0M2"),
+        373 => Some("DSC-HX95"),
+        374 => Some("DSC-RX100M7"),
+        389 => Some("ZV-1F"),
+        395 => Some("ZV-1M2"),
+        // DSLR-A series
+        256 => Some("DSLR-A100"),
+        257 => Some("DSLR-A900"),
+        258 => Some("DSLR-A700"),
+        259 => Some("DSLR-A200"),
+        260 => Some("DSLR-A350"),
+        261 => Some("DSLR-A300"),
+        263 => Some("DSLR-A380/A390"),
+        264 => Some("DSLR-A330"),
+        265 => Some("DSLR-A230"),
+        266 => Some("DSLR-A290"),
+        269 => Some("DSLR-A850"),
+        273 => Some("DSLR-A550"),
+        274 => Some("DSLR-A500"),
+        275 => Some("DSLR-A450"),
+        282 => Some("DSLR-A560"),
+        283 => Some("DSLR-A580"),
+        // SLT-A series
+        280 => Some("SLT-A33"),
+        281 => Some("SLT-A55"),
+        285 => Some("SLT-A35"),
+        286 => Some("SLT-A65"),
+        287 => Some("SLT-A77"),
+        291 => Some("SLT-A37"),
+        292 => Some("SLT-A57"),
+        294 => Some("SLT-A99"),
+        303 => Some("SLT-A58"),
+        // NEX series
+        278 => Some("NEX-5"),
+        279 => Some("NEX-3"),
+        284 => Some("NEX-C3"),
+        288 => Some("NEX-5N"),
+        289 => Some("NEX-7"),
+        290 => Some("NEX-VG20E"),
+        293 => Some("NEX-F3"),
+        295 => Some("NEX-6"),
+        296 => Some("NEX-5R"),
+        299 => Some("NEX-VG900"),
+        300 => Some("NEX-VG30E"),
+        305 => Some("NEX-3N"),
+        307 => Some("NEX-5T"),
+        // ILCE (Alpha) series
+        302 => Some("ILCE-3000/3500"),
+        306 => Some("ILCE-7"),
+        311 => Some("ILCE-7R"),
+        312 => Some("ILCE-6000"),
+        313 => Some("ILCE-5000"),
+        318 => Some("ILCE-7S"),
+        339 => Some("ILCE-5100"),
+        340 => Some("ILCE-7M2"),
+        346 => Some("ILCE-QX1"),
+        347 => Some("ILCE-7RM2"),
+        350 => Some("ILCE-7SM2"),
+        357 => Some("ILCE-6300"),
+        358 => Some("ILCE-9"),
+        360 => Some("ILCE-6500"),
+        362 => Some("ILCE-7RM3"),
+        363 => Some("ILCE-7M3"),
+        371 => Some("ILCE-6400"),
+        375 => Some("ILCE-7RM4"),
+        376 => Some("ILCE-9M2"),
+        378 => Some("ILCE-6600"),
+        379 => Some("ILCE-6100"),
+        381 => Some("ILCE-7C"),
+        383 => Some("ILCE-7SM3"),
+        384 => Some("ILCE-1"),
+        386 => Some("ILCE-7RM3A"),
+        387 => Some("ILCE-7RM4A"),
+        388 => Some("ILCE-7M4"),
+        390 => Some("ILCE-7RM5"),
+        392 => Some("ILCE-9M3"),
+        394 => Some("ILCE-6700"),
+        396 => Some("ILCE-7CR"),
+        397 => Some("ILCE-7CM2"),
+        400 => Some("ILCE-1M2"),
+        407 => Some("ILCE-7M5"),
+        // ILCA (A-mount) series
+        319 => Some("ILCA-77M2"),
+        353 => Some("ILCA-68"),
+        354 => Some("ILCA-99M2"),
+        // Cinema/Pro Video
+        385 => Some("ILME-FX3"),
+        391 => Some("ILME-FX30"),
+        406 => Some("ILME-FX2"),
+        // ZV Vlog cameras
+        380 => Some("ZV-1"),
+        382 => Some("ZV-E10"),
+        393 => Some("ZV-E1"),
+        399 => Some("ZV-E10M2"),
+        _ => None,
+    }
+}
+
+/// Get Sony/Minolta lens name from lens type ID
+/// Based on ExifTool's minoltaLensTypes and sonyLensTypes2 databases
+pub fn get_sony_lens_name(lens_id: u32) -> Option<&'static str> {
+    match lens_id {
+        // Minolta AF lenses (inherited by Sony A-mount)
+        0 => Some("Minolta AF 28-85mm F3.5-4.5"),
+        1 => Some("Minolta AF 80-200mm F2.8 HS-APO G"),
+        2 => Some("Minolta AF 28-70mm F2.8 G"),
+        3 => Some("Minolta AF 28-80mm F4-5.6"),
+        4 => Some("Minolta AF 85mm F1.4G"),
+        5 => Some("Minolta AF 35-70mm F3.5-4.5"),
+        6 => Some("Minolta AF 24-85mm F3.5-4.5"),
+        7 => Some("Minolta AF 100-300mm F4.5-5.6 APO"),
+        8 => Some("Minolta AF 70-210mm F4.5-5.6"),
+        9 => Some("Minolta AF 50mm F3.5 Macro"),
+        10 => Some("Minolta AF 28-105mm F3.5-4.5"),
+        11 => Some("Minolta AF 300mm F4 HS-APO G"),
+        12 => Some("Minolta AF 100mm F2.8 Soft Focus"),
+        13 => Some("Minolta AF 75-300mm F4.5-5.6"),
+        14 => Some("Minolta AF 100-400mm F4.5-6.7 APO"),
+        15 => Some("Minolta AF 400mm F4.5 HS-APO G"),
+        16 => Some("Minolta AF 17-35mm F3.5 G"),
+        17 => Some("Minolta AF 20-35mm F3.5-4.5"),
+        18 => Some("Minolta AF 28-80mm F3.5-5.6 II"),
+        19 => Some("Minolta AF 35mm F1.4 G"),
+        20 => Some("Minolta/Sony 135mm F2.8 STF"),
+        22 => Some("Minolta AF 35-80mm F4-5.6 II"),
+        23 => Some("Minolta AF 200mm F4 Macro APO G"),
+        24 => Some("Minolta/Sony AF 24-105mm F3.5-4.5 (D)"),
+        25 => Some("Minolta AF 100-300mm F4.5-5.6 APO (D)"),
+        27 => Some("Minolta AF 85mm F1.4 G (D)"),
+        28 => Some("Minolta/Sony AF 100mm F2.8 Macro (D)"),
+        29 => Some("Minolta/Sony AF 75-300mm F4.5-5.6 (D)"),
+        30 => Some("Minolta AF 28-80mm F3.5-5.6 (D)"),
+        31 => Some("Minolta/Sony AF 50mm F2.8 Macro (D)"),
+        32 => Some("Minolta/Sony AF 300mm F2.8 G APO"),
+        33 => Some("Minolta/Sony AF 70-200mm F2.8 G"),
+        35 => Some("Minolta AF 85mm F1.4 G (D) Limited"),
+        36 => Some("Minolta AF 28-100mm F3.5-5.6 (D)"),
+        38 => Some("Minolta AF 17-35mm F2.8-4 (D)"),
+        39 => Some("Minolta AF 28-75mm F2.8 (D)"),
+        40 => Some("Minolta/Sony AF DT 18-70mm F3.5-5.6 (D)"),
+        41 => Some("Minolta/Sony AF DT 11-18mm F4.5-5.6 (D)"),
+        42 => Some("Minolta/Sony AF DT 18-200mm F3.5-6.3 (D)"),
+        43 => Some("Sony 35mm F1.4 G (SAL35F14G)"),
+        44 => Some("Sony 50mm F1.4 (SAL50F14)"),
+        45 => Some("Carl Zeiss Planar T* 85mm F1.4 ZA"),
+        46 => Some("Carl Zeiss Vario-Sonnar T* DT 16-80mm F3.5-4.5 ZA"),
+        47 => Some("Carl Zeiss Sonnar T* 135mm F1.8 ZA"),
+        48 => Some("Carl Zeiss Vario-Sonnar T* 24-70mm F2.8 ZA SSM"),
+        49 => Some("Sony DT 55-200mm F4-5.6 (SAL55200)"),
+        50 => Some("Sony DT 18-250mm F3.5-6.3 (SAL18250)"),
+        51 => Some("Sony DT 16-105mm F3.5-5.6 (SAL16105)"),
+        52 => Some("Sony 70-300mm F4.5-5.6 G SSM (SAL70300G)"),
+        53 => Some("Sony 70-400mm F4-5.6 G SSM (SAL70400G)"),
+        54 => Some("Carl Zeiss Vario-Sonnar T* 16-35mm F2.8 ZA SSM"),
+        55 => Some("Sony DT 18-55mm F3.5-5.6 SAM (SAL1855)"),
+        56 => Some("Sony DT 55-200mm F4-5.6 SAM (SAL55200-2)"),
+        57 => Some("Sony DT 50mm F1.8 SAM (SAL50F18)"),
+        58 => Some("Sony DT 30mm F2.8 Macro SAM (SAL30M28)"),
+        59 => Some("Sony 28-75mm F2.8 SAM (SAL2875)"),
+        60 => Some("Carl Zeiss Distagon T* 24mm F2 ZA SSM"),
+        61 => Some("Sony 85mm F2.8 SAM (SAL85F28)"),
+        62 => Some("Sony DT 35mm F1.8 SAM (SAL35F18)"),
+        63 => Some("Sony DT 16-50mm F2.8 SSM (SAL1650)"),
+        64 => Some("Sony 500mm F4 G SSM (SAL500F40G)"),
+        65 => Some("Sony DT 18-135mm F3.5-5.6 SAM (SAL18135)"),
+        66 => Some("Sony 300mm F2.8 G SSM II (SAL300F28G2)"),
+        67 => Some("Sony 70-200mm F2.8 G SSM II (SAL70200G2)"),
+        68 => Some("Sony DT 55-300mm F4.5-5.6 SAM (SAL55300)"),
+        69 => Some("Sony 70-400mm F4-5.6 G SSM II (SAL70400G2)"),
+        70 => Some("Carl Zeiss Planar T* 50mm F1.4 ZA SSM"),
+        // Sony E-mount lenses (use sonyLensTypes2 format with high IDs)
+        32784 => Some("Sony E 16mm F2.8 (SEL16F28)"),
+        32785 => Some("Sony E 18-55mm F3.5-5.6 OSS (SEL1855)"),
+        32786 => Some("Sony E 55-210mm F4.5-6.3 OSS (SEL55210)"),
+        32787 => Some("Sony E 18-200mm F3.5-6.3 OSS (SEL18200)"),
+        32788 => Some("Sony E 30mm F3.5 Macro (SEL30M35)"),
+        32789 => Some("Sony E 24mm F1.8 ZA (SEL24F18Z)"),
+        32790 => Some("Sony E 50mm F1.8 OSS (SEL50F18)"),
+        32791 => Some("Sony E 16-50mm F3.5-5.6 PZ OSS (SELP1650)"),
+        32792 => Some("Sony E 10-18mm F4 OSS (SEL1018)"),
+        32793 => Some("Sony E PZ 18-105mm F4 G OSS (SELP18105G)"),
+        32794 => Some("Sony E 20mm F2.8 (SEL20F28)"),
+        32795 => Some("Sony E 35mm F1.8 OSS (SEL35F18)"),
+        32796 => Some("Sony E PZ 18-200mm F3.5-6.3 OSS (SELP18200)"),
+        32797 => Some("Sony FE 35mm F2.8 ZA (SEL35F28Z)"),
+        32798 => Some("Sony FE 24-70mm F4 ZA OSS (SEL2470Z)"),
+        32799 => Some("Sony FE 55mm F1.8 ZA (SEL55F18Z)"),
+        32800 => Some("Sony FE 70-200mm F4 G OSS (SEL70200G)"),
+        32801 => Some("Sony FE 28-70mm F3.5-5.6 OSS (SEL2870)"),
+        32802 => Some("Sony FE 16-35mm F4 ZA OSS (SEL1635Z)"),
+        32803 => Some("Sony FE 90mm F2.8 Macro G OSS (SEL90M28G)"),
+        32807 => Some("Sony E 18-200mm F3.5-6.3 OSS LE (SEL18200LE)"),
+        32808 => Some("Sony E 50mm F1.8 OSS (SEL50F18)"),
+        32813 => Some("Sony FE 28mm F2 (SEL28F20)"),
+        32814 => Some("Sony FE 35mm F1.4 ZA (SEL35F14Z)"),
+        32815 => Some("Sony FE 24-240mm F3.5-6.3 OSS (SEL24240)"),
+        32816 => Some("Sony FE 28-135mm F4 G PZ OSS (SELP28135G)"),
+        32817 => Some("Sony FE PZ 28-135mm F4 G OSS (SELP28135G)"),
+        32820 => Some("Sony FE 21mm F2.8 (SEL21F28)"),
+        32821 => Some("Sony FE 16mm F3.5 Fisheye (SEL16F35)"),
+        32826 => Some("Sony FE 85mm F1.4 GM (SEL85F14GM)"),
+        32827 => Some("Sony FE 50mm F1.4 ZA (SEL50F14Z)"),
+        32829 => Some("Sony FE 70-300mm F4.5-5.6 G OSS (SEL70300G)"),
+        32830 => Some("Sony FE 100mm F2.8 STF GM OSS (SEL100F28GM)"),
+        32831 => Some("Sony FE 50mm F2.8 Macro (SEL50M28)"),
+        32832 => Some("Sony FE 85mm F1.8 (SEL85F18)"),
+        33072 => Some("Sony FE 70-200mm F2.8 GM OSS (SEL70200GM)"),
+        33073 => Some("Sony FE 24-70mm F2.8 GM (SEL2470GM)"),
+        33076 => Some("Sony FE 100-400mm F4.5-5.6 GM OSS (SEL100400GM)"),
+        33077 => Some("Sony FE 12-24mm F4 G (SEL1224G)"),
+        33079 => Some("Sony FE 16-35mm F2.8 GM (SEL1635GM)"),
+        33080 => Some("Sony FE 400mm F2.8 GM OSS (SEL400F28GM)"),
+        33081 => Some("Sony FE 24mm F1.4 GM (SEL24F14GM)"),
+        33082 => Some("Sony FE 135mm F1.8 GM (SEL135F18GM)"),
+        33083 => Some("Sony FE 200-600mm F5.6-6.3 G OSS (SEL200600G)"),
+        33084 => Some("Sony FE 600mm F4 GM OSS (SEL600F40GM)"),
+        33085 => Some("Sony FE 20mm F1.8 G (SEL20F18G)"),
+        33086 => Some("Sony FE 35mm F1.8 (SEL35F18F)"),
+        33088 => Some("Sony FE 12-24mm F2.8 GM (SEL1224GM)"),
+        33089 => Some("Sony FE 50mm F1.2 GM (SEL50F12GM)"),
+        33090 => Some("Sony FE 14mm F1.8 GM (SEL14F18GM)"),
+        33091 => Some("Sony FE 35mm F1.4 GM (SEL35F14GM)"),
+        33092 => Some("Sony FE 24mm F2.8 G (SEL24F28G)"),
+        33093 => Some("Sony FE 40mm F2.5 G (SEL40F25G)"),
+        33094 => Some("Sony FE 50mm F2.5 G (SEL50F25G)"),
+        33095 => Some("Sony FE 70-200mm F2.8 GM OSS II (SEL70200GM2)"),
+        33096 => Some("Sony FE 24-70mm F2.8 GM II (SEL2470GM2)"),
+        33097 => Some("Sony FE 16-35mm F2.8 GM II (SEL1635GM2)"),
+        _ => None,
+    }
+}
+
 /// Read u16 with given endianness
 fn read_u16(data: &[u8], endian: Endianness) -> u16 {
     match endian {
@@ -266,6 +520,66 @@ pub fn decode_image_stabilization(value: u16) -> &'static str {
     }
 }
 
+/// Decode ImageQuality value (tag 0x0102)
+pub fn decode_image_quality(value: u16) -> &'static str {
+    match value {
+        0 => "RAW",
+        1 => "Super Fine",
+        2 => "Fine",
+        3 => "Standard",
+        4 => "Economy",
+        5 => "Extra Fine",
+        6 => "RAW + JPEG/HEIF",
+        7 => "Compressed RAW",
+        8 => "Compressed RAW + JPEG",
+        9 => "Light",
+        _ => "Unknown",
+    }
+}
+
+/// Decode WhiteBalance value (tag 0x0115)
+pub fn decode_white_balance(value: u16) -> &'static str {
+    match value {
+        0x00 => "Auto",
+        0x01 => "Color Temperature/Color Filter",
+        0x10 => "Daylight",
+        0x20 => "Cloudy",
+        0x30 => "Shade",
+        0x40 => "Tungsten",
+        0x50 => "Flash",
+        0x60 => "Fluorescent",
+        0x70 => "Custom",
+        0x80 => "Underwater",
+        _ => "Unknown",
+    }
+}
+
+/// Decode LongExposureNoiseReduction value (tag 0x2008)
+pub fn decode_long_exposure_noise_reduction(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On (unused)",
+        0x10001 => "On (dark subtracted)",
+        0xffff0000 => "Off (65535)",
+        0xffff0001 => "On (65535)",
+        0xffffffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HighISONoiseReduction value (tag 0x2009)
+pub fn decode_high_iso_noise_reduction(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Low",
+        2 => "Normal",
+        3 => "High",
+        256 => "Auto",
+        65535 => "n/a",
+        _ => "Unknown",
+    }
+}
+
 /// Parse a single IFD entry from Sony maker notes
 fn parse_ifd_entry(
     data: &[u8],
@@ -359,6 +673,8 @@ fn parse_ifd_entry(
             if values.len() == 1 {
                 let v = values[0];
                 let decoded = match tag_id {
+                    SONY_IMAGE_QUALITY => Some(decode_image_quality(v).to_string()),
+                    SONY_WHITE_BALANCE => Some(decode_white_balance(v).to_string()),
                     SONY_CREATIVE_STYLE => Some(decode_creative_style(v).to_string()),
                     SONY_EXPOSURE_MODE => Some(decode_exposure_mode(v).to_string()),
                     SONY_AF_MODE => Some(decode_af_mode(v).to_string()),
@@ -367,6 +683,9 @@ fn parse_ifd_entry(
                     }
                     SONY_FOCUS_MODE => Some(decode_focus_mode(v).to_string()),
                     SONY_IMAGE_STABILIZATION => Some(decode_image_stabilization(v).to_string()),
+                    SONY_HIGH_ISO_NOISE_REDUCTION => {
+                        Some(decode_high_iso_noise_reduction(v).to_string())
+                    }
                     _ => None,
                 };
 
@@ -389,18 +708,29 @@ fn parse_ifd_entry(
             }
 
             // Apply value decoders for single-value LONG tags
-            if values.len() == 1 && values[0] <= u16::MAX as u32 {
-                let v = values[0] as u16;
-                let decoded = match tag_id {
-                    SONY_DYNAMIC_RANGE_OPTIMIZER => {
-                        Some(decode_dynamic_range_optimizer(v).to_string())
-                    }
-                    SONY_IMAGE_STABILIZATION => Some(decode_image_stabilization(v).to_string()),
-                    _ => None,
-                };
+            if values.len() == 1 {
+                let v = values[0];
+                // First check tags that need full u32 range
+                if tag_id == SONY_LONG_EXPOSURE_NOISE_REDUCTION {
+                    ExifValue::Ascii(decode_long_exposure_noise_reduction(v).to_string())
+                } else if v <= u16::MAX as u32 {
+                    // Then check tags that fit in u16
+                    let v16 = v as u16;
+                    let decoded = match tag_id {
+                        SONY_DYNAMIC_RANGE_OPTIMIZER => {
+                            Some(decode_dynamic_range_optimizer(v16).to_string())
+                        }
+                        SONY_IMAGE_STABILIZATION => {
+                            Some(decode_image_stabilization(v16).to_string())
+                        }
+                        _ => None,
+                    };
 
-                if let Some(s) = decoded {
-                    ExifValue::Ascii(s)
+                    if let Some(s) = decoded {
+                        ExifValue::Ascii(s)
+                    } else {
+                        ExifValue::Long(values)
+                    }
                 } else {
                     ExifValue::Long(values)
                 }
