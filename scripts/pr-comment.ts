@@ -149,9 +149,10 @@ function generateReport(results: FormatTestResult[]): string {
   }
   lines.push("");
 
-  // Group results by reference tool
-  const exiftoolResults = results.filter((r) => r.reference_tool === "exiftool");
-  const exiv2Results = results.filter((r) => r.reference_tool === "exiv2");
+  // Group results by test type (based on test_name pattern)
+  const exiftoolJsonResults = results.filter((r) => r.test_name?.startsWith("exiftool_json_"));
+  const exiv2Results = results.filter((r) => r.test_name?.startsWith("exiv2_"));
+  const fileTestResults = results.filter((r) => r.test_name?.startsWith("test_") && r.test_name?.endsWith("_files"));
 
   // Helper to generate a results table for a group
   const generateResultsTable = (groupResults: FormatTestResult[]): void => {
@@ -172,11 +173,11 @@ function generateReport(results: FormatTestResult[]): string {
     lines.push("");
   };
 
-  // ExifTool results table
-  if (exiftoolResults.length > 0) {
+  // ExifTool JSON results table
+  if (exiftoolJsonResults.length > 0) {
     lines.push("### ExifTool Comparison");
     lines.push("");
-    generateResultsTable(exiftoolResults);
+    generateResultsTable(exiftoolJsonResults);
   }
 
   // exiv2 results table
@@ -184,6 +185,13 @@ function generateReport(results: FormatTestResult[]): string {
     lines.push("### exiv2 Comparison");
     lines.push("");
     generateResultsTable(exiv2Results);
+  }
+
+  // File test results table
+  if (fileTestResults.length > 0) {
+    lines.push("### File Tests");
+    lines.push("");
+    generateResultsTable(fileTestResults);
   }
 
   // Per-file details section
@@ -271,12 +279,15 @@ function generateReport(results: FormatTestResult[]): string {
     lines.push("");
   };
 
-  // Generate per-file details for each tool
-  if (exiftoolResults.length > 0) {
-    generatePerFileDetails(exiftoolResults, "ExifTool");
+  // Generate per-file details for each test type
+  if (exiftoolJsonResults.length > 0) {
+    generatePerFileDetails(exiftoolJsonResults, "ExifTool");
   }
   if (exiv2Results.length > 0) {
     generatePerFileDetails(exiv2Results, "exiv2");
+  }
+  if (fileTestResults.length > 0) {
+    generatePerFileDetails(fileTestResults, "File Tests");
   }
 
   // All clear message if no issues
