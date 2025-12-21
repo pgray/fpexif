@@ -58,7 +58,7 @@ This document tracks planned image format support additions for the fpexif libra
 - **Estimated Effort**: 1-2 hours
 
 ### 3. CRW - Canon Raw v1
-- **Status**: ❌ Not started
+- **Status**: ✅ Complete
 - **Priority**: HIGH
 - **Complexity**: HIGH (uses CIFF format, NOT TIFF-based)
 - **Market Share**: Low (legacy format, 2000-2004)
@@ -66,13 +66,12 @@ This document tracks planned image format support additions for the fpexif libra
   - Uses CIFF (Camera Image File Format), not TIFF
   - Signature: "HEAPCCDR" at offset 6
   - Different structure from TIFF-based formats
-  - Requires new parser implementation
   - Still important for archival/legacy images
-- **Implementation**:
-  - Create `src/formats/ciff.rs`
-  - Implement CIFF heap structure parser
-  - Extract EXIF from CIFF records
-- **Estimated Effort**: 8-12 hours
+- **Implementation**: Complete
+  - `src/formats/ciff.rs` - CIFF heap structure parser
+  - `src/formats/crw.rs` - CRW format handler
+  - Builds synthetic EXIF from CIFF metadata
+  - Extracts: Make, Model, DateTime, ImageWidth/Height, Orientation, Owner, Firmware
 
 ---
 

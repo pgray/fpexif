@@ -628,14 +628,15 @@ impl<R: Read + Seek> CiffParser<R> {
         metadata.control_mode = read_u16(34);
         metadata.focus_distance_upper = read_u16(36);
         metadata.focus_distance_lower = read_u16(38);
-        metadata.f_number = read_u16(40);
-        metadata.exposure_time = read_u16(42);
-        metadata.measured_ev2 = read_i16(44);
-        metadata.bulb_duration = read_u16(46);
-        metadata.camera_type = read_u16(50);
-        metadata.auto_rotate = read_i16(52);
-        metadata.nd_filter = read_i16(54);
-        metadata.self_timer2 = read_u16(56);
+        // Index 21-24 per ExifTool Canon.pm
+        metadata.f_number = read_u16(42); // Index 21
+        metadata.exposure_time = read_u16(44); // Index 22
+        metadata.measured_ev2 = read_i16(46); // Index 23
+        metadata.bulb_duration = read_u16(48); // Index 24
+        metadata.camera_type = read_u16(52); // Index 26
+        metadata.auto_rotate = read_i16(54); // Index 27
+        metadata.nd_filter = read_i16(56); // Index 28
+        metadata.self_timer2 = read_u16(58); // Index 29
     }
 
     /// Build a synthetic TIFF EXIF segment from the extracted metadata
@@ -728,6 +729,129 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
         }
     }
 
+    // Add ISO (tag 0x8827 - ISOSpeedRatings)
+    // Use auto_iso which is stored as: ISO = 100 * 2^(value/32)
+    // A value of 0 means ISO 100
+    if let Some(auto_iso_raw) = metadata.auto_iso {
+        let iso = if auto_iso_raw == 0 {
+            100u16
+        } else {
+            (100.0 * 2.0_f64.powf(auto_iso_raw as f64 / 32.0)).round() as u16
+        };
+        ifd_entries.push((0x8827, 3, 1, iso.to_le_bytes().to_vec()));
+    }
+
+    // Add ExposureTime (tag 0x829A) - RATIONAL
+    // Canon stores as APEX value, convert: time = 2^(-value/32)
+    if let Some(apex_time) = metadata.exposure_time {
+        if apex_time > 0 {
+            let time_secs = 2.0_f64.powf(-(apex_time as f64) / 32.0);
+            // Express as rational: 1/x for short exposures, x/1 for long
+            let (num, denom) = if time_secs >= 1.0 {
+                ((time_secs * 10.0) as u32, 10u32)
+            } else {
+                (1u32, (1.0 / time_secs).round() as u32)
+            };
+            let mut rational = Vec::new();
+            rational.extend_from_slice(&num.to_le_bytes());
+            rational.extend_from_slice(&denom.to_le_bytes());
+            ifd_entries.push((0x829A, 5, 1, rational));
+        }
+    }
+
+    // Add FNumber (tag 0x829D) - RATIONAL
+    // Canon stores as APEX value, convert: fnumber = 2^(value/64)
+    if let Some(apex_fnum) = metadata.f_number {
+        if apex_fnum > 0 {
+            let fnum = 2.0_f64.powf((apex_fnum as f64) / 64.0);
+            // Express as rational with denominator 10 for one decimal place
+            let num = (fnum * 10.0).round() as u32;
+            let denom = 10u32;
+            let mut rational = Vec::new();
+            rational.extend_from_slice(&num.to_le_bytes());
+            rational.extend_from_slice(&denom.to_le_bytes());
+            ifd_entries.push((0x829D, 5, 1, rational));
+        }
+    }
+
+    // Add FocalLength (tag 0x920A) - RATIONAL
+    if let Some(fl) = metadata.focal_length {
+        let units = metadata.focal_units.unwrap_or(1) as u32;
+        if units > 0 && fl > 0 {
+            let fl_mm = fl as u32;
+            let mut rational = Vec::new();
+            rational.extend_from_slice(&fl_mm.to_le_bytes());
+            rational.extend_from_slice(&units.to_le_bytes());
+            ifd_entries.push((0x920A, 5, 1, rational));
+        }
+    }
+
+    // Add ExposureBiasValue (tag 0x9204) - SRATIONAL
+    if let Some(ev_comp) = metadata.exposure_compensation {
+        // Canon stores as value * 32 (e.g., -32 = -1 EV)
+        // EXIF wants it as a rational in EV
+        let num = ev_comp as i32;
+        let denom = 32i32;
+        let mut rational = Vec::new();
+        rational.extend_from_slice(&num.to_le_bytes());
+        rational.extend_from_slice(&denom.to_le_bytes());
+        ifd_entries.push((0x9204, 10, 1, rational)); // type 10 = SRATIONAL
+    }
+
+    // Add MeteringMode (tag 0x9207)
+    if let Some(metering) = metadata.metering_mode {
+        // Canon: 0=Default, 1=Spot, 2=Average, 3=Evaluative, 4=Partial, 5=CenterWeighted
+        // EXIF: 1=Average, 2=CenterWeighted, 3=Spot, 4=MultiSpot, 5=Pattern
+        let exif_metering: u16 = match metering {
+            1 => 3, // Spot
+            2 => 1, // Average
+            3 => 5, // Evaluative -> Pattern
+            4 => 6, // Partial
+            5 => 2, // CenterWeighted
+            _ => 0, // Unknown
+        };
+        ifd_entries.push((0x9207, 3, 1, exif_metering.to_le_bytes().to_vec()));
+    }
+
+    // Add Flash (tag 0x9209)
+    if let Some(flash) = metadata.flash_mode {
+        // Simple mapping: 0 = no flash, otherwise flash fired
+        let exif_flash: u16 = if flash == 0 { 0 } else { 1 };
+        ifd_entries.push((0x9209, 3, 1, exif_flash.to_le_bytes().to_vec()));
+    }
+
+    // Add FocalPlaneXResolution (tag 0xA20E) and YResolution (tag 0xA20F)
+    if let Some(xsize) = metadata.focal_plane_x_size {
+        if let Some(width) = metadata.image_width {
+            if xsize > 0 {
+                // xsize is in 1/1000 mm, calculate pixels per mm then convert to inches
+                // Resolution = width / (xsize/1000) pixels per mm
+                // For EXIF we want pixels per inch = resolution * 25.4
+                let res_x = ((width as f64) / (xsize as f64 / 1000.0) * 25.4) as u32;
+                let mut rational = Vec::new();
+                rational.extend_from_slice(&res_x.to_le_bytes());
+                rational.extend_from_slice(&1u32.to_le_bytes());
+                ifd_entries.push((0xA20E, 5, 1, rational));
+            }
+        }
+    }
+    if let Some(ysize) = metadata.focal_plane_y_size {
+        if let Some(height) = metadata.image_height {
+            if ysize > 0 {
+                let res_y = ((height as f64) / (ysize as f64 / 1000.0) * 25.4) as u32;
+                let mut rational = Vec::new();
+                rational.extend_from_slice(&res_y.to_le_bytes());
+                rational.extend_from_slice(&1u32.to_le_bytes());
+                ifd_entries.push((0xA20F, 5, 1, rational));
+            }
+        }
+    }
+
+    // Add FocalPlaneResolutionUnit (tag 0xA210) - 2 = inches
+    if metadata.focal_plane_x_size.is_some() || metadata.focal_plane_y_size.is_some() {
+        ifd_entries.push((0xA210, 3, 1, 2u16.to_le_bytes().to_vec()));
+    }
+
     // Sort entries by tag number (required by TIFF spec)
     ifd_entries.sort_by_key(|e| e.0);
 
@@ -746,11 +870,16 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
         data.extend_from_slice(&count.to_le_bytes());
 
         let value_size = match *type_id {
-            1 => *count,     // BYTE
-            2 => *count,     // ASCII
-            3 => *count * 2, // SHORT
-            4 => *count * 4, // LONG
-            5 => *count * 8, // RATIONAL
+            1 => *count,      // BYTE
+            2 => *count,      // ASCII
+            3 => *count * 2,  // SHORT
+            4 => *count * 4,  // LONG
+            5 => *count * 8,  // RATIONAL
+            6 => *count,      // SBYTE
+            7 => *count,      // UNDEFINED
+            8 => *count * 2,  // SSHORT
+            9 => *count * 4,  // SLONG
+            10 => *count * 8, // SRATIONAL
             _ => *count,
         };
 
@@ -773,11 +902,11 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
     // Write data area for values that didn't fit
     for (_, type_id, count, value_data) in &ifd_entries {
         let value_size = match *type_id {
-            1 => *count,
-            2 => *count,
-            3 => *count * 2,
-            4 => *count * 4,
-            5 => *count * 8,
+            1 | 6 | 7 => *count,  // BYTE, SBYTE, UNDEFINED
+            2 => *count,          // ASCII
+            3 | 8 => *count * 2,  // SHORT, SSHORT
+            4 | 9 => *count * 4,  // LONG, SLONG
+            5 | 10 => *count * 8, // RATIONAL, SRATIONAL
             _ => *count,
         };
 
