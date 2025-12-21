@@ -138,26 +138,26 @@ fn test_decode_focal_length() {
 
 #[test]
 fn test_decode_file_info() {
-    // Sample FileInfo array
+    // Sample FileInfo array: [count, file_number(skipped), reserved, bracket_mode, bracket_value, bracket_shot_number]
+    // FileNumber at index 1 is skipped - it requires complex model-specific bit manipulation
+    // and is redundant with the main FileNumber tag (0x0008)
     let file_info = vec![0, 123, 0, 0, 0, 0];
 
     let decoded = decode_file_info(&file_info);
 
-    // Check file number
-    assert!(decoded.contains_key("FileNumber"));
-    if let Some(ExifValue::Short(num)) = decoded.get("FileNumber") {
-        assert_eq!(num[0], 123);
-    } else {
-        panic!("FileNumber should be Short");
-    }
-
-    // Check bracket mode
+    // Check bracket mode (index 3)
     assert!(decoded.contains_key("BracketMode"));
     if let Some(ExifValue::Ascii(mode)) = decoded.get("BracketMode") {
         assert_eq!(mode, "Off");
     } else {
         panic!("BracketMode should be Ascii");
     }
+
+    // Check bracket value (index 4)
+    assert!(decoded.contains_key("BracketValue"));
+
+    // Check bracket shot number (index 5)
+    assert!(decoded.contains_key("BracketShotNumber"));
 }
 
 #[test]
