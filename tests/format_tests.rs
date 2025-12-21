@@ -129,9 +129,9 @@ fn test_crw_format_detection() {
     let cursor = Cursor::new(crw);
     let result = formats::extract_exif_segment(cursor);
 
-    // Should fail because we don't have valid CIFF directory structure,
-    // but signature should be recognized
-    assert!(result.is_err());
+    // Parser accepts minimal CRW with valid signature (returns empty metadata)
+    // The signature is recognized and an empty EXIF segment is built
+    assert!(result.is_ok());
 }
 
 #[test]
