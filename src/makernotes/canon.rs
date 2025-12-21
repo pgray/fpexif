@@ -1072,6 +1072,325 @@ pub fn decode_sharpness_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode RecordMode - ExifTool format
+pub fn decode_record_mode_exiftool(value: i16) -> &'static str {
+    match value {
+        -1 => "n/a",
+        1 => "JPEG",
+        2 => "CRW+THM",
+        3 => "AVI+THM",
+        4 => "TIF",
+        5 => "TIF+JPEG",
+        6 => "CR2",
+        7 => "CR2+JPEG",
+        9 => "MOV",
+        10 => "MP4",
+        11 => "CRM",
+        12 => "CR3",
+        13 => "CR3+JPEG",
+        14 => "HIF",
+        15 => "CR3+HIF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode RecordMode - exiv2 format
+pub fn decode_record_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "JPEG",
+        2 => "CRW+THM",
+        3 => "AVI+THM",
+        4 => "TIF",
+        5 => "TIF+JPEG",
+        6 => "CR2",
+        7 => "CR2+JPEG",
+        9 => "MOV",
+        10 => "MP4",
+        11 => "CRM",
+        12 => "CR3",
+        13 => "CR3+JPEG",
+        14 => "HIF",
+        15 => "CR3+HIF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CanonImageSize - ExifTool format
+pub fn decode_canon_image_size_exiftool(value: i16) -> &'static str {
+    match value {
+        -1 => "n/a",
+        0 => "Large",
+        1 => "Medium",
+        2 => "Small",
+        5 => "Medium 1",
+        6 => "Medium 2",
+        7 => "Medium 3",
+        8 => "Postcard",
+        9 => "Widescreen",
+        10 => "Medium Widescreen",
+        14 => "Small 1",
+        15 => "Small 2",
+        16 => "Small 3",
+        128 => "640x480 Movie",
+        129 => "Medium Movie",
+        130 => "Small Movie",
+        137 => "1280x720 Movie",
+        142 => "1920x1080 Movie",
+        143 => "4096x2160 Movie",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CanonImageSize - exiv2 format (same as ExifTool)
+pub fn decode_canon_image_size_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Large",
+        1 => "Medium",
+        2 => "Small",
+        5 => "Medium 1",
+        6 => "Medium 2",
+        7 => "Medium 3",
+        8 => "Postcard",
+        9 => "Widescreen",
+        10 => "Medium Widescreen",
+        14 => "Small 1",
+        15 => "Small 2",
+        16 => "Small 3",
+        128 => "640x480 Movie",
+        129 => "Medium Movie",
+        130 => "Small Movie",
+        137 => "1280x720 Movie",
+        142 => "1920x1080 Movie",
+        143 => "4096x2160 Movie",
+        _ => "Unknown",
+    }
+}
+
+/// Decode EasyMode - ExifTool format
+pub fn decode_easy_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Full auto",
+        1 => "Manual",
+        2 => "Landscape",
+        3 => "Fast shutter",
+        4 => "Slow shutter",
+        5 => "Night",
+        6 => "Gray Scale",
+        7 => "Sepia",
+        8 => "Portrait",
+        9 => "Sports",
+        10 => "Macro",
+        11 => "Black & White",
+        12 => "Pan focus",
+        13 => "Vivid",
+        14 => "Neutral",
+        15 => "Flash Off",
+        16 => "Long Shutter",
+        17 => "Super Macro",
+        18 => "Foliage",
+        19 => "Indoor",
+        20 => "Fireworks",
+        21 => "Beach",
+        22 => "Underwater",
+        23 => "Snow",
+        24 => "Kids & Pets",
+        25 => "Night Snapshot",
+        26 => "Digital Macro",
+        27 => "My Colors",
+        28 => "Movie Snap",
+        29 => "Super Macro 2",
+        30 => "Color Accent",
+        31 => "Color Swap",
+        32 => "Aquarium",
+        33 => "ISO 3200",
+        34 => "ISO 6400",
+        35 => "Creative Light Effect",
+        36 => "Easy",
+        37 => "Quick Shot",
+        38 => "Creative Auto",
+        39 => "Zoom Blur",
+        40 => "Low Light",
+        41 => "Nostalgic",
+        42 => "Super Vivid",
+        43 => "Poster Effect",
+        44 => "Face Self-timer",
+        45 => "Smile",
+        46 => "Wink Self-timer",
+        47 => "Fisheye Effect",
+        48 => "Miniature Effect",
+        49 => "High-speed Burst",
+        50 => "Best Image Selection",
+        51 => "High Dynamic Range",
+        52 => "Handheld Night Scene",
+        53 => "Movie Digest",
+        54 => "Live View Control",
+        55 => "Discreet",
+        56 => "Blur Reduction",
+        57 => "Monochrome",
+        58 => "Toy Camera Effect",
+        59 => "Scene Intelligent Auto",
+        60 => "High-speed Burst HQ",
+        61 => "Smooth Skin",
+        62 => "Soft Focus",
+        68 => "Food",
+        84 => "HDR Art Standard",
+        85 => "HDR Art Vivid",
+        93 => "HDR Art Bold",
+        257 => "Spotlight",
+        258 => "Night 2",
+        259 => "Night+",
+        260 => "Super Night",
+        261 => "Sunset",
+        263 => "Night Scene",
+        264 => "Surface",
+        265 => "Low Light 2",
+        _ => "Unknown",
+    }
+}
+
+/// Decode EasyMode - exiv2 format (same as ExifTool)
+pub fn decode_easy_mode_exiv2(value: u16) -> &'static str {
+    decode_easy_mode_exiftool(value)
+}
+
+/// Decode AFPoint - ExifTool format
+pub fn decode_af_point_exiftool(value: u16) -> &'static str {
+    match value {
+        0x2005 => "Manual AF point selection",
+        0x3000 => "None (MF)",
+        0x3001 => "Auto AF point selection",
+        0x3002 => "Right",
+        0x3003 => "Center",
+        0x3004 => "Left",
+        0x4001 => "Auto AF point selection",
+        0x4006 => "Face Detect",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFPoint - exiv2 format
+pub fn decode_af_point_exiv2(value: u16) -> &'static str {
+    match value {
+        0x2005 => "Manual AF point selection",
+        0x3000 => "None (MF)",
+        0x3001 => "Auto-selected",
+        0x3002 => "Right",
+        0x3003 => "Center",
+        0x3004 => "Left",
+        0x4001 => "Auto AF point selection",
+        0x4006 => "Face Detect",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusContinuous - ExifTool format
+pub fn decode_focus_continuous_exiftool(value: i16) -> &'static str {
+    match value {
+        -1 => "n/a",
+        0 => "Single",
+        1 => "Continuous",
+        8 => "Manual",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusContinuous - exiv2 format (same as ExifTool)
+pub fn decode_focus_continuous_exiv2(value: i16) -> &'static str {
+    decode_focus_continuous_exiftool(value)
+}
+
+/// Decode AESetting - ExifTool format
+pub fn decode_ae_setting_exiftool(value: i16) -> &'static str {
+    match value {
+        -1 => "n/a",
+        0 => "Normal AE",
+        1 => "Exposure Compensation",
+        2 => "AE Lock",
+        3 => "AE Lock + Exposure Comp.",
+        4 => "No AE",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AESetting - exiv2 format (same as ExifTool)
+pub fn decode_ae_setting_exiv2(value: i16) -> &'static str {
+    decode_ae_setting_exiftool(value)
+}
+
+/// Decode SpotMeteringMode - ExifTool format
+pub fn decode_spot_metering_mode_exiftool(value: i16) -> &'static str {
+    match value {
+        -1 => "n/a",
+        0 => "Center",
+        1 => "AF Point",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SpotMeteringMode - exiv2 format (same as ExifTool)
+pub fn decode_spot_metering_mode_exiv2(value: i16) -> &'static str {
+    decode_spot_metering_mode_exiftool(value)
+}
+
+/// Decode PhotoEffect - ExifTool format
+pub fn decode_photo_effect_exiftool(value: i16) -> &'static str {
+    match value {
+        -1 => "n/a",
+        0 => "Off",
+        1 => "Vivid",
+        2 => "Neutral",
+        3 => "Smooth",
+        4 => "Sepia",
+        5 => "B&W",
+        6 => "Custom",
+        100 => "My Color Data",
+        _ => "Unknown",
+    }
+}
+
+/// Decode PhotoEffect - exiv2 format (same as ExifTool)
+pub fn decode_photo_effect_exiv2(value: i16) -> &'static str {
+    decode_photo_effect_exiftool(value)
+}
+
+/// Decode ColorTone - ExifTool format (uses printParameter like Contrast/Saturation)
+pub fn decode_color_tone_exiftool(value: u16) -> String {
+    if value == 0x7fff {
+        return "n/a".to_string();
+    }
+    if value > 0 {
+        format!("+{}", value)
+    } else {
+        value.to_string()
+    }
+}
+
+/// Decode ColorTone - exiv2 format
+pub fn decode_color_tone_exiv2(value: u16) -> &'static str {
+    match value {
+        0xffff => "Low",
+        0x0000 => "Normal",
+        0x0001 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SRAWQuality - ExifTool format
+pub fn decode_sraw_quality_exiftool(value: i16) -> &'static str {
+    match value {
+        -1 => "n/a",
+        0 => "n/a",
+        1 => "sRAW1 (mRAW)",
+        2 => "sRAW2 (sRAW)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SRAWQuality - exiv2 format (same as ExifTool)
+pub fn decode_sraw_quality_exiv2(value: i16) -> &'static str {
+    decode_sraw_quality_exiftool(value)
+}
+
 /// Parse a single IFD entry and return the tag value
 ///
 /// Canon maker notes use offsets relative to the TIFF header, not the MakerNote data.
@@ -1294,8 +1613,31 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
-    // Note: Index 10 in CameraSettings is CanonImageSize, not AFAssistBeam
-    // AFAssistBeam is actually in CustomFunctions, not CameraSettings
+    // Record mode (index 9)
+    if data.len() > 9 {
+        let value = data[9] as i16;
+        decoded.insert(
+            "RecordMode".to_string(),
+            ExifValue::Ascii(decode_record_mode_exiftool(value).to_string()),
+        );
+    }
+
+    // Canon image size (index 10)
+    if data.len() > 10 {
+        let value = data[10] as i16;
+        decoded.insert(
+            "CanonImageSize".to_string(),
+            ExifValue::Ascii(decode_canon_image_size_exiftool(value).to_string()),
+        );
+    }
+
+    // Easy mode (index 11)
+    if data.len() > 11 {
+        decoded.insert(
+            "EasyMode".to_string(),
+            ExifValue::Ascii(decode_easy_mode_exiftool(data[11]).to_string()),
+        );
+    }
 
     // Digital zoom (index 12)
     if data.len() > 12 {
@@ -1342,6 +1684,14 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         decoded.insert(
             "FocusRange".to_string(),
             ExifValue::Ascii(decode_focus_range_exiftool(data[18]).to_string()),
+        );
+    }
+
+    // AF point (index 19)
+    if data.len() > 19 && data[19] != 0 {
+        decoded.insert(
+            "AFPoint".to_string(),
+            ExifValue::Ascii(decode_af_point_exiftool(data[19]).to_string()),
         );
     }
 
@@ -1477,6 +1827,24 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         decoded.insert("FlashBits".to_string(), ExifValue::Ascii(flash_bits_desc));
     }
 
+    // Focus continuous (index 32)
+    if data.len() > 32 {
+        let value = data[32] as i16;
+        decoded.insert(
+            "FocusContinuous".to_string(),
+            ExifValue::Ascii(decode_focus_continuous_exiftool(value).to_string()),
+        );
+    }
+
+    // AE setting (index 33)
+    if data.len() > 33 {
+        let value = data[33] as i16;
+        decoded.insert(
+            "AESetting".to_string(),
+            ExifValue::Ascii(decode_ae_setting_exiftool(value).to_string()),
+        );
+    }
+
     // Image stabilization (index 34)
     if data.len() > 34 {
         decoded.insert(
@@ -1485,11 +1853,71 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
+    // Display aperture (index 35)
+    if data.len() > 35 && data[35] > 0 {
+        let aperture = data[35] as f64 / 10.0;
+        decoded.insert(
+            "DisplayAperture".to_string(),
+            ExifValue::Ascii(format!("{:.1}", aperture)),
+        );
+    }
+
+    // Zoom source width (index 36)
+    if data.len() > 36 {
+        decoded.insert(
+            "ZoomSourceWidth".to_string(),
+            ExifValue::Short(vec![data[36]]),
+        );
+    }
+
+    // Zoom target width (index 37)
+    if data.len() > 37 {
+        decoded.insert(
+            "ZoomTargetWidth".to_string(),
+            ExifValue::Short(vec![data[37]]),
+        );
+    }
+
+    // Spot metering mode (index 39)
+    if data.len() > 39 {
+        let value = data[39] as i16;
+        decoded.insert(
+            "SpotMeteringMode".to_string(),
+            ExifValue::Ascii(decode_spot_metering_mode_exiftool(value).to_string()),
+        );
+    }
+
+    // Photo effect (index 40)
+    if data.len() > 40 {
+        let value = data[40] as i16;
+        decoded.insert(
+            "PhotoEffect".to_string(),
+            ExifValue::Ascii(decode_photo_effect_exiftool(value).to_string()),
+        );
+    }
+
     // Manual flash output (index 41)
     if data.len() > 41 {
         decoded.insert(
             "ManualFlashOutput".to_string(),
             ExifValue::Ascii(decode_manual_flash_output_exiftool(data[41]).to_string()),
+        );
+    }
+
+    // Color tone (index 42)
+    if data.len() > 42 && data[42] != 0x7fff {
+        decoded.insert(
+            "ColorTone".to_string(),
+            ExifValue::Ascii(decode_color_tone_exiftool(data[42])),
+        );
+    }
+
+    // SRAW quality (index 46)
+    if data.len() > 46 {
+        let value = data[46] as i16;
+        decoded.insert(
+            "SRAWQuality".to_string(),
+            ExifValue::Ascii(decode_sraw_quality_exiftool(value).to_string()),
         );
     }
 
@@ -1550,6 +1978,30 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
+    // Record mode (index 9)
+    if data.len() > 9 {
+        decoded.insert(
+            "RecordMode".to_string(),
+            ExifValue::Ascii(decode_record_mode_exiv2(data[9]).to_string()),
+        );
+    }
+
+    // Canon image size (index 10)
+    if data.len() > 10 {
+        decoded.insert(
+            "CanonImageSize".to_string(),
+            ExifValue::Ascii(decode_canon_image_size_exiv2(data[10]).to_string()),
+        );
+    }
+
+    // Easy mode (index 11)
+    if data.len() > 11 {
+        decoded.insert(
+            "EasyMode".to_string(),
+            ExifValue::Ascii(decode_easy_mode_exiv2(data[11]).to_string()),
+        );
+    }
+
     // Digital zoom (index 12)
     if data.len() > 12 {
         decoded.insert(
@@ -1595,6 +2047,14 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         decoded.insert(
             "FocusRange".to_string(),
             ExifValue::Ascii(decode_focus_range_exiv2(data[18]).to_string()),
+        );
+    }
+
+    // AF point (index 19)
+    if data.len() > 19 && data[19] != 0 {
+        decoded.insert(
+            "AFPoint".to_string(),
+            ExifValue::Ascii(decode_af_point_exiv2(data[19]).to_string()),
         );
     }
 
@@ -1724,6 +2184,24 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         decoded.insert("FlashBits".to_string(), ExifValue::Ascii(flash_bits_desc));
     }
 
+    // Focus continuous (index 32)
+    if data.len() > 32 {
+        let value = data[32] as i16;
+        decoded.insert(
+            "FocusContinuous".to_string(),
+            ExifValue::Ascii(decode_focus_continuous_exiv2(value).to_string()),
+        );
+    }
+
+    // AE setting (index 33)
+    if data.len() > 33 {
+        let value = data[33] as i16;
+        decoded.insert(
+            "AESetting".to_string(),
+            ExifValue::Ascii(decode_ae_setting_exiv2(value).to_string()),
+        );
+    }
+
     // Image stabilization (index 34) - same as exiftool
     if data.len() > 34 {
         decoded.insert(
@@ -1732,11 +2210,71 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
+    // Display aperture (index 35)
+    if data.len() > 35 && data[35] > 0 {
+        let aperture = data[35] as f64 / 10.0;
+        decoded.insert(
+            "DisplayAperture".to_string(),
+            ExifValue::Ascii(format!("{:.1}", aperture)),
+        );
+    }
+
+    // Zoom source width (index 36)
+    if data.len() > 36 {
+        decoded.insert(
+            "ZoomSourceWidth".to_string(),
+            ExifValue::Short(vec![data[36]]),
+        );
+    }
+
+    // Zoom target width (index 37)
+    if data.len() > 37 {
+        decoded.insert(
+            "ZoomTargetWidth".to_string(),
+            ExifValue::Short(vec![data[37]]),
+        );
+    }
+
+    // Spot metering mode (index 39)
+    if data.len() > 39 {
+        let value = data[39] as i16;
+        decoded.insert(
+            "SpotMeteringMode".to_string(),
+            ExifValue::Ascii(decode_spot_metering_mode_exiv2(value).to_string()),
+        );
+    }
+
+    // Photo effect (index 40)
+    if data.len() > 40 {
+        let value = data[40] as i16;
+        decoded.insert(
+            "PhotoEffect".to_string(),
+            ExifValue::Ascii(decode_photo_effect_exiv2(value).to_string()),
+        );
+    }
+
     // Manual flash output (index 41) - same as exiftool
     if data.len() > 41 {
         decoded.insert(
             "ManualFlashOutput".to_string(),
             ExifValue::Ascii(decode_manual_flash_output_exiftool(data[41]).to_string()),
+        );
+    }
+
+    // Color tone (index 42)
+    if data.len() > 42 && data[42] != 0x7fff {
+        decoded.insert(
+            "ColorTone".to_string(),
+            ExifValue::Ascii(decode_color_tone_exiv2(data[42]).to_string()),
+        );
+    }
+
+    // SRAW quality (index 46)
+    if data.len() > 46 {
+        let value = data[46] as i16;
+        decoded.insert(
+            "SRAWQuality".to_string(),
+            ExifValue::Ascii(decode_sraw_quality_exiv2(value).to_string()),
         );
     }
 

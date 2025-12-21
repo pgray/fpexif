@@ -149,102 +149,134 @@ function generateReport(results: FormatTestResult[]): string {
   }
   lines.push("");
 
-  // Summary table by format
-  lines.push("### Results by Format");
-  lines.push("");
-  lines.push("| Test | Files | Match % | ✓ Match | ✗ Mismatch | ⚠ Missing | + Extra |");
-  lines.push("|------|-------|---------|---------|------------|-----------|---------|");
+  // Group results by reference tool
+  const exiftoolResults = results.filter((r) => r.reference_tool === "exiftool");
+  const exiv2Results = results.filter((r) => r.reference_tool === "exiv2");
 
-  for (const r of results) {
-    const matching = r.total_matching_tags || 0;
-    const mismatched = r.total_mismatched_tags || 0;
-    const missing = r.total_missing_tags || 0;
-    const extra = r.total_extra_tags || 0;
-    const comparable = matching + mismatched + missing;
-    const rate = comparable > 0 ? ((matching / comparable) * 100).toFixed(1) : "N/A";
-    // Use test_name for unique identification, fallback to format + reference_tool
-    const testLabel = r.test_name || `${r.format} (${r.reference_tool})`;
-    lines.push(
-      `| ${testLabel} | ${r.files_tested} | ${rate}% | ${matching} | ${mismatched} | ${missing} | ${extra} |`
-    );
-  }
-  lines.push("");
+  // Helper to generate a results table for a group
+  const generateResultsTable = (groupResults: FormatTestResult[]): void => {
+    lines.push("| Format | Files | Match % | ✓ Match | ✗ Mismatch | ⚠ Missing | + Extra |");
+    lines.push("|--------|-------|---------|---------|------------|-----------|---------|");
 
-  // Per-file details for each format
-  lines.push("### Per-File Results");
-  lines.push("");
-
-  for (const r of results) {
-    if (r.file_results.length === 0) continue;
-
-    lines.push("<details>");
-    const formatMatching = r.total_matching_tags || 0;
-    const formatMismatched = r.total_mismatched_tags || 0;
-    const formatMissing = r.total_missing_tags || 0;
-    const formatComparable = formatMatching + formatMismatched + formatMissing;
-    const formatRate = formatComparable > 0 ? ((formatMatching / formatComparable) * 100).toFixed(1) : "N/A";
-    // Use test_name for unique identification, fallback to format + reference_tool
-    const testLabel = r.test_name || `${r.format} (${r.reference_tool})`;
-    lines.push(
-      `<summary><b>${testLabel}</b> - ${r.files_tested} files, ${formatRate}% match rate</summary>`
-    );
-    lines.push("");
-
-    // Per-file table
-    lines.push("| File | ✓ Match | ✗ Mismatch | ⚠ Missing | + Extra | Status |");
-    lines.push("|------|---------|------------|-----------|---------|--------|");
-
-    for (const f of r.file_results) {
-      const fileName = getFileName(f.file_path);
-      const matching = f.matching_tags || 0;
-      const mismatched = f.mismatched_tags || 0;
-      const missing = f.missing_tags || 0;
-      const extra = f.extra_tags || 0;
-      const status = f.success ? "✓" : "✗";
+    for (const r of groupResults) {
+      const matching = r.total_matching_tags || 0;
+      const mismatched = r.total_mismatched_tags || 0;
+      const missing = r.total_missing_tags || 0;
+      const extra = r.total_extra_tags || 0;
+      const comparable = matching + mismatched + missing;
+      const rate = comparable > 0 ? ((matching / comparable) * 100).toFixed(1) : "N/A";
       lines.push(
-        `| \`${fileName}\` | ${matching} | ${mismatched} | ${missing} | ${extra} | ${status} |`
+        `| ${r.format} | ${r.files_tested} | ${rate}% | ${matching} | ${mismatched} | ${missing} | ${extra} |`
       );
     }
     lines.push("");
+  };
 
-    // Show detailed issues for this format
-    const mismatchIssues = r.file_results.flatMap((f) =>
-      f.issues.filter((i) => i.category === "value_mismatch")
+  // ExifTool results table
+  if (exiftoolResults.length > 0) {
+    lines.push("### ExifTool Comparison");
+    lines.push("");
+    generateResultsTable(exiftoolResults);
+  }
+
+  // exiv2 results table
+  if (exiv2Results.length > 0) {
+    lines.push("### exiv2 Comparison");
+    lines.push("");
+    generateResultsTable(exiv2Results);
+  }
+
+  // Per-file details section
+  lines.push("### Per-File Results");
+  lines.push("");
+
+  // Helper to generate per-file details for a group
+  const generatePerFileDetails = (groupResults: FormatTestResult[], toolName: string): void => {
+    const groupWithFiles = groupResults.filter((r) => r.file_results.length > 0);
+    if (groupWithFiles.length === 0) return;
+
+    lines.push("<details>");
+    const groupMatching = groupResults.reduce((sum, r) => sum + (r.total_matching_tags || 0), 0);
+    const groupMismatched = groupResults.reduce((sum, r) => sum + (r.total_mismatched_tags || 0), 0);
+    const groupMissing = groupResults.reduce((sum, r) => sum + (r.total_missing_tags || 0), 0);
+    const groupComparable = groupMatching + groupMismatched + groupMissing;
+    const groupRate = groupComparable > 0 ? ((groupMatching / groupComparable) * 100).toFixed(1) : "N/A";
+    const groupFiles = groupResults.reduce((sum, r) => sum + r.files_tested, 0);
+    lines.push(
+      `<summary><b>${toolName}</b> - ${groupFiles} files, ${groupRate}% match rate</summary>`
     );
+    lines.push("");
 
-    if (mismatchIssues.length > 0) {
-      lines.push("**Value Mismatches:**");
-      lines.push("```");
-      for (const issue of mismatchIssues.slice(0, 10)) {
-        lines.push(`  ${issue.message}`);
-      }
-      if (mismatchIssues.length > 10) {
-        lines.push(`  ... and ${mismatchIssues.length - 10} more`);
-      }
-      lines.push("```");
+    for (const r of groupResults) {
+      if (r.file_results.length === 0) continue;
+
+      lines.push(`#### ${r.format}`);
       lines.push("");
-    }
 
-    const missingIssues = r.file_results.flatMap((f) =>
-      f.issues.filter((i) => i.category === "missing_field")
-    );
+      // Per-file table
+      lines.push("| File | ✓ Match | ✗ Mismatch | ⚠ Missing | + Extra | Status |");
+      lines.push("|------|---------|------------|-----------|---------|--------|");
 
-    if (missingIssues.length > 0) {
-      lines.push("**Missing Fields:**");
-      lines.push("```");
-      const uniqueFields = [...new Set(missingIssues.map((i) => i.field).filter(Boolean))];
-      for (const field of uniqueFields.slice(0, 15)) {
-        lines.push(`  ${field}`);
+      for (const f of r.file_results) {
+        const fileName = getFileName(f.file_path);
+        const matching = f.matching_tags || 0;
+        const mismatched = f.mismatched_tags || 0;
+        const missing = f.missing_tags || 0;
+        const extra = f.extra_tags || 0;
+        const status = f.success ? "✓" : "✗";
+        lines.push(
+          `| \`${fileName}\` | ${matching} | ${mismatched} | ${missing} | ${extra} | ${status} |`
+        );
       }
-      if (uniqueFields.length > 15) {
-        lines.push(`  ... and ${uniqueFields.length - 15} more`);
-      }
-      lines.push("```");
       lines.push("");
+
+      // Show detailed issues for this format
+      const mismatchIssues = r.file_results.flatMap((f) =>
+        f.issues.filter((i) => i.category === "value_mismatch")
+      );
+
+      if (mismatchIssues.length > 0) {
+        lines.push("**Value Mismatches:**");
+        lines.push("```");
+        for (const issue of mismatchIssues.slice(0, 10)) {
+          lines.push(`  ${issue.message}`);
+        }
+        if (mismatchIssues.length > 10) {
+          lines.push(`  ... and ${mismatchIssues.length - 10} more`);
+        }
+        lines.push("```");
+        lines.push("");
+      }
+
+      const missingIssues = r.file_results.flatMap((f) =>
+        f.issues.filter((i) => i.category === "missing_field")
+      );
+
+      if (missingIssues.length > 0) {
+        lines.push("**Missing Fields:**");
+        lines.push("```");
+        const uniqueFields = [...new Set(missingIssues.map((i) => i.field).filter(Boolean))];
+        for (const field of uniqueFields.slice(0, 15)) {
+          lines.push(`  ${field}`);
+        }
+        if (uniqueFields.length > 15) {
+          lines.push(`  ... and ${uniqueFields.length - 15} more`);
+        }
+        lines.push("```");
+        lines.push("");
+      }
     }
 
     lines.push("</details>");
     lines.push("");
+  };
+
+  // Generate per-file details for each tool
+  if (exiftoolResults.length > 0) {
+    generatePerFileDetails(exiftoolResults, "ExifTool");
+  }
+  if (exiv2Results.length > 0) {
+    generatePerFileDetails(exiv2Results, "exiv2");
   }
 
   // All clear message if no issues

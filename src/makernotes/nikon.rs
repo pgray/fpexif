@@ -74,6 +74,12 @@ pub const NIKON_VARI_PROGRAM: u16 = 0x00AB;
 pub const NIKON_IMAGE_STABILIZATION: u16 = 0x00AC;
 pub const NIKON_AF_RESPONSE: u16 = 0x00AD;
 pub const NIKON_LIGHT_SOURCE: u16 = 0x0090;
+pub const NIKON_SHOOTING_MODE: u16 = 0x0089;
+pub const NIKON_AUTO_BRACKET_RELEASE: u16 = 0x008A;
+pub const NIKON_LENS_F_STOPS: u16 = 0x008B;
+pub const NIKON_CONTRAST_CURVE: u16 = 0x008C;
+pub const NIKON_COLOR_HUE: u16 = 0x008D;
+pub const NIKON_SCENE_MODE: u16 = 0x008F;
 
 /// Get the name of a Nikon MakerNote tag
 pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -114,6 +120,12 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_DATE_STAMP_MODE => Some("DateStampMode"),
         NIKON_RETOUCH_HISTORY => Some("RetouchHistory"),
         NIKON_LIGHT_SOURCE => Some("LightSource"),
+        NIKON_SHOOTING_MODE => Some("ShootingMode"),
+        NIKON_AUTO_BRACKET_RELEASE => Some("AutoBracketRelease"),
+        NIKON_LENS_F_STOPS => Some("LensFStops"),
+        NIKON_CONTRAST_CURVE => Some("ContrastCurve"),
+        NIKON_COLOR_HUE => Some("ColorHue"),
+        NIKON_SCENE_MODE => Some("SceneMode"),
         NIKON_SERIAL_NUMBER_2 => Some("SerialNumber"),
         NIKON_IMAGE_DATA_SIZE => Some("ImageDataSize"),
         NIKON_IMAGE_COUNT => Some("ImageCount"),
@@ -458,6 +470,94 @@ pub fn decode_flash_mode_exiftool(value: u8) -> &'static str {
         8 => "Fired, Commander Mode",
         9 => "Fired, TTL Mode",
         18 => "LED Light",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Shooting Mode bitmask (tag 0x0089) - ExifTool format
+/// This is a bitmask with special handling for single-frame mode
+pub fn decode_shooting_mode_exiftool(value: u16) -> String {
+    // Check for single-frame mode (no bits 0,1,2,7 set)
+    if value & 0x87 == 0 {
+        if value == 0 {
+            return "Single-Frame".to_string();
+        }
+        // Has other bits but not continuous mode bits
+        let mut result = "Single-Frame".to_string();
+        let decoded_bits = decode_shooting_mode_bits(value, false);
+        if !decoded_bits.is_empty() {
+            result.push_str(", ");
+            result.push_str(&decoded_bits);
+        }
+        return result;
+    }
+
+    decode_shooting_mode_bits(value, false)
+}
+
+/// Decode Shooting Mode bitmask (tag 0x0089) - exiv2 format
+/// exiv2 decodes all bits without special single-frame handling
+pub fn decode_shooting_mode_exiv2(value: u16) -> String {
+    decode_shooting_mode_bits(value, true)
+}
+
+/// Helper to decode shooting mode bits
+fn decode_shooting_mode_bits(value: u16, _is_exiv2: bool) -> String {
+    let mut modes = Vec::new();
+
+    if value & 0x0001 != 0 {
+        modes.push("Continuous");
+    }
+    if value & 0x0002 != 0 {
+        modes.push("Delay");
+    }
+    if value & 0x0004 != 0 {
+        modes.push("PC Control");
+    }
+    if value & 0x0008 != 0 {
+        modes.push("Self-timer");
+    }
+    if value & 0x0010 != 0 {
+        modes.push("Exposure Bracketing");
+    }
+    if value & 0x0020 != 0 {
+        // Note: For D70, bit 5 means "Unused LE-NR Slowdown"
+        // For other models it means "Auto ISO"
+        modes.push("Auto ISO");
+    }
+    if value & 0x0040 != 0 {
+        modes.push("White-Balance Bracketing");
+    }
+    if value & 0x0080 != 0 {
+        modes.push("IR Control");
+    }
+    if value & 0x0100 != 0 {
+        modes.push("D-Lighting Bracketing");
+    }
+
+    if modes.is_empty() {
+        "Unknown".to_string()
+    } else {
+        modes.join(", ")
+    }
+}
+
+/// Decode Auto Bracket Release value (tag 0x008A) - ExifTool format
+pub fn decode_auto_bracket_release_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Auto Release",
+        2 => "Manual Release",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Auto Bracket Release value (tag 0x008A) - exiv2 format
+pub fn decode_auto_bracket_release_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Auto release",
+        2 => "Manual release",
         _ => "Unknown",
     }
 }
@@ -964,6 +1064,10 @@ pub fn parse_nikon_maker_notes(
                             }
                             NIKON_RETOUCH_HISTORY => {
                                 Some(decode_retouch_history_exiftool(v).to_string())
+                            }
+                            NIKON_SHOOTING_MODE => Some(decode_shooting_mode_exiftool(v)),
+                            NIKON_AUTO_BRACKET_RELEASE => {
+                                Some(decode_auto_bracket_release_exiftool(v).to_string())
                             }
                             _ => None,
                         };
