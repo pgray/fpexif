@@ -1594,6 +1594,261 @@ pub fn decode_measured_ev_exiv2(value: i16) -> String {
     decode_measured_ev_exiftool(value)
 }
 
+/// Decode SuperMacro - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:1601
+pub fn decode_super_macro_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On (1)",
+        2 => "On (2)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SuperMacro - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonSuperMacro
+pub fn decode_super_macro_exiv2(value: u16) -> &'static str {
+    decode_super_macro_exiftool(value)
+}
+
+/// Decode AutoLightingOptimizer - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:4020
+pub fn decode_auto_lighting_optimizer_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Low",
+        2 => "Strong",
+        3 => "Off",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AutoLightingOptimizer - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonAutoLightingOptimizer
+pub fn decode_auto_lighting_optimizer_exiv2(value: u16) -> &'static str {
+    decode_auto_lighting_optimizer_exiftool(value)
+}
+
+/// Decode LongExposureNoiseReduction - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:8980
+pub fn decode_long_exposure_noise_reduction_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Auto",
+        2 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode LongExposureNoiseReduction - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonLongExposureNoiseReduction
+pub fn decode_long_exposure_noise_reduction_exiv2(value: u16) -> &'static str {
+    decode_long_exposure_noise_reduction_exiftool(value)
+}
+
+/// Decode HighISONoiseReduction - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:4012
+pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Low",
+        2 => "Strong",
+        3 => "Off",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HighISONoiseReduction - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonHighISONoiseReduction
+pub fn decode_high_iso_noise_reduction_exiv2(value: u16) -> &'static str {
+    decode_high_iso_noise_reduction_exiftool(value)
+}
+
+/// Decode DigitalLensOptimizer - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9000
+pub fn decode_digital_lens_optimizer_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Standard",
+        2 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DigitalLensOptimizer - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonDigitalLensOptimizer
+pub fn decode_digital_lens_optimizer_exiv2(value: u16) -> &'static str {
+    decode_digital_lens_optimizer_exiftool(value)
+}
+
+/// Decode ColorSpace - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm (ColorData)
+pub fn decode_color_space_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "sRGB",
+        2 => "Adobe RGB",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ColorSpace - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonColorSpace
+pub fn decode_color_space_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "sRGB",
+        2 => "Adobe RGB",
+        65535 => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HDR - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9120
+pub fn decode_hdr_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Auto",
+        2 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HDR - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonHdr
+pub fn decode_hdr_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "On (RAW)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HDREffect - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9128
+pub fn decode_hdr_effect_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Natural",
+        1 => "Art (standard)",
+        2 => "Art (vivid)",
+        3 => "Art (bold)",
+        4 => "Art (embossed)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HDREffect - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonHdrEffect
+pub fn decode_hdr_effect_exiv2(value: u16) -> &'static str {
+    decode_hdr_effect_exiftool(value)
+}
+
+/// Decode CameraOrientation - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:3403
+pub fn decode_camera_orientation_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Horizontal (normal)",
+        1 => "Rotate 90 CW",
+        2 => "Rotate 270 CW",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraOrientation - exiv2 format
+pub fn decode_camera_orientation_exiv2(value: u16) -> &'static str {
+    decode_camera_orientation_exiftool(value)
+}
+
+/// Decode DualPixelRaw - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9008 (uses %offOn)
+pub fn decode_dual_pixel_raw_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DualPixelRaw - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonDualPixelRaw
+pub fn decode_dual_pixel_raw_exiv2(value: u16) -> &'static str {
+    decode_dual_pixel_raw_exiftool(value)
+}
+
+/// Decode SerialNumberFormat - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:1593
+pub fn decode_serial_number_format_exiftool(value: u32) -> &'static str {
+    match value {
+        0x90000000 => "Format 1",
+        0xa0000000 => "Format 2",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SerialNumberFormat - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonSerialNumberFormat
+pub fn decode_serial_number_format_exiv2(value: u32) -> &'static str {
+    decode_serial_number_format_exiftool(value)
+}
+
+/// Decode MultiExposure - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9061
+pub fn decode_multi_exposure_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "On (RAW)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MultiExposure - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonMultiExposure
+pub fn decode_multi_exposure_exiv2(value: u16) -> &'static str {
+    decode_multi_exposure_exiftool(value)
+}
+
+/// Decode MultiExposureControl - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9069
+pub fn decode_multi_exposure_control_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Additive",
+        1 => "Average",
+        2 => "Bright (comparative)",
+        3 => "Dark (comparative)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MultiExposureControl - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonMultiExposureControl
+pub fn decode_multi_exposure_control_exiv2(value: u16) -> &'static str {
+    decode_multi_exposure_control_exiftool(value)
+}
+
+/// Decode AmbienceSelection - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9039
+pub fn decode_ambience_selection_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Vivid",
+        2 => "Warm",
+        3 => "Soft",
+        4 => "Cool",
+        5 => "Intense",
+        6 => "Brighter",
+        7 => "Darker",
+        8 => "Monochrome",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AmbienceSelection - exiv2 format
+/// Source: exiv2/src/canonmn_int.cpp canonAmbienceSelection
+pub fn decode_ambience_selection_exiv2(value: u16) -> &'static str {
+    decode_ambience_selection_exiftool(value)
+}
+
 /// Parse a single IFD entry and return the tag value
 ///
 /// Canon maker notes use offsets relative to the TIFF header, not the MakerNote data.
