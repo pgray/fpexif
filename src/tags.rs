@@ -406,11 +406,11 @@ pub const TAG_BLACK_LEVEL_REPEAT_DIM: ExifTagId = ExifTagId {
     id: 0xC619,
     ifd: TagGroup::Main,
 };
-pub const TAG_CAMERA_SERIAL_NUMBER: ExifTagId = ExifTagId {
+pub const TAG_BLACK_LEVEL: ExifTagId = ExifTagId {
     id: 0xC61A,
     ifd: TagGroup::Main,
 };
-pub const TAG_LENS_INFO: ExifTagId = ExifTagId {
+pub const TAG_WHITE_LEVEL: ExifTagId = ExifTagId {
     id: 0xC61D,
     ifd: TagGroup::Main,
 };
@@ -422,7 +422,7 @@ pub const TAG_ORIGINAL_RAW_FILE_DATA: ExifTagId = ExifTagId {
     id: 0xC61F,
     ifd: TagGroup::Main,
 };
-pub const TAG_ACTIVE_AREA: ExifTagId = ExifTagId {
+pub const TAG_DEFAULT_CROP_SIZE: ExifTagId = ExifTagId {
     id: 0xC620,
     ifd: TagGroup::Main,
 };
@@ -462,6 +462,14 @@ pub const TAG_LINEAR_RESPONSE_LIMIT: ExifTagId = ExifTagId {
     id: 0xC62E,
     ifd: TagGroup::Main,
 };
+pub const TAG_CAMERA_SERIAL_NUMBER: ExifTagId = ExifTagId {
+    id: 0xC62F,
+    ifd: TagGroup::Main,
+};
+pub const TAG_LENS_INFO: ExifTagId = ExifTagId {
+    id: 0xC630,
+    ifd: TagGroup::Main,
+};
 pub const TAG_RAW_DATA_UNIQUE_ID: ExifTagId = ExifTagId {
     id: 0xC65C,
     ifd: TagGroup::Main,
@@ -486,8 +494,12 @@ pub const TAG_BEST_QUALITY_SCALE: ExifTagId = ExifTagId {
     id: 0xC65D,
     ifd: TagGroup::Main,
 };
-pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
+pub const TAG_ACTIVE_AREA: ExifTagId = ExifTagId {
     id: 0xC68D,
+    ifd: TagGroup::Main,
+};
+pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
+    id: 0xC71C,
     ifd: TagGroup::Main,
 };
 
@@ -925,11 +937,11 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_CFA_LAYOUT, "CFALayout");
     map.insert(TAG_LINEARIZATION_TABLE, "LinearizationTable");
     map.insert(TAG_BLACK_LEVEL_REPEAT_DIM, "BlackLevelRepeatDim");
-    map.insert(TAG_CAMERA_SERIAL_NUMBER, "CameraSerialNumber");
-    map.insert(TAG_LENS_INFO, "LensInfo");
+    map.insert(TAG_BLACK_LEVEL, "BlackLevel");
+    map.insert(TAG_WHITE_LEVEL, "WhiteLevel");
     map.insert(TAG_ORIGINAL_RAW_FILE_NAME, "OriginalRawFileName");
     map.insert(TAG_ORIGINAL_RAW_FILE_DATA, "OriginalRawFileData");
-    map.insert(TAG_ACTIVE_AREA, "ActiveArea");
+    map.insert(TAG_DEFAULT_CROP_SIZE, "DefaultCropSize");
     map.insert(TAG_COLOR_MATRIX1, "ColorMatrix1");
     map.insert(TAG_COLOR_MATRIX2, "ColorMatrix2");
     map.insert(TAG_ANALOG_BALANCE, "AnalogBalance");
@@ -939,12 +951,15 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_BASELINE_SHARPNESS, "BaselineSharpness");
     map.insert(TAG_PREVIEW_COLOR_SPACE, "PreviewColorSpace");
     map.insert(TAG_LINEAR_RESPONSE_LIMIT, "LinearResponseLimit");
+    map.insert(TAG_CAMERA_SERIAL_NUMBER, "CameraSerialNumber");
+    map.insert(TAG_LENS_INFO, "LensInfo");
     map.insert(TAG_RAW_DATA_UNIQUE_ID, "RawDataUniqueID");
     map.insert(TAG_MASKED_AREAS, "MaskedAreas");
     map.insert(TAG_SHADOW_SCALE, "ShadowScale");
     map.insert(TAG_CALIBRATION_ILLUMINANT1, "CalibrationIlluminant1");
     map.insert(TAG_CALIBRATION_ILLUMINANT2, "CalibrationIlluminant2");
     map.insert(TAG_BEST_QUALITY_SCALE, "BestQualityScale");
+    map.insert(TAG_ACTIVE_AREA, "ActiveArea");
     map.insert(TAG_RAW_IMAGE_DIGEST, "RawImageDigest");
 
     // EXIF SubIFD tags
@@ -1107,64 +1122,66 @@ pub fn get_metering_mode_description(value: u16) -> &'static str {
     }
 }
 
-/// Human-readable descriptions for various EXIF light source values
+/// Human-readable descriptions for various EXIF light source values (exiftool-compatible)
 pub fn get_light_source_description(value: u16) -> &'static str {
     match value {
         0 => "Unknown",
         1 => "Daylight",
         2 => "Fluorescent",
-        3 => "Tungsten (incandescent light)",
+        3 => "Tungsten (Incandescent)",
         4 => "Flash",
-        9 => "Fine weather",
-        10 => "Cloudy weather",
+        9 => "Fine Weather",
+        10 => "Cloudy",
         11 => "Shade",
-        12 => "Daylight fluorescent (D 5700 – 7100K)",
-        13 => "Day white fluorescent (N 4600 – 5400K)",
-        14 => "Cool white fluorescent (W 3900 – 4500K)",
-        15 => "White fluorescent (WW 3200 – 3700K)",
-        17 => "Standard light A",
-        18 => "Standard light B",
-        19 => "Standard light C",
+        12 => "Daylight Fluorescent",
+        13 => "Day White Fluorescent",
+        14 => "Cool White Fluorescent",
+        15 => "White Fluorescent",
+        16 => "Warm White Fluorescent",
+        17 => "Standard Light A",
+        18 => "Standard Light B",
+        19 => "Standard Light C",
         20 => "D55",
         21 => "D65",
         22 => "D75",
         23 => "D50",
-        24 => "ISO studio tungsten",
-        255 => "Other light source",
-        _ => "Reserved",
+        24 => "ISO Studio Tungsten",
+        255 => "Other",
+        _ => "Unknown",
     }
 }
 
-/// Human-readable descriptions for various EXIF flash values
+/// Human-readable descriptions for various EXIF flash values (exiftool-compatible)
 pub fn get_flash_description(value: u16) -> &'static str {
     match value {
-        0x0000 => "Flash did not fire",
-        0x0001 => "Flash fired",
-        0x0005 => "Strobe return light not detected",
-        0x0007 => "Strobe return light detected",
-        0x0009 => "Flash fired, compulsory flash mode",
-        0x000D => "Flash fired, compulsory flash mode, return light not detected",
-        0x000F => "Flash fired, compulsory flash mode, return light detected",
-        0x0010 => "Off, Did not fire",
-        0x0018 => "Flash did not fire, auto mode",
-        0x0019 => "Flash fired, auto mode",
-        0x001D => "Flash fired, auto mode, return light not detected",
-        0x001F => "Flash fired, auto mode, return light detected",
-        0x0020 => "No flash function",
-        0x0041 => "Flash fired, red-eye reduction mode",
-        0x0045 => "Flash fired, red-eye reduction mode, return light not detected",
-        0x0047 => "Flash fired, red-eye reduction mode, return light detected",
-        0x0049 => "Flash fired, compulsory flash mode, red-eye reduction mode",
-        0x004D => {
-            "Flash fired, compulsory flash mode, red-eye reduction mode, return light not detected"
-        }
-        0x004F => {
-            "Flash fired, compulsory flash mode, red-eye reduction mode, return light detected"
-        }
-        0x0059 => "Flash fired, auto mode, red-eye reduction mode",
-        0x005D => "Flash fired, auto mode, return light not detected, red-eye reduction mode",
-        0x005F => "Flash fired, auto mode, return light detected, red-eye reduction mode",
-        _ => "Unknown flash mode",
+        0x00 => "No Flash",
+        0x01 => "Fired",
+        0x05 => "Fired, Return not detected",
+        0x07 => "Fired, Return detected",
+        0x08 => "On, Did not fire",
+        0x09 => "On, Fired",
+        0x0D => "On, Return not detected",
+        0x0F => "On, Return detected",
+        0x10 => "Off, Did not fire",
+        0x14 => "Off, Did not fire, Return not detected",
+        0x18 => "Auto, Did not fire",
+        0x19 => "Auto, Fired",
+        0x1D => "Auto, Fired, Return not detected",
+        0x1F => "Auto, Fired, Return detected",
+        0x20 => "No flash function",
+        0x30 => "Off, No flash function",
+        0x41 => "Fired, Red-eye reduction",
+        0x45 => "Fired, Red-eye reduction, Return not detected",
+        0x47 => "Fired, Red-eye reduction, Return detected",
+        0x49 => "On, Red-eye reduction",
+        0x4D => "On, Red-eye reduction, Return not detected",
+        0x4F => "On, Red-eye reduction, Return detected",
+        0x50 => "Off, Red-eye reduction",
+        0x58 => "Auto, Did not fire, Red-eye reduction",
+        0x59 => "Auto, Fired, Red-eye reduction",
+        0x5D => "Auto, Fired, Red-eye reduction, Return not detected",
+        0x5F => "Auto, Fired, Red-eye reduction, Return detected",
+        _ => "Unknown",
     }
 }
 
@@ -1375,6 +1392,61 @@ pub fn get_subject_distance_range_description(value: u16) -> &'static str {
         1 => "Macro",
         2 => "Close",
         3 => "Distant",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for PhotometricInterpretation values
+pub fn get_photometric_interpretation_description(value: u16) -> &'static str {
+    match value {
+        0 => "WhiteIsZero",
+        1 => "BlackIsZero",
+        2 => "RGB",
+        3 => "RGB Palette",
+        4 => "Transparency Mask",
+        5 => "CMYK",
+        6 => "YCbCr",
+        8 => "CIELab",
+        9 => "ICCLab",
+        10 => "ITULab",
+        32803 => "Color Filter Array",
+        34892 => "Linear Raw",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for PlanarConfiguration values
+pub fn get_planar_configuration_description(value: u16) -> &'static str {
+    match value {
+        1 => "Chunky",
+        2 => "Planar",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable description for GPSLatitudeRef values
+pub fn get_gps_latitude_ref_description(value: &str) -> &'static str {
+    match value {
+        "N" => "North",
+        "S" => "South",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable description for GPSLongitudeRef values
+pub fn get_gps_longitude_ref_description(value: &str) -> &'static str {
+    match value {
+        "E" => "East",
+        "W" => "West",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable description for GPSAltitudeRef values
+pub fn get_gps_altitude_ref_description(value: u8) -> &'static str {
+    match value {
+        0 => "Above Sea Level",
+        1 => "Below Sea Level",
         _ => "Unknown",
     }
 }

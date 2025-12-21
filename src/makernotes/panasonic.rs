@@ -45,12 +45,14 @@ pub const PANA_LENS_TYPE: u16 = 0x0051;
 pub const PANA_LENS_SERIAL_NUMBER: u16 = 0x0052;
 pub const PANA_ACCESSORY_TYPE: u16 = 0x0053;
 pub const PANA_ACCESSORY_SERIAL_NUMBER: u16 = 0x0054;
-pub const PANA_ACCELEROMETER_X: u16 = 0x008A;
-pub const PANA_ACCELEROMETER_Y: u16 = 0x008B;
+pub const PANA_SHADING_COMPENSATION: u16 = 0x008A;
+pub const PANA_WB_SHIFT_INTELLIGENT_AUTO: u16 = 0x008B;
 pub const PANA_ACCELEROMETER_Z: u16 = 0x008C;
-pub const PANA_CAMERA_ORIENTATION: u16 = 0x008D;
-pub const PANA_ROLL_ANGLE: u16 = 0x008E;
-pub const PANA_PITCH_ANGLE: u16 = 0x008F;
+pub const PANA_ACCELEROMETER_X: u16 = 0x008D;
+pub const PANA_ACCELEROMETER_Y: u16 = 0x008E;
+pub const PANA_CAMERA_ORIENTATION: u16 = 0x008F;
+pub const PANA_ROLL_ANGLE: u16 = 0x0090;
+pub const PANA_PITCH_ANGLE: u16 = 0x0091;
 pub const PANA_BATTERY_LEVEL: u16 = 0x0096;
 pub const PANA_CITY: u16 = 0x006D;
 pub const PANA_LANDMARK: u16 = 0x006E;
@@ -102,9 +104,11 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
         PANA_LENS_SERIAL_NUMBER => Some("LensSerialNumber"),
         PANA_ACCESSORY_TYPE => Some("AccessoryType"),
         PANA_ACCESSORY_SERIAL_NUMBER => Some("AccessorySerialNumber"),
+        PANA_SHADING_COMPENSATION => Some("ShadingCompensation"),
+        PANA_WB_SHIFT_INTELLIGENT_AUTO => Some("WBShiftIntelligentAuto"),
+        PANA_ACCELEROMETER_Z => Some("AccelerometerZ"),
         PANA_ACCELEROMETER_X => Some("AccelerometerX"),
         PANA_ACCELEROMETER_Y => Some("AccelerometerY"),
-        PANA_ACCELEROMETER_Z => Some("AccelerometerZ"),
         PANA_CAMERA_ORIENTATION => Some("CameraOrientation"),
         PANA_ROLL_ANGLE => Some("RollAngle"),
         PANA_PITCH_ANGLE => Some("PitchAngle"),
@@ -122,20 +126,38 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
-/// Decode ImageQuality value
-fn decode_image_quality(value: u16) -> &'static str {
+/// Decode ImageQuality value (tag 0x0001) - ExifTool format
+pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
     match value {
+        1 => "TIFF",
         2 => "High",
         3 => "Standard",
         6 => "Very High",
         7 => "RAW",
         9 => "Motion Picture",
+        11 => "Full HD Movie",
+        12 => "4K Movie",
         _ => "Unknown",
     }
 }
 
-/// Decode WhiteBalance value
-fn decode_white_balance(value: u16) -> &'static str {
+/// Decode ImageQuality value (tag 0x0001) - exiv2 format
+pub fn decode_image_quality_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "TIFF",
+        2 => "High",
+        3 => "Normal",
+        6 => "Very High",
+        7 => "Raw",
+        9 => "Motion Picture",
+        11 => "Full HD Movie",
+        12 => "4k Movie",
+        _ => "Unknown",
+    }
+}
+
+/// Decode WhiteBalance value (tag 0x0003) - ExifTool format
+pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
     match value {
         1 => "Auto",
         2 => "Daylight",
@@ -150,8 +172,26 @@ fn decode_white_balance(value: u16) -> &'static str {
     }
 }
 
-/// Decode FocusMode value
-fn decode_focus_mode(value: u16) -> &'static str {
+/// Decode WhiteBalance value (tag 0x0003) - exiv2 format
+pub fn decode_white_balance_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "Auto",
+        2 => "Daylight",
+        3 => "Cloudy",
+        4 => "Halogen",
+        5 => "Manual",
+        8 => "Flash",
+        10 => "Black and white",
+        11 => "Manual",
+        12 => "Shade",
+        13 => "Kelvin",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusMode value (tag 0x0007)
+/// Identical between ExifTool and exiv2
+pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
     match value {
         1 => "Auto",
         2 => "Manual",
@@ -163,9 +203,11 @@ fn decode_focus_mode(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_focus_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode AFAreaMode value
-fn decode_af_area_mode(value: u16) -> &'static str {
+/// Decode AFAreaMode value (tag 0x000F) - ExifTool format
+/// Note: exiv2 parses this as two bytes, but ExifTool uses single values
+pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Face Detect",
         1 => "Spot Mode",
@@ -178,31 +220,61 @@ fn decode_af_area_mode(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_af_area_mode_exiv2 - exiv2 uses different two-byte parsing, complex
 
-/// Decode ImageStabilization value
-fn decode_image_stabilization(value: u16) -> &'static str {
+/// Decode ImageStabilization value (tag 0x001A) - ExifTool format
+pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
+    match value {
+        2 => "On, Optical",
+        3 => "Off",
+        4 => "On, Mode 2",
+        5 => "On, Optical Panning",
+        6 => "On, Body-only",
+        7 => "On, Body-only Panning",
+        9 => "Dual IS",
+        10 => "Dual IS Panning",
+        11 => "Dual2 IS",
+        12 => "Dual2 IS Panning",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageStabilization value (tag 0x001A) - exiv2 format
+pub fn decode_image_stabilization_exiv2(value: u16) -> &'static str {
     match value {
         2 => "On, Mode 1",
         3 => "Off",
         4 => "On, Mode 2",
         5 => "Panning",
+        6 => "On, Mode 3",
         _ => "Unknown",
     }
 }
 
-/// Decode MacroMode value
-fn decode_macro_mode(value: u16) -> &'static str {
+/// Decode MacroMode value (tag 0x001C) - ExifTool format
+pub fn decode_macro_mode_exiftool(value: u16) -> &'static str {
     match value {
         1 => "On",
         2 => "Off",
         257 => "Tele-macro",
-        258 => "Macro-zoom",
+        513 => "Macro Zoom",
         _ => "Unknown",
     }
 }
 
-/// Decode ShootingMode value
-fn decode_shooting_mode(value: u16) -> &'static str {
+/// Decode MacroMode value (tag 0x001C) - exiv2 format
+pub fn decode_macro_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "On",
+        2 => "Off",
+        257 => "Tele-macro",
+        513 => "Macro-zoom",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ShootingMode value (tag 0x001F) - ExifTool format
+pub fn decode_shooting_mode_exiftool(value: u16) -> &'static str {
     match value {
         1 => "Normal",
         2 => "Portrait",
@@ -231,9 +303,10 @@ fn decode_shooting_mode(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_shooting_mode_exiv2 - exiv2 has 90+ values, same base values match
 
-/// Decode PhotoStyle value
-fn decode_photo_style(value: u16) -> &'static str {
+/// Decode PhotoStyle value (tag 0x0089) - ExifTool format
+pub fn decode_photo_style_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Auto",
         1 => "Standard or Custom",
@@ -253,8 +326,23 @@ fn decode_photo_style(value: u16) -> &'static str {
     }
 }
 
-/// Decode ShutterType value
-fn decode_shutter_type(value: u16) -> &'static str {
+/// Decode PhotoStyle value (tag 0x0089) - exiv2 format
+pub fn decode_photo_style_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "NoAuto",
+        1 => "Standard or Custom",
+        2 => "Vivid",
+        3 => "Natural",
+        4 => "Monochrome",
+        5 => "Scenery",
+        6 => "Portrait",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ShutterType value (tag 0x009A) - ExifTool format
+/// Identical between ExifTool and exiv2
+pub fn decode_shutter_type_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Mechanical",
         1 => "Electronic",
@@ -262,9 +350,10 @@ fn decode_shutter_type(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_shutter_type_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ContrastMode value (enhanced)
-fn decode_contrast_mode(value: u16) -> &'static str {
+/// Decode ContrastMode value (tag 0x002C) - ExifTool format
+pub fn decode_contrast_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Normal",
         1 => "Low",
@@ -279,8 +368,23 @@ fn decode_contrast_mode(value: u16) -> &'static str {
     }
 }
 
-/// Decode BurstMode value
-fn decode_burst_mode(value: u16) -> &'static str {
+/// Decode ContrastMode value (tag 0x002C) - exiv2 format
+pub fn decode_contrast_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Low",
+        2 => "High",
+        6 => "Medium low",
+        7 => "Medium high",
+        256 => "Low",
+        272 => "Standard",
+        288 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode BurstMode value (tag 0x002A) - ExifTool format
+pub fn decode_burst_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "On",
@@ -294,8 +398,19 @@ fn decode_burst_mode(value: u16) -> &'static str {
     }
 }
 
-/// Decode IntelligentResolution value
-fn decode_intelligent_resolution(value: u16) -> &'static str {
+/// Decode BurstMode value (tag 0x002A) - exiv2 format
+pub fn decode_burst_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Low/High quality",
+        2 => "Infinite",
+        _ => "Unknown",
+    }
+}
+
+/// Decode IntelligentResolution value (tag 0x0070)
+/// Identical between ExifTool and exiv2
+pub fn decode_intelligent_resolution_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Low",
@@ -305,27 +420,33 @@ fn decode_intelligent_resolution(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_intelligent_resolution_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ClearRetouch value
-fn decode_clear_retouch(value: u16) -> &'static str {
+/// Decode ClearRetouch value (tag 0x0077)
+/// Identical between ExifTool and exiv2
+pub fn decode_clear_retouch_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "On",
         _ => "Unknown",
     }
 }
+// decode_clear_retouch_exiv2 - same as exiftool, no separate function needed
 
-/// Decode TouchAE value
-fn decode_touch_ae(value: u16) -> &'static str {
+/// Decode TouchAE value (tag 0x00AE)
+/// Identical between ExifTool and exiv2
+pub fn decode_touch_ae_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "On",
         _ => "Unknown",
     }
 }
+// decode_touch_ae_exiv2 - same as exiftool, no separate function needed
 
-/// Decode FlashCurtain value
-fn decode_flash_curtain(value: u16) -> &'static str {
+/// Decode FlashCurtain value (tag 0x00AB)
+/// Identical between ExifTool and exiv2
+pub fn decode_flash_curtain_exiftool(value: u16) -> &'static str {
     match value {
         0 => "n/a",
         1 => "1st",
@@ -333,15 +454,17 @@ fn decode_flash_curtain(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_flash_curtain_exiv2 - same as exiftool, no separate function needed
 
-/// Decode HDRShot value
-fn decode_hdr_shot(value: u16) -> &'static str {
+/// Decode HDRShot value (tag 0x0093) - ExifTool format
+pub fn decode_hdr_shot_exiftool(value: u16) -> &'static str {
     match value {
         0 => "No",
         1 => "Yes",
         _ => "Unknown",
     }
 }
+// decode_hdr_shot_exiv2 - exiv2 uses different tag (0x009E) with EV values
 
 /// Parse Panasonic maker notes
 pub fn parse_panasonic_maker_notes(
@@ -399,12 +522,16 @@ pub fn parse_panasonic_maker_notes(
         {
             // Calculate value size
             let value_size = match tag_type {
-                1 => count as usize,     // BYTE
-                2 => count as usize,     // ASCII
-                3 => count as usize * 2, // SHORT
-                4 => count as usize * 4, // LONG
-                5 => count as usize * 8, // RATIONAL
-                7 => count as usize,     // UNDEFINED
+                1 => count as usize,      // BYTE
+                2 => count as usize,      // ASCII
+                3 => count as usize * 2,  // SHORT
+                4 => count as usize * 4,  // LONG
+                5 => count as usize * 8,  // RATIONAL
+                6 => count as usize,      // SBYTE
+                7 => count as usize,      // UNDEFINED
+                8 => count as usize * 2,  // SSHORT
+                9 => count as usize * 4,  // SLONG
+                10 => count as usize * 8, // SRATIONAL
                 _ => 0,
             };
 
@@ -429,14 +556,26 @@ pub fn parse_panasonic_maker_notes(
                 }
                 2 => {
                     // ASCII
-                    let offset = value_offset as usize;
-                    if offset + count as usize <= data.len() {
-                        let s = String::from_utf8_lossy(&data[offset..offset + count as usize])
+                    if count <= 4 {
+                        // Inline value for short strings
+                        let bytes = match endian {
+                            Endianness::Little => value_offset.to_le_bytes(),
+                            Endianness::Big => value_offset.to_be_bytes(),
+                        };
+                        let s = String::from_utf8_lossy(&bytes[..count as usize])
                             .trim_end_matches('\0')
                             .to_string();
                         ExifValue::Ascii(s)
                     } else {
-                        continue;
+                        let offset = value_offset as usize;
+                        if offset + count as usize <= data.len() {
+                            let s = String::from_utf8_lossy(&data[offset..offset + count as usize])
+                                .trim_end_matches('\0')
+                                .to_string();
+                            ExifValue::Ascii(s)
+                        } else {
+                            continue;
+                        }
                     }
                 }
                 3 => {
@@ -482,26 +621,38 @@ pub fn parse_panasonic_maker_notes(
                     if values.len() == 1 {
                         let v = values[0];
                         let decoded = match tag_id {
-                            PANA_IMAGE_QUALITY => Some(decode_image_quality(v).to_string()),
-                            PANA_WHITE_BALANCE => Some(decode_white_balance(v).to_string()),
-                            PANA_FOCUS_MODE => Some(decode_focus_mode(v).to_string()),
-                            PANA_AF_AREA_MODE => Some(decode_af_area_mode(v).to_string()),
+                            PANA_IMAGE_QUALITY => {
+                                Some(decode_image_quality_exiftool(v).to_string())
+                            }
+                            PANA_WHITE_BALANCE => {
+                                Some(decode_white_balance_exiftool(v).to_string())
+                            }
+                            PANA_FOCUS_MODE => Some(decode_focus_mode_exiftool(v).to_string()),
+                            PANA_AF_AREA_MODE => Some(decode_af_area_mode_exiftool(v).to_string()),
                             PANA_IMAGE_STABILIZATION => {
-                                Some(decode_image_stabilization(v).to_string())
+                                Some(decode_image_stabilization_exiftool(v).to_string())
                             }
-                            PANA_MACRO_MODE => Some(decode_macro_mode(v).to_string()),
-                            PANA_SHOOTING_MODE => Some(decode_shooting_mode(v).to_string()),
-                            PANA_PHOTO_STYLE => Some(decode_photo_style(v).to_string()),
-                            PANA_SHUTTER_TYPE => Some(decode_shutter_type(v).to_string()),
-                            PANA_CONTRAST_MODE => Some(decode_contrast_mode(v).to_string()),
-                            PANA_BURST_MODE => Some(decode_burst_mode(v).to_string()),
+                            PANA_MACRO_MODE => Some(decode_macro_mode_exiftool(v).to_string()),
+                            PANA_SHOOTING_MODE => {
+                                Some(decode_shooting_mode_exiftool(v).to_string())
+                            }
+                            PANA_PHOTO_STYLE => Some(decode_photo_style_exiftool(v).to_string()),
+                            PANA_SHUTTER_TYPE => Some(decode_shutter_type_exiftool(v).to_string()),
+                            PANA_CONTRAST_MODE => {
+                                Some(decode_contrast_mode_exiftool(v).to_string())
+                            }
+                            PANA_BURST_MODE => Some(decode_burst_mode_exiftool(v).to_string()),
                             PANA_INTELLIGENT_RESOLUTION => {
-                                Some(decode_intelligent_resolution(v).to_string())
+                                Some(decode_intelligent_resolution_exiftool(v).to_string())
                             }
-                            PANA_CLEAR_RETOUCH => Some(decode_clear_retouch(v).to_string()),
-                            PANA_TOUCH_AE => Some(decode_touch_ae(v).to_string()),
-                            PANA_FLASH_CURTAIN => Some(decode_flash_curtain(v).to_string()),
-                            PANA_HDR_SHOT => Some(decode_hdr_shot(v).to_string()),
+                            PANA_CLEAR_RETOUCH => {
+                                Some(decode_clear_retouch_exiftool(v).to_string())
+                            }
+                            PANA_TOUCH_AE => Some(decode_touch_ae_exiftool(v).to_string()),
+                            PANA_FLASH_CURTAIN => {
+                                Some(decode_flash_curtain_exiftool(v).to_string())
+                            }
+                            PANA_HDR_SHOT => Some(decode_hdr_shot_exiftool(v).to_string()),
                             _ => None,
                         };
 
@@ -539,11 +690,153 @@ pub fn parse_panasonic_maker_notes(
                         }
                     }
                 }
+                5 => {
+                    // RATIONAL (numerator/denominator pairs)
+                    let offset = value_offset as usize;
+                    if offset + value_size <= data.len() {
+                        let mut values = Vec::new();
+                        let mut cursor = Cursor::new(&data[offset..]);
+                        for _ in 0..count {
+                            if let (Ok(num), Ok(den)) = (
+                                match endian {
+                                    Endianness::Little => cursor.read_u32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_u32::<BigEndian>(),
+                                },
+                                match endian {
+                                    Endianness::Little => cursor.read_u32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_u32::<BigEndian>(),
+                                },
+                            ) {
+                                values.push((num, den));
+                            } else {
+                                break;
+                            }
+                        }
+                        ExifValue::Rational(values)
+                    } else {
+                        continue;
+                    }
+                }
+                6 => {
+                    // SBYTE
+                    if count <= 4 {
+                        let bytes = match endian {
+                            Endianness::Little => value_offset.to_le_bytes(),
+                            Endianness::Big => value_offset.to_be_bytes(),
+                        };
+                        let sbytes: Vec<i8> =
+                            bytes[..count as usize].iter().map(|&b| b as i8).collect();
+                        ExifValue::SByte(sbytes)
+                    } else {
+                        let offset = value_offset as usize;
+                        if offset + count as usize <= data.len() {
+                            let sbytes: Vec<i8> = data[offset..offset + count as usize]
+                                .iter()
+                                .map(|&b| b as i8)
+                                .collect();
+                            ExifValue::SByte(sbytes)
+                        } else {
+                            continue;
+                        }
+                    }
+                }
                 7 => {
                     // UNDEFINED
                     let offset = value_offset as usize;
                     if offset + count as usize <= data.len() {
                         ExifValue::Undefined(data[offset..offset + count as usize].to_vec())
+                    } else {
+                        continue;
+                    }
+                }
+                8 => {
+                    // SSHORT
+                    let mut values = Vec::new();
+                    if count == 1 {
+                        // Inline value
+                        values.push(match endian {
+                            Endianness::Little => (value_offset & 0xFFFF) as i16,
+                            Endianness::Big => (value_offset >> 16) as i16,
+                        });
+                    } else if count == 2 {
+                        // Two inline values
+                        values.push(match endian {
+                            Endianness::Little => (value_offset & 0xFFFF) as i16,
+                            Endianness::Big => (value_offset >> 16) as i16,
+                        });
+                        values.push(match endian {
+                            Endianness::Little => (value_offset >> 16) as i16,
+                            Endianness::Big => (value_offset & 0xFFFF) as i16,
+                        });
+                    } else {
+                        // Values at offset
+                        let offset = value_offset as usize;
+                        if offset + value_size <= data.len() {
+                            let mut cursor = Cursor::new(&data[offset..]);
+                            for _ in 0..count {
+                                if let Ok(v) = match endian {
+                                    Endianness::Little => cursor.read_i16::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_i16::<BigEndian>(),
+                                } {
+                                    values.push(v);
+                                } else {
+                                    break;
+                                }
+                            }
+                        } else {
+                            continue;
+                        }
+                    }
+                    ExifValue::SShort(values)
+                }
+                9 => {
+                    // SLONG
+                    if count == 1 {
+                        ExifValue::SLong(vec![value_offset as i32])
+                    } else {
+                        let offset = value_offset as usize;
+                        if offset + value_size <= data.len() {
+                            let mut values = Vec::new();
+                            let mut cursor = Cursor::new(&data[offset..]);
+                            for _ in 0..count {
+                                if let Ok(v) = match endian {
+                                    Endianness::Little => cursor.read_i32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_i32::<BigEndian>(),
+                                } {
+                                    values.push(v);
+                                } else {
+                                    break;
+                                }
+                            }
+                            ExifValue::SLong(values)
+                        } else {
+                            continue;
+                        }
+                    }
+                }
+                10 => {
+                    // SRATIONAL (signed numerator/denominator pairs)
+                    let offset = value_offset as usize;
+                    if offset + value_size <= data.len() {
+                        let mut values = Vec::new();
+                        let mut cursor = Cursor::new(&data[offset..]);
+                        for _ in 0..count {
+                            if let (Ok(num), Ok(den)) = (
+                                match endian {
+                                    Endianness::Little => cursor.read_i32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_i32::<BigEndian>(),
+                                },
+                                match endian {
+                                    Endianness::Little => cursor.read_i32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_i32::<BigEndian>(),
+                                },
+                            ) {
+                                values.push((num, den));
+                            } else {
+                                break;
+                            }
+                        }
+                        ExifValue::SRational(values)
                     } else {
                         continue;
                     }

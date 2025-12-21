@@ -1,5 +1,29 @@
 # Canon CR2 Maker Notes Analysis and Fix Proposal
 
+## Implementation Status
+
+The following items from this analysis have been implemented:
+
+### Completed
+- **Model database** (~65 entries) - EOS, PowerShot, etc. (was already present)
+- **Lens database** (~180 entries) - EF, EF-S, RF mount lenses via `get_canon_lens_name()`
+
+### Pending
+- Core EXIF formatting fixes (UserComment null handling, GPS formatting)
+- APEX value output format (string -> number for MeasuredEV, TargetAperture, etc.)
+- AF area array formatting (space-separated strings)
+- Categories lookup (bit flag decoding)
+- DateStampMode lookup
+- AEBBracketValue format fix
+- FocalLength calculation fix
+- Additional CanonModelID entries
+- AFInfo structure parsing
+- SensorInfo structure parsing
+- CameraInfo structure parsing
+- Computed fields (DOF, CircleOfConfusion, HyperfocalDistance)
+
+---
+
 ## Executive Summary
 
 The Canon maker notes implementation has extensive tag parsing but needs refinements to match ExifTool's output formatting and value interpretations. This analysis identifies the most impactful fixes needed to match ExifTool's output for 55 CR2 test files.

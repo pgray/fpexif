@@ -371,6 +371,446 @@ fn get_focus_info_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
+// =============================================================================
+// Decode Functions - ExifTool and exiv2 compatible value decoders
+// =============================================================================
+
+/// Decode ExposureMode value (CS 0x0200) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Manual",
+        2 => "Program",
+        3 => "Aperture-priority AE",
+        4 => "Shutter speed priority AE",
+        5 => "Program-shift",
+        _ => "Unknown",
+    }
+}
+// decode_exposure_mode_exiv2 - same as exiftool, no separate function needed
+
+/// Decode MeteringMode value (CS 0x0202) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_metering_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        2 => "Center-weighted average",
+        3 => "Spot",
+        5 => "ESP",
+        261 => "Pattern+AF",
+        515 => "Spot+Highlight control",
+        1027 => "Spot+Shadow control",
+        _ => "Unknown",
+    }
+}
+// decode_metering_mode_exiv2 - same as exiftool, no separate function needed
+
+/// Decode MacroMode value (CS 0x0300 and Main 0x0202) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_macro_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "Super Macro",
+        _ => "Unknown",
+    }
+}
+// decode_macro_mode_exiv2 - same as exiftool, no separate function needed
+
+/// Decode FocusMode value (CS 0x0301) - ExifTool format
+pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Single AF",
+        1 => "Sequential shooting AF",
+        2 => "Continuous AF",
+        3 => "Multi AF",
+        4 => "Face Detect",
+        10 => "MF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusMode value (CS 0x0301) - exiv2 format
+/// Note: exiv2 doesn't have value 4 (Face Detect)
+pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Single AF",
+        1 => "Sequential shooting AF",
+        2 => "Continuous AF",
+        3 => "Multi AF",
+        10 => "MF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusProcess value (CS 0x0302) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_focus_process_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "AF Not Used",
+        1 => "AF Used",
+        _ => "Unknown",
+    }
+}
+// decode_focus_process_exiv2 - same as exiftool, no separate function needed
+
+/// Decode AFSearch value (CS 0x0303) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_af_search_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Not Ready",
+        1 => "Ready",
+        _ => "Unknown",
+    }
+}
+// decode_af_search_exiv2 - same as exiftool, no separate function needed
+
+/// Decode FlashMode value (CS 0x0400) - ExifTool format (bitmask)
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "Fill-in",
+        3 => "On, Fill-in",
+        4 => "Red-eye",
+        8 => "Slow-sync",
+        16 => "Forced On",
+        32 => "2nd Curtain",
+        _ => {
+            // Bitmask combinations - return simple description
+            if value & 1 != 0 {
+                "On"
+            } else {
+                "Unknown"
+            }
+        }
+    }
+}
+// decode_flash_mode_exiv2 - same as exiftool, no separate function needed
+
+/// Decode WhiteBalance value (CS 0x0500) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Auto (Keep Warm Color Off)",
+        16 => "7500K (Fine Weather with Shade)",
+        17 => "6000K (Cloudy)",
+        18 => "5300K (Fine Weather)",
+        20 => "3000K (Tungsten light)",
+        21 => "3600K (Tungsten light-like)",
+        22 => "Auto Setup",
+        23 => "5500K (Flash)",
+        33 => "6600K (Daylight fluorescent)",
+        34 => "4500K (Neutral white fluorescent)",
+        35 => "4000K (Cool white fluorescent)",
+        36 => "White Fluorescent",
+        48 => "3600K (Tungsten light-like)",
+        67 => "Underwater",
+        256 => "One Touch WB 1",
+        257 => "One Touch WB 2",
+        258 => "One Touch WB 3",
+        259 => "One Touch WB 4",
+        512 => "Custom WB 1",
+        513 => "Custom WB 2",
+        514 => "Custom WB 3",
+        515 => "Custom WB 4",
+        _ => "Unknown",
+    }
+}
+// decode_white_balance_exiv2 - same as exiftool, no separate function needed
+
+/// Decode ColorSpace value (CS 0x0507) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_color_space_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "sRGB",
+        1 => "Adobe RGB",
+        2 => "Pro Photo RGB",
+        _ => "Unknown",
+    }
+}
+// decode_color_space_exiv2 - same as exiftool, no separate function needed
+
+/// Decode SceneMode value (CS 0x0509) - ExifTool format
+pub fn decode_scene_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        6 => "Auto",
+        7 => "Sport",
+        8 => "Portrait",
+        9 => "Landscape+Portrait",
+        10 => "Landscape",
+        11 => "Night Scene",
+        12 => "Self Portrait",
+        13 => "Panorama",
+        14 => "2 in 1",
+        15 => "Movie",
+        16 => "Landscape+Portrait",
+        17 => "Night+Portrait",
+        18 => "Indoor",
+        19 => "Fireworks",
+        20 => "Sunset",
+        21 => "Beauty Skin",
+        22 => "Macro",
+        23 => "Super Macro",
+        24 => "Food",
+        25 => "Documents",
+        26 => "Museum",
+        27 => "Shoot & Select",
+        28 => "Beach & Snow",
+        29 => "Self Portrait+Timer",
+        30 => "Candle",
+        31 => "Available Light",
+        32 => "Behind Glass",
+        33 => "My Mode",
+        34 => "Pet",
+        35 => "Underwater Wide1",
+        36 => "Underwater Macro",
+        37 => "Shoot & Select1",
+        38 => "Shoot & Select2",
+        39 => "High Key",
+        40 => "Digital Image Stabilization",
+        41 => "Auction",
+        42 => "Beach",
+        43 => "Snow",
+        44 => "Underwater Wide2",
+        45 => "Low Key",
+        46 => "Children",
+        47 => "Vivid",
+        48 => "Nature Macro",
+        49 => "Underwater Snapshot",
+        50 => "Shooting Guide",
+        54 => "Face Portrait",
+        57 => "Bulb",
+        59 => "Smile Shot",
+        60 => "Quick Shutter",
+        63 => "Slow Shutter",
+        64 => "Bird Watching",
+        65 => "Multiple Exposure",
+        66 => "e-Portrait",
+        67 => "Soft Background Shot",
+        142 => "Hand-held Starlight",
+        154 => "HDR",
+        197 => "Panning",
+        203 => "Light Trails",
+        204 => "Backlight HDR",
+        205 => "Silent",
+        206 => "Multi Focus Shot",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SceneMode value (CS 0x0509) - exiv2 format
+/// Note: exiv2 has fewer scene modes than ExifTool
+pub fn decode_scene_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        6 => "Auto",
+        7 => "Sport",
+        8 => "Portrait",
+        9 => "Landscape+Portrait",
+        10 => "Landscape",
+        11 => "Night Scene",
+        12 => "Self Portrait",
+        13 => "Panorama",
+        14 => "2 in 1",
+        15 => "Movie",
+        16 => "Landscape+Portrait",
+        17 => "Night+Portrait",
+        18 => "Indoor",
+        19 => "Fireworks",
+        20 => "Sunset",
+        22 => "Macro",
+        23 => "Super Macro",
+        24 => "Food",
+        25 => "Documents",
+        26 => "Museum",
+        27 => "Shoot & Select",
+        28 => "Beach & Snow",
+        29 => "Self Protrait+Timer",
+        30 => "Candle",
+        31 => "Available Light",
+        32 => "Behind Glass",
+        33 => "My Mode",
+        34 => "Pet",
+        35 => "Underwater Wide1",
+        36 => "Underwater Macro",
+        37 => "Shoot & Select1",
+        38 => "Shoot & Select2",
+        39 => "High Key",
+        40 => "Digital Image Stabilization",
+        41 => "Auction",
+        42 => "Beach",
+        43 => "Snow",
+        44 => "Underwater Wide2",
+        45 => "Low Key",
+        46 => "Children",
+        47 => "Vivid",
+        48 => "Nature Macro",
+        49 => "Underwater Snapshot",
+        50 => "Shooting Guide",
+        _ => "Unknown",
+    }
+}
+
+/// Decode NoiseReduction value (CS 0x050A) - ExifTool format (bitmask)
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "(none)",
+        1 => "Noise Reduction",
+        2 => "Noise Filter",
+        3 => "Noise Reduction, Noise Filter",
+        4 => "Noise Filter (ISO Boost)",
+        8 => "Auto",
+        _ => {
+            if value & 8 != 0 {
+                "Auto"
+            } else if value != 0 {
+                "On"
+            } else {
+                "Unknown"
+            }
+        }
+    }
+}
+// decode_noise_reduction_exiv2 - same as exiftool, no separate function needed
+
+/// Decode DistortionCorrection value (CS 0x050B) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_distortion_correction_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+// decode_distortion_correction_exiv2 - same as exiftool, no separate function needed
+
+/// Decode ShadingCompensation value (CS 0x050C) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_shading_compensation_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+// decode_shading_compensation_exiv2 - same as exiftool, no separate function needed
+
+/// Decode PictureMode value (CS 0x0520) - ExifTool format
+pub fn decode_picture_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Vivid",
+        2 => "Natural",
+        3 => "Muted",
+        4 => "Portrait",
+        5 => "i-Enhance",
+        6 => "e-Portrait",
+        7 => "Color Creator",
+        8 => "Underwater",
+        9 => "Color Profile 1",
+        10 => "Color Profile 2",
+        11 => "Color Profile 3",
+        12 => "Monochrome Profile 1",
+        13 => "Monochrome Profile 2",
+        14 => "Monochrome Profile 3",
+        17 => "Art Mode",
+        18 => "Monochrome Profile 4",
+        256 => "Monotone",
+        512 => "Sepia",
+        _ => "Unknown",
+    }
+}
+
+/// Decode PictureMode value (CS 0x0520) - exiv2 format
+/// Note: exiv2 doesn't have values 8, 17, 18
+pub fn decode_picture_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "Vivid",
+        2 => "Natural",
+        3 => "Muted",
+        4 => "Portrait",
+        5 => "i-Enhance",
+        6 => "e-Portrait",
+        7 => "Color Creator",
+        9 => "Color Profile 1",
+        10 => "Color Profile 2",
+        11 => "Color Profile 3",
+        12 => "Monochrome Profile 1",
+        13 => "Monochrome Profile 2",
+        14 => "Monochrome Profile 3",
+        256 => "Monotone",
+        512 => "Sepia",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageQuality value (CS 0x0603) - ExifTool format
+pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "SQ",
+        2 => "HQ",
+        3 => "SHQ",
+        4 => "RAW",
+        5 => "SQ (5)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageQuality value (CS 0x0603) - exiv2 format
+/// Note: exiv2 doesn't have value 5
+pub fn decode_image_quality_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "SQ",
+        2 => "HQ",
+        3 => "SHQ",
+        4 => "RAW",
+        _ => "Unknown",
+    }
+}
+
+/// Decode JpegQuality value (Main 0x0201) - ExifTool format
+pub fn decode_jpeg_quality_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "SQ",
+        2 => "HQ",
+        3 => "SHQ",
+        4 => "RAW",
+        5 => "Medium-Fine",
+        6 => "Small-Fine",
+        33 => "Uncompressed",
+        _ => "Unknown",
+    }
+}
+
+/// Decode JpegQuality value (Main 0x0201) - exiv2 format
+pub fn decode_jpeg_quality_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "Standard Quality (SQ)",
+        2 => "High Quality (HQ)",
+        3 => "Super High Quality (SHQ)",
+        6 => "Raw",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AELock value (CS 0x0201) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_ae_lock_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+// decode_ae_lock_exiv2 - same as exiftool, no separate function needed
+
+// =============================================================================
+// IFD Parsing Functions
+// =============================================================================
+
 /// Read u16 with given endianness
 fn read_u16(data: &[u8], endian: Endianness) -> u16 {
     match endian {

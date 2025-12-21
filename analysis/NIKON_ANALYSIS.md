@@ -1,5 +1,27 @@
 # Nikon NEF Maker Notes Analysis and Fix Proposal
 
+## Implementation Status
+
+The following items from this analysis have been implemented:
+
+### Completed
+- **ColorSpace decoder** (0x001E) - Decodes 1=sRGB, 2=Adobe RGB
+- **VignetteControl decoder** (0x002A) - Decodes 0=Off, 1=Low, 2=Normal, 3=High
+- **DateStampMode decoder** (0x009D) - Decodes 0=Off, 1=Date & Time, 2=Date, 3=Date Counter
+- **SerialNumber parsing** (0x001D) - Reads serial from ASCII string
+- **ShutterCount parsing** (0x00A7) - Via encrypted ShotInfo (0x0091) structure
+- **ShotInfo decryption** - Nikon cipher with XLAT lookup tables implemented
+- **Lens database** (~90 entries) - Composite 8-byte hex key lookup
+- **New tag constants**: NIKON_DATE_STAMP_MODE, NIKON_SERIAL_NUMBER_2, NIKON_IMAGE_DATA_SIZE, NIKON_IMAGE_COUNT, NIKON_DELETED_IMAGE_COUNT, NIKON_SHUTTER_COUNT
+
+### Pending
+- Core EXIF formatting fixes (CFAPattern, PhotometricInterpretation, etc.)
+- LensData (0x0083) - encrypted structure for detailed lens info
+- FlashInfo (0x00A8) - flash-related metadata
+- Complex nested structures with version-specific parsing
+
+---
+
 ## Executive Summary
 
 The current Nikon maker notes implementation is a stub that doesn't parse actual tag values. This analysis identifies the most impactful fixes needed to match ExifTool's output for 47 NEF test files.

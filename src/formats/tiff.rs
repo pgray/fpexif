@@ -18,8 +18,10 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
         return Err(ExifError::Format("Not a valid TIFF file".to_string()));
     }
 
+    let is_little_endian = tiff_header[0] == b'I';
+
     // Verify TIFF magic number (0x002A for standard TIFF, 0x002B for BigTIFF, 0x4F52 for ORF, 0x5352 for SRW)
-    let magic = if tiff_header[0] == b'I' {
+    let magic = if is_little_endian {
         u16::from_le_bytes([tiff_header[2], tiff_header[3]])
     } else {
         u16::from_be_bytes([tiff_header[2], tiff_header[3]])
@@ -43,6 +45,16 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
         return Err(ExifError::Format("TIFF file too short".to_string()));
     }
 
+    // Special handling for Panasonic RW2 files (magic 0x0055)
+    // RW2 files have a Panasonic-specific IFD that reuses standard TIFF tag IDs with wrong types.
+    // The correct EXIF data is in an embedded JPEG pointed to by tag 0x002E (JpgFromRaw).
+    if magic == 0x0055 {
+        if let Some(embedded_exif) = extract_rw2_embedded_exif(&tiff_data, is_little_endian) {
+            return Ok(embedded_exif);
+        }
+        // Fall through to default behavior if we can't find embedded JPEG
+    }
+
     // Create APP1 segment format: "Exif\0\0" + TIFF data
     // This allows the existing parser to work with TIFF-based RAW files
     let mut app1_data = Vec::with_capacity(6 + tiff_data.len());
@@ -50,6 +62,156 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
     app1_data.extend_from_slice(&tiff_data);
 
     Ok(app1_data)
+}
+
+/// Extract EXIF data from embedded JPEG in Panasonic RW2 files
+/// RW2 files store the real EXIF data in an embedded JPEG pointed to by tag 0x002E
+fn extract_rw2_embedded_exif(tiff_data: &[u8], is_little_endian: bool) -> Option<Vec<u8>> {
+    if tiff_data.len() < 8 {
+        return None;
+    }
+
+    // Read IFD0 offset from TIFF header (bytes 4-7)
+    let ifd_offset = if is_little_endian {
+        u32::from_le_bytes([tiff_data[4], tiff_data[5], tiff_data[6], tiff_data[7]]) as usize
+    } else {
+        u32::from_be_bytes([tiff_data[4], tiff_data[5], tiff_data[6], tiff_data[7]]) as usize
+    };
+
+    if ifd_offset + 2 > tiff_data.len() {
+        return None;
+    }
+
+    // Read number of IFD entries
+    let num_entries = if is_little_endian {
+        u16::from_le_bytes([tiff_data[ifd_offset], tiff_data[ifd_offset + 1]]) as usize
+    } else {
+        u16::from_be_bytes([tiff_data[ifd_offset], tiff_data[ifd_offset + 1]]) as usize
+    };
+
+    // Search for tag 0x002E (JpgFromRaw) in the IFD
+    let mut entry_offset = ifd_offset + 2;
+    for _ in 0..num_entries {
+        if entry_offset + 12 > tiff_data.len() {
+            break;
+        }
+
+        let tag_id = if is_little_endian {
+            u16::from_le_bytes([tiff_data[entry_offset], tiff_data[entry_offset + 1]])
+        } else {
+            u16::from_be_bytes([tiff_data[entry_offset], tiff_data[entry_offset + 1]])
+        };
+
+        if tag_id == 0x002E {
+            // Found JpgFromRaw tag - get the data count and offset
+            let count = if is_little_endian {
+                u32::from_le_bytes([
+                    tiff_data[entry_offset + 4],
+                    tiff_data[entry_offset + 5],
+                    tiff_data[entry_offset + 6],
+                    tiff_data[entry_offset + 7],
+                ]) as usize
+            } else {
+                u32::from_be_bytes([
+                    tiff_data[entry_offset + 4],
+                    tiff_data[entry_offset + 5],
+                    tiff_data[entry_offset + 6],
+                    tiff_data[entry_offset + 7],
+                ]) as usize
+            };
+
+            let data_offset = if is_little_endian {
+                u32::from_le_bytes([
+                    tiff_data[entry_offset + 8],
+                    tiff_data[entry_offset + 9],
+                    tiff_data[entry_offset + 10],
+                    tiff_data[entry_offset + 11],
+                ]) as usize
+            } else {
+                u32::from_be_bytes([
+                    tiff_data[entry_offset + 8],
+                    tiff_data[entry_offset + 9],
+                    tiff_data[entry_offset + 10],
+                    tiff_data[entry_offset + 11],
+                ]) as usize
+            };
+
+            // The embedded JPEG starts at data_offset
+            // Look for JPEG SOI marker (0xFFD8) and APP1 marker (0xFFE1) with "Exif\0\0"
+            if data_offset + count <= tiff_data.len() {
+                let jpeg_data = &tiff_data[data_offset..data_offset + count];
+
+                // Look for APP1 EXIF segment within the JPEG
+                if let Some(exif_data) = extract_exif_from_jpeg(jpeg_data) {
+                    return Some(exif_data);
+                }
+            }
+            break;
+        }
+
+        entry_offset += 12;
+    }
+
+    None
+}
+
+/// Extract EXIF APP1 segment from embedded JPEG data
+fn extract_exif_from_jpeg(jpeg_data: &[u8]) -> Option<Vec<u8>> {
+    // Check for JPEG SOI marker
+    if jpeg_data.len() < 4 || jpeg_data[0] != 0xFF || jpeg_data[1] != 0xD8 {
+        return None;
+    }
+
+    let mut offset = 2;
+    while offset + 4 < jpeg_data.len() {
+        // Check for marker
+        if jpeg_data[offset] != 0xFF {
+            offset += 1;
+            continue;
+        }
+
+        let marker = jpeg_data[offset + 1];
+
+        // Skip padding bytes (0xFF)
+        if marker == 0xFF {
+            offset += 1;
+            continue;
+        }
+
+        // Check for APP1 marker (0xE1)
+        if marker == 0xE1 {
+            // Read segment length (big-endian)
+            let length =
+                u16::from_be_bytes([jpeg_data[offset + 2], jpeg_data[offset + 3]]) as usize;
+
+            if offset + 2 + length > jpeg_data.len() {
+                return None;
+            }
+
+            // Check for "Exif\0\0" identifier
+            let segment_data = &jpeg_data[offset + 4..offset + 2 + length];
+            if segment_data.len() >= 6 && &segment_data[0..6] == b"Exif\0\0" {
+                // Return the full APP1 data including "Exif\0\0" prefix
+                return Some(segment_data.to_vec());
+            }
+        }
+
+        // Skip to next marker
+        if marker == 0xD8 || marker == 0xD9 || (0xD0..=0xD7).contains(&marker) {
+            // Standalone markers without length
+            offset += 2;
+        } else {
+            // Markers with length
+            if offset + 4 > jpeg_data.len() {
+                return None;
+            }
+            let length =
+                u16::from_be_bytes([jpeg_data[offset + 2], jpeg_data[offset + 3]]) as usize;
+            offset += 2 + length;
+        }
+    }
+
+    None
 }
 
 /// Detect specific TIFF-based RAW format from TIFF data
