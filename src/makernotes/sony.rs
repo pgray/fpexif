@@ -580,6 +580,60 @@ pub fn decode_high_iso_noise_reduction(value: u16) -> &'static str {
     }
 }
 
+/// Decode SceneMode value (tag 0xB023)
+pub fn decode_scene_mode(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Portrait",
+        2 => "Text",
+        3 => "Night Scene",
+        4 => "Sunset",
+        5 => "Sports",
+        6 => "Landscape",
+        7 => "Night Portrait",
+        8 => "Macro",
+        9 => "Super Macro",
+        16 => "Auto",
+        17 => "Night View/Portrait",
+        18 => "Sweep Panorama",
+        19 => "Handheld Night Shot",
+        20 => "Anti Motion Blur",
+        21 => "Cont. Priority AE",
+        22 => "Auto+",
+        23 => "3D Sweep Panorama",
+        24 => "Superior Auto",
+        25 => "High Sensitivity",
+        26 => "Fireworks",
+        27 => "Food",
+        28 => "Pet",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Contrast/Saturation/Sharpness adjustment values
+/// (tags 0x2004/0x2005/0x2006)
+pub fn decode_adjustment(value: i32) -> &'static str {
+    match value {
+        -3 => "-3",
+        -2 => "-2",
+        -1 => "-1",
+        0 => "Normal",
+        1 => "+1",
+        2 => "+2",
+        3 => "+3",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ColorTemperature value (tag 0xB021)
+/// Returns None if value should be displayed as-is (actual temperature)
+pub fn decode_color_temperature(value: u32) -> Option<&'static str> {
+    match value {
+        0 => Some("Auto"),
+        _ => None, // Display actual temperature value
+    }
+}
+
 /// Parse a single IFD entry from Sony maker notes
 fn parse_ifd_entry(
     data: &[u8],
@@ -686,6 +740,8 @@ fn parse_ifd_entry(
                     SONY_HIGH_ISO_NOISE_REDUCTION => {
                         Some(decode_high_iso_noise_reduction(v).to_string())
                     }
+                    SONY_SCENE_MODE => Some(decode_scene_mode(v).to_string()),
+                    SONY_SONY_MODEL_ID => get_sony_model_name(v).map(|s| s.to_string()),
                     _ => None,
                 };
 
@@ -713,6 +769,34 @@ fn parse_ifd_entry(
                 // First check tags that need full u32 range
                 if tag_id == SONY_LONG_EXPOSURE_NOISE_REDUCTION {
                     ExifValue::Ascii(decode_long_exposure_noise_reduction(v).to_string())
+                } else if tag_id == SONY_LENS_ID {
+                    // LensID uses u32 for lookup
+                    if let Some(name) = get_sony_lens_name(v) {
+                        ExifValue::Ascii(name.to_string())
+                    } else {
+                        ExifValue::Long(values)
+                    }
+                } else if tag_id == SONY_COLOR_TEMPERATURE {
+                    // ColorTemperature: 0 = "Auto", otherwise show value
+                    if let Some(s) = decode_color_temperature(v) {
+                        ExifValue::Ascii(s.to_string())
+                    } else {
+                        ExifValue::Long(values)
+                    }
+                } else if tag_id == SONY_WHITE_BALANCE {
+                    // WhiteBalance is int32u in some cameras
+                    if v <= u16::MAX as u32 {
+                        ExifValue::Ascii(decode_white_balance(v as u16).to_string())
+                    } else {
+                        ExifValue::Long(values)
+                    }
+                } else if tag_id == SONY_CONTRAST
+                    || tag_id == SONY_SATURATION
+                    || tag_id == SONY_SHARPNESS
+                {
+                    // Contrast/Saturation/Sharpness as signed value
+                    let signed_v = v as i32;
+                    ExifValue::Ascii(decode_adjustment(signed_v).to_string())
                 } else if v <= u16::MAX as u32 {
                     // Then check tags that fit in u16
                     let v16 = v as u16;
@@ -723,6 +807,8 @@ fn parse_ifd_entry(
                         SONY_IMAGE_STABILIZATION => {
                             Some(decode_image_stabilization(v16).to_string())
                         }
+                        SONY_SCENE_MODE => Some(decode_scene_mode(v16).to_string()),
+                        SONY_SONY_MODEL_ID => get_sony_model_name(v16).map(|s| s.to_string()),
                         _ => None,
                     };
 
