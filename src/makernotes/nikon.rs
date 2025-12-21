@@ -53,16 +53,26 @@ pub const NIKON_DIGITAL_ZOOM: u16 = 0x0086;
 pub const NIKON_FLASH_MODE: u16 = 0x0087;
 pub const NIKON_AF_INFO: u16 = 0x0088;
 pub const NIKON_SHOT_INFO: u16 = 0x0091;
+pub const NIKON_HUE_ADJUSTMENT: u16 = 0x0092;
+pub const NIKON_NEF_COMPRESSION: u16 = 0x0093;
+pub const NIKON_SATURATION: u16 = 0x0094;
+pub const NIKON_NOISE_REDUCTION: u16 = 0x0095;
 pub const NIKON_COLOR_BALANCE: u16 = 0x0097;
 pub const NIKON_LENS_DATA: u16 = 0x0098;
 pub const NIKON_RAW_IMAGE_CENTER: u16 = 0x0099;
 pub const NIKON_FLASH_INFO: u16 = 0x00A8;
 pub const NIKON_DATE_STAMP_MODE: u16 = 0x009D;
+pub const NIKON_RETOUCH_HISTORY: u16 = 0x009E;
 pub const NIKON_SERIAL_NUMBER_2: u16 = 0x00A0;
 pub const NIKON_IMAGE_DATA_SIZE: u16 = 0x00A2;
 pub const NIKON_IMAGE_COUNT: u16 = 0x00A5;
 pub const NIKON_DELETED_IMAGE_COUNT: u16 = 0x00A6;
 pub const NIKON_SHUTTER_COUNT: u16 = 0x00A7;
+pub const NIKON_IMAGE_OPTIMIZATION: u16 = 0x00A9;
+pub const NIKON_SATURATION_2: u16 = 0x00AA;
+pub const NIKON_VARI_PROGRAM: u16 = 0x00AB;
+pub const NIKON_IMAGE_STABILIZATION: u16 = 0x00AC;
+pub const NIKON_AF_RESPONSE: u16 = 0x00AD;
 pub const NIKON_LIGHT_SOURCE: u16 = 0x0090;
 
 /// Get the name of a Nikon MakerNote tag
@@ -92,18 +102,28 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_FLASH_MODE => Some("FlashMode"),
         NIKON_AF_INFO => Some("AFInfo"),
         NIKON_SHOT_INFO => Some("ShotInfo"),
+        NIKON_HUE_ADJUSTMENT => Some("HueAdjustment"),
+        NIKON_NEF_COMPRESSION => Some("NEFCompression"),
+        NIKON_SATURATION => Some("Saturation"),
+        NIKON_NOISE_REDUCTION => Some("NoiseReduction"),
         NIKON_COLOR_BALANCE => Some("ColorBalance"),
         NIKON_LENS_DATA => Some("LensData"),
         NIKON_RAW_IMAGE_CENTER => Some("RawImageCenter"),
         NIKON_FLASH_INFO => Some("FlashInfo"),
         NIKON_HIGH_ISO_NOISE_REDUCTION => Some("HighISONoiseReduction"),
         NIKON_DATE_STAMP_MODE => Some("DateStampMode"),
+        NIKON_RETOUCH_HISTORY => Some("RetouchHistory"),
         NIKON_LIGHT_SOURCE => Some("LightSource"),
         NIKON_SERIAL_NUMBER_2 => Some("SerialNumber"),
         NIKON_IMAGE_DATA_SIZE => Some("ImageDataSize"),
         NIKON_IMAGE_COUNT => Some("ImageCount"),
         NIKON_DELETED_IMAGE_COUNT => Some("DeletedImageCount"),
         NIKON_SHUTTER_COUNT => Some("ShutterCount"),
+        NIKON_IMAGE_OPTIMIZATION => Some("ImageOptimization"),
+        NIKON_SATURATION_2 => Some("Saturation"),
+        NIKON_VARI_PROGRAM => Some("VariProgram"),
+        NIKON_IMAGE_STABILIZATION => Some("ImageStabilization"),
+        NIKON_AF_RESPONSE => Some("AFResponse"),
         _ => None,
     }
 }
@@ -387,6 +407,46 @@ pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
     }
 }
 // decode_date_stamp_mode_exiv2 - not defined in exiv2
+
+/// Decode NEF Compression value (tag 0x0093) - ExifTool format
+pub fn decode_nef_compression_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Lossy (type 1)",
+        2 => "Uncompressed",
+        3 => "Lossless",
+        4 => "Lossy (type 2)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode NEF Compression value (tag 0x0093) - exiv2 format
+pub fn decode_nef_compression_exiv2(value: u16) -> &'static str {
+    decode_nef_compression_exiftool(value)
+}
+
+/// Decode Retouch History value (tag 0x009E) - ExifTool format
+pub fn decode_retouch_history_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        3 => "B & W",
+        4 => "Sepia",
+        5 => "Trim",
+        6 => "Small Picture",
+        7 => "D-Lighting",
+        8 => "Red Eye",
+        9 => "Cyanotype",
+        10 => "Sky Light",
+        11 => "Warm Tone",
+        12 => "Color Custom",
+        13 => "Image Overlay",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Retouch History - exiv2 format (same values)
+pub fn decode_retouch_history_exiv2(value: u16) -> &'static str {
+    decode_retouch_history_exiftool(value)
+}
 
 /// Decode Flash Mode value (tag 0x0087) - ExifTool format
 pub fn decode_flash_mode_exiftool(value: u8) -> &'static str {
@@ -898,6 +958,12 @@ pub fn parse_nikon_maker_notes(
                             }
                             NIKON_DATE_STAMP_MODE => {
                                 Some(decode_date_stamp_mode_exiftool(v).to_string())
+                            }
+                            NIKON_NEF_COMPRESSION => {
+                                Some(decode_nef_compression_exiftool(v).to_string())
+                            }
+                            NIKON_RETOUCH_HISTORY => {
+                                Some(decode_retouch_history_exiftool(v).to_string())
                             }
                             _ => None,
                         };

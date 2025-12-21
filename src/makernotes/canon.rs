@@ -976,6 +976,102 @@ pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
 
 // DateStampMode exiv2 - same as exiftool, no separate function needed
 
+/// Decode DigitalZoom - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_digital_zoom_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "2x",
+        2 => "4x",
+        3 => "Other",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DigitalZoom - exiv2 format (same as exiftool)
+pub fn decode_digital_zoom_exiv2(value: u16) -> &'static str {
+    decode_digital_zoom_exiftool(value)
+}
+
+/// Decode Contrast - ExifTool format (from Canon.pm using printParameter)
+pub fn decode_contrast_exiftool(value: u16) -> String {
+    if value == 0x7fff {
+        return "n/a".to_string();
+    }
+    let signed_val = if value > 0xfff0 {
+        (value as i32) - 0x10000
+    } else {
+        value as i32
+    };
+    if signed_val == 0 {
+        "Normal".to_string()
+    } else if signed_val > 0 {
+        format!("+{}", signed_val)
+    } else {
+        signed_val.to_string()
+    }
+}
+
+/// Decode Contrast - exiv2 format (from canonmn_int.cpp canonCsLnh)
+pub fn decode_contrast_exiv2(value: u16) -> &'static str {
+    match value {
+        0xffff => "Low",
+        0x0000 => "Normal",
+        0x0001 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Saturation - ExifTool format
+pub fn decode_saturation_exiftool(value: u16) -> String {
+    if value == 0x7fff {
+        return "n/a".to_string();
+    }
+    let signed_val = if value > 0xfff0 {
+        (value as i32) - 0x10000
+    } else {
+        value as i32
+    };
+    if signed_val == 0 {
+        "Normal".to_string()
+    } else if signed_val > 0 {
+        format!("+{}", signed_val)
+    } else {
+        signed_val.to_string()
+    }
+}
+
+/// Decode Saturation - exiv2 format
+pub fn decode_saturation_exiv2(value: u16) -> &'static str {
+    match value {
+        0xffff => "Low",
+        0x0000 => "Normal",
+        0x0001 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Sharpness - ExifTool format
+pub fn decode_sharpness_exiftool(value: u16) -> String {
+    if value == 0x7fff {
+        return "n/a".to_string();
+    }
+    if value > 0 {
+        format!("+{}", value)
+    } else {
+        value.to_string()
+    }
+}
+
+/// Decode Sharpness - exiv2 format
+pub fn decode_sharpness_exiv2(value: u16) -> &'static str {
+    match value {
+        0xffff => "Low",
+        0x0000 => "Normal",
+        0x0001 => "High",
+        _ => "Unknown",
+    }
+}
+
 /// Parse a single IFD entry and return the tag value
 ///
 /// Canon maker notes use offsets relative to the TIFF header, not the MakerNote data.
@@ -1201,6 +1297,38 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     // Note: Index 10 in CameraSettings is CanonImageSize, not AFAssistBeam
     // AFAssistBeam is actually in CustomFunctions, not CameraSettings
 
+    // Digital zoom (index 12)
+    if data.len() > 12 {
+        decoded.insert(
+            "DigitalZoom".to_string(),
+            ExifValue::Ascii(decode_digital_zoom_exiftool(data[12]).to_string()),
+        );
+    }
+
+    // Contrast (index 13)
+    if data.len() > 13 && data[13] != 0x7fff {
+        decoded.insert(
+            "Contrast".to_string(),
+            ExifValue::Ascii(decode_contrast_exiftool(data[13])),
+        );
+    }
+
+    // Saturation (index 14)
+    if data.len() > 14 && data[14] != 0x7fff {
+        decoded.insert(
+            "Saturation".to_string(),
+            ExifValue::Ascii(decode_saturation_exiftool(data[14])),
+        );
+    }
+
+    // Sharpness (index 15)
+    if data.len() > 15 && data[15] != 0x7fff {
+        decoded.insert(
+            "Sharpness".to_string(),
+            ExifValue::Ascii(decode_sharpness_exiftool(data[15])),
+        );
+    }
+
     // Metering mode (index 17)
     if data.len() > 17 {
         decoded.insert(
@@ -1419,6 +1547,38 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         decoded.insert(
             "FocusMode".to_string(),
             ExifValue::Ascii(decode_focus_mode_exiv2(data[7]).to_string()),
+        );
+    }
+
+    // Digital zoom (index 12)
+    if data.len() > 12 {
+        decoded.insert(
+            "DigitalZoom".to_string(),
+            ExifValue::Ascii(decode_digital_zoom_exiv2(data[12]).to_string()),
+        );
+    }
+
+    // Contrast (index 13)
+    if data.len() > 13 {
+        decoded.insert(
+            "Contrast".to_string(),
+            ExifValue::Ascii(decode_contrast_exiv2(data[13]).to_string()),
+        );
+    }
+
+    // Saturation (index 14)
+    if data.len() > 14 {
+        decoded.insert(
+            "Saturation".to_string(),
+            ExifValue::Ascii(decode_saturation_exiv2(data[14]).to_string()),
+        );
+    }
+
+    // Sharpness (index 15)
+    if data.len() > 15 {
+        decoded.insert(
+            "Sharpness".to_string(),
+            ExifValue::Ascii(decode_sharpness_exiv2(data[15]).to_string()),
         );
     }
 
