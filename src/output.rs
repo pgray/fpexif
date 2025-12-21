@@ -364,7 +364,10 @@ fn should_format_as_space_separated(tag_id: u16) -> bool {
 fn should_format_rationals_as_space_separated(tag_id: u16) -> bool {
     matches!(
         tag_id,
-        0xC621 // ColorMatrix1 (DNG)
+        0x013E // WhitePoint
+        | 0x013F // PrimaryChromaticities
+        | 0x0211 // YCbCrCoefficients
+        | 0xC621 // ColorMatrix1 (DNG)
         | 0xC622 // ColorMatrix2 (DNG)
         | 0xC627 // AnalogBalance (DNG)
         | 0xC628 // AsShotNeutral (DNG)
@@ -791,14 +794,31 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         );
     }
 
+    // Add derived date fields for ExifTool compatibility
+    // ModifyDate is an alias for DateTime (0x0132)
+    if let Some(ExifValue::Ascii(s)) = exif_data.get_tag_by_id(0x0132) {
+        let cleaned = s.trim_end_matches('\0').trim();
+        output.insert("ModifyDate".to_string(), Value::String(cleaned.to_string()));
+    }
+
+    // CreateDate is an alias for DateTimeDigitized (0x9004)
+    if let Some(ExifValue::Ascii(s)) = exif_data.get_tag_by_id(0x9004) {
+        let cleaned = s.trim_end_matches('\0').trim();
+        output.insert("CreateDate".to_string(), Value::String(cleaned.to_string()));
+    }
+
     // Add maker notes if present
+    // Skip MakerNote tags that would overwrite standard EXIF tags
     if let Some(maker_notes) = exif_data.get_maker_notes() {
         for (tag_id, maker_tag) in maker_notes.iter() {
             let tag_name = maker_tag
                 .tag_name
                 .unwrap_or_else(|| Box::leak(format!("MakerNote{:04X}", tag_id).into_boxed_str()));
-            let json_value = format_exif_value_for_json(&maker_tag.value, *tag_id);
-            output.insert(tag_name.to_string(), json_value);
+            // Only add if tag doesn't already exist (preserve standard EXIF over MakerNote)
+            if !output.contains_key(tag_name) {
+                let json_value = format_exif_value_for_json(&maker_tag.value, *tag_id);
+                output.insert(tag_name.to_string(), json_value);
+            }
         }
     }
 
