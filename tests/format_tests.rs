@@ -159,13 +159,15 @@ fn test_mrw_format_detection() {
     let cursor = Cursor::new(mrw);
     let result = formats::extract_exif_segment(cursor);
 
-    // Should fail because we don't have valid PRD block,
+    // Should fail because we don't have valid TTW block,
     // but signature should be recognized
     assert!(result.is_err());
     if let Err(fpexif::errors::ExifError::Format(msg)) = result {
-        // Either "No EXIF data found" or "Invalid MRW block structure"
+        // Various valid MRW-related error messages
         assert!(
-            msg.contains("No EXIF data found") || msg.contains("Invalid MRW block structure"),
+            msg.contains("No EXIF data found")
+                || msg.contains("Invalid MRW block structure")
+                || msg.contains("No TTW block found"),
             "Unexpected error message: {}",
             msg
         );
