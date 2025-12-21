@@ -111,3 +111,68 @@ constexpr TagDetails canonFocusMode[] = {
     {2, N_("AI Focus")},
 };
 ```
+
+### Decode Function Naming Convention
+
+All value-to-string decode functions MUST have format suffixes:
+
+```rust
+// In src/makernotes/sony.rs
+
+/// ExifTool mapping - from Sony.pm PrintConv
+pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        1 => "AF-S",
+        2 => "AF-C",
+        3 => "AF-A",
+        _ => "Unknown",
+    }
+}
+
+/// exiv2 mapping - from sonymn_int.cpp sonyFocusMode2
+pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        2 => "AF-S",
+        3 => "AF-C",
+        4 => "AF-A",
+        6 => "DMF",
+        _ => "Unknown",
+    }
+}
+```
+
+### What to Look For in Each Reference
+
+#### ExifTool (.pm files)
+| Pattern | Maps to |
+|---------|---------|
+| `PrintConv => { 0 => 'Value' }` | `decode_*_exiftool()` match arms |
+| `%manufacturerLensTypes` | `get_*_lens_name()` |
+| `%manufacturerModelID` | `get_*_model_name()` |
+| `Name => 'TagName'` | Tag constant name |
+
+#### exiv2 (*mn_int.cpp files)
+| Pattern | Maps to |
+|---------|---------|
+| `constexpr TagDetails name[]` | `decode_*_exiv2()` match arms |
+| `TagInfo(0xNNNN, "Name", ...)` | Tag constant and name |
+| Lens/model arrays | `get_*_lens_name()`, `get_*_model_name()` |
+
+### Tags to Implement for Each Manufacturer
+
+These are the common tags every manufacturer module should decode:
+
+| Tag | ExifTool pattern | exiv2 pattern |
+|-----|------------------|---------------|
+| FocusMode | `PrintConv => { 0 => 'One-Shot' }` | `*FocusMode[]` |
+| WhiteBalance | `PrintConv => { 0 => 'Auto' }` | `*WhiteBalance[]` |
+| ExposureMode | `PrintConv` | `*ExposureMode[]` |
+| MeteringMode | `PrintConv` | `*MeteringMode[]` |
+| ImageQuality | `PrintConv` | `*Quality[]` |
+| Sharpness | `PrintConv` | `*Sharpness[]` |
+| Saturation | `PrintConv` | `*Saturation[]` |
+| Contrast | `PrintConv` | `*Contrast[]` |
+| LensType/LensID | `%*LensTypes` | `*LensType[]` |
+| ModelID | `%*ModelID` | `*ModelId[]` |
