@@ -552,3 +552,83 @@ fn test_exiftool_json_compatibility_rw2() {
 fn test_exiftool_json_compatibility_raf() {
     run_and_report("raf");
 }
+
+#[test]
+fn test_exiftool_json_compatibility_3fr() {
+    run_and_report("3fr");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_crw() {
+    run_and_report("crw");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_dcr() {
+    run_and_report("dcr");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_erf() {
+    run_and_report("erf");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_kdc() {
+    run_and_report("kdc");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_mdc() {
+    run_and_report("mdc");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_mef() {
+    run_and_report("mef");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_mos() {
+    run_and_report("mos");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_mrw() {
+    run_and_report("mrw");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_nrw() {
+    run_and_report("nrw");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_pef() {
+    run_and_report("pef");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_raw() {
+    run_and_report("raw");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_sr2() {
+    run_and_report("sr2");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_srf() {
+    run_and_report("srf");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_srw() {
+    run_and_report("srw");
+}
+
+#[test]
+fn test_exiftool_json_compatibility_x3f() {
+    run_and_report("x3f");
+}

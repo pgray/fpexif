@@ -152,8 +152,8 @@ function generateReport(results: FormatTestResult[]): string {
   // Summary table by format
   lines.push("### Results by Format");
   lines.push("");
-  lines.push("| Format | Files | Match % | ✓ Match | ✗ Mismatch | ⚠ Missing | + Extra |");
-  lines.push("|--------|-------|---------|---------|------------|-----------|---------|");
+  lines.push("| Test | Files | Match % | ✓ Match | ✗ Mismatch | ⚠ Missing | + Extra |");
+  lines.push("|------|-------|---------|---------|------------|-----------|---------|");
 
   for (const r of results) {
     const matching = r.total_matching_tags || 0;
@@ -162,8 +162,10 @@ function generateReport(results: FormatTestResult[]): string {
     const extra = r.total_extra_tags || 0;
     const comparable = matching + mismatched + missing;
     const rate = comparable > 0 ? ((matching / comparable) * 100).toFixed(1) : "N/A";
+    // Use test_name for unique identification, fallback to format + reference_tool
+    const testLabel = r.test_name || `${r.format} (${r.reference_tool})`;
     lines.push(
-      `| ${r.format} | ${r.files_tested} | ${rate}% | ${matching} | ${mismatched} | ${missing} | ${extra} |`
+      `| ${testLabel} | ${r.files_tested} | ${rate}% | ${matching} | ${mismatched} | ${missing} | ${extra} |`
     );
   }
   lines.push("");
@@ -181,8 +183,10 @@ function generateReport(results: FormatTestResult[]): string {
     const formatMissing = r.total_missing_tags || 0;
     const formatComparable = formatMatching + formatMismatched + formatMissing;
     const formatRate = formatComparable > 0 ? ((formatMatching / formatComparable) * 100).toFixed(1) : "N/A";
+    // Use test_name for unique identification, fallback to format + reference_tool
+    const testLabel = r.test_name || `${r.format} (${r.reference_tool})`;
     lines.push(
-      `<summary><b>${r.format}</b> - ${r.files_tested} files, ${formatRate}% match rate</summary>`
+      `<summary><b>${testLabel}</b> - ${r.files_tested} files, ${formatRate}% match rate</summary>`
     );
     lines.push("");
 

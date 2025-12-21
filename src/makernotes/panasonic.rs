@@ -53,7 +53,7 @@ pub const PANA_ACCELEROMETER_Y: u16 = 0x008E;
 pub const PANA_CAMERA_ORIENTATION: u16 = 0x008F;
 pub const PANA_ROLL_ANGLE: u16 = 0x0090;
 pub const PANA_PITCH_ANGLE: u16 = 0x0091;
-pub const PANA_BATTERY_LEVEL: u16 = 0x0096;
+pub const PANA_BATTERY_LEVEL: u16 = 0x0038;
 pub const PANA_CITY: u16 = 0x006D;
 pub const PANA_LANDMARK: u16 = 0x006E;
 pub const PANA_INTELLIGENT_RESOLUTION: u16 = 0x0070;
@@ -466,6 +466,160 @@ pub fn decode_hdr_shot_exiftool(value: u16) -> &'static str {
 }
 // decode_hdr_shot_exiv2 - exiv2 uses different tag (0x009E) with EV values
 
+/// Decode Audio value (tag 0x0020) - ExifTool format
+pub fn decode_audio_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Yes",
+        2 => "No",
+        3 => "Stereo",
+        _ => "Unknown",
+    }
+}
+// decode_audio_exiv2 - same as exiftool
+
+/// Decode ColorEffect value (tag 0x0028) - ExifTool format
+pub fn decode_color_effect_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Off",
+        2 => "Warm",
+        3 => "Cool",
+        4 => "Black & White",
+        5 => "Sepia",
+        6 => "Happy",
+        8 => "Vivid",
+        _ => "Unknown",
+    }
+}
+// decode_color_effect_exiv2 - same as exiftool
+
+/// Decode NoiseReduction value (tag 0x002D) - ExifTool format
+pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Low (-1)",
+        2 => "High (+1)",
+        3 => "Lowest (-2)",
+        4 => "Highest (+2)",
+        5 => "+5",
+        6 => "+6",
+        65531 => "-5",
+        65532 => "-4",
+        65533 => "-3",
+        65534 => "-2",
+        65535 => "-1",
+        _ => "Unknown",
+    }
+}
+// decode_noise_reduction_exiv2 - same as exiftool
+
+/// Decode SelfTimer value (tag 0x002E) - ExifTool format
+pub fn decode_self_timer_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off (0)",
+        1 => "Off",
+        2 => "10 s",
+        3 => "2 s",
+        4 => "10 s / 3 pictures",
+        258 => "2 s after shutter pressed",
+        266 => "10 s after shutter pressed",
+        778 => "3 photos after 10 s",
+        _ => "Unknown",
+    }
+}
+// decode_self_timer_exiv2 - same as exiftool
+
+/// Decode Rotation value (tag 0x0030) - ExifTool format
+pub fn decode_rotation_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Horizontal (normal)",
+        3 => "Rotate 180",
+        6 => "Rotate 90 CW",
+        8 => "Rotate 270 CW",
+        _ => "Unknown",
+    }
+}
+// decode_rotation_exiv2 - same as exiftool
+
+/// Decode AFAssistLamp value (tag 0x0031) - ExifTool format
+pub fn decode_af_assist_lamp_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Fired",
+        2 => "Enabled but Not Used",
+        3 => "Disabled but Required",
+        4 => "Disabled and Not Required",
+        _ => "Unknown",
+    }
+}
+// decode_af_assist_lamp_exiv2 - same as exiftool
+
+/// Decode ColorMode value (tag 0x0032) - ExifTool format
+pub fn decode_color_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Natural",
+        2 => "Vivid",
+        _ => "Unknown",
+    }
+}
+// decode_color_mode_exiv2 - same as exiftool
+
+/// Decode OpticalZoomMode value (tag 0x0034) - ExifTool format
+pub fn decode_optical_zoom_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Standard",
+        2 => "Extended",
+        _ => "Unknown",
+    }
+}
+// decode_optical_zoom_mode_exiv2 - same as exiftool
+
+/// Decode ConversionLens value (tag 0x0035) - ExifTool format
+pub fn decode_conversion_lens_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Off",
+        2 => "Wide",
+        3 => "Telephoto",
+        4 => "Macro",
+        _ => "Unknown",
+    }
+}
+// decode_conversion_lens_exiv2 - same as exiftool
+
+/// Decode BatteryLevel value (tag 0x0038) - ExifTool format
+pub fn decode_battery_level_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Full",
+        2 => "Medium",
+        3 => "Low",
+        4 => "Near Empty",
+        7 => "Near Full",
+        8 => "Medium Low",
+        256 => "n/a",
+        _ => "Unknown",
+    }
+}
+// decode_battery_level_exiv2 - same as exiftool
+
+/// Decode WorldTimeLocation value (tag 0x003A) - ExifTool format
+pub fn decode_world_time_location_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Home",
+        2 => "Destination",
+        _ => "Unknown",
+    }
+}
+// decode_world_time_location_exiv2 - same as exiftool
+
+/// Decode TextStamp value (tag 0x003B) - ExifTool format
+pub fn decode_text_stamp_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Off",
+        2 => "On",
+        _ => "Unknown",
+    }
+}
+// decode_text_stamp_exiv2 - same as exiftool
+
 /// Parse Panasonic maker notes
 pub fn parse_panasonic_maker_notes(
     data: &[u8],
@@ -473,12 +627,20 @@ pub fn parse_panasonic_maker_notes(
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
-    // Panasonic maker notes use standard IFD format
-    if data.len() < 2 {
+    // Panasonic maker notes start with "Panasonic\0" header (12 bytes)
+    // followed by standard IFD format
+    if data.len() < 14 {
         return Ok(tags);
     }
 
-    let mut cursor = Cursor::new(data);
+    // Check for and skip Panasonic header
+    let ifd_start = if data.starts_with(b"Panasonic\0") {
+        12 // Skip "Panasonic\0" (10 bytes) + 2 bytes padding
+    } else {
+        0 // No header, start at beginning
+    };
+
+    let mut cursor = Cursor::new(&data[ifd_start..]);
 
     // Read number of entries
     let num_entries = match endian {
@@ -653,6 +815,32 @@ pub fn parse_panasonic_maker_notes(
                                 Some(decode_flash_curtain_exiftool(v).to_string())
                             }
                             PANA_HDR_SHOT => Some(decode_hdr_shot_exiftool(v).to_string()),
+                            PANA_AUDIO => Some(decode_audio_exiftool(v).to_string()),
+                            PANA_COLOR_EFFECT => Some(decode_color_effect_exiftool(v).to_string()),
+                            PANA_NOISE_REDUCTION => {
+                                Some(decode_noise_reduction_exiftool(v).to_string())
+                            }
+                            PANA_SELF_TIMER => Some(decode_self_timer_exiftool(v).to_string()),
+                            PANA_ROTATION => Some(decode_rotation_exiftool(v).to_string()),
+                            PANA_AF_ASSIST_LAMP => {
+                                Some(decode_af_assist_lamp_exiftool(v).to_string())
+                            }
+                            PANA_COLOR_MODE => Some(decode_color_mode_exiftool(v).to_string()),
+                            PANA_OPTICAL_ZOOM_MODE => {
+                                Some(decode_optical_zoom_mode_exiftool(v).to_string())
+                            }
+                            PANA_CONVERSION_LENS => {
+                                Some(decode_conversion_lens_exiftool(v).to_string())
+                            }
+                            PANA_BATTERY_LEVEL => {
+                                Some(decode_battery_level_exiftool(v).to_string())
+                            }
+                            PANA_WORLD_TIME_LOCATION => {
+                                Some(decode_world_time_location_exiftool(v).to_string())
+                            }
+                            PANA_TEXT_STAMP | PANA_TEXT_STAMP_2 => {
+                                Some(decode_text_stamp_exiftool(v).to_string())
+                            }
                             _ => None,
                         };
 

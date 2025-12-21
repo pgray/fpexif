@@ -1050,7 +1050,34 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
 
 /// Get the name of a tag from its ID
 pub fn get_tag_name(tag_id: ExifTagId) -> Option<&'static str> {
-    TAG_NAMES.get_or_init(init_tag_names).get(&tag_id).copied()
+    let tag_names = TAG_NAMES.get_or_init(init_tag_names);
+
+    // Try exact match first
+    if let Some(name) = tag_names.get(&tag_id) {
+        return Some(*name);
+    }
+
+    // Fall back to checking other tag groups with the same ID
+    // This handles cases where synthetic EXIF (e.g., from CRW) places tags in IFD0
+    // that are normally defined in EXIF SubIFD
+    const GROUPS: [TagGroup; 5] = [
+        TagGroup::Main,
+        TagGroup::Exif,
+        TagGroup::Gps,
+        TagGroup::Interop,
+        TagGroup::Thumbnail,
+    ];
+
+    for group in GROUPS {
+        if group != tag_id.ifd {
+            let alt_tag = ExifTagId::new(tag_id.id, group);
+            if let Some(name) = tag_names.get(&alt_tag) {
+                return Some(*name);
+            }
+        }
+    }
+
+    None
 }
 
 // Reverse mapping of tag names to IDs
