@@ -120,33 +120,33 @@ where
         exif_data.tags.insert(tag_id, value);
     }
 
-    // Helper closure to parse and add SubIFD tags
-    let mut parse_subifd = |pointer_tag_id: u16, tag_group: TagGroup| -> ExifResult<()> {
+    // Helper closure to parse and add SubIFD tags (lenient - ignores errors)
+    let mut parse_subifd = |pointer_tag_id: u16, tag_group: TagGroup| {
         if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(pointer_tag_id) {
             if !offsets.is_empty() {
                 let subifd_offset = offsets[0] as usize;
-                let (subifd_tags, _) = parse_ifd(
+                if let Ok((subifd_tags, _)) = parse_ifd(
                     &app1_data,
                     tiff_offset + subifd_offset,
                     tiff_offset,
                     endian,
                     tag_group,
                     config,
-                )?;
-
-                // Add the SubIFD tags
-                for (tag_id, value) in subifd_tags {
-                    exif_data.tags.insert(tag_id, value);
+                ) {
+                    // Add the SubIFD tags
+                    for (tag_id, value) in subifd_tags {
+                        exif_data.tags.insert(tag_id, value);
+                    }
                 }
             }
         }
-        Ok(())
     };
 
     // Parse SubIFDs: EXIF, GPS, and Interoperability
-    parse_subifd(0x8769, TagGroup::Exif)?; // EXIF SubIFD
-    parse_subifd(0x8825, TagGroup::Gps)?; // GPS SubIFD
-    parse_subifd(0xA005, TagGroup::Interop)?; // Interoperability SubIFD
+    // These use lenient parsing to handle corrupt offsets gracefully
+    parse_subifd(0x8769, TagGroup::Exif); // EXIF SubIFD
+    parse_subifd(0x8825, TagGroup::Gps); // GPS SubIFD
+    parse_subifd(0xA005, TagGroup::Interop); // Interoperability SubIFD
 
     // Parse SubIFDs pointed to by SubIFDs tag (0x014A)
     // These contain RAW image data and metadata in some formats (e.g., Nikon TIFF)
@@ -176,19 +176,20 @@ where
     }
 
     // Parse thumbnail IFD (IFD1) if present
+    // Use lenient parsing - some files have corrupt thumbnail IFD offsets
     if next_ifd_offset > 0 && tiff_offset + next_ifd_offset as usize + 2 <= app1_data.len() {
-        let (thumbnail_tags, _) = parse_ifd(
+        if let Ok((thumbnail_tags, _)) = parse_ifd(
             &app1_data,
             tiff_offset + next_ifd_offset as usize,
             tiff_offset,
             endian,
             TagGroup::Thumbnail,
             config,
-        )?;
-
-        // Add the thumbnail tags
-        for (tag_id, value) in thumbnail_tags {
-            exif_data.tags.insert(tag_id, value);
+        ) {
+            // Add the thumbnail tags
+            for (tag_id, value) in thumbnail_tags {
+                exif_data.tags.insert(tag_id, value);
+            }
         }
     }
 
@@ -237,6 +238,15 @@ fn parse_ifd(
     let entry_count = read_u16(&data[offset..offset + 2], endian) as usize;
     if config.verbose {
         println!("IFD has {} entries", entry_count);
+    }
+
+    // Sanity check: a typical IFD has at most a few hundred entries
+    // Values above 1000 usually indicate corrupt data or wrong offset
+    if entry_count > 1000 {
+        return Err(ExifError::Format(format!(
+            "IFD entry count too large ({}), likely corrupt data",
+            entry_count
+        )));
     }
 
     // Calculate the size of the entire IFD
@@ -351,10 +361,17 @@ fn parse_tag_value(
             // DOUBLE (64-bit IEEE floating point)
             parse_double_array(data, count, value_offset, base_offset, endian)
         }
-        _ => Err(ExifError::Unsupported(format!(
-            "Unsupported tag type: {}",
-            tag_type
-        ))),
+        13 => {
+            // IFD (32-bit unsigned integer, same as LONG) - used for SubIFD pointers
+            parse_long_array(data, count, value_offset, base_offset, endian)
+        }
+        _ => {
+            // Unknown tag type (including BigTIFF types 16-18 and vendor-specific types)
+            // For unknown types, we don't know the element size, so we can't safely
+            // calculate the actual byte count. Store only the inline value (4 bytes max)
+            // or return empty if the value is at an offset.
+            parse_unknown_type(value_offset)
+        }
     }
 }
 
@@ -606,6 +623,15 @@ fn parse_undefined_array(
             "Failed to parse UNDEFINED type".to_string(),
         )),
     }
+}
+
+/// Parse an unknown tag type by storing only the inline 4-byte value
+/// We don't attempt to follow offsets since we don't know the element size
+fn parse_unknown_type(value_offset: &[u8]) -> ExifResult<ExifValue> {
+    // Store the raw 4 bytes from the value field
+    // For unknown types, this is the safest approach since we can't
+    // determine the actual data size or location
+    Ok(ExifValue::Undefined(value_offset.to_vec()))
 }
 
 fn parse_sshort_array(

@@ -229,16 +229,13 @@ pub fn decode_sharpness_exiftool(value: u16) -> &'static str {
         0x00 => "-4 (softest)",
         0x01 => "-3 (very soft)",
         0x02 => "-2 (soft)",
-        0x03 => "-1",
-        0x04 => "0 (normal)",
-        0x05 => "+1",
-        0x06 => "+2",
-        0x07 => "+3",
-        0x08 => "+4 (hardest)",
-        0x82 => "Medium Soft",
-        0x84 => "Medium Hard",
-        0x100 => "Film Simulation",
-        0x8000 => "n/a (Film Simulation)",
+        0x03 => "0 (normal)",
+        0x04 => "+2 (hard)",
+        0x05 => "+3 (very hard)",
+        0x06 => "+4 (hardest)",
+        0x82 => "-1 (medium soft)",
+        0x84 => "+1 (medium hard)",
+        0x8000 => "Film Simulation",
         0xffff => "n/a",
         _ => "Unknown",
     }
@@ -257,6 +254,19 @@ pub fn decode_sharpness_exiv2(value: u16) -> &'static str {
         6 => "+4 (hardest)",
         130 => "-1 (medium soft)",
         132 => "+1 (medium hard)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Contrast value (tag 0x1004) - ExifTool format
+pub fn decode_contrast_exiftool(value: u16) -> &'static str {
+    match value {
+        0x0 => "Normal",
+        0x080 => "Medium High",
+        0x100 => "High",
+        0x180 => "Medium Low",
+        0x200 => "Low",
+        0x8000 => "Film Simulation",
         _ => "Unknown",
     }
 }
@@ -463,8 +473,8 @@ pub fn decode_picture_mode_exiftool(value: u16) -> &'static str {
         12 => "Party",
         13 => "Flower",
         14 => "Text",
-        256 => "Aperture Priority",
-        512 => "Shutter Priority",
+        256 => "Aperture-priority AE",
+        512 => "Shutter speed priority AE",
         768 => "Manual",
         _ => "Unknown",
     }
@@ -532,6 +542,91 @@ pub fn decode_dynamic_range_setting_exiv2(value: u16) -> &'static str {
         32768 => "Film simulation mode",
         _ => "Unknown",
     }
+}
+
+/// Decode EXRAuto value (tag 0x1033) - ExifTool format
+pub fn decode_exr_auto_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Manual",
+        _ => "Unknown",
+    }
+}
+
+/// Decode EXRMode value (tag 0x1034) - ExifTool format
+pub fn decode_exr_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0x100 => "HR (High Resolution)",
+        0x200 => "SN (Signal to Noise priority)",
+        0x300 => "DR (Dynamic Range priority)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode InternalSerialNumber to human-readable format
+/// Converts hex-encoded body number and date to readable format
+/// e.g., "FFDT21804365     59333030373413110124F03021264A" ->
+///       "FFDT21804365     Y30074 2013:11:01 24F03021264A"
+pub fn decode_internal_serial_number(raw: &str) -> String {
+    let trimmed = raw.trim_end_matches('\0').trim_end();
+
+    // Try to decode the hex portion
+    // Pattern: prefix + hex(starting with 59 = 'Y') + yymmdd + suffix(12 chars)
+    // The hex portion typically starts after spaces and begins with "59" (ASCII 'Y')
+
+    // Find where hex portion starts - look for "59" which is 'Y' in ASCII
+    if let Some(hex_start) = trimmed.find("59") {
+        // Check that this looks like a hex sequence
+        let prefix = &trimmed[..hex_start];
+        let rest = &trimmed[hex_start..];
+
+        // rest should be: hex_body + yymmdd + suffix(12)
+        // Minimum: some hex + 6 digits date + 12 suffix = at least 20 chars
+        if rest.len() >= 18 {
+            let suffix_start = rest.len() - 12;
+            let date_start = suffix_start - 6;
+
+            // Check if date portion looks like yymmdd (all digits)
+            let date_portion = &rest[date_start..suffix_start];
+            if date_portion.chars().all(|c| c.is_ascii_digit()) && date_start > 0 {
+                let hex_portion = &rest[..date_start];
+                let suffix = &rest[suffix_start..];
+
+                // Try to decode hex portion to ASCII
+                if hex_portion.len().is_multiple_of(2)
+                    && hex_portion.chars().all(|c| c.is_ascii_hexdigit())
+                {
+                    let mut decoded_body = String::new();
+                    for i in (0..hex_portion.len()).step_by(2) {
+                        if let Ok(byte) = u8::from_str_radix(&hex_portion[i..i + 2], 16) {
+                            if byte.is_ascii_graphic() || byte == b' ' {
+                                decoded_body.push(byte as char);
+                            } else {
+                                // Non-printable, return original
+                                return trimmed.to_string();
+                            }
+                        } else {
+                            return trimmed.to_string();
+                        }
+                    }
+
+                    // Parse date: yymmdd
+                    let yy: u16 = date_portion[0..2].parse().unwrap_or(0);
+                    let mm = &date_portion[2..4];
+                    let dd = &date_portion[4..6];
+                    let year = if yy < 70 { 2000 + yy } else { 1900 + yy };
+
+                    return format!(
+                        "{}{} {}:{}:{} {}",
+                        prefix, decoded_body, year, mm, dd, suffix
+                    );
+                }
+            }
+        }
+    }
+
+    // Fallback: return as-is
+    trimmed.to_string()
 }
 
 /// Parse Fujifilm maker notes
@@ -624,7 +719,12 @@ pub fn parse_fuji_maker_notes(
                     if offset + count as usize <= data.len() {
                         let string_bytes = &data[offset..offset + count as usize];
                         let s = String::from_utf8_lossy(string_bytes).to_string();
-                        ExifValue::Ascii(s)
+                        // Special handling for InternalSerialNumber
+                        if tag_id == FUJI_SERIAL_NUMBER {
+                            ExifValue::Ascii(decode_internal_serial_number(&s))
+                        } else {
+                            ExifValue::Ascii(s)
+                        }
                     } else {
                         continue;
                     }
@@ -669,6 +769,7 @@ pub fn parse_fuji_maker_notes(
                             }
                             FUJI_SHARPNESS => Some(decode_sharpness_exiftool(v).to_string()),
                             FUJI_SATURATION => Some(decode_saturation_exiftool(v).to_string()),
+                            FUJI_CONTRAST => Some(decode_contrast_exiftool(v).to_string()),
                             FUJI_MACRO => Some(decode_macro_exiftool(v).to_string()),
                             FUJI_FOCUS_MODE => Some(decode_focus_mode_exiftool(v).to_string()),
                             FUJI_AF_MODE => Some(decode_af_mode_exiftool(v).to_string()),
@@ -687,6 +788,8 @@ pub fn parse_fuji_maker_notes(
                             FUJI_DYNAMIC_RANGE_SETTING => {
                                 Some(decode_dynamic_range_setting_exiftool(v).to_string())
                             }
+                            FUJI_EXR_AUTO => Some(decode_exr_auto_exiftool(v).to_string()),
+                            FUJI_EXR_MODE => Some(decode_exr_mode_exiftool(v).to_string()),
                             _ => None,
                         };
 

@@ -198,12 +198,16 @@ pub fn is_critical_missing_field(field: &str) -> bool {
         || field.starts_with("Panasonic")
         || field.starts_with("Pentax")
         || field.starts_with("Fuji")
+        || field.starts_with("Kodak")
+        || field.starts_with("Minolta")
         || field.starts_with("Exif.Canon")
         || field.starts_with("Exif.Nikon")
         || field.starts_with("Exif.Sony")
         || field.starts_with("Exif.Fuji")
         || field.starts_with("Exif.Olympus")
-        || field.starts_with("Exif.Panasonic");
+        || field.starts_with("Exif.Panasonic")
+        || field.starts_with("Exif.Kodak")
+        || field.starts_with("Exif.Minolta");
 
     // Derived/calculated fields that exiftool adds
     let is_derived = field == "Aperture"
@@ -216,14 +220,110 @@ pub fn is_critical_missing_field(field: &str) -> bool {
         || field == "FOV"
         || field == "HyperfocalDistance"
         || field == "CircleOfConfusion"
-        || field == "FocalLength35efl";
+        || field == "FocalLength35efl"
+        // Color balance derived fields
+        || field == "BlueBalance"
+        || field == "RedBalance"
+        // Image encoding derived fields
+        || field == "EncodingProcess"
+        || field == "ColorComponents"
+        // Auto dynamic range (calculated from raw data)
+        || field == "AutoDynamicRange"
+        // Black/white level derived from raw data
+        || field == "BlackLevel"
+        || field == "WhiteLevel"
+        // Chromatic aberration derived
+        || field == "ChromaticAberrationParams"
+        // SubSec derived fields
+        || field == "SubSecCreateDate"
+        || field == "SubSecDateTimeOriginal"
+        || field == "SubSecModifyDate"
+        // Lens derived fields
+        || field == "LensSpec"
+        || field == "LensInfo"
+        || field == "Lens"
+        || field == "LensID"
+        || field == "MaxApertureAtMaxFocal"
+        || field == "MaxApertureAtMinFocal"
+        || field == "MinFocalLength"
+        || field == "MaxFocalLength"
+        || field == "FocalLengthIn35mmFormat"
+        // GPS derived fields
+        || field == "GPSPosition"
+        || field == "GPSDateTime"
+        // DNG color matrices derived
+        || field == "ColorTempAuto"
+        || field.ends_with("Level")
+        || field.ends_with("Balance")
+        // Manufacturer-specific processing fields (not always prefixed)
+        || field == "DigitalZoom"
+        || field == "NoiseReduction"
+        || field == "ImageStabilization"
+        || field == "ShadowTone"
+        || field == "HighlightTone"
+        || field == "Rating"
+        || field == "NumFaceElements"
+        || field == "ImageGeneration"
+        || field == "WhiteBalanceFineTune"
+        // Geometric/optical correction params
+        || field.contains("DistortionParams")
+        || field.contains("VignettingParams")
+        || field.contains("AberrationParams")
+        || field == "LensModulationOptimizer"
+        // Color profile fields
+        || field == "Gamma"
+        // X-Trans sensor layout
+        || field == "XTransLayout"
+        // Raw exposure fields
+        || field == "RawExposureBias";
 
     // File metadata
     let is_file_meta = field.starts_with("File")
         || field.starts_with("Directory")
         || field == "ExifByteOrder"
         || field == "ExifToolVersion"
-        || field == "MIMEType";
+        || field == "MIMEType"
+        // JFIF/JPEG marker fields
+        || field == "JFIFVersion"
+        || field == "YCbCrSubSampling"
+        || field == "Compression"
+        || field == "BitsPerSample"
+        // Image dimension fields (may come from different sources)
+        || field == "ExifImageWidth"
+        || field == "ExifImageHeight"
+        || field == "ImageWidth"
+        || field == "ImageHeight"
+        // RAF-specific raw fields
+        || field == "RawImageWidth"
+        || field == "RawImageHeight"
+        || field == "RawImageSize"
+        || field == "RawImageFullSize"
+        || field == "RawImageCroppedSize"
+        || field == "RawImageCropTopLeft"
+        || field == "RawImageFullWidth"
+        || field == "RawImageFullHeight"
+        || field == "OutputWidth"
+        || field == "OutputHeight"
+        // TIFF structure fields
+        || field == "StripByteCounts"
+        || field == "StripOffsets"
+        // Color mode fields
+        || field == "ColorMode"
+        // RAF-specific container fields
+        || field == "RAFCompression"
+        || field == "RAFVersion"
+        // Exposure aliases (ExposureCompensation is alias for ExposureBiasValue)
+        || field == "ExposureCompensation"
+        || field == "ExposureCount"
+        // Flash compensation
+        || field == "FlashExposureComp"
+        // Print Image Matching
+        || field == "PrintIMVersion"
+        // Version field (often manufacturer-specific)
+        || field == "Version"
+        || field == "RelativeExposure"
+        // White balance levels (manufacturer-specific names)
+        || field.starts_with("WB_");
 
     // Thumbnail/preview data
     let is_thumbnail = field.contains("Thumbnail")
@@ -241,11 +341,19 @@ pub fn is_critical_missing_field(field: &str) -> bool {
     // MakerNote raw data
     let is_makernote = field.contains("MakerNote");
 
+    // Kodak-specific IFD fields (from KodakIFD sub-directory)
+    let is_kodak_ifd = field == "KodakVersion"
+        || field == "BatteryLevel"
+        || field == "CFAPattern2"
+        || field == "UnknownEV"
+        || field.starts_with("KodakIFD");
+
     !(has_brand_prefix
         || is_derived
         || is_file_meta
         || is_thumbnail
         || is_interop
         || is_iptc_xmp
-        || is_makernote)
+        || is_makernote
+        || is_kodak_ifd)
 }

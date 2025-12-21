@@ -311,7 +311,7 @@ jobs:
         run: nice -n 19 cargo build --examples --verbose
 
   wasm:
-    name: WebAssembly Build and Test
+    name: wasm
     runs-on: self-hosted
 
     steps:

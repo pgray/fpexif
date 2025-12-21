@@ -45,11 +45,17 @@ pub const NIKON_WORLD_TIME: u16 = 0x0024;
 pub const NIKON_ISO_INFO: u16 = 0x0025;
 pub const NIKON_VIGNETTE_CONTROL: u16 = 0x002A;
 pub const NIKON_DISTORTION_CONTROL: u16 = 0x002B;
-pub const NIKON_LENS_DATA: u16 = 0x0083;
+pub const NIKON_AUXILIARY_LENS: u16 = 0x0082;
+pub const NIKON_LENS_TYPE: u16 = 0x0083;
+pub const NIKON_LENS: u16 = 0x0084;
+pub const NIKON_MANUAL_FOCUS_DISTANCE: u16 = 0x0085;
+pub const NIKON_DIGITAL_ZOOM: u16 = 0x0086;
+pub const NIKON_FLASH_MODE: u16 = 0x0087;
+pub const NIKON_AF_INFO: u16 = 0x0088;
 pub const NIKON_SHOT_INFO: u16 = 0x0091;
 pub const NIKON_COLOR_BALANCE: u16 = 0x0097;
-pub const NIKON_LENS_TYPE: u16 = 0x0098;
-pub const NIKON_LENS: u16 = 0x0099;
+pub const NIKON_LENS_DATA: u16 = 0x0098;
+pub const NIKON_RAW_IMAGE_CENTER: u16 = 0x0099;
 pub const NIKON_FLASH_INFO: u16 = 0x00A8;
 pub const NIKON_DATE_STAMP_MODE: u16 = 0x009D;
 pub const NIKON_SERIAL_NUMBER_2: u16 = 0x00A0;
@@ -57,6 +63,7 @@ pub const NIKON_IMAGE_DATA_SIZE: u16 = 0x00A2;
 pub const NIKON_IMAGE_COUNT: u16 = 0x00A5;
 pub const NIKON_DELETED_IMAGE_COUNT: u16 = 0x00A6;
 pub const NIKON_SHUTTER_COUNT: u16 = 0x00A7;
+pub const NIKON_LIGHT_SOURCE: u16 = 0x0090;
 
 /// Get the name of a Nikon MakerNote tag
 pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -77,13 +84,21 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_PICTURE_CONTROL_DATA => Some("PictureControlData"),
         NIKON_VIGNETTE_CONTROL => Some("VignetteControl"),
         NIKON_DISTORTION_CONTROL => Some("DistortionControl"),
-        NIKON_LENS_DATA => Some("LensData"),
-        NIKON_SHOT_INFO => Some("ShotInfo"),
+        NIKON_AUXILIARY_LENS => Some("AuxiliaryLens"),
         NIKON_LENS_TYPE => Some("LensType"),
         NIKON_LENS => Some("Lens"),
+        NIKON_MANUAL_FOCUS_DISTANCE => Some("ManualFocusDistance"),
+        NIKON_DIGITAL_ZOOM => Some("DigitalZoom"),
+        NIKON_FLASH_MODE => Some("FlashMode"),
+        NIKON_AF_INFO => Some("AFInfo"),
+        NIKON_SHOT_INFO => Some("ShotInfo"),
+        NIKON_COLOR_BALANCE => Some("ColorBalance"),
+        NIKON_LENS_DATA => Some("LensData"),
+        NIKON_RAW_IMAGE_CENTER => Some("RawImageCenter"),
         NIKON_FLASH_INFO => Some("FlashInfo"),
         NIKON_HIGH_ISO_NOISE_REDUCTION => Some("HighISONoiseReduction"),
         NIKON_DATE_STAMP_MODE => Some("DateStampMode"),
+        NIKON_LIGHT_SOURCE => Some("LightSource"),
         NIKON_SERIAL_NUMBER_2 => Some("SerialNumber"),
         NIKON_IMAGE_DATA_SIZE => Some("ImageDataSize"),
         NIKON_IMAGE_COUNT => Some("ImageCount"),
@@ -230,18 +245,43 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
             _ => value.trim(),
         }
         .to_string(),
+        NIKON_FLASH_SETTING => match value.trim() {
+            "NORMAL" => "Normal",
+            "SLOW" => "Slow",
+            "REAR" => "Rear",
+            "REAR SLOW" => "Rear Slow",
+            "RED-EYE" => "Red-eye",
+            "RED-EYE SLOW" => "Red-eye Slow",
+            "SLOW REAR" => "Slow Rear",
+            "" => "Normal",
+            _ => value.trim(),
+        }
+        .to_string(),
         NIKON_SHARPNESS => match value.trim() {
             "AUTO" => "Auto",
             "NORMAL" => "Normal",
-            "LOW" => "Low",
+            "LOW" => "Soft",
             "MED.L" | "MEDIUM LOW" => "Medium Low",
             "MED.H" | "MEDIUM HIGH" => "Medium High",
-            "HIGH" => "High",
+            "HIGH" => "Hard",
             "NONE" => "None",
             _ => value.trim(),
         }
         .to_string(),
-        NIKON_COLOR_MODE => value.trim().to_string(),
+        NIKON_COLOR_MODE => match value.trim() {
+            "COLOR" => "Color",
+            "B&W" | "B & W" | "BLACK & WHITE" => "Black & White",
+            _ => value.trim(),
+        }
+        .to_string(),
+        NIKON_LIGHT_SOURCE => match value.trim() {
+            "NATURAL" => "Natural",
+            "SPEEDLIGHT" => "Speedlight",
+            "COLORED" => "Colored",
+            "MIXED" => "Mixed",
+            _ => value.trim(),
+        }
+        .to_string(),
         _ => value.trim().to_string(),
     }
 }
@@ -347,6 +387,20 @@ pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
     }
 }
 // decode_date_stamp_mode_exiv2 - not defined in exiv2
+
+/// Decode Flash Mode value (tag 0x0087) - ExifTool format
+pub fn decode_flash_mode_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "Did Not Fire",
+        1 => "Fired, Manual",
+        3 => "Not Ready",
+        7 => "Fired, External",
+        8 => "Fired, Commander Mode",
+        9 => "Fired, TTL Mode",
+        18 => "LED Light",
+        _ => "Unknown",
+    }
+}
 
 /// Nikon decryption lookup tables (from ExifTool)
 const NIKON_XLAT_0: [u8; 256] = [
@@ -795,6 +849,8 @@ pub fn parse_nikon_maker_notes(
                     // Apply decoder for lens type
                     if tag_id == NIKON_LENS_TYPE && !bytes.is_empty() {
                         ExifValue::Ascii(decode_lens_type_exiftool(bytes[0]))
+                    } else if tag_id == NIKON_FLASH_MODE && !bytes.is_empty() {
+                        ExifValue::Ascii(decode_flash_mode_exiftool(bytes[0]).to_string())
                     } else {
                         ExifValue::Byte(bytes)
                     }
@@ -822,10 +878,10 @@ pub fn parse_nikon_maker_notes(
                             break;
                         }
                     }
-                    // Special handling for ISO tag
+                    // Special handling for ISO tag - extract the actual ISO value
                     if tag_id == NIKON_ISO_SETTING && values.len() >= 2 {
                         let iso = if values[1] > 0 { values[1] } else { values[0] };
-                        ExifValue::Ascii(iso.to_string())
+                        ExifValue::Short(vec![iso])
                     } else if values.len() == 1 {
                         // Apply value decoders for single SHORT values
                         let v = values[0];
