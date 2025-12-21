@@ -134,72 +134,72 @@ fn test_sony_a100_value_decoding() {
 
 #[test]
 fn test_decode_creative_style_values() {
-    // Test the decode_creative_style function directly through parsing
+    // Test the decode_creative_style_exiftool function directly through parsing
     use fpexif::makernotes::sony::*;
 
-    assert_eq!(decode_creative_style(1), "Standard");
-    assert_eq!(decode_creative_style(2), "Vivid");
-    assert_eq!(decode_creative_style(3), "Portrait");
-    assert_eq!(decode_creative_style(4), "Landscape");
-    assert_eq!(decode_creative_style(8), "B&W");
-    assert_eq!(decode_creative_style(13), "Neutral");
-    assert_eq!(decode_creative_style(999), "Unknown");
+    assert_eq!(decode_creative_style_exiftool(1), "Standard");
+    assert_eq!(decode_creative_style_exiftool(2), "Vivid");
+    assert_eq!(decode_creative_style_exiftool(3), "Portrait");
+    assert_eq!(decode_creative_style_exiftool(4), "Landscape");
+    assert_eq!(decode_creative_style_exiftool(8), "B&W");
+    assert_eq!(decode_creative_style_exiftool(13), "Neutral");
+    assert_eq!(decode_creative_style_exiftool(999), "Unknown");
 }
 
 #[test]
 fn test_decode_focus_mode_values() {
     use fpexif::makernotes::sony::*;
 
-    assert_eq!(decode_focus_mode(0), "Manual");
-    assert_eq!(decode_focus_mode(1), "AF-S");
-    assert_eq!(decode_focus_mode(2), "AF-C");
-    assert_eq!(decode_focus_mode(3), "AF-A");
-    assert_eq!(decode_focus_mode(4), "DMF");
-    assert_eq!(decode_focus_mode(999), "Unknown");
+    assert_eq!(decode_focus_mode_exiftool(0), "Manual");
+    assert_eq!(decode_focus_mode_exiftool(1), "AF-S");
+    assert_eq!(decode_focus_mode_exiftool(2), "AF-C");
+    assert_eq!(decode_focus_mode_exiftool(3), "AF-A");
+    assert_eq!(decode_focus_mode_exiftool(4), "DMF");
+    assert_eq!(decode_focus_mode_exiftool(999), "Unknown");
 }
 
 #[test]
 fn test_decode_af_mode_values() {
     use fpexif::makernotes::sony::*;
 
-    assert_eq!(decode_af_mode(0), "Default");
-    assert_eq!(decode_af_mode(1), "Multi");
-    assert_eq!(decode_af_mode(2), "Center");
-    assert_eq!(decode_af_mode(3), "Spot");
-    assert_eq!(decode_af_mode(4), "Flexible Spot");
-    assert_eq!(decode_af_mode(14), "Eye AF");
-    assert_eq!(decode_af_mode(999), "Unknown");
+    assert_eq!(decode_af_mode_exiftool(0), "Default");
+    assert_eq!(decode_af_mode_exiftool(1), "Multi");
+    assert_eq!(decode_af_mode_exiftool(2), "Center");
+    assert_eq!(decode_af_mode_exiftool(3), "Spot");
+    assert_eq!(decode_af_mode_exiftool(4), "Flexible Spot");
+    assert_eq!(decode_af_mode_exiftool(14), "Eye AF");
+    assert_eq!(decode_af_mode_exiftool(999), "Unknown");
 }
 
 #[test]
 fn test_decode_exposure_mode_values() {
     use fpexif::makernotes::sony::*;
 
-    assert_eq!(decode_exposure_mode(0), "Auto");
-    assert_eq!(decode_exposure_mode(1), "Portrait");
-    assert_eq!(decode_exposure_mode(2), "Landscape");
-    assert_eq!(decode_exposure_mode(12), "Superior Auto");
-    assert_eq!(decode_exposure_mode(999), "Unknown");
+    assert_eq!(decode_exposure_mode_exiftool(0), "Auto");
+    assert_eq!(decode_exposure_mode_exiftool(1), "Portrait");
+    assert_eq!(decode_exposure_mode_exiftool(2), "Landscape");
+    assert_eq!(decode_exposure_mode_exiftool(12), "Superior Auto");
+    assert_eq!(decode_exposure_mode_exiftool(999), "Unknown");
 }
 
 #[test]
 fn test_decode_dynamic_range_optimizer_values() {
     use fpexif::makernotes::sony::*;
 
-    assert_eq!(decode_dynamic_range_optimizer(0), "Off");
-    assert_eq!(decode_dynamic_range_optimizer(1), "Standard");
-    assert_eq!(decode_dynamic_range_optimizer(2), "Advanced Auto");
-    assert_eq!(decode_dynamic_range_optimizer(3), "Auto");
-    assert_eq!(decode_dynamic_range_optimizer(8), "Advanced Lv5");
-    assert_eq!(decode_dynamic_range_optimizer(999), "Unknown");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(0), "Off");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(1), "Standard");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(2), "Advanced Auto");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(3), "Auto");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(8), "Advanced Lv5");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(999), "Unknown");
 }
 
 #[test]
 fn test_decode_image_stabilization_values() {
     use fpexif::makernotes::sony::*;
 
-    assert_eq!(decode_image_stabilization(0), "Off");
-    assert_eq!(decode_image_stabilization(1), "On");
-    assert_eq!(decode_image_stabilization(2), "On (2)");
-    assert_eq!(decode_image_stabilization(999), "Unknown");
+    assert_eq!(decode_image_stabilization_exiftool(0), "Off");
+    assert_eq!(decode_image_stabilization_exiftool(1), "On");
+    assert_eq!(decode_image_stabilization_exiftool(2), "On (2)");
+    assert_eq!(decode_image_stabilization_exiftool(999), "Unknown");
 }

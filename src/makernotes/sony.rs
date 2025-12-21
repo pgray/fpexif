@@ -386,8 +386,9 @@ fn read_u32(data: &[u8], endian: Endianness) -> u32 {
     }
 }
 
-/// Decode CreativeStyle value (tag 0xB020)
-pub fn decode_creative_style(value: u16) -> &'static str {
+/// Decode CreativeStyle value (tag 0xB020) - ExifTool format
+/// Note: exiv2 uses string-based lookup, not integer codes
+pub fn decode_creative_style_exiftool(value: u16) -> &'static str {
     match value {
         0 => "None",
         1 => "Standard",
@@ -419,9 +420,10 @@ pub fn decode_creative_style(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_creative_style_exiv2 - exiv2 uses string-based lookup (StringTagDetails)
 
-/// Decode ExposureMode value (tag 0xB041)
-pub fn decode_exposure_mode(value: u16) -> &'static str {
+/// Decode ExposureMode value (tag 0xB041) - ExifTool format
+pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Auto",
         1 => "Portrait",
@@ -448,8 +450,39 @@ pub fn decode_exposure_mode(value: u16) -> &'static str {
     }
 }
 
-/// Decode AFMode value (tag 0xB043)
-pub fn decode_af_mode(value: u16) -> &'static str {
+/// Decode ExposureMode value (tag 0xB041) - exiv2 format
+/// Note: exiv2 has completely different value mappings
+pub fn decode_exposure_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Program AE",
+        1 => "Portrait",
+        2 => "Beach",
+        3 => "Sports",
+        4 => "Snow",
+        5 => "Landscape",
+        6 => "Auto",
+        7 => "Aperture-priority AE",
+        8 => "Shutter speed priority AE",
+        9 => "Night Scene/Twilight",
+        10 => "Hi-Speed Shutter",
+        11 => "Twilight Portrait",
+        12 => "Soft Snap/Portrait",
+        13 => "Fireworks",
+        14 => "Smile Shutter",
+        15 => "Manual",
+        35 => "Slow Shutter",
+        36 => "Macro",
+        37 => "Landscape",
+        38 => "Sunset",
+        39 => "Continuous Priority AE",
+        40 => "Sweep Panorama",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFMode value (tag 0xB043) - ExifTool format
+pub fn decode_af_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Default",
         1 => "Multi",
@@ -470,9 +503,25 @@ pub fn decode_af_mode(value: u16) -> &'static str {
     }
 }
 
-/// Decode DynamicRangeOptimizer value (tag 0xB025)
+/// Decode AFMode value (tag 0xB043) - exiv2 format (Set1)
+pub fn decode_af_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Default",
+        1 => "Multi",
+        2 => "Center",
+        3 => "Spot",
+        4 => "Flexible Spot",
+        6 => "Touch",
+        14 => "Tracking",
+        15 => "Face Detected",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DynamicRangeOptimizer value (tag 0xB025) - ExifTool format
 /// Note: This tag can be either SHORT or LONG depending on camera model
-pub fn decode_dynamic_range_optimizer(value: u16) -> &'static str {
+pub fn decode_dynamic_range_optimizer_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Standard",
@@ -492,9 +541,31 @@ pub fn decode_dynamic_range_optimizer(value: u16) -> &'static str {
     }
 }
 
-/// Decode FocusMode value (tag 0x201B)
+/// Decode DynamicRangeOptimizer value (tag 0xB025) - exiv2 format
+/// Note: exiv2 uses different indices for Advanced levels (8-11 vs 4-7)
+pub fn decode_dynamic_range_optimizer_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Standard",
+        2 => "Advanced Auto",
+        3 => "Auto",
+        8 => "Advanced Lv1",
+        9 => "Advanced Lv2",
+        10 => "Advanced Lv3",
+        11 => "Advanced Lv4",
+        12 => "Advanced Lv5",
+        16 => "Lv1",
+        17 => "Lv2",
+        18 => "Lv3",
+        19 => "Lv4",
+        20 => "Lv5",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusMode value (tag 0x201B) - ExifTool format
 /// Note: This tag can be BYTE or SHORT depending on camera model
-pub fn decode_focus_mode(value: u16) -> &'static str {
+pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Manual",
         1 => "AF-S",
@@ -508,9 +579,23 @@ pub fn decode_focus_mode(value: u16) -> &'static str {
     }
 }
 
-/// Decode ImageStabilization value (tag 0xB026)
+/// Decode FocusMode value (tag 0x201B) - exiv2 format (sonyFocusMode2)
+/// Note: exiv2 has gaps in the sequence (no 1, 5)
+pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        2 => "AF-S",
+        3 => "AF-C",
+        4 => "AF-A",
+        6 => "DMF",
+        7 => "AF-D",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageStabilization value (tag 0xB026) - ExifTool format
 /// Note: This tag can be either SHORT or LONG depending on camera model
-pub fn decode_image_stabilization(value: u16) -> &'static str {
+pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "On",
@@ -520,8 +605,20 @@ pub fn decode_image_stabilization(value: u16) -> &'static str {
     }
 }
 
-/// Decode ImageQuality value (tag 0x0102)
-pub fn decode_image_quality(value: u16) -> &'static str {
+/// Decode ImageStabilization value (tag 0xB026) - exiv2 format
+/// Note: exiv2 only has Off, On, n/a
+pub fn decode_image_stabilization_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageQuality value (tag 0x0102) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
     match value {
         0 => "RAW",
         1 => "Super Fine",
@@ -536,9 +633,11 @@ pub fn decode_image_quality(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_image_quality_exiv2 - same as exiftool, no separate function needed
 
-/// Decode WhiteBalance value (tag 0x0115)
-pub fn decode_white_balance(value: u16) -> &'static str {
+/// Decode WhiteBalance value (tag 0x0115) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
     match value {
         0x00 => "Auto",
         0x01 => "Color Temperature/Color Filter",
@@ -553,9 +652,11 @@ pub fn decode_white_balance(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_white_balance_exiv2 - same as exiftool, no separate function needed
 
-/// Decode LongExposureNoiseReduction value (tag 0x2008)
-pub fn decode_long_exposure_noise_reduction(value: u32) -> &'static str {
+/// Decode LongExposureNoiseReduction value (tag 0x2008) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_long_exposure_noise_reduction_exiftool(value: u32) -> &'static str {
     match value {
         0 => "Off",
         1 => "On (unused)",
@@ -566,9 +667,11 @@ pub fn decode_long_exposure_noise_reduction(value: u32) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_long_exposure_noise_reduction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode HighISONoiseReduction value (tag 0x2009)
-pub fn decode_high_iso_noise_reduction(value: u16) -> &'static str {
+/// Decode HighISONoiseReduction value (tag 0x2009) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Low",
@@ -579,9 +682,11 @@ pub fn decode_high_iso_noise_reduction(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_high_iso_noise_reduction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode SceneMode value (tag 0xB023)
-pub fn decode_scene_mode(value: u16) -> &'static str {
+/// Decode SceneMode value (tag 0xB023) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_scene_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Standard",
         1 => "Portrait",
@@ -606,13 +711,17 @@ pub fn decode_scene_mode(value: u16) -> &'static str {
         26 => "Fireworks",
         27 => "Food",
         28 => "Pet",
+        33 => "HDR",
+        0xffff => "n/a",
         _ => "Unknown",
     }
 }
+// decode_scene_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode Contrast/Saturation/Sharpness adjustment values
+/// Decode Contrast/Saturation/Sharpness adjustment values - ExifTool format
 /// (tags 0x2004/0x2005/0x2006)
-pub fn decode_adjustment(value: i32) -> &'static str {
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_adjustment_exiftool(value: i32) -> &'static str {
     match value {
         -3 => "-3",
         -2 => "-2",
@@ -624,19 +733,23 @@ pub fn decode_adjustment(value: i32) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_adjustment_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ColorTemperature value (tag 0xB021)
+/// Decode ColorTemperature value (tag 0xB021) - ExifTool format
 /// Returns None if value should be displayed as-is (actual temperature)
-pub fn decode_color_temperature(value: u32) -> Option<&'static str> {
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_color_temperature_exiftool(value: u32) -> Option<&'static str> {
     match value {
         0 => Some("Auto"),
         _ => None, // Display actual temperature value
     }
 }
+// decode_color_temperature_exiv2 - same as exiftool, no separate function needed
 
-/// Decode Teleconverter value (tag 0x0105)
+/// Decode Teleconverter value (tag 0x0105) - ExifTool format
 /// Based on ExifTool's minoltaTeleconverters
-pub fn decode_teleconverter(value: u32) -> &'static str {
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_teleconverter_exiftool(value: u32) -> &'static str {
     match value {
         0x00 => "None",
         0x04 => "Minolta/Sony AF 1.4x APO (D) (0x04)",
@@ -650,9 +763,10 @@ pub fn decode_teleconverter(value: u32) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_teleconverter_exiv2 - same as exiftool, no separate function needed
 
-/// Decode PictureEffect value (tag 0x200E)
-pub fn decode_picture_effect(value: u16) -> &'static str {
+/// Decode PictureEffect value (tag 0x200E) - ExifTool format
+pub fn decode_picture_effect_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Toy Camera",
@@ -693,8 +807,53 @@ pub fn decode_picture_effect(value: u16) -> &'static str {
     }
 }
 
-/// Decode VignettingCorrection value (tag 0x2011)
-pub fn decode_vignetting_correction(value: u32) -> &'static str {
+/// Decode PictureEffect value (tag 0x200E) - exiv2 format
+/// Note: exiv2 uses offset values for Miniature modes (48-54 vs 36-42)
+pub fn decode_picture_effect_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Toy Camera",
+        2 => "Pop Color",
+        3 => "Posterization",
+        4 => "Posterization B/W",
+        5 => "Retro Photo",
+        6 => "Soft High Key",
+        7 => "Partial Color (red)",
+        8 => "Partial Color (green)",
+        9 => "Partial Color (blue)",
+        10 => "Partial Color (yellow)",
+        13 => "High Contrast Monochrome",
+        16 => "Toy Camera (normal)",
+        17 => "Toy Camera (cool)",
+        18 => "Toy Camera (warm)",
+        19 => "Toy Camera (green)",
+        20 => "Toy Camera (magenta)",
+        32 => "Soft Focus (low)",
+        33 => "Soft Focus",
+        34 => "Soft Focus (high)",
+        48 => "Miniature (auto)",
+        49 => "Miniature (top)",
+        50 => "Miniature (middle horizontal)",
+        51 => "Miniature (bottom)",
+        52 => "Miniature (left)",
+        53 => "Miniature (middle vertical)",
+        54 => "Miniature (right)",
+        64 => "HDR Painting (low)",
+        65 => "HDR Painting",
+        66 => "HDR Painting (high)",
+        80 => "Rich-tone Monochrome",
+        96 => "Watercolor",
+        97 => "Watercolor 2",
+        112 => "Illustration (low)",
+        113 => "Illustration",
+        114 => "Illustration (high)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode VignettingCorrection value (tag 0x2011) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_vignetting_correction_exiftool(value: u32) -> &'static str {
     match value {
         0 => "Off",
         2 => "Auto",
@@ -702,9 +861,11 @@ pub fn decode_vignetting_correction(value: u32) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_vignetting_correction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode DistortionCorrection value (tag 0x2013)
-pub fn decode_distortion_correction(value: u32) -> &'static str {
+/// Decode DistortionCorrection value (tag 0x2013) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_distortion_correction_exiftool(value: u32) -> &'static str {
     match value {
         0 => "Off",
         2 => "Auto",
@@ -712,9 +873,11 @@ pub fn decode_distortion_correction(value: u32) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_distortion_correction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ReleaseMode value (tag 0xB049)
-pub fn decode_release_mode(value: u16) -> &'static str {
+/// Decode ReleaseMode value (tag 0xB049) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_release_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Normal",
         2 => "Continuous",
@@ -725,9 +888,10 @@ pub fn decode_release_mode(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_release_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode MultiFrameNoiseReduction value (tag 0x200B)
-pub fn decode_multi_frame_noise_reduction(value: u32) -> &'static str {
+/// Decode MultiFrameNoiseReduction value (tag 0x200B) - ExifTool format
+pub fn decode_multi_frame_noise_reduction_exiftool(value: u32) -> &'static str {
     match value {
         0 => "Off",
         1 => "On",
@@ -736,8 +900,20 @@ pub fn decode_multi_frame_noise_reduction(value: u32) -> &'static str {
     }
 }
 
-/// Decode IntelligentAuto value (tag 0xB052)
-pub fn decode_intelligent_auto(value: u16) -> &'static str {
+/// Decode MultiFrameNoiseReduction value (tag 0x200B) - exiv2 format
+/// Note: exiv2 uses 256 for n/a instead of 255
+pub fn decode_multi_frame_noise_reduction_exiv2(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        256 => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode IntelligentAuto value (tag 0xB052) - ExifTool format
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_intelligent_auto_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "On",
@@ -745,10 +921,12 @@ pub fn decode_intelligent_auto(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_intelligent_auto_exiv2 - same as exiftool, no separate function needed
 
-/// Decode HDR value (tag 0x200A)
+/// Decode HDR value (tag 0x200A) - ExifTool format
 /// Returns the first element of the HDR pair (level)
-pub fn decode_hdr(value: u16) -> &'static str {
+/// Note: exiv2 uses identical values - no separate version needed
+pub fn decode_hdr_exiftool(value: u16) -> &'static str {
     match value {
         0x0 => "Off",
         0x01 => "Auto",
@@ -766,10 +944,11 @@ pub fn decode_hdr(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_hdr_exiv2 - same as exiftool, no separate function needed
 
-/// Decode Quality value (tag 0x0102 and 0xB047)
+/// Decode Quality value (tag 0x0102 and 0xB047) - ExifTool format
 /// Note: This overlaps with decode_image_quality but with more values
-pub fn decode_quality(value: u32) -> &'static str {
+pub fn decode_quality_exiftool(value: u32) -> &'static str {
     match value {
         0 => "RAW",
         1 => "Super Fine",
@@ -782,6 +961,18 @@ pub fn decode_quality(value: u32) -> &'static str {
         8 => "Compressed RAW + JPEG",
         9 => "Light",
         0xffffffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Quality value (tag 0xB047) - exiv2 format (sonyJPEGQuality)
+/// Note: exiv2 uses different mapping for tag 0xB047 only
+pub fn decode_quality_exiv2(value: u32) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Fine",
+        2 => "Extra Fine",
+        0xffff => "n/a",
         _ => "Unknown",
     }
 }
@@ -898,7 +1089,7 @@ fn parse_ifd_entry(
             if bytes.len() == 1 {
                 let v = bytes[0] as u16;
                 let decoded = match tag_id {
-                    SONY_FOCUS_MODE => Some(decode_focus_mode(v).to_string()),
+                    SONY_FOCUS_MODE => Some(decode_focus_mode_exiftool(v).to_string()),
                     _ => None,
                 };
 
@@ -944,25 +1135,27 @@ fn parse_ifd_entry(
                 }
 
                 let decoded = match tag_id {
-                    SONY_IMAGE_QUALITY => Some(decode_image_quality(v).to_string()),
-                    SONY_WHITE_BALANCE => Some(decode_white_balance(v).to_string()),
-                    SONY_CREATIVE_STYLE => Some(decode_creative_style(v).to_string()),
-                    SONY_EXPOSURE_MODE => Some(decode_exposure_mode(v).to_string()),
-                    SONY_AF_MODE => Some(decode_af_mode(v).to_string()),
+                    SONY_IMAGE_QUALITY => Some(decode_image_quality_exiftool(v).to_string()),
+                    SONY_WHITE_BALANCE => Some(decode_white_balance_exiftool(v).to_string()),
+                    SONY_CREATIVE_STYLE => Some(decode_creative_style_exiftool(v).to_string()),
+                    SONY_EXPOSURE_MODE => Some(decode_exposure_mode_exiftool(v).to_string()),
+                    SONY_AF_MODE => Some(decode_af_mode_exiftool(v).to_string()),
                     SONY_DYNAMIC_RANGE_OPTIMIZER => {
-                        Some(decode_dynamic_range_optimizer(v).to_string())
+                        Some(decode_dynamic_range_optimizer_exiftool(v).to_string())
                     }
-                    SONY_FOCUS_MODE => Some(decode_focus_mode(v).to_string()),
-                    SONY_IMAGE_STABILIZATION => Some(decode_image_stabilization(v).to_string()),
+                    SONY_FOCUS_MODE => Some(decode_focus_mode_exiftool(v).to_string()),
+                    SONY_IMAGE_STABILIZATION => {
+                        Some(decode_image_stabilization_exiftool(v).to_string())
+                    }
                     SONY_HIGH_ISO_NOISE_REDUCTION => {
-                        Some(decode_high_iso_noise_reduction(v).to_string())
+                        Some(decode_high_iso_noise_reduction_exiftool(v).to_string())
                     }
-                    SONY_SCENE_MODE => Some(decode_scene_mode(v).to_string()),
+                    SONY_SCENE_MODE => Some(decode_scene_mode_exiftool(v).to_string()),
                     SONY_SONY_MODEL_ID => get_sony_model_name(v).map(|s| s.to_string()),
-                    SONY_PICTURE_EFFECT => Some(decode_picture_effect(v).to_string()),
-                    SONY_RELEASE_MODE => Some(decode_release_mode(v).to_string()),
-                    SONY_INTELLIGENT_AUTO => Some(decode_intelligent_auto(v).to_string()),
-                    SONY_QUALITY_2 => Some(decode_quality(v as u32).to_string()),
+                    SONY_PICTURE_EFFECT => Some(decode_picture_effect_exiftool(v).to_string()),
+                    SONY_RELEASE_MODE => Some(decode_release_mode_exiftool(v).to_string()),
+                    SONY_INTELLIGENT_AUTO => Some(decode_intelligent_auto_exiftool(v).to_string()),
+                    SONY_QUALITY_2 => Some(decode_quality_exiftool(v as u32).to_string()),
                     _ => None,
                 };
 
@@ -973,7 +1166,7 @@ fn parse_ifd_entry(
                 }
             } else if values.len() == 2 && tag_id == SONY_HDR {
                 // HDR is stored as two u16 values, decode the first one
-                ExifValue::Ascii(decode_hdr(values[0]).to_string())
+                ExifValue::Ascii(decode_hdr_exiftool(values[0]).to_string())
             } else {
                 ExifValue::Short(values)
             }
@@ -992,7 +1185,7 @@ fn parse_ifd_entry(
                 let v = values[0];
                 // First check tags that need full u32 range
                 if tag_id == SONY_LONG_EXPOSURE_NOISE_REDUCTION {
-                    ExifValue::Ascii(decode_long_exposure_noise_reduction(v).to_string())
+                    ExifValue::Ascii(decode_long_exposure_noise_reduction_exiftool(v).to_string())
                 } else if tag_id == SONY_LENS_ID {
                     // LensID uses u32 for lookup
                     if let Some(name) = get_sony_lens_name(v) {
@@ -1002,7 +1195,7 @@ fn parse_ifd_entry(
                     }
                 } else if tag_id == SONY_COLOR_TEMPERATURE {
                     // ColorTemperature: 0 = "Auto", otherwise show value
-                    if let Some(s) = decode_color_temperature(v) {
+                    if let Some(s) = decode_color_temperature_exiftool(v) {
                         ExifValue::Ascii(s.to_string())
                     } else {
                         ExifValue::Long(values)
@@ -1010,7 +1203,7 @@ fn parse_ifd_entry(
                 } else if tag_id == SONY_WHITE_BALANCE {
                     // WhiteBalance is int32u in some cameras
                     if v <= u16::MAX as u32 {
-                        ExifValue::Ascii(decode_white_balance(v as u16).to_string())
+                        ExifValue::Ascii(decode_white_balance_exiftool(v as u16).to_string())
                     } else {
                         ExifValue::Long(values)
                     }
@@ -1020,29 +1213,29 @@ fn parse_ifd_entry(
                 {
                     // Contrast/Saturation/Sharpness as signed value
                     let signed_v = v as i32;
-                    ExifValue::Ascii(decode_adjustment(signed_v).to_string())
+                    ExifValue::Ascii(decode_adjustment_exiftool(signed_v).to_string())
                 } else if tag_id == SONY_TELECONVERTER {
                     // Teleconverter uses full u32 range
-                    ExifValue::Ascii(decode_teleconverter(v).to_string())
+                    ExifValue::Ascii(decode_teleconverter_exiftool(v).to_string())
                 } else if tag_id == SONY_VIGNETTING_CORRECTION {
-                    ExifValue::Ascii(decode_vignetting_correction(v).to_string())
+                    ExifValue::Ascii(decode_vignetting_correction_exiftool(v).to_string())
                 } else if tag_id == SONY_DISTORTION_CORRECTION {
-                    ExifValue::Ascii(decode_distortion_correction(v).to_string())
+                    ExifValue::Ascii(decode_distortion_correction_exiftool(v).to_string())
                 } else if tag_id == SONY_MULTI_FRAME_NOISE_REDUCTION {
-                    ExifValue::Ascii(decode_multi_frame_noise_reduction(v).to_string())
+                    ExifValue::Ascii(decode_multi_frame_noise_reduction_exiftool(v).to_string())
                 } else if tag_id == SONY_IMAGE_QUALITY {
-                    ExifValue::Ascii(decode_quality(v).to_string())
+                    ExifValue::Ascii(decode_quality_exiftool(v).to_string())
                 } else if v <= u16::MAX as u32 {
                     // Then check tags that fit in u16
                     let v16 = v as u16;
                     let decoded = match tag_id {
                         SONY_DYNAMIC_RANGE_OPTIMIZER => {
-                            Some(decode_dynamic_range_optimizer(v16).to_string())
+                            Some(decode_dynamic_range_optimizer_exiftool(v16).to_string())
                         }
                         SONY_IMAGE_STABILIZATION => {
-                            Some(decode_image_stabilization(v16).to_string())
+                            Some(decode_image_stabilization_exiftool(v16).to_string())
                         }
-                        SONY_SCENE_MODE => Some(decode_scene_mode(v16).to_string()),
+                        SONY_SCENE_MODE => Some(decode_scene_mode_exiftool(v16).to_string()),
                         SONY_SONY_MODEL_ID => get_sony_model_name(v16).map(|s| s.to_string()),
                         _ => None,
                     };

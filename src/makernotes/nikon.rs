@@ -246,21 +246,48 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
     }
 }
 
-/// Decode Active D-Lighting value
-fn decode_active_d_lighting(value: u16) -> &'static str {
+/// Decode Active D-Lighting value (tag 0x0022) - ExifTool format
+pub fn decode_active_d_lighting_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Low",
-        2 => "Normal",
-        3 => "High",
-        4 => "Extra High",
-        5 => "Auto",
+        3 => "Normal",
+        5 => "High",
+        7 => "Extra High",
+        8 => "Extra High 1",
+        9 => "Extra High 2",
+        65535 => "Auto",
         _ => "Unknown",
     }
 }
 
-/// Decode Color Space value
-fn decode_color_space(value: u16) -> &'static str {
+/// Decode Active D-Lighting value (tag 0x0022) - exiv2 format
+/// Values based on exiv2 nikonmn_int.cpp nikonActiveDLighting[]
+pub fn decode_active_d_lighting_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Low",
+        3 => "Normal",
+        5 => "High",
+        7 => "Extra High",
+        65535 => "Auto",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Color Space value (tag 0x001E) - ExifTool format
+pub fn decode_color_space_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "sRGB",
+        2 => "Adobe RGB",
+        4 => "BT.2100",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Color Space value (tag 0x001E) - exiv2 format
+/// Values based on exiv2 nikonmn_int.cpp nikonColorSpace[]
+pub fn decode_color_space_exiv2(value: u16) -> &'static str {
     match value {
         1 => "sRGB",
         2 => "Adobe RGB",
@@ -268,19 +295,20 @@ fn decode_color_space(value: u16) -> &'static str {
     }
 }
 
-/// Decode Vignette Control value
-fn decode_vignette_control(value: u16) -> &'static str {
+/// Decode Vignette Control value (tag 0x002A) - ExifTool format
+pub fn decode_vignette_control_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Low",
-        2 => "Normal",
-        3 => "High",
+        3 => "Normal",
+        5 => "High",
         _ => "Unknown",
     }
 }
+// decode_vignette_control_exiv2 - same as exiftool, no separate function needed
 
-/// Decode High ISO Noise Reduction value (tag 0x00b1)
-fn decode_high_iso_noise_reduction(value: u16) -> &'static str {
+/// Decode High ISO Noise Reduction value (tag 0x00B1) - ExifTool format
+pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Minimal",
@@ -293,8 +321,23 @@ fn decode_high_iso_noise_reduction(value: u16) -> &'static str {
     }
 }
 
-/// Decode Date Stamp Mode value (tag 0x009d)
-fn decode_date_stamp_mode(value: u16) -> &'static str {
+/// Decode High ISO Noise Reduction value (tag 0x00B1) - exiv2 format
+/// Values based on exiv2 nikonmn_int.cpp nikonHighISONoiseReduction[]
+/// Note: exiv2 skips values 3 and 5 that ExifTool has
+pub fn decode_high_iso_noise_reduction_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Minimal",
+        2 => "Low",
+        4 => "Normal",
+        6 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Date Stamp Mode value (tag 0x009D) - ExifTool format
+/// Note: This tag is not defined in exiv2
+pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Date & Time",
@@ -303,6 +346,7 @@ fn decode_date_stamp_mode(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+// decode_date_stamp_mode_exiv2 - not defined in exiv2
 
 /// Nikon decryption lookup tables (from ExifTool)
 const NIKON_XLAT_0: [u8; 256] = [
@@ -477,10 +521,10 @@ pub fn parse_shot_info_shutter_count(serial: u32, shutter_count: u32, data: &[u8
     Some(count)
 }
 
-/// Decode Lens Type bitfield following ExifTool's logic
+/// Decode Lens Type bitfield (tag 0x0083) - ExifTool format
 /// Bit 0 = MF, Bit 1 = D, Bit 2 = G, Bit 3 = VR, Bit 4 = 1, Bit 5 = FT-1, Bit 6 = E, Bit 7 = AF-P
 /// Special handling: "D G" -> "G", "E" replaces "G", "1" goes first, "FT-1" goes last
-fn decode_lens_type(value: u8) -> String {
+pub fn decode_lens_type_exiftool(value: u8) -> String {
     if value == 0 {
         return "AF".to_string();
     }
@@ -530,6 +574,31 @@ fn decode_lens_type(value: u8) -> String {
 
     if features.is_empty() {
         "AF".to_string()
+    } else {
+        features.join(" ")
+    }
+}
+
+/// Decode Lens Type bitfield (tag 0x0083) - exiv2 format
+/// exiv2 only decodes bits 0-3 (MF, D, G, VR)
+pub fn decode_lens_type_exiv2(value: u8) -> String {
+    let mut features = Vec::new();
+
+    if value & 0x01 != 0 {
+        features.push("MF");
+    }
+    if value & 0x02 != 0 {
+        features.push("D");
+    }
+    if value & 0x04 != 0 {
+        features.push("G");
+    }
+    if value & 0x08 != 0 {
+        features.push("VR");
+    }
+
+    if features.is_empty() {
+        String::new()
     } else {
         features.join(" ")
     }
@@ -725,7 +794,7 @@ pub fn parse_nikon_maker_notes(
                     let bytes = value_bytes[..count as usize].to_vec();
                     // Apply decoder for lens type
                     if tag_id == NIKON_LENS_TYPE && !bytes.is_empty() {
-                        ExifValue::Ascii(decode_lens_type(bytes[0]))
+                        ExifValue::Ascii(decode_lens_type_exiftool(bytes[0]))
                     } else {
                         ExifValue::Byte(bytes)
                     }
@@ -762,14 +831,18 @@ pub fn parse_nikon_maker_notes(
                         let v = values[0];
                         let decoded = match tag_id {
                             NIKON_ACTIVE_D_LIGHTING => {
-                                Some(decode_active_d_lighting(v).to_string())
+                                Some(decode_active_d_lighting_exiftool(v).to_string())
                             }
-                            NIKON_COLOR_SPACE => Some(decode_color_space(v).to_string()),
-                            NIKON_VIGNETTE_CONTROL => Some(decode_vignette_control(v).to_string()),
+                            NIKON_COLOR_SPACE => Some(decode_color_space_exiftool(v).to_string()),
+                            NIKON_VIGNETTE_CONTROL => {
+                                Some(decode_vignette_control_exiftool(v).to_string())
+                            }
                             NIKON_HIGH_ISO_NOISE_REDUCTION => {
-                                Some(decode_high_iso_noise_reduction(v).to_string())
+                                Some(decode_high_iso_noise_reduction_exiftool(v).to_string())
                             }
-                            NIKON_DATE_STAMP_MODE => Some(decode_date_stamp_mode(v).to_string()),
+                            NIKON_DATE_STAMP_MODE => {
+                                Some(decode_date_stamp_mode_exiftool(v).to_string())
+                            }
                             _ => None,
                         };
 
