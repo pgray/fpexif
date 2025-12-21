@@ -556,6 +556,426 @@ fn canon_ev(val: i16) -> f64 {
     sign * (val_int as f64 + frac) / 0x20 as f64
 }
 
+// =============================================================================
+// Dual-format decode functions (ExifTool and exiv2)
+// Only _exiv2 versions created where values actually differ from ExifTool
+// =============================================================================
+
+/// Decode MacroMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_macro_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Macro",
+        2 => "Normal",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MacroMode - exiv2 format (from canonmn_int.cpp canonCsMacro)
+/// Differs: exiftool uses "Macro"/"Normal", exiv2 uses "On"/"Off"
+pub fn decode_macro_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "On",
+        2 => "Off",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Quality - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_quality_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Economy",
+        2 => "Normal",
+        3 => "Fine",
+        4 => "RAW",
+        5 => "Superfine",
+        130 => "Normal Movie",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Quality - exiv2 format (from canonmn_int.cpp canonCsQuality)
+/// Differs: exiv2 has additional values (n/a, unknown, CRAW, Movie (2))
+pub fn decode_quality_exiv2(value: u16) -> &'static str {
+    match value as i16 {
+        -1 => "n/a",
+        0 => "unknown",
+        1 => "Economy",
+        2 => "Normal",
+        3 => "Fine",
+        4 => "RAW",
+        5 => "Superfine",
+        7 => "CRAW",
+        130 => "Normal Movie",
+        131 => "Movie (2)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FlashMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Flash Not Fired",
+        1 => "Auto",
+        2 => "On",
+        3 => "Red-eye reduction",
+        4 => "Slow-sync",
+        5 => "Auto + Red-eye reduction",
+        6 => "On + Red-eye reduction",
+        16 => "External flash",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FlashMode - exiv2 format (from canonmn_int.cpp canonCsFlashMode)
+/// Differs: different wording for several values
+pub fn decode_flash_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Auto",
+        2 => "On",
+        3 => "Red-eye",
+        4 => "Slow sync",
+        5 => "Auto + red-eye",
+        6 => "On + red-eye",
+        16 => "External",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DriveMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_drive_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Single-frame Shooting",
+        1 => "Continuous Shooting",
+        2 => "Movie",
+        3 => "Continuous, Speed Priority",
+        4 => "Continuous, Low",
+        5 => "Continuous, High",
+        6 => "Silent Single Shooting",
+        9 => "Single-frame Shooting, Silent",
+        10 => "Continuous Shooting, Silent",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DriveMode - exiv2 format (from canonmn_int.cpp canonCsDriveMode)
+/// Differs: different wording
+pub fn decode_drive_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Single / timer",
+        1 => "Continuous",
+        2 => "Movie",
+        3 => "Continuous, speed priority",
+        4 => "Continuous, low",
+        5 => "Continuous, high",
+        6 => "Silent Single",
+        9 => "Single, Silent",
+        10 => "Continuous, Silent",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "One-shot AF",
+        1 => "AI Servo AF",
+        2 => "AI Focus AF",
+        3 => "Manual Focus",
+        4 => "Single",
+        5 => "Continuous",
+        6 => "Manual Focus",
+        16 => "Pan Focus",
+        256 => "Manual",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusMode - exiv2 format (from canonmn_int.cpp canonCsFocusMode)
+/// Differs: different wording and additional values (512, 519)
+pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "One shot AF",
+        1 => "AI servo AF",
+        2 => "AI focus AF",
+        3 => "Manual focus (3)",
+        4 => "Single",
+        5 => "Continuous",
+        6 => "Manual focus (6)",
+        16 => "Pan focus",
+        256 => "AF + MF",
+        512 => "Movie Snap Focus",
+        519 => "Movie Servo AF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MeteringMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_metering_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        3 => "Evaluative",
+        4 => "Partial",
+        5 => "Center-weighted average",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MeteringMode - exiv2 format (from canonmn_int.cpp canonCsMeteringMode)
+/// Differs: exiv2 has additional values (0=Default, 1=Spot, 2=Average)
+pub fn decode_metering_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Default",
+        1 => "Spot",
+        2 => "Average",
+        3 => "Evaluative",
+        4 => "Partial",
+        5 => "Center-weighted average",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusRange - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_focus_range_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        1 => "Auto",
+        2 => "Not Known",
+        3 => "Macro",
+        7 => "Very Close",
+        8 => "Close",
+        9 => "Middle Range",
+        10 => "Far Range",
+        11 => "Pan Focus",
+        14 => "Super Macro",
+        15 => "Infinity",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusRange (FocusType in exiv2) - exiv2 format (from canonmn_int.cpp canonCsFocusType)
+/// Differs: different capitalization and value ordering (4-10 shifted)
+pub fn decode_focus_range_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        1 => "Auto",
+        2 => "Not known",
+        3 => "Macro",
+        4 => "Very close",
+        5 => "Close",
+        6 => "Middle range",
+        7 => "Far range",
+        8 => "Pan focus",
+        9 => "Super macro",
+        10 => "Infinity",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ExposureMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Easy",
+        1 => "Program AE",
+        2 => "Shutter speed priority AE",
+        3 => "Aperture-priority AE",
+        4 => "Manual",
+        5 => "Depth-of-field AE",
+        6 => "M-Dep",
+        7 => "Bulb",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ExposureMode (ExposureProgram in exiv2) - exiv2 format (from canonmn_int.cpp canonCsExposureProgram)
+/// Differs: different wording with mode abbreviations in parentheses
+pub fn decode_exposure_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Easy shooting (Auto)",
+        1 => "Program (P)",
+        2 => "Shutter priority (Tv)",
+        3 => "Aperture priority (Av)",
+        4 => "Manual (M)",
+        5 => "A-DEP",
+        6 => "M-DEP",
+        7 => "Bulb",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageStabilization - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "Shoot Only",
+        3 => "Panning",
+        4 => "Dynamic",
+        256 => "Off (2)",
+        257 => "On (2)",
+        258 => "Shoot Only (2)",
+        259 => "Panning (2)",
+        260 => "Dynamic (2)",
+        0xFFFF => "n/a",
+        _ => "Unknown",
+    }
+}
+
+// ImageStabilization exiv2 - same as exiftool, no separate function needed
+
+/// Decode ManualFlashOutput - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_manual_flash_output_exiftool(value: u16) -> &'static str {
+    match value {
+        0x0000 => "n/a",
+        0x0500 => "Full",
+        0x0502 => "Medium",
+        0x0504 => "Low",
+        0x7FFF => "n/a",
+        _ => "Unknown",
+    }
+}
+
+// ManualFlashOutput exiv2 - same as exiftool, no separate function needed
+
+/// Decode WhiteBalance - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Daylight",
+        2 => "Cloudy",
+        3 => "Tungsten",
+        4 => "Fluorescent",
+        5 => "Flash",
+        6 => "Custom",
+        7 => "Black & White",
+        8 => "Shade",
+        9 => "Manual Temperature",
+        10 => "PC Set1",
+        11 => "PC Set2",
+        12 => "PC Set3",
+        14 => "Daylight Fluorescent",
+        15 => "Custom 1",
+        16 => "Custom 2",
+        17 => "Underwater",
+        _ => "Unknown",
+    }
+}
+
+/// Decode WhiteBalance - exiv2 format (from canonmn_int.cpp canonSiWhiteBalance)
+/// Differs: additional values and slightly different naming (PC Set 1 vs PC Set1)
+pub fn decode_white_balance_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Daylight",
+        2 => "Cloudy",
+        3 => "Tungsten",
+        4 => "Fluorescent",
+        5 => "Flash",
+        6 => "Custom",
+        7 => "Black & White",
+        8 => "Shade",
+        9 => "Manual Temperature (Kelvin)",
+        10 => "PC Set 1",
+        11 => "PC Set 2",
+        12 => "PC Set 3",
+        14 => "Daylight Fluorescent",
+        15 => "Custom 1",
+        16 => "Custom 2",
+        17 => "Underwater",
+        18 => "Custom 3",
+        19 => "Custom 3",
+        20 => "PC Set 4",
+        21 => "PC Set 5",
+        23 => "Auto (ambience priority)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocalType - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_focal_type_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "n/a",
+        1 => "Fixed",
+        2 => "Zoom",
+        _ => "Unknown",
+    }
+}
+
+// FocalType exiv2 - same as exiftool, no separate function needed
+
+/// Decode BracketMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_bracket_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "AEB",
+        2 => "FEB",
+        3 => "ISO",
+        4 => "WB",
+        _ => "Unknown",
+    }
+}
+
+// BracketMode exiv2 - same as exiftool, no separate function needed
+
+/// Decode AFAreaMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off (Manual Focus)",
+        1 => "AF Point Expansion (surround)",
+        2 => "Single-point AF",
+        4 => "Auto",
+        5 => "Face Detect AF",
+        6 => "Face + Tracking",
+        7 => "Zone AF",
+        8 => "AF Point Expansion (4 point)",
+        9 => "Spot AF",
+        10 => "AF Point Expansion (8 point)",
+        11 => "Flexizone Multi",
+        13 => "Flexizone Single",
+        14 => "Large Zone AF",
+        // Compact camera modes
+        0x0060 => "Face AiAF",
+        0x1001 => "Single-point AF (Compact)",
+        0x1002 => "Tracking AF (Compact)",
+        0x1003 => "Face + Tracking (Compact)",
+        0xFFFF => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFAreaMode - exiv2 format (from canonmn_int.cpp canonAFAreaMode)
+/// Differs: 4="Multi-point AF" vs "Auto", 11/12 Flexizone naming, no compact modes
+pub fn decode_af_area_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off (Manual Focus)",
+        1 => "AF Point Expansion (surround)",
+        2 => "Single-point AF",
+        4 => "Multi-point AF",
+        5 => "Face Detect AF",
+        6 => "Face + Tracking",
+        7 => "Zone AF",
+        8 => "AF Point Expansion (4 point)",
+        9 => "Spot AF",
+        10 => "AF Point Expansion (8 point)",
+        11 => "Flexizone Multi (49 point)",
+        12 => "Flexizone Multi (9 point)",
+        13 => "Flexizone Single",
+        14 => "Large Zone AF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DateStampMode - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Date",
+        2 => "Date & Time",
+        _ => "Unknown",
+    }
+}
+
+// DateStampMode exiv2 - same as exiftool, no separate function needed
+
 /// Parse a single IFD entry and return the tag value
 ///
 /// Canon maker notes use offsets relative to the TIFF header, not the MakerNote data.
@@ -718,20 +1138,20 @@ fn parse_ifd_entry(
 /// Decode Canon CameraSettings array sub-fields
 ///
 /// This function decodes the CanonCameraSettings array into individual fields
-/// that can be easily interpreted.
+/// that can be easily interpreted. Uses ExifTool format by default.
 pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
+    decode_camera_settings_exiftool(data)
+}
+
+/// Decode Canon CameraSettings array sub-fields - ExifTool format
+pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
     // Macro mode (index 1)
     if data.len() > 1 {
-        let macro_mode = match data[1] {
-            1 => "Macro",
-            2 => "Normal",
-            _ => "Unknown",
-        };
         decoded.insert(
             "MacroMode".to_string(),
-            ExifValue::Ascii(macro_mode.to_string()),
+            ExifValue::Ascii(decode_macro_mode_exiftool(data[1]).to_string()),
         );
     }
 
@@ -748,74 +1168,33 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // Quality (index 3)
     if data.len() > 3 {
-        let quality = match data[3] {
-            1 => "Economy",
-            2 => "Normal",
-            3 => "Fine",
-            4 => "RAW",
-            5 => "Superfine",
-            130 => "Normal Movie",
-            _ => "Unknown",
-        };
-        decoded.insert("Quality".to_string(), ExifValue::Ascii(quality.to_string()));
+        decoded.insert(
+            "Quality".to_string(),
+            ExifValue::Ascii(decode_quality_exiftool(data[3]).to_string()),
+        );
     }
 
     // Flash mode (index 4)
     if data.len() > 4 {
-        let flash_mode = match data[4] {
-            0 => "Flash Not Fired",
-            1 => "Auto",
-            2 => "On",
-            3 => "Red-eye reduction",
-            4 => "Slow-sync",
-            5 => "Auto + Red-eye reduction",
-            6 => "On + Red-eye reduction",
-            16 => "External flash",
-            _ => "Unknown",
-        };
         decoded.insert(
             "FlashMode".to_string(),
-            ExifValue::Ascii(flash_mode.to_string()),
+            ExifValue::Ascii(decode_flash_mode_exiftool(data[4]).to_string()),
         );
     }
 
     // Drive mode (index 5)
     if data.len() > 5 {
-        let drive_mode = match data[5] {
-            0 => "Single-frame Shooting",
-            1 => "Continuous Shooting",
-            2 => "Movie",
-            3 => "Continuous, Speed Priority",
-            4 => "Continuous, Low",
-            5 => "Continuous, High",
-            6 => "Silent Single Shooting",
-            9 => "Single-frame Shooting, Silent",
-            10 => "Continuous Shooting, Silent",
-            _ => "Unknown",
-        };
         decoded.insert(
             "DriveMode".to_string(),
-            ExifValue::Ascii(drive_mode.to_string()),
+            ExifValue::Ascii(decode_drive_mode_exiftool(data[5]).to_string()),
         );
     }
 
     // Focus mode (index 7)
     if data.len() > 7 {
-        let focus_mode = match data[7] {
-            0 => "One-shot AF",
-            1 => "AI Servo AF",
-            2 => "AI Focus AF",
-            3 => "Manual Focus",
-            4 => "Single",
-            5 => "Continuous",
-            6 => "Manual Focus",
-            16 => "Pan Focus",
-            256 => "Manual",
-            _ => "Unknown",
-        };
         decoded.insert(
             "FocusMode".to_string(),
-            ExifValue::Ascii(focus_mode.to_string()),
+            ExifValue::Ascii(decode_focus_mode_exiftool(data[7]).to_string()),
         );
     }
 
@@ -824,56 +1203,25 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // Metering mode (index 17)
     if data.len() > 17 {
-        let metering_mode = match data[17] {
-            3 => "Evaluative",
-            4 => "Partial",
-            5 => "Center-weighted average",
-            _ => "Unknown",
-        };
         decoded.insert(
             "MeteringMode".to_string(),
-            ExifValue::Ascii(metering_mode.to_string()),
+            ExifValue::Ascii(decode_metering_mode_exiftool(data[17]).to_string()),
         );
     }
 
     // Focus range (index 18)
     if data.len() > 18 {
-        let focus_range = match data[18] {
-            0 => "Manual",
-            1 => "Auto",
-            2 => "Not Known",
-            3 => "Macro",
-            7 => "Very Close",
-            8 => "Close",
-            9 => "Middle Range",
-            10 => "Far Range",
-            11 => "Pan Focus",
-            14 => "Super Macro",
-            15 => "Infinity",
-            _ => "Unknown",
-        };
         decoded.insert(
             "FocusRange".to_string(),
-            ExifValue::Ascii(focus_range.to_string()),
+            ExifValue::Ascii(decode_focus_range_exiftool(data[18]).to_string()),
         );
     }
 
     // Exposure mode (index 20)
     if data.len() > 20 {
-        let exposure_mode = match data[20] {
-            0 => "Easy",
-            1 => "Program AE",
-            2 => "Shutter speed priority AE",
-            3 => "Aperture-priority AE",
-            4 => "Manual",
-            5 => "Depth-of-field AE",
-            6 => "M-Dep",
-            7 => "Bulb",
-            _ => "Unknown",
-        };
         decoded.insert(
             "ExposureMode".to_string(),
-            ExifValue::Ascii(exposure_mode.to_string()),
+            ExifValue::Ascii(decode_exposure_mode_exiftool(data[20]).to_string()),
         );
     }
 
@@ -1003,41 +1351,232 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // Image stabilization (index 34)
     if data.len() > 34 {
-        let is_value = data[34];
-        let is_desc = match is_value {
-            0 => "Off",
-            1 => "On",
-            2 => "Shoot Only",
-            3 => "Panning",
-            4 => "Dynamic",
-            256 => "Off (2)",
-            257 => "On (2)",
-            258 => "Shoot Only (2)",
-            259 => "Panning (2)",
-            260 => "Dynamic (2)",
-            0xFFFF => "n/a",
-            _ => "Unknown",
-        };
         decoded.insert(
             "ImageStabilization".to_string(),
-            ExifValue::Ascii(is_desc.to_string()),
+            ExifValue::Ascii(decode_image_stabilization_exiftool(data[34]).to_string()),
         );
     }
 
     // Manual flash output (index 41)
     if data.len() > 41 {
-        let mfo = data[41];
-        let mfo_desc = match mfo {
-            0x0000 => "n/a",
-            0x0500 => "Full",
-            0x0502 => "Medium",
-            0x0504 => "Low",
-            0x7FFF => "n/a",
-            _ => "Unknown",
-        };
         decoded.insert(
             "ManualFlashOutput".to_string(),
-            ExifValue::Ascii(mfo_desc.to_string()),
+            ExifValue::Ascii(decode_manual_flash_output_exiftool(data[41]).to_string()),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon CameraSettings array sub-fields - exiv2 format
+pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Macro mode (index 1)
+    if data.len() > 1 {
+        decoded.insert(
+            "MacroMode".to_string(),
+            ExifValue::Ascii(decode_macro_mode_exiv2(data[1]).to_string()),
+        );
+    }
+
+    // Self timer (index 2)
+    if data.len() > 2 {
+        let self_timer = if data[2] == 0 {
+            "Off".to_string()
+        } else {
+            format!("{} s", data[2] as f64 / 10.0)
+        };
+        decoded.insert("SelfTimer".to_string(), ExifValue::Ascii(self_timer));
+    }
+
+    // Quality (index 3)
+    if data.len() > 3 {
+        decoded.insert(
+            "Quality".to_string(),
+            ExifValue::Ascii(decode_quality_exiv2(data[3]).to_string()),
+        );
+    }
+
+    // Flash mode (index 4)
+    if data.len() > 4 {
+        decoded.insert(
+            "FlashMode".to_string(),
+            ExifValue::Ascii(decode_flash_mode_exiv2(data[4]).to_string()),
+        );
+    }
+
+    // Drive mode (index 5)
+    if data.len() > 5 {
+        decoded.insert(
+            "DriveMode".to_string(),
+            ExifValue::Ascii(decode_drive_mode_exiv2(data[5]).to_string()),
+        );
+    }
+
+    // Focus mode (index 7)
+    if data.len() > 7 {
+        decoded.insert(
+            "FocusMode".to_string(),
+            ExifValue::Ascii(decode_focus_mode_exiv2(data[7]).to_string()),
+        );
+    }
+
+    // Metering mode (index 17)
+    if data.len() > 17 {
+        decoded.insert(
+            "MeteringMode".to_string(),
+            ExifValue::Ascii(decode_metering_mode_exiv2(data[17]).to_string()),
+        );
+    }
+
+    // Focus range (index 18)
+    if data.len() > 18 {
+        decoded.insert(
+            "FocusRange".to_string(),
+            ExifValue::Ascii(decode_focus_range_exiv2(data[18]).to_string()),
+        );
+    }
+
+    // Exposure mode (index 20)
+    if data.len() > 20 {
+        decoded.insert(
+            "ExposureMode".to_string(),
+            ExifValue::Ascii(decode_exposure_mode_exiv2(data[20]).to_string()),
+        );
+    }
+
+    // Focal units per mm (index 25)
+    let focal_units = if data.len() > 25 && data[25] > 0 {
+        data[25] as f64
+    } else {
+        1.0
+    };
+
+    // Max focal length (index 23)
+    if data.len() > 23 {
+        let fl = data[23] as f64 / focal_units;
+        decoded.insert(
+            "MaxFocalLength".to_string(),
+            ExifValue::Ascii(format!("{} mm", fl as u32)),
+        );
+    }
+
+    // Min focal length (index 24)
+    if data.len() > 24 {
+        let fl = data[24] as f64 / focal_units;
+        decoded.insert(
+            "MinFocalLength".to_string(),
+            ExifValue::Ascii(format!("{} mm", fl as u32)),
+        );
+    }
+
+    // Max aperture (index 26)
+    if data.len() > 26 && data[26] > 0 {
+        let apex = data[26] as f64 / 32.0;
+        let f_number = 2f64.powf(apex / 2.0);
+        let rounded = (f_number * 10.0).round() / 10.0;
+        decoded.insert(
+            "MaxAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
+        );
+    }
+
+    // Min aperture (index 27)
+    if data.len() > 27 && data[27] > 0 {
+        let apex = data[27] as f64 / 32.0;
+        let f_number = 2f64.powf(apex / 2.0);
+        let rounded = (f_number * 10.0).round() / 10.0;
+        decoded.insert(
+            "MinAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
+        );
+    }
+
+    // Camera ISO (index 16)
+    if data.len() > 16 && data[16] != 0x7FFF {
+        let raw_iso = data[16];
+        let iso_value = if raw_iso & 0x4000 != 0 {
+            raw_iso & 0x3FFF
+        } else {
+            match raw_iso {
+                0 | 14 | 15 => 0,
+                16 => 50,
+                17 => 100,
+                18 => 200,
+                19 => 400,
+                20 => 800,
+                _ => raw_iso,
+            }
+        };
+        decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![iso_value]));
+    }
+
+    // Focal units per mm (index 25)
+    if data.len() > 25 && data[25] > 0 {
+        decoded.insert(
+            "FocalUnits".to_string(),
+            ExifValue::Ascii(format!("{}/mm", data[25])),
+        );
+    }
+
+    // Flash activity (index 28)
+    if data.len() > 28 {
+        decoded.insert(
+            "FlashActivity".to_string(),
+            ExifValue::Short(vec![data[28]]),
+        );
+    }
+
+    // Flash bits (index 29)
+    if data.len() > 29 {
+        let bits = data[29];
+        let flash_bits_desc = if bits == 0 {
+            "(none)".to_string()
+        } else {
+            let mut descriptions = Vec::new();
+            if bits & 0x0001 != 0 {
+                descriptions.push("Manual");
+            }
+            if bits & 0x0002 != 0 {
+                descriptions.push("TTL");
+            }
+            if bits & 0x0004 != 0 {
+                descriptions.push("A-TTL");
+            }
+            if bits & 0x0008 != 0 {
+                descriptions.push("E-TTL");
+            }
+            if bits & 0x0010 != 0 {
+                descriptions.push("FP sync enabled");
+            }
+            if bits & 0x0080 != 0 {
+                descriptions.push("External");
+            } else if bits & 0x0040 != 0 {
+                descriptions.push("Internal");
+            }
+            if descriptions.is_empty() {
+                format!("Unknown (0x{:04x})", bits)
+            } else {
+                descriptions.join(", ")
+            }
+        };
+        decoded.insert("FlashBits".to_string(), ExifValue::Ascii(flash_bits_desc));
+    }
+
+    // Image stabilization (index 34) - same as exiftool
+    if data.len() > 34 {
+        decoded.insert(
+            "ImageStabilization".to_string(),
+            ExifValue::Ascii(decode_image_stabilization_exiftool(data[34]).to_string()),
+        );
+    }
+
+    // Manual flash output (index 41) - same as exiftool
+    if data.len() > 41 {
+        decoded.insert(
+            "ManualFlashOutput".to_string(),
+            ExifValue::Ascii(decode_manual_flash_output_exiftool(data[41]).to_string()),
         );
     }
 
@@ -1047,8 +1586,13 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
 /// Decode Canon ShotInfo array sub-fields
 ///
 /// This function decodes the CanonShotInfo array into individual fields
-/// that can be easily interpreted.
+/// that can be easily interpreted. Uses ExifTool format by default.
 pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    decode_shot_info_exiftool(data)
+}
+
+/// Decode Canon ShotInfo array sub-fields - ExifTool format
+pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
     // Auto ISO (index 1)
@@ -1117,27 +1661,10 @@ pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // White balance (index 7)
     if data.len() > 7 {
-        let wb = match data[7] {
-            0 => "Auto",
-            1 => "Daylight",
-            2 => "Cloudy",
-            3 => "Tungsten",
-            4 => "Fluorescent",
-            5 => "Flash",
-            6 => "Custom",
-            7 => "Black & White",
-            8 => "Shade",
-            9 => "Manual Temperature",
-            10 => "PC Set1",
-            11 => "PC Set2",
-            12 => "PC Set3",
-            14 => "Daylight Fluorescent",
-            15 => "Custom 1",
-            16 => "Custom 2",
-            17 => "Underwater",
-            _ => "Unknown",
-        };
-        decoded.insert("WhiteBalance".to_string(), ExifValue::Ascii(wb.to_string()));
+        decoded.insert(
+            "WhiteBalance".to_string(),
+            ExifValue::Ascii(decode_white_balance_exiftool(data[7]).to_string()),
+        );
     }
 
     // Sequence number (index 9)
@@ -1226,24 +1753,172 @@ pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
     decoded
 }
 
+/// Decode Canon ShotInfo array sub-fields - exiv2 format
+pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Auto ISO (index 1)
+    if data.len() > 1 && data[1] as i16 != -1 {
+        let val = data[1] as i16;
+        let auto_iso = ((val as f64 / 32.0) * 2f64.ln()).exp() * 100.0;
+        decoded.insert(
+            "AutoISO".to_string(),
+            ExifValue::Ascii(format!("{:.0}", auto_iso)),
+        );
+    }
+
+    // Base ISO (index 2)
+    if data.len() > 2 && data[2] > 0 {
+        let val = data[2] as i16;
+        let base_iso = ((val as f64 / 32.0) * 2f64.ln()).exp() * 100.0 / 32.0;
+        decoded.insert(
+            "BaseISO".to_string(),
+            ExifValue::Ascii(format!("{:.0}", base_iso)),
+        );
+    }
+
+    // Measured EV (index 3)
+    if data.len() > 3 {
+        let raw = data[3] as i16;
+        let ev = (raw as f64 / 32.0) + 5.0;
+        decoded.insert(
+            "MeasuredEV".to_string(),
+            ExifValue::Ascii(format!("{:.2}", ev)),
+        );
+    }
+
+    // Target aperture (index 4)
+    if data.len() > 4 && data[4] > 0 {
+        let apex = data[4] as f64 / 64.0;
+        let f_number = 2f64.powf(apex);
+        let rounded = (f_number * 10.0).round() / 10.0;
+        decoded.insert(
+            "TargetAperture".to_string(),
+            ExifValue::Ascii(format!("{}", rounded)),
+        );
+    }
+
+    // Target exposure time (index 5)
+    if data.len() > 5 && data[5] > 0 {
+        let apex = data[5] as f64 / 32.0;
+        let time = 2f64.powf(-apex);
+        let formatted = if time < 1.0 {
+            let denominator = (1.0 / time).round() as u32;
+            format!("1/{}", denominator)
+        } else {
+            format!("{}", time.round() as u32)
+        };
+        decoded.insert(
+            "TargetExposureTime".to_string(),
+            ExifValue::Ascii(formatted),
+        );
+    }
+
+    // White balance (index 7) - uses exiv2 format
+    if data.len() > 7 {
+        decoded.insert(
+            "WhiteBalance".to_string(),
+            ExifValue::Ascii(decode_white_balance_exiv2(data[7]).to_string()),
+        );
+    }
+
+    // Sequence number (index 9)
+    if data.len() > 9 {
+        decoded.insert(
+            "SequenceNumber".to_string(),
+            ExifValue::Short(vec![data[9]]),
+        );
+    }
+
+    // Flash exposure compensation (index 15)
+    if data.len() > 15 {
+        decoded.insert(
+            "FlashExposureComp".to_string(),
+            ExifValue::Short(vec![data[15]]),
+        );
+    }
+
+    // AEB Bracket Value (index 17)
+    if data.len() > 17 {
+        let raw = data[17] as i16;
+        let aeb_value = canon_ev(raw);
+        let formatted = if aeb_value == 0.0 {
+            "0".to_string()
+        } else if aeb_value > 0.0 {
+            format!("+{:.1}", aeb_value)
+        } else {
+            format!("{:.1}", aeb_value)
+        };
+        decoded.insert("AEBBracketValue".to_string(), ExifValue::Ascii(formatted));
+    }
+
+    // Exposure compensation (index 6)
+    if data.len() > 6 {
+        let raw = data[6] as i16;
+        let ev_comp = canon_ev(raw);
+        let formatted = if ev_comp == 0.0 {
+            "0".to_string()
+        } else if ev_comp > 0.0 {
+            format!("+{:.1}", ev_comp)
+        } else {
+            format!("{:.1}", ev_comp)
+        };
+        decoded.insert(
+            "ExposureCompensation".to_string(),
+            ExifValue::Ascii(formatted),
+        );
+    }
+
+    // Flash guide number (index 13)
+    if data.len() > 13 {
+        decoded.insert(
+            "FlashGuideNumber".to_string(),
+            ExifValue::Short(vec![data[13]]),
+        );
+    }
+
+    // Flash exposure compensation (index 15)
+    if data.len() > 15 {
+        let raw = data[15] as i16;
+        let flash_comp = canon_ev(raw);
+        let formatted = if flash_comp == 0.0 {
+            "0".to_string()
+        } else if flash_comp > 0.0 {
+            format!("+{:.1}", flash_comp)
+        } else {
+            format!("{:.1}", flash_comp)
+        };
+        decoded.insert("FlashExposureComp".to_string(), ExifValue::Ascii(formatted));
+    }
+
+    // Subject distance (index 19)
+    if data.len() > 19 {
+        decoded.insert(
+            "SubjectDistance".to_string(),
+            ExifValue::Short(vec![data[19]]),
+        );
+    }
+
+    decoded
+}
+
 /// Decode Canon FocalLength array sub-fields
 ///
 /// This function decodes the CanonFocalLength array into individual fields
-/// that can be easily interpreted.
+/// that can be easily interpreted. Uses ExifTool format by default.
 pub fn decode_focal_length(data: &[u16]) -> HashMap<String, ExifValue> {
+    decode_focal_length_exiftool(data)
+}
+
+/// Decode Canon FocalLength array sub-fields - ExifTool format
+pub fn decode_focal_length_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
     // Focal type (index 0)
     if !data.is_empty() {
-        let focal_type = match data[0] {
-            0 => "n/a",
-            1 => "Fixed",
-            2 => "Zoom",
-            _ => "Unknown",
-        };
         decoded.insert(
             "FocalType".to_string(),
-            ExifValue::Ascii(focal_type.to_string()),
+            ExifValue::Ascii(decode_focal_type_exiftool(data[0]).to_string()),
         );
     }
 
@@ -1283,11 +1958,19 @@ pub fn decode_focal_length(data: &[u16]) -> HashMap<String, ExifValue> {
     decoded
 }
 
+// decode_focal_length_exiv2 - same as exiftool (FocalType values are identical)
+// Use decode_focal_length_exiftool for both formats
+
 /// Decode Canon FileInfo array sub-fields
 ///
 /// This function decodes the CanonFileInfo array into individual fields
-/// that can be easily interpreted.
+/// that can be easily interpreted. Uses ExifTool format by default.
 pub fn decode_file_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    decode_file_info_exiftool(data)
+}
+
+/// Decode Canon FileInfo array sub-fields - ExifTool format
+pub fn decode_file_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
     // File number (index 1)
@@ -1297,17 +1980,9 @@ pub fn decode_file_info(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // Bracket mode (index 3)
     if data.len() > 3 {
-        let bracket_mode = match data[3] {
-            0 => "Off",
-            1 => "AEB",
-            2 => "FEB",
-            3 => "ISO",
-            4 => "WB",
-            _ => "Unknown",
-        };
         decoded.insert(
             "BracketMode".to_string(),
-            ExifValue::Ascii(bracket_mode.to_string()),
+            ExifValue::Ascii(decode_bracket_mode_exiftool(data[3]).to_string()),
         );
     }
 
@@ -1327,39 +2002,26 @@ pub fn decode_file_info(data: &[u16]) -> HashMap<String, ExifValue> {
     decoded
 }
 
+// decode_file_info_exiv2 - same as exiftool (BracketMode values are identical)
+// Use decode_file_info_exiftool for both formats
+
 /// Decode Canon AFInfo2 array sub-fields
 ///
 /// This function decodes the CanonAFInfo2 array which contains AF area information.
+/// Uses ExifTool format by default.
 pub fn decode_af_info2(data: &[u16]) -> HashMap<String, ExifValue> {
+    decode_af_info2_exiftool(data)
+}
+
+/// Decode Canon AFInfo2 array sub-fields - ExifTool format
+pub fn decode_af_info2_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
     // AF area mode (index 0)
     if !data.is_empty() {
-        let af_mode = match data[0] {
-            0 => "Off (Manual Focus)",
-            1 => "AF Point Expansion (surround)",
-            2 => "Single-point AF",
-            4 => "Auto",
-            5 => "Face Detect AF",
-            6 => "Face + Tracking",
-            7 => "Zone AF",
-            8 => "AF Point Expansion (4 point)",
-            9 => "Spot AF",
-            10 => "AF Point Expansion (8 point)",
-            11 => "Flexizone Multi",
-            13 => "Flexizone Single",
-            14 => "Large Zone AF",
-            // Compact camera modes
-            0x0060 => "Face AiAF",
-            0x1001 => "Single-point AF (Compact)",
-            0x1002 => "Tracking AF (Compact)",
-            0x1003 => "Face + Tracking (Compact)",
-            0xFFFF => "n/a",
-            _ => "Unknown",
-        };
         decoded.insert(
             "AFAreaMode".to_string(),
-            ExifValue::Ascii(af_mode.to_string()),
+            ExifValue::Ascii(decode_af_area_mode_exiftool(data[0]).to_string()),
         );
     }
 
@@ -1391,6 +2053,70 @@ pub fn decode_af_info2(data: &[u16]) -> HashMap<String, ExifValue> {
                 x_positions.push(data[2 + 2 * num_af_points as usize + i]);
             }
             // Y positions start after X positions
+            if data.len() > 2 + 3 * num_af_points as usize + i {
+                y_positions.push(data[2 + 3 * num_af_points as usize + i]);
+            }
+        }
+
+        if !widths.is_empty() {
+            decoded.insert("AFAreaWidths".to_string(), ExifValue::Short(widths));
+        }
+        if !heights.is_empty() {
+            decoded.insert("AFAreaHeights".to_string(), ExifValue::Short(heights));
+        }
+        if !x_positions.is_empty() {
+            decoded.insert(
+                "AFAreaXPositions".to_string(),
+                ExifValue::Short(x_positions),
+            );
+        }
+        if !y_positions.is_empty() {
+            decoded.insert(
+                "AFAreaYPositions".to_string(),
+                ExifValue::Short(y_positions),
+            );
+        }
+    }
+
+    decoded
+}
+
+/// Decode Canon AFInfo2 array sub-fields - exiv2 format
+pub fn decode_af_info2_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // AF area mode (index 0) - uses exiv2 format
+    if !data.is_empty() {
+        decoded.insert(
+            "AFAreaMode".to_string(),
+            ExifValue::Ascii(decode_af_area_mode_exiv2(data[0]).to_string()),
+        );
+    }
+
+    // Number of AF points (index 1)
+    if data.len() > 1 {
+        let num_af_points = data[1];
+        decoded.insert(
+            "NumAFPoints".to_string(),
+            ExifValue::Short(vec![num_af_points]),
+        );
+
+        // AF area widths (index 2 onwards, based on num_af_points)
+        let mut widths = Vec::new();
+        let mut heights = Vec::new();
+        let mut x_positions = Vec::new();
+        let mut y_positions = Vec::new();
+
+        for i in 0..num_af_points as usize {
+            if data.len() > 2 + i {
+                widths.push(data[2 + i]);
+            }
+            if data.len() > 2 + num_af_points as usize + i {
+                heights.push(data[2 + num_af_points as usize + i]);
+            }
+            if data.len() > 2 + 2 * num_af_points as usize + i {
+                x_positions.push(data[2 + 2 * num_af_points as usize + i]);
+            }
             if data.len() > 2 + 3 * num_af_points as usize + i {
                 y_positions.push(data[2 + 3 * num_af_points as usize + i]);
             }
@@ -1590,17 +2316,11 @@ pub fn parse_canon_maker_notes(
                         value
                     }
                 }
-                // DateStampMode - decode 0="Off", 1="Date", 2="Date & Time"
+                // DateStampMode - decode using decode function
                 CANON_DATE_STAMP_MODE => {
                     if let ExifValue::Short(ref shorts) = value {
                         if !shorts.is_empty() {
-                            let mode_str = match shorts[0] {
-                                0 => "Off",
-                                1 => "Date",
-                                2 => "Date & Time",
-                                _ => "Unknown",
-                            };
-                            ExifValue::Ascii(mode_str.to_string())
+                            ExifValue::Ascii(decode_date_stamp_mode_exiftool(shorts[0]).to_string())
                         } else {
                             value
                         }
