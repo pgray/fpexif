@@ -21,8 +21,14 @@ fn gcd(a: u32, b: u32) -> u32 {
 #[cfg(feature = "serde")]
 fn format_short_value(value: u16, tag_id: u16) -> Value {
     match tag_id {
+        0x0106 => Value::String(
+            crate::tags::get_photometric_interpretation_description(value).to_string(),
+        ),
         0x0112 => Value::String(crate::tags::get_orientation_description(value).to_string()),
         0x0103 => Value::String(crate::tags::get_compression_description(value).to_string()),
+        0x011C => {
+            Value::String(crate::tags::get_planar_configuration_description(value).to_string())
+        }
         0x0128 => Value::String(crate::tags::get_resolution_unit_description(value).to_string()),
         0x0213 => Value::String(crate::tags::get_ycbcr_positioning_description(value).to_string()),
         0x8822 => Value::String(crate::tags::get_exposure_program_description(value).to_string()),
@@ -197,6 +203,80 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
                 .collect();
             Value::String(channels.join(", "))
         }
+        0x9286 => {
+            // UserComment - check for charset marker and handle null padding
+            if data.len() >= 8 {
+                let charset = &data[0..8];
+                let content = &data[8..];
+
+                // Check for ASCII charset marker
+                if charset == b"ASCII\0\0\0" {
+                    // Check if content is just nulls/spaces (empty comment)
+                    let cleaned: String = content
+                        .iter()
+                        .filter(|&&b| b != 0)
+                        .map(|&b| b as char)
+                        .collect::<String>()
+                        .trim()
+                        .to_string();
+                    return Value::String(cleaned);
+                }
+
+                // Check for Unicode charset marker
+                if charset == b"UNICODE\0" {
+                    // Try to decode as UTF-16
+                    if content.len() >= 2 {
+                        // Check for BOM
+                        let is_le = content.len() >= 2 && content[0] == 0xFF && content[1] == 0xFE;
+                        let is_be = content.len() >= 2 && content[0] == 0xFE && content[1] == 0xFF;
+                        let start = if is_le || is_be { 2 } else { 0 };
+
+                        if content.len() > start {
+                            let u16_values: Vec<u16> = content[start..]
+                                .chunks(2)
+                                .filter_map(|chunk| {
+                                    if chunk.len() == 2 {
+                                        Some(if is_be {
+                                            u16::from_be_bytes([chunk[0], chunk[1]])
+                                        } else {
+                                            u16::from_le_bytes([chunk[0], chunk[1]])
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            if let Ok(s) = String::from_utf16(&u16_values) {
+                                let cleaned = s.trim_end_matches('\0').trim().to_string();
+                                return Value::String(cleaned);
+                            }
+                        }
+                    }
+                }
+
+                // Check if content after charset marker is all nulls
+                if content.iter().all(|&b| b == 0) {
+                    return Value::String(String::new());
+                }
+            }
+
+            // Check if entire data is nulls (empty comment without charset marker)
+            if data.iter().all(|&b| b == 0) {
+                return Value::String(String::new());
+            }
+
+            // Default: return as base64 for non-empty binary data
+            if data.len() <= 32 {
+                Value::String(
+                    data.iter()
+                        .map(|b| format!("{:02x}", b))
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
+            } else {
+                Value::String(base64_encode(data))
+            }
+        }
         0xA300 if data.len() == 1 => {
             // FileSource
             Value::String(crate::tags::get_file_source_description(data[0]).to_string())
@@ -204,6 +284,14 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
         0xA301 if data.len() == 1 => {
             // SceneType
             Value::String(crate::tags::get_scene_type_description(data[0]).to_string())
+        }
+        // CFAPattern in EXIF SubIFD (0xA302) as Undefined type
+        0xA302 if data.len() >= 4 => {
+            if let Some(formatted) = format_cfa_pattern(data) {
+                Value::String(formatted)
+            } else {
+                Value::String(base64_encode(data))
+            }
         }
         _ => {
             if data.len() <= 32 {
@@ -228,7 +316,41 @@ fn should_format_as_space_separated(tag_id: u16) -> bool {
         tag_id,
         0x0102 // BitsPerSample
         | 0x0013 // ThumbnailImageValidArea (Canon)
+        | 0x828D // CFARepeatPatternDim
+        | 0x0214 // ReferenceBlackWhite
     )
+}
+
+/// Format CFA pattern bytes as ExifTool-compatible string
+/// Converts [0,1,1,2] to "[Red,Green][Green,Blue]"
+#[cfg(feature = "serde")]
+fn format_cfa_pattern(data: &[u8]) -> Option<String> {
+    // CFA pattern for 2x2 Bayer pattern should have 4 bytes
+    if data.len() < 4 {
+        return None;
+    }
+
+    let color_name = |c: u8| -> &'static str {
+        match c {
+            0 => "Red",
+            1 => "Green",
+            2 => "Blue",
+            3 => "Cyan",
+            4 => "Magenta",
+            5 => "Yellow",
+            6 => "White",
+            _ => "Unknown",
+        }
+    };
+
+    // Format as [Row1][Row2] for 2x2 pattern
+    Some(format!(
+        "[{},{}][{},{}]",
+        color_name(data[0]),
+        color_name(data[1]),
+        color_name(data[2]),
+        color_name(data[3])
+    ))
 }
 
 /// Convert an ExifValue to a JSON value in exiftool-compatible format
@@ -245,6 +367,10 @@ pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
         ExifValue::Byte(v) if v.len() == 1 => match tag_id {
             0xA300 => Value::String(crate::tags::get_file_source_description(v[0]).to_string()),
             0xA301 => Value::String(crate::tags::get_scene_type_description(v[0]).to_string()),
+            // GPSAltitudeRef (0x0005 in GPS IFD)
+            0x0005 => {
+                Value::String(crate::tags::get_gps_altitude_ref_description(v[0]).to_string())
+            }
             _ => Value::Number(v[0].into()),
         },
 
@@ -282,6 +408,13 @@ pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
             // GPSVersionID (0x0000) should be formatted as "2.2.0.0"
             if tag_id == 0x0000 && v.len() == 4 {
                 Value::String(format!("{}.{}.{}.{}", v[0], v[1], v[2], v[3]))
+            // CFAPattern (0x828E TIFF/EP, 0xA302 EXIF) - format as [Red,Green][Green,Blue]
+            } else if (tag_id == 0x828E || tag_id == 0xA302) && v.len() >= 4 {
+                if let Some(formatted) = format_cfa_pattern(v) {
+                    Value::String(formatted)
+                } else {
+                    Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
+                }
             } else if should_format_as_space_separated(tag_id) {
                 Value::String(
                     v.iter()

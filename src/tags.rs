@@ -1393,3 +1393,58 @@ pub fn get_subject_distance_range_description(value: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+
+/// Human-readable descriptions for PhotometricInterpretation values
+pub fn get_photometric_interpretation_description(value: u16) -> &'static str {
+    match value {
+        0 => "WhiteIsZero",
+        1 => "BlackIsZero",
+        2 => "RGB",
+        3 => "RGB Palette",
+        4 => "Transparency Mask",
+        5 => "CMYK",
+        6 => "YCbCr",
+        8 => "CIELab",
+        9 => "ICCLab",
+        10 => "ITULab",
+        32803 => "Color Filter Array",
+        34892 => "Linear Raw",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable descriptions for PlanarConfiguration values
+pub fn get_planar_configuration_description(value: u16) -> &'static str {
+    match value {
+        1 => "Chunky",
+        2 => "Planar",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable description for GPSLatitudeRef values
+pub fn get_gps_latitude_ref_description(value: &str) -> &'static str {
+    match value {
+        "N" => "North",
+        "S" => "South",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable description for GPSLongitudeRef values
+pub fn get_gps_longitude_ref_description(value: &str) -> &'static str {
+    match value {
+        "E" => "East",
+        "W" => "West",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable description for GPSAltitudeRef values
+pub fn get_gps_altitude_ref_description(value: u8) -> &'static str {
+    match value {
+        0 => "Above Sea Level",
+        1 => "Below Sea Level",
+        _ => "Unknown",
+    }
+}
