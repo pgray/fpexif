@@ -81,6 +81,37 @@ function generateReport(results: FormatTestResult[]): string {
   lines.push("## Test Issues Report");
   lines.push("");
 
+  // Check for critical issues upfront
+  const totalCritical = results.reduce((sum, r) => sum + r.critical_issues, 0);
+  if (totalCritical > 0) {
+    // Collect all critical issues with their context
+    const criticalIssues: { format: string; file: string; message: string }[] = [];
+    for (const r of results) {
+      for (const f of r.file_results) {
+        for (const issue of f.issues) {
+          if (issue.category === "critical") {
+            criticalIssues.push({
+              format: r.format,
+              file: getFileName(f.file_path),
+              message: issue.message,
+            });
+          }
+        }
+      }
+    }
+
+    lines.push(`> [!CAUTION]`);
+    lines.push(`> **${totalCritical} critical issue${totalCritical === 1 ? "" : "s"} detected!**`);
+    lines.push(`>`);
+    for (const issue of criticalIssues.slice(0, 10)) {
+      lines.push(`> - **${issue.format}** \`${issue.file}\`: ${issue.message}`);
+    }
+    if (criticalIssues.length > 10) {
+      lines.push(`> - ... and ${criticalIssues.length - 10} more`);
+    }
+    lines.push("");
+  }
+
   if (results.length === 0) {
     lines.push("### All Clear!");
     lines.push("");
@@ -92,7 +123,6 @@ function generateReport(results: FormatTestResult[]): string {
   const totalUnknown = results.reduce((sum, r) => sum + r.unknown_tags, 0);
   const totalMissing = results.reduce((sum, r) => sum + r.missing_fields, 0);
   const totalMismatches = results.reduce((sum, r) => sum + r.value_mismatches, 0);
-  const totalCritical = results.reduce((sum, r) => sum + r.critical_issues, 0);
   const totalIssues = totalUnknown + totalMissing + totalMismatches;
   const totalFiles = results.reduce((sum, r) => sum + r.files_tested, 0);
   const totalPassed = results.reduce((sum, r) => sum + r.files_passed, 0);

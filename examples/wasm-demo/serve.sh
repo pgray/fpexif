@@ -14,16 +14,14 @@ if [ ! -d "pkg" ]; then
     exit 1
 fi
 
+# Check if deno is available
+if ! command -v deno &> /dev/null; then
+    echo "Error: Deno not found. Please install Deno: https://deno.land/"
+    exit 1
+fi
+
 echo "Starting server at http://localhost:3000"
 echo "Press Ctrl+C to stop"
 echo ""
 
-# Try python3 first, then python
-if command -v python3 &> /dev/null; then
-    python3 -m http.server 3000
-elif command -v python &> /dev/null; then
-    python -m http.server 3000
-else
-    echo "Error: Python not found. Please install Python or use another HTTP server."
-    exit 1
-fi
+deno run --allow-net --allow-read jsr:@std/http/file-server --port 3000
