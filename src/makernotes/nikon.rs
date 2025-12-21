@@ -347,6 +347,79 @@ pub fn decode_active_d_lighting_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode JPG Compression value - ExifTool format
+/// From Nikon.pm PrintConv for tag 0x0044 in WorldTime
+pub fn decode_jpg_compression_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Size Priority",
+        3 => "Optimal Quality",
+        _ => "Unknown",
+    }
+}
+
+/// Decode JPG Compression value - exiv2 format
+/// exiv2 does not define this tag, using ExifTool values
+pub fn decode_jpg_compression_exiv2(value: u16) -> &'static str {
+    decode_jpg_compression_exiftool(value)
+}
+
+/// Decode VR Type value - ExifTool format
+/// From Nikon.pm VRInfo subdirectory, offset 8
+pub fn decode_vr_type_exiftool(value: u8) -> &'static str {
+    match value {
+        2 => "In-body",
+        3 => "In-body + Lens",
+        _ => "Unknown",
+    }
+}
+
+/// Decode VR Type value - exiv2 format
+/// exiv2 does not define VRType, using ExifTool values
+pub fn decode_vr_type_exiv2(value: u8) -> &'static str {
+    decode_vr_type_exiftool(value)
+}
+
+/// Decode Daylight Savings value - ExifTool format
+/// From Nikon.pm WorldTime subdirectory, offset 2
+pub fn decode_daylight_savings_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "No",
+        1 => "Yes",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Daylight Savings value - exiv2 format
+/// Values based on exiv2 nikonmn_int.cpp nikonYesNo[]
+pub fn decode_daylight_savings_exiv2(value: u8) -> &'static str {
+    match value {
+        0 => "No",
+        1 => "Yes",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Image Stabilization ASCII value - ExifTool format
+/// Tag 0x00ac is ASCII string type, this decodes common string values
+/// From Nikon.pm - tag 0x00ac is just stored as string, but some cameras
+/// store numeric-like strings that can be decoded
+pub fn decode_image_stabilization_exiftool(value: &str) -> &'static str {
+    match value.trim() {
+        "0" | "OFF" => "Off",
+        "1" | "ON" => "On",
+        "2" | "ON (2)" => "On (2)",
+        "3" | "ON (3)" => "On (3)",
+        "4" | "ON (4)" => "On (4)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Image Stabilization ASCII value - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_image_stabilization_exiv2(value: &str) -> &'static str {
+    decode_image_stabilization_exiftool(value)
+}
+
 /// Decode Color Space value (tag 0x001E) - ExifTool format
 pub fn decode_color_space_exiftool(value: u16) -> &'static str {
     match value {

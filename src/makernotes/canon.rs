@@ -902,6 +902,134 @@ pub fn decode_focal_type_exiftool(value: u16) -> &'static str {
 
 // FocalType exiv2 - same as exiftool, no separate function needed
 
+/// Decode SlowShutter - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_slow_shutter_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Night Scene",
+        2 => "On",
+        3 => "None",
+        0xFFFF => "n/a", // -1 as u16
+        _ => "Unknown",
+    }
+}
+
+/// Decode SlowShutter - exiv2 format (from canonmn_int.cpp slowShutter)
+pub fn decode_slow_shutter_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Night Scene",
+        2 => "On",
+        3 => "None",
+        65535 => "n/a", // -1 as u16
+        _ => "Unknown",
+    }
+}
+
+/// Decode AutoExposureBracketing - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_auto_exposure_bracketing_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On (shot 1)",
+        2 => "On (shot 2)",
+        3 => "On (shot 3)",
+        0xFFFF => "On", // -1 as u16
+        _ => "Unknown",
+    }
+}
+
+/// Decode AutoExposureBracketing - exiv2 format (from canonmn_int.cpp autoExposureBracketing)
+pub fn decode_auto_exposure_bracketing_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On (shot 1)",
+        2 => "On (shot 2)",
+        3 => "On (shot 3)",
+        65535 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFPointsInFocus - ExifTool format (from Canon.pm PrintConv)
+/// Used by D30, D60 and some PowerShot/Ixus models
+pub fn decode_af_points_in_focus_exiftool(value: u16) -> &'static str {
+    match value {
+        0x3000 => "None (MF)",
+        0x3001 => "Right",
+        0x3002 => "Center",
+        0x3003 => "Center+Right",
+        0x3004 => "Left",
+        0x3005 => "Left+Right",
+        0x3006 => "Left+Center",
+        0x3007 => "All",
+        _ => "Unknown",
+    }
+}
+
+// AFPointsInFocus exiv2 - same as exiftool for basic values
+
+/// Decode ControlMode - ExifTool format (from Canon.pm PrintConv, ShotInfo index 18)
+pub fn decode_control_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "n/a",
+        1 => "Camera Local Control",
+        3 => "Computer Remote Control",
+        _ => "Unknown",
+    }
+}
+
+// ControlMode exiv2 - same as exiftool
+
+/// Decode CameraType - ExifTool format (from Canon.pm PrintConv, ShotInfo index 26)
+pub fn decode_camera_type_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "n/a",
+        248 => "EOS High-end",
+        250 => "Compact",
+        252 => "EOS Mid-range",
+        255 => "DV Camera",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraType - exiv2 format (from canonmn_int.cpp cameraType)
+pub fn decode_camera_type_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "n/a",
+        248 => "EOS High-end",
+        250 => "Compact",
+        252 => "EOS Mid-range",
+        255 => "DV Camera",
+        _ => "Unknown",
+    }
+}
+
+/// Decode NDFilter - ExifTool format (from Canon.pm PrintConv, ShotInfo index 28)
+pub fn decode_nd_filter_exiftool(value: u16) -> &'static str {
+    match value as i16 {
+        -1 => "n/a",
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+
+// NDFilter exiv2 - same as exiftool
+
+/// Decode AutoRotate - ExifTool format (from Canon.pm PrintConv, ShotInfo index 27)
+pub fn decode_auto_rotate_exiftool(value: u16) -> &'static str {
+    match value as i16 {
+        -1 => "n/a",
+        0 => "None",
+        1 => "Rotate 90 CW",
+        2 => "Rotate 180",
+        3 => "Rotate 270 CW",
+        _ => "Unknown",
+    }
+}
+
+// AutoRotate exiv2 - same as exiftool
+
 /// Decode BracketMode - ExifTool format (from Canon.pm PrintConv)
 pub fn decode_bracket_mode_exiftool(value: u16) -> &'static str {
     match value {
@@ -1389,6 +1517,81 @@ pub fn decode_sraw_quality_exiftool(value: i16) -> &'static str {
 /// Decode SRAWQuality - exiv2 format (same as ExifTool)
 pub fn decode_sraw_quality_exiv2(value: i16) -> &'static str {
     decode_sraw_quality_exiftool(value)
+}
+
+/// Decode FocusBracketing - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_focus_bracketing_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Disable",
+        1 => "Enable",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusBracketing - exiv2 format (same as ExifTool)
+pub fn decode_focus_bracketing_exiv2(value: u16) -> &'static str {
+    decode_focus_bracketing_exiftool(value)
+}
+
+/// Decode DaylightSavings - ExifTool format (from Canon.pm PrintConv)
+pub fn decode_daylight_savings_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        60 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DaylightSavings - exiv2 format (same as ExifTool)
+pub fn decode_daylight_savings_exiv2(value: u16) -> &'static str {
+    decode_daylight_savings_exiftool(value)
+}
+
+/// Decode PictureStyle - ExifTool format (from Canon.pm pictureStyles)
+pub fn decode_picture_style_exiftool(value: u16) -> &'static str {
+    match value {
+        0x00 => "None",
+        0x01 => "Standard",
+        0x02 => "Portrait",
+        0x03 => "High Saturation",
+        0x04 => "Adobe RGB",
+        0x05 => "Low Saturation",
+        0x06 => "CM Set 1",
+        0x07 => "CM Set 2",
+        0x21 => "User Def. 1",
+        0x22 => "User Def. 2",
+        0x23 => "User Def. 3",
+        0x41 => "PC 1",
+        0x42 => "PC 2",
+        0x43 => "PC 3",
+        0x81 => "Standard",
+        0x82 => "Portrait",
+        0x83 => "Landscape",
+        0x84 => "Neutral",
+        0x85 => "Faithful",
+        0x86 => "Monochrome",
+        0x87 => "Auto",
+        0x88 => "Fine Detail",
+        0xff => "n/a",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode PictureStyle - exiv2 format (same as ExifTool)
+pub fn decode_picture_style_exiv2(value: u16) -> &'static str {
+    decode_picture_style_exiftool(value)
+}
+
+/// Decode MeasuredEV - ExifTool format (from Canon.pm PrintConv)
+/// Simple passthrough that returns the value as a string
+pub fn decode_measured_ev_exiftool(value: i16) -> String {
+    value.to_string()
+}
+
+/// Decode MeasuredEV - exiv2 format (same as ExifTool)
+pub fn decode_measured_ev_exiv2(value: i16) -> String {
+    decode_measured_ev_exiftool(value)
 }
 
 /// Parse a single IFD entry and return the tag value
@@ -2365,11 +2568,57 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // Slow shutter (index 8)
+    if data.len() > 8 {
+        decoded.insert(
+            "SlowShutter".to_string(),
+            ExifValue::Ascii(decode_slow_shutter_exiftool(data[8]).to_string()),
+        );
+    }
+
     // Sequence number (index 9)
     if data.len() > 9 {
         decoded.insert(
             "SequenceNumber".to_string(),
             ExifValue::Short(vec![data[9]]),
+        );
+    }
+
+    // Optical zoom code (index 10)
+    if data.len() > 10 {
+        let zoom_str = if data[10] == 8 {
+            "n/a".to_string()
+        } else {
+            data[10].to_string()
+        };
+        decoded.insert("OpticalZoomCode".to_string(), ExifValue::Ascii(zoom_str));
+    }
+
+    // Camera temperature (index 12)
+    // Value stored as: actual_temp + 128
+    // Only valid for some EOS models (not 1D/1DS)
+    if data.len() > 12 && data[12] > 0 {
+        let temp = (data[12] as i16) - 128;
+        decoded.insert(
+            "CameraTemperature".to_string(),
+            ExifValue::Ascii(format!("{} C", temp)),
+        );
+    }
+
+    // AF points in focus (index 14)
+    // Used by D30, D60 and some PowerShot/Ixus models
+    if data.len() > 14 && data[14] != 0 {
+        decoded.insert(
+            "AFPointsInFocus".to_string(),
+            ExifValue::Ascii(decode_af_points_in_focus_exiftool(data[14]).to_string()),
+        );
+    }
+
+    // Auto exposure bracketing (index 16)
+    if data.len() > 16 {
+        decoded.insert(
+            "AutoExposureBracketing".to_string(),
+            ExifValue::Ascii(decode_auto_exposure_bracketing_exiftool(data[16]).to_string()),
         );
     }
 
@@ -2395,6 +2644,58 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
             format!("{:.1}", aeb_value)
         };
         decoded.insert("AEBBracketValue".to_string(), ExifValue::Ascii(formatted));
+    }
+
+    // Control mode (index 18)
+    if data.len() > 18 {
+        decoded.insert(
+            "ControlMode".to_string(),
+            ExifValue::Ascii(decode_control_mode_exiftool(data[18]).to_string()),
+        );
+    }
+
+    // Measured EV 2 (index 23)
+    // Formula: val / 8 - 6
+    if data.len() > 23 && data[23] != 0 {
+        let ev2 = (data[23] as f64 / 8.0) - 6.0;
+        decoded.insert(
+            "MeasuredEV2".to_string(),
+            ExifValue::Ascii(format!("{:.3}", ev2)),
+        );
+    }
+
+    // Bulb duration (index 24)
+    // Value stored as: duration * 10
+    if data.len() > 24 {
+        let duration = data[24] as f64 / 10.0;
+        decoded.insert(
+            "BulbDuration".to_string(),
+            ExifValue::Ascii(format!("{}", duration as u32)),
+        );
+    }
+
+    // Camera type (index 26)
+    if data.len() > 26 {
+        decoded.insert(
+            "CameraType".to_string(),
+            ExifValue::Ascii(decode_camera_type_exiftool(data[26]).to_string()),
+        );
+    }
+
+    // Auto rotate (index 27)
+    if data.len() > 27 && data[27] as i16 >= 0 {
+        decoded.insert(
+            "AutoRotate".to_string(),
+            ExifValue::Ascii(decode_auto_rotate_exiftool(data[27]).to_string()),
+        );
+    }
+
+    // ND filter (index 28)
+    if data.len() > 28 {
+        decoded.insert(
+            "NDFilter".to_string(),
+            ExifValue::Ascii(decode_nd_filter_exiftool(data[28]).to_string()),
+        );
     }
 
     // Exposure compensation (index 6)
@@ -2520,11 +2821,54 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // Slow shutter (index 8)
+    if data.len() > 8 {
+        decoded.insert(
+            "SlowShutter".to_string(),
+            ExifValue::Ascii(decode_slow_shutter_exiv2(data[8]).to_string()),
+        );
+    }
+
     // Sequence number (index 9)
     if data.len() > 9 {
         decoded.insert(
             "SequenceNumber".to_string(),
             ExifValue::Short(vec![data[9]]),
+        );
+    }
+
+    // Optical zoom code (index 10)
+    if data.len() > 10 {
+        let zoom_str = if data[10] == 8 {
+            "n/a".to_string()
+        } else {
+            data[10].to_string()
+        };
+        decoded.insert("OpticalZoomCode".to_string(), ExifValue::Ascii(zoom_str));
+    }
+
+    // Camera temperature (index 12)
+    if data.len() > 12 && data[12] > 0 {
+        let temp = (data[12] as i16) - 128;
+        decoded.insert(
+            "CameraTemperature".to_string(),
+            ExifValue::Ascii(format!("{} C", temp)),
+        );
+    }
+
+    // AF points in focus (index 14)
+    if data.len() > 14 && data[14] != 0 {
+        decoded.insert(
+            "AFPointsInFocus".to_string(),
+            ExifValue::Ascii(decode_af_points_in_focus_exiftool(data[14]).to_string()),
+        );
+    }
+
+    // Auto exposure bracketing (index 16)
+    if data.len() > 16 {
+        decoded.insert(
+            "AutoExposureBracketing".to_string(),
+            ExifValue::Ascii(decode_auto_exposure_bracketing_exiv2(data[16]).to_string()),
         );
     }
 
@@ -2548,6 +2892,56 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
             format!("{:.1}", aeb_value)
         };
         decoded.insert("AEBBracketValue".to_string(), ExifValue::Ascii(formatted));
+    }
+
+    // Control mode (index 18) - same as exiftool
+    if data.len() > 18 {
+        decoded.insert(
+            "ControlMode".to_string(),
+            ExifValue::Ascii(decode_control_mode_exiftool(data[18]).to_string()),
+        );
+    }
+
+    // Measured EV 2 (index 23)
+    if data.len() > 23 && data[23] != 0 {
+        let ev2 = (data[23] as f64 / 8.0) - 6.0;
+        decoded.insert(
+            "MeasuredEV2".to_string(),
+            ExifValue::Ascii(format!("{:.3}", ev2)),
+        );
+    }
+
+    // Bulb duration (index 24)
+    if data.len() > 24 {
+        let duration = data[24] as f64 / 10.0;
+        decoded.insert(
+            "BulbDuration".to_string(),
+            ExifValue::Ascii(format!("{}", duration as u32)),
+        );
+    }
+
+    // Camera type (index 26) - uses exiv2 format
+    if data.len() > 26 {
+        decoded.insert(
+            "CameraType".to_string(),
+            ExifValue::Ascii(decode_camera_type_exiv2(data[26]).to_string()),
+        );
+    }
+
+    // Auto rotate (index 27) - same as exiftool
+    if data.len() > 27 && data[27] as i16 >= 0 {
+        decoded.insert(
+            "AutoRotate".to_string(),
+            ExifValue::Ascii(decode_auto_rotate_exiftool(data[27]).to_string()),
+        );
+    }
+
+    // ND filter (index 28) - same as exiftool
+    if data.len() > 28 {
+        decoded.insert(
+            "NDFilter".to_string(),
+            ExifValue::Ascii(decode_nd_filter_exiftool(data[28]).to_string()),
+        );
     }
 
     // Exposure compensation (index 6)
@@ -2671,10 +3065,10 @@ pub fn decode_file_info(data: &[u16]) -> HashMap<String, ExifValue> {
 pub fn decode_file_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
-    // File number (index 1)
-    if data.len() > 1 {
-        decoded.insert("FileNumber".to_string(), ExifValue::Short(vec![data[1]]));
-    }
+    // File number (index 1) - SKIP
+    // The FileNumber at index 1 requires complex model-specific bit manipulation.
+    // It's redundant with the main FileNumber tag (0x0008) which is already decoded.
+    // See Canon.pm lines 6793-6850 for the complex conditional decoding logic.
 
     // Bracket mode (index 3)
     if data.len() > 3 {

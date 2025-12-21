@@ -35,7 +35,9 @@
       "Bash(do echo \"=== $f ===\")",
       "Bash(done)",
       "Bash(FPEXIF_TEST_FILES=/fpexif/raws timeout 90 cargo test:*)",
-      "Bash(./bin/mfr-test:*)"
+      "Bash(./bin/mfr-test:*)",
+      "Bash(./bin/fpexif:*)",
+      "Bash(deno run:*)"
     ],
     "deny": [],
     "ask": []
