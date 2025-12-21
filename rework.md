@@ -10,7 +10,7 @@ Refactor all decode functions in makernote modules to support dual output format
 
 | Module | Decode Functions | Match Arms | Status |
 |--------|-----------------|------------|--------|
-| canon.rs | 5 | 440 | needs rework |
+| canon.rs | 5 | 440 | ✅ DONE |
 | fuji.rs | 15 | 109 | needs rework |
 | nikon.rs | 7 | 38 | needs rework |
 | panasonic.rs | 16 | 135 | needs rework |
@@ -45,15 +45,19 @@ Update `parse_*_maker_notes()` to use the appropriate version (default to exifto
 
 ## Module-Specific References
 
-### Canon
+### Canon ✅ DONE
 - ExifTool: `exiftool/lib/Image/ExifTool/Canon.pm`, `CanonCustom.pm`
 - exiv2: `exiv2/src/canonmn_int.cpp`
-- Functions to rework:
-  - `decode_camera_settings` (complex - has inline decoding)
-  - `decode_shot_info`
-  - `decode_focal_length`
-  - `decode_file_info`
-  - `decode_af_info2`
+- **Completed**: 15 individual decode functions with `_exiftool` suffix, 11 with `_exiv2` versions
+- **Pattern used**:
+  - Created individual `decode_*_exiftool()` functions for each field
+  - Only created `_exiv2` versions where values actually differ
+  - Container functions (`decode_camera_settings`, etc.) delegate to `_exiftool` version by default
+  - Added `_exiv2` container functions that call the `_exiv2` decode functions
+- **Fields with different exiv2 values**: MacroMode, Quality, FlashMode, DriveMode, FocusMode,
+  MeteringMode, FocusRange, ExposureMode, WhiteBalance, AFAreaMode
+- **Fields with identical values (no _exiv2 needed)**: ImageStabilization, ManualFlashOutput,
+  FocalType, BracketMode, DateStampMode
 
 ### Fuji
 - ExifTool: `exiftool/lib/Image/ExifTool/FujiFilm.pm`
@@ -181,3 +185,47 @@ After each module rework:
 2. `cargo test` - tests pass
 3. `./bin/ccc` - clippy/fmt clean
 4. Compare output with actual exiftool/exiv2 on sample images
+
+## Lessons Learned (from Canon rework)
+
+### Pattern for container functions
+```rust
+// Default function delegates to exiftool
+pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
+    decode_camera_settings_exiftool(data)
+}
+
+// ExifTool version calls individual decode functions
+pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+    if data.len() > 1 {
+        decoded.insert(
+            "MacroMode".to_string(),
+            ExifValue::Ascii(decode_macro_mode_exiftool(data[1]).to_string()),
+        );
+    }
+    // ... more fields
+    decoded
+}
+
+// exiv2 version - only create if at least one field differs
+pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
+    // Same structure, calls _exiv2 decode functions where they exist
+    // Falls back to _exiftool for fields that are identical
+}
+```
+
+### When NOT to create _exiv2 version
+- If all values in the match are identical between ExifTool and exiv2
+- Add a comment: `// decode_foo_exiv2 - same as exiftool, no separate function needed`
+
+### Finding exiv2 values
+- Search for `constexpr TagDetails canon*` in `exiv2/src/canonmn_int.cpp`
+- Values are in format: `{0, N_("Off")}, {1, N_("On")}`
+- `N_()` is a gettext macro, ignore it - just use the string
+
+### Common differences between ExifTool and exiv2
+- Capitalization: "One-shot AF" vs "One shot AF"
+- Wording: "Flash Not Fired" vs "Off"
+- Additional values in one or the other
+- Value numbering shifts (especially in "focus type" style fields)
