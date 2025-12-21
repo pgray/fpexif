@@ -45,12 +45,14 @@ pub const PANA_LENS_TYPE: u16 = 0x0051;
 pub const PANA_LENS_SERIAL_NUMBER: u16 = 0x0052;
 pub const PANA_ACCESSORY_TYPE: u16 = 0x0053;
 pub const PANA_ACCESSORY_SERIAL_NUMBER: u16 = 0x0054;
-pub const PANA_ACCELEROMETER_X: u16 = 0x008A;
-pub const PANA_ACCELEROMETER_Y: u16 = 0x008B;
+pub const PANA_SHADING_COMPENSATION: u16 = 0x008A;
+pub const PANA_WB_SHIFT_INTELLIGENT_AUTO: u16 = 0x008B;
 pub const PANA_ACCELEROMETER_Z: u16 = 0x008C;
-pub const PANA_CAMERA_ORIENTATION: u16 = 0x008D;
-pub const PANA_ROLL_ANGLE: u16 = 0x008E;
-pub const PANA_PITCH_ANGLE: u16 = 0x008F;
+pub const PANA_ACCELEROMETER_X: u16 = 0x008D;
+pub const PANA_ACCELEROMETER_Y: u16 = 0x008E;
+pub const PANA_CAMERA_ORIENTATION: u16 = 0x008F;
+pub const PANA_ROLL_ANGLE: u16 = 0x0090;
+pub const PANA_PITCH_ANGLE: u16 = 0x0091;
 pub const PANA_BATTERY_LEVEL: u16 = 0x0096;
 pub const PANA_CITY: u16 = 0x006D;
 pub const PANA_LANDMARK: u16 = 0x006E;
@@ -102,9 +104,11 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
         PANA_LENS_SERIAL_NUMBER => Some("LensSerialNumber"),
         PANA_ACCESSORY_TYPE => Some("AccessoryType"),
         PANA_ACCESSORY_SERIAL_NUMBER => Some("AccessorySerialNumber"),
+        PANA_SHADING_COMPENSATION => Some("ShadingCompensation"),
+        PANA_WB_SHIFT_INTELLIGENT_AUTO => Some("WBShiftIntelligentAuto"),
+        PANA_ACCELEROMETER_Z => Some("AccelerometerZ"),
         PANA_ACCELEROMETER_X => Some("AccelerometerX"),
         PANA_ACCELEROMETER_Y => Some("AccelerometerY"),
-        PANA_ACCELEROMETER_Z => Some("AccelerometerZ"),
         PANA_CAMERA_ORIENTATION => Some("CameraOrientation"),
         PANA_ROLL_ANGLE => Some("RollAngle"),
         PANA_PITCH_ANGLE => Some("PitchAngle"),
@@ -180,12 +184,19 @@ fn decode_af_area_mode(value: u16) -> &'static str {
 }
 
 /// Decode ImageStabilization value
+/// Values based on ExifTool Panasonic.pm reference
 fn decode_image_stabilization(value: u16) -> &'static str {
     match value {
-        2 => "On, Mode 1",
+        2 => "On, Optical",
         3 => "Off",
         4 => "On, Mode 2",
-        5 => "Panning",
+        5 => "On, Optical Panning",
+        6 => "On, Body-only",
+        7 => "On, Body-only Panning",
+        9 => "Dual IS",
+        10 => "Dual IS Panning",
+        11 => "Dual2 IS",
+        12 => "Dual2 IS Panning",
         _ => "Unknown",
     }
 }
