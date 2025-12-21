@@ -57,6 +57,10 @@ fn format_short_value(value: u16, tag_id: u16) -> Value {
         0xA40B => Value::String(crate::tags::get_gain_control_description(value).to_string()),
         0xA217 => Value::String(crate::tags::get_sensing_method_description(value).to_string()),
         0x8830 => Value::String(crate::tags::get_sensitivity_type_description(value).to_string()),
+        // DNG CalibrationIlluminant tags use LightSource descriptions
+        0xC65A | 0xC65B => {
+            Value::String(crate::tags::get_light_source_description(value).to_string())
+        }
         _ => Value::Number(value.into()),
     }
 }
@@ -311,6 +315,7 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
 }
 
 /// Tags that should be formatted as space-separated strings instead of JSON arrays
+#[cfg(feature = "serde")]
 fn should_format_as_space_separated(tag_id: u16) -> bool {
     matches!(
         tag_id,
@@ -318,6 +323,19 @@ fn should_format_as_space_separated(tag_id: u16) -> bool {
         | 0x0013 // ThumbnailImageValidArea (Canon)
         | 0x828D // CFARepeatPatternDim
         | 0x0214 // ReferenceBlackWhite
+        | 0xC620 // DefaultCropSize (DNG)
+    )
+}
+
+/// Tags that should be formatted as space-separated decimals for rational/srational arrays
+#[cfg(feature = "serde")]
+fn should_format_rationals_as_space_separated(tag_id: u16) -> bool {
+    matches!(
+        tag_id,
+        0xC621 // ColorMatrix1 (DNG)
+        | 0xC622 // ColorMatrix2 (DNG)
+        | 0xC627 // AnalogBalance (DNG)
+        | 0xC628 // AsShotNeutral (DNG)
     )
 }
 
@@ -405,8 +423,8 @@ pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
 
         // Multi-value arrays
         ExifValue::Byte(v) => {
-            // GPSVersionID (0x0000) should be formatted as "2.2.0.0"
-            if tag_id == 0x0000 && v.len() == 4 {
+            // GPSVersionID (0x0000), DNGVersion (0xC612), DNGBackwardVersion (0xC613) should be formatted as "2.2.0.0"
+            if (tag_id == 0x0000 || tag_id == 0xC612 || tag_id == 0xC613) && v.len() == 4 {
                 Value::String(format!("{}.{}.{}.{}", v[0], v[1], v[2], v[3]))
             // CFAPattern (0x828E TIFF/EP, 0xA302 EXIF) - format as [Red,Green][Green,Blue]
             } else if (tag_id == 0x828E || tag_id == 0xA302) && v.len() >= 4 {
@@ -438,7 +456,18 @@ pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
                 Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
             }
         }
-        ExifValue::Long(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
+        ExifValue::Long(v) => {
+            if should_format_as_space_separated(tag_id) {
+                Value::String(
+                    v.iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
+            } else {
+                Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
+            }
+        }
         ExifValue::SByte(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
         ExifValue::SShort(v) => {
             if should_format_as_space_separated(tag_id) {
@@ -475,34 +504,70 @@ pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
         ),
 
         // Multi-value Rationals
-        ExifValue::Rational(v) => Value::Array(
-            v.iter()
-                .map(|&(num, den)| {
-                    if den == 0 {
-                        Value::String("inf".to_string())
-                    } else {
-                        let decimal = num as f64 / den as f64;
-                        serde_json::Number::from_f64(decimal)
-                            .map(Value::Number)
-                            .unwrap_or_else(|| Value::String(decimal.to_string()))
-                    }
-                })
-                .collect(),
-        ),
-        ExifValue::SRational(v) => Value::Array(
-            v.iter()
-                .map(|&(num, den)| {
-                    if den == 0 {
-                        Value::String("inf".to_string())
-                    } else {
-                        let decimal = num as f64 / den as f64;
-                        serde_json::Number::from_f64(decimal)
-                            .map(Value::Number)
-                            .unwrap_or_else(|| Value::String(decimal.to_string()))
-                    }
-                })
-                .collect(),
-        ),
+        ExifValue::Rational(v) => {
+            if should_format_rationals_as_space_separated(tag_id) {
+                // Format as space-separated decimals for DNG color matrix tags
+                let decimals: Vec<String> = v
+                    .iter()
+                    .map(|&(num, den)| {
+                        if den == 0 {
+                            "inf".to_string()
+                        } else {
+                            let decimal = num as f64 / den as f64;
+                            decimal.to_string()
+                        }
+                    })
+                    .collect();
+                Value::String(decimals.join(" "))
+            } else {
+                Value::Array(
+                    v.iter()
+                        .map(|&(num, den)| {
+                            if den == 0 {
+                                Value::String("inf".to_string())
+                            } else {
+                                let decimal = num as f64 / den as f64;
+                                serde_json::Number::from_f64(decimal)
+                                    .map(Value::Number)
+                                    .unwrap_or_else(|| Value::String(decimal.to_string()))
+                            }
+                        })
+                        .collect(),
+                )
+            }
+        }
+        ExifValue::SRational(v) => {
+            if should_format_rationals_as_space_separated(tag_id) {
+                // Format as space-separated decimals for DNG color matrix tags
+                let decimals: Vec<String> = v
+                    .iter()
+                    .map(|&(num, den)| {
+                        if den == 0 {
+                            "inf".to_string()
+                        } else {
+                            let decimal = num as f64 / den as f64;
+                            decimal.to_string()
+                        }
+                    })
+                    .collect();
+                Value::String(decimals.join(" "))
+            } else {
+                Value::Array(
+                    v.iter()
+                        .map(|&(num, den)| {
+                            if den == 0 {
+                                Value::String("inf".to_string())
+                            } else {
+                                let decimal = num as f64 / den as f64;
+                                serde_json::Number::from_f64(decimal)
+                                    .map(Value::Number)
+                                    .unwrap_or_else(|| Value::String(decimal.to_string()))
+                            }
+                        })
+                        .collect(),
+                )
+            }
+        }
 
         // Undefined - use helper function
         ExifValue::Undefined(v) => format_undefined_value(v, tag_id),

@@ -54,8 +54,7 @@ fn test_decode_camera_settings() {
     // Check focus mode
     assert!(decoded.contains_key("FocusMode"));
 
-    // Check AF assist beam
-    assert!(decoded.contains_key("AFAssistBeam"));
+    // Note: AFAssistBeam is in CustomFunctions, not CameraSettings
 
     // Check metering mode
     assert!(decoded.contains_key("MeteringMode"));

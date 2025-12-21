@@ -477,35 +477,59 @@ pub fn parse_shot_info_shutter_count(serial: u32, shutter_count: u32, data: &[u8
     Some(count)
 }
 
-/// Decode Lens Type bitfield
-/// Bit 0 = MF, Bit 1 = D, Bit 2 = G, Bit 3 = VR, Bit 4 = 1, Bit 6 = E, Bit 7 = AF-P
+/// Decode Lens Type bitfield following ExifTool's logic
+/// Bit 0 = MF, Bit 1 = D, Bit 2 = G, Bit 3 = VR, Bit 4 = 1, Bit 5 = FT-1, Bit 6 = E, Bit 7 = AF-P
+/// Special handling: "D G" -> "G", "E" replaces "G", "1" goes first, "FT-1" goes last
 fn decode_lens_type(value: u8) -> String {
+    if value == 0 {
+        return "AF".to_string();
+    }
+
     let mut features = Vec::new();
 
-    if value & 0x01 != 0 {
-        features.push("MF");
-    }
-    if value & 0x02 != 0 {
-        features.push("D");
-    }
-    if value & 0x04 != 0 {
-        features.push("G");
-    }
-    if value & 0x08 != 0 {
-        features.push("VR");
-    }
-    if value & 0x10 != 0 {
+    // Bit checks
+    let has_mf = value & 0x01 != 0;
+    let has_d = value & 0x02 != 0;
+    let has_g = value & 0x04 != 0;
+    let has_vr = value & 0x08 != 0;
+    let has_1 = value & 0x10 != 0;
+    let has_ft1 = value & 0x20 != 0;
+    let has_e = value & 0x40 != 0;
+    let has_afp = value & 0x80 != 0;
+
+    // Special handling for "1" - goes first
+    if has_1 {
         features.push("1");
     }
-    if value & 0x40 != 0 {
+
+    // Special handling for "E" - replaces "G" at start
+    if has_e {
         features.push("E");
+    } else if has_g {
+        // Only add "G" if not "E"
+        features.push("G");
+    } else if has_d {
+        // Only add "D" if not part of "D G" combo
+        features.push("D");
     }
-    if value & 0x80 != 0 {
+
+    if has_mf {
+        features.push("MF");
+    }
+    if has_vr {
+        features.push("VR");
+    }
+    if has_afp {
         features.push("AF-P");
     }
 
+    // "FT-1" goes last
+    if has_ft1 {
+        features.push("FT-1");
+    }
+
     if features.is_empty() {
-        "Unknown".to_string()
+        "AF".to_string()
     } else {
         features.join(" ")
     }

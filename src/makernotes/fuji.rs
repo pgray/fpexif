@@ -140,9 +140,8 @@ fn decode_film_mode(value: u16) -> &'static str {
 /// Decode DynamicRange value (tag 0x1400)
 fn decode_dynamic_range(value: u16) -> &'static str {
     match value {
-        1 => "Standard (100%)",
-        3 => "Wide 1 (DR200)",
-        4 => "Wide 2 (DR400)",
+        1 => "Standard",
+        3 => "Wide",
         _ => "Unknown",
     }
 }
@@ -176,14 +175,48 @@ fn decode_white_balance(value: u16) -> &'static str {
 /// Decode Sharpness value (tag 0x1001)
 fn decode_sharpness(value: u16) -> &'static str {
     match value {
-        1 => "Soft (-2)",
-        2 => "Soft (-1)",
-        3 => "Normal",
-        4 => "Hard (+1)",
-        5 => "Hard (+2)",
-        130 => "Medium Soft",
-        132 => "Medium Hard",
-        256 => "Film Simulation",
+        0x00 => "-4 (softest)",
+        0x01 => "-3 (very soft)",
+        0x02 => "-2 (soft)",
+        0x03 => "-1",
+        0x04 => "0 (normal)",
+        0x05 => "+1",
+        0x06 => "+2",
+        0x07 => "+3",
+        0x08 => "+4 (hardest)",
+        0x82 => "Medium Soft",
+        0x84 => "Medium Hard",
+        0x100 => "Film Simulation",
+        0x8000 => "n/a (Film Simulation)",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Saturation value (tag 0x1003)
+fn decode_saturation(value: u16) -> &'static str {
+    match value {
+        0x0 => "0 (normal)",
+        0x80 => "+1 (medium high)",
+        0x100 => "+2 (high)",
+        0x180 => "+3 (very high)",
+        0x200 => "+4 (highest)",
+        0x300 => "+4.5",
+        0x301 => "Acros",
+        0x302 => "Acros+Ye Filter",
+        0x303 => "Acros+R Filter",
+        0x304 => "Acros+G Filter",
+        0x8000 => "Film Simulation",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Macro value (tag 0x1020)
+fn decode_macro(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
         _ => "Unknown",
     }
 }
@@ -193,8 +226,65 @@ fn decode_focus_mode(value: u16) -> &'static str {
     match value {
         0 => "Auto",
         1 => "Manual",
-        2 => "AF-S",
-        3 => "AF-C",
+        65535 => "Movie",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFMode value (tag 0x1022)
+fn decode_af_mode(value: u16) -> &'static str {
+    match value {
+        0 => "No",
+        1 => "Single Point",
+        256 => "Zone",
+        512 => "Wide/Tracking",
+        768 => "Wide/Tracking (PriorityFace)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SlowSync value (tag 0x1030)
+fn decode_slow_sync(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AutoBracketing value (tag 0x1100)
+fn decode_auto_bracketing(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "Pre-shot",
+        _ => "Unknown",
+    }
+}
+
+/// Decode BlurWarning value (tag 0x1300)
+fn decode_blur_warning(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Blur Warning",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusWarning value (tag 0x1301)
+fn decode_focus_warning(value: u16) -> &'static str {
+    match value {
+        0 => "Good",
+        1 => "Out of focus",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ExposureWarning value (tag 0x1302)
+fn decode_exposure_warning(value: u16) -> &'static str {
+    match value {
+        0 => "Good",
+        1 => "Bad exposure",
         _ => "Unknown",
     }
 }
@@ -363,8 +453,16 @@ pub fn parse_fuji_maker_notes(
                             FUJI_DYNAMIC_RANGE => Some(decode_dynamic_range(v).to_string()),
                             FUJI_WHITE_BALANCE => Some(decode_white_balance(v).to_string()),
                             FUJI_SHARPNESS => Some(decode_sharpness(v).to_string()),
+                            FUJI_SATURATION => Some(decode_saturation(v).to_string()),
+                            FUJI_MACRO => Some(decode_macro(v).to_string()),
                             FUJI_FOCUS_MODE => Some(decode_focus_mode(v).to_string()),
+                            FUJI_AF_MODE => Some(decode_af_mode(v).to_string()),
+                            FUJI_SLOW_SYNC => Some(decode_slow_sync(v).to_string()),
                             FUJI_PICTURE_MODE => Some(decode_picture_mode(v).to_string()),
+                            FUJI_AUTO_BRACKETING => Some(decode_auto_bracketing(v).to_string()),
+                            FUJI_BLUR_WARNING => Some(decode_blur_warning(v).to_string()),
+                            FUJI_FOCUS_WARNING => Some(decode_focus_warning(v).to_string()),
+                            FUJI_EXPOSURE_WARNING => Some(decode_exposure_warning(v).to_string()),
                             FUJI_DYNAMIC_RANGE_SETTING => {
                                 Some(decode_dynamic_range_setting(v).to_string())
                             }
@@ -376,6 +474,10 @@ pub fn parse_fuji_maker_notes(
                         } else {
                             ExifValue::Short(values)
                         }
+                    } else if values.len() == 2 && tag_id == FUJI_FOCUS_PIXEL {
+                        // Special formatting for FocusPixel: "X Y" space-separated
+                        let formatted = format!("{} {}", values[0], values[1]);
+                        ExifValue::Ascii(formatted)
                     } else {
                         ExifValue::Short(values)
                     }

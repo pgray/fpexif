@@ -287,6 +287,37 @@ pub fn get_canon_lens_name(lens_id: u16) -> Option<&'static str> {
     }
 }
 
+/// Get picture style name from ID
+pub fn get_picture_style_name(style_id: u16) -> &'static str {
+    match style_id {
+        0x00 => "None",
+        0x01 => "Standard",
+        0x02 => "Portrait",
+        0x03 => "High Saturation",
+        0x04 => "Adobe RGB",
+        0x05 => "Low Saturation",
+        0x06 => "CM Set 1",
+        0x07 => "CM Set 2",
+        0x21 => "User Def. 1",
+        0x22 => "User Def. 2",
+        0x23 => "User Def. 3",
+        0x41 => "PC 1",
+        0x42 => "PC 2",
+        0x43 => "PC 3",
+        0x81 => "Standard",
+        0x82 => "Portrait",
+        0x83 => "Landscape",
+        0x84 => "Neutral",
+        0x85 => "Faithful",
+        0x86 => "Monochrome",
+        0x87 => "Auto",
+        0x88 => "Fine Detail",
+        0xff => "n/a",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
 /// Get the Canon model name from model ID
 pub fn get_canon_model_name(model_id: u32) -> Option<&'static str> {
     match model_id {
@@ -504,6 +535,25 @@ fn read_i32(data: &[u8], endian: Endianness) -> i32 {
         Endianness::Little => i32::from_le_bytes([data[0], data[1], data[2], data[3]]),
         Endianness::Big => i32::from_be_bytes([data[0], data[1], data[2], data[3]]),
     }
+}
+
+/// Convert Canon's EV representation to a floating point value
+/// This matches ExifTool's CanonEv function
+fn canon_ev(val: i16) -> f64 {
+    let sign = if val < 0 { -1.0 } else { 1.0 };
+    let val_abs = val.unsigned_abs();
+
+    let mut frac = (val_abs & 0x1f) as f64;
+    let val_int = val_abs - (val_abs & 0x1f);
+
+    // Convert 1/3 and 2/3 codes
+    if (val_abs & 0x1f) == 0x0c {
+        frac = 0x20 as f64 / 3.0;
+    } else if (val_abs & 0x1f) == 0x14 {
+        frac = 0x40 as f64 / 3.0;
+    }
+
+    sign * (val_int as f64 + frac) / 0x20 as f64
 }
 
 /// Parse a single IFD entry and return the tag value
@@ -769,20 +819,8 @@ pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
-    // AF assist beam (index 10)
-    if data.len() > 10 {
-        let af_assist = match data[10] {
-            0 => "Off",
-            1 => "On (Auto)",
-            2 => "On",
-            0xFFFF => "n/a",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "AFAssistBeam".to_string(),
-            ExifValue::Ascii(af_assist.to_string()),
-        );
-    }
+    // Note: Index 10 in CameraSettings is CanonImageSize, not AFAssistBeam
+    // AFAssistBeam is actually in CustomFunctions, not CameraSettings
 
     // Metering mode (index 17)
     if data.len() > 17 {
@@ -1014,13 +1052,25 @@ pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
     // Auto ISO (index 1)
-    if data.len() > 1 {
-        decoded.insert("AutoISO".to_string(), ExifValue::Short(vec![data[1]]));
+    // Formula: exp(val/32*log(2))*100
+    if data.len() > 1 && data[1] as i16 != -1 {
+        let val = data[1] as i16;
+        let auto_iso = ((val as f64 / 32.0) * 2f64.ln()).exp() * 100.0;
+        decoded.insert(
+            "AutoISO".to_string(),
+            ExifValue::Ascii(format!("{:.0}", auto_iso)),
+        );
     }
 
     // Base ISO (index 2)
-    if data.len() > 2 {
-        decoded.insert("BaseISO".to_string(), ExifValue::Short(vec![data[2]]));
+    // Formula: exp(val/32*log(2))*100/32
+    if data.len() > 2 && data[2] > 0 {
+        let val = data[2] as i16;
+        let base_iso = ((val as f64 / 32.0) * 2f64.ln()).exp() * 100.0 / 32.0;
+        decoded.insert(
+            "BaseISO".to_string(),
+            ExifValue::Ascii(format!("{:.0}", base_iso)),
+        );
     }
 
     // Measured EV (index 3) - Canon APEX value, stored as value/32 with +5.0 offset
@@ -1106,28 +1156,38 @@ pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
-    // Auto exposure bracketing (index 16)
-    if data.len() > 16 {
-        let aeb = match data[16] {
-            0xFFFF | 0 => "Off",
-            1 => "On",
-            _ => "Unknown",
+    // AEB Bracket Value (index 17) - using CanonEv encoding
+    // Note: index 16 is AutoExposureBracketing (On/Off), index 17 is the actual bracket value
+    if data.len() > 17 {
+        let raw = data[17] as i16;
+        let aeb_value = canon_ev(raw);
+        // Format with sign prefix ("+0.0" format), but for 0 output just "0"
+        let formatted = if aeb_value == 0.0 {
+            "0".to_string()
+        } else if aeb_value > 0.0 {
+            format!("+{:.1}", aeb_value)
+        } else {
+            format!("{:.1}", aeb_value)
         };
-        decoded.insert(
-            "AEBBracketValue".to_string(),
-            ExifValue::Ascii(aeb.to_string()),
-        );
+        decoded.insert("AEBBracketValue".to_string(), ExifValue::Ascii(formatted));
     }
 
     // Exposure compensation (index 6)
     if data.len() > 6 {
-        // Canon stores exposure compensation as a signed value
-        // The value needs to be divided by 32 to get the actual EV compensation
+        // Canon stores exposure compensation using CanonEv encoding
         let raw = data[6] as i16;
-        let ev_comp = raw as f64 / 32.0;
+        let ev_comp = canon_ev(raw);
+        // Format: "0" for zero, otherwise "+x.x" or "-x.x"
+        let formatted = if ev_comp == 0.0 {
+            "0".to_string()
+        } else if ev_comp > 0.0 {
+            format!("+{:.1}", ev_comp)
+        } else {
+            format!("{:.1}", ev_comp)
+        };
         decoded.insert(
             "ExposureCompensation".to_string(),
-            ExifValue::Ascii(format!("{:+.1}", ev_comp)),
+            ExifValue::Ascii(formatted),
         );
     }
 
@@ -1141,13 +1201,18 @@ pub fn decode_shot_info(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // Flash exposure compensation (index 15)
     if data.len() > 15 {
-        // Similar to exposure compensation, divide by 32
+        // Canon stores flash exposure compensation using CanonEv encoding
         let raw = data[15] as i16;
-        let flash_comp = raw as f64 / 32.0;
-        decoded.insert(
-            "FlashExposureComp".to_string(),
-            ExifValue::Ascii(format!("{:+.1}", flash_comp)),
-        );
+        let flash_comp = canon_ev(raw);
+        // Format: "0" for zero, otherwise "+x.x" or "-x.x"
+        let formatted = if flash_comp == 0.0 {
+            "0".to_string()
+        } else if flash_comp > 0.0 {
+            format!("+{:.1}", flash_comp)
+        } else {
+            format!("{:.1}", flash_comp)
+        };
+        decoded.insert("FlashExposureComp".to_string(), ExifValue::Ascii(formatted));
     }
 
     // Subject distance (index 19)
@@ -1501,6 +1566,115 @@ pub fn parse_canon_maker_notes(
                             let dir = v / 10000;
                             let file = v % 10000;
                             ExifValue::Ascii(format!("{}-{:04}", dir, file))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // SerialNumberFormat - decode to "Format 1" or "Format 2"
+                CANON_SERIAL_NUMBER_FORMAT => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            let format_str = match longs[0] {
+                                0x90000000 => "Format 1".to_string(),
+                                0xa0000000 => "Format 2".to_string(),
+                                _ => format!("Unknown (0x{:08x})", longs[0]),
+                            };
+                            ExifValue::Ascii(format_str)
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // DateStampMode - decode 0="Off", 1="Date", 2="Date & Time"
+                CANON_DATE_STAMP_MODE => {
+                    if let ExifValue::Short(ref shorts) = value {
+                        if !shorts.is_empty() {
+                            let mode_str = match shorts[0] {
+                                0 => "Off",
+                                1 => "Date",
+                                2 => "Date & Time",
+                                _ => "Unknown",
+                            };
+                            ExifValue::Ascii(mode_str.to_string())
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // Categories - decode bit flags to "(none)" or category names
+                CANON_CATEGORIES => {
+                    if let ExifValue::Long(ref longs) = value {
+                        // Format is 2 values: first is always 8, second is the category bitmask
+                        if longs.len() >= 2 && longs[0] == 8 {
+                            let categories = longs[1];
+                            if categories == 0 {
+                                ExifValue::Ascii("(none)".to_string())
+                            } else {
+                                let mut cat_names = Vec::new();
+                                if categories & 0x01 != 0 {
+                                    cat_names.push("People");
+                                }
+                                if categories & 0x02 != 0 {
+                                    cat_names.push("Scenery");
+                                }
+                                if categories & 0x04 != 0 {
+                                    cat_names.push("Events");
+                                }
+                                if categories & 0x08 != 0 {
+                                    cat_names.push("User 1");
+                                }
+                                if categories & 0x10 != 0 {
+                                    cat_names.push("User 2");
+                                }
+                                if categories & 0x20 != 0 {
+                                    cat_names.push("User 3");
+                                }
+                                if categories & 0x40 != 0 {
+                                    cat_names.push("To Do");
+                                }
+                                ExifValue::Ascii(cat_names.join(", "))
+                            }
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // PictureStyleUserDef - decode array of 3 shorts to style names
+                CANON_PICTURE_STYLE_USER_DEF => {
+                    if let ExifValue::Short(ref shorts) = value {
+                        if shorts.len() >= 3 {
+                            let styles: Vec<String> = shorts
+                                .iter()
+                                .take(3)
+                                .map(|&s| get_picture_style_name(s).to_string())
+                                .collect();
+                            ExifValue::Ascii(styles.join("; "))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // PictureStylePC - decode array of 3 shorts to style names
+                CANON_PICTURE_STYLE_PC => {
+                    if let ExifValue::Short(ref shorts) = value {
+                        if shorts.len() >= 3 {
+                            let styles: Vec<String> = shorts
+                                .iter()
+                                .take(3)
+                                .map(|&s| get_picture_style_name(s).to_string())
+                                .collect();
+                            ExifValue::Ascii(styles.join("; "))
                         } else {
                             value
                         }

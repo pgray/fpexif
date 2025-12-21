@@ -634,6 +634,212 @@ pub fn decode_color_temperature(value: u32) -> Option<&'static str> {
     }
 }
 
+/// Decode Teleconverter value (tag 0x0105)
+/// Based on ExifTool's minoltaTeleconverters
+pub fn decode_teleconverter(value: u32) -> &'static str {
+    match value {
+        0x00 => "None",
+        0x04 => "Minolta/Sony AF 1.4x APO (D) (0x04)",
+        0x05 => "Minolta/Sony AF 2x APO (D) (0x05)",
+        0x48 => "Minolta/Sony AF 2x APO (D)",
+        0x50 => "Minolta AF 2x APO II",
+        0x60 => "Minolta AF 2x APO",
+        0x88 => "Minolta/Sony AF 1.4x APO (D)",
+        0x90 => "Minolta AF 1.4x APO II",
+        0xa0 => "Minolta AF 1.4x APO",
+        _ => "Unknown",
+    }
+}
+
+/// Decode PictureEffect value (tag 0x200E)
+pub fn decode_picture_effect(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Toy Camera",
+        2 => "Pop Color",
+        3 => "Posterization",
+        4 => "Posterization B/W",
+        5 => "Retro Photo",
+        6 => "Soft High Key",
+        7 => "Partial Color (red)",
+        8 => "Partial Color (green)",
+        9 => "Partial Color (blue)",
+        10 => "Partial Color (yellow)",
+        13 => "High Contrast Monochrome",
+        16 => "Toy Camera (normal)",
+        17 => "Toy Camera (cool)",
+        18 => "Toy Camera (warm)",
+        19 => "Toy Camera (green)",
+        20 => "Toy Camera (magenta)",
+        32 => "Soft Focus (low)",
+        33 => "Soft Focus",
+        34 => "Soft Focus (high)",
+        36 => "Miniature (auto)",
+        37 => "Miniature (top)",
+        38 => "Miniature (middle horizontal)",
+        39 => "Miniature (bottom)",
+        40 => "Miniature (left)",
+        41 => "Miniature (middle vertical)",
+        42 => "Miniature (right)",
+        48 => "HDR Painting (low)",
+        49 => "HDR Painting",
+        50 => "HDR Painting (high)",
+        64 => "Rich-tone Monochrome",
+        80 => "Watercolor",
+        96 => "Illustration (low)",
+        97 => "Illustration",
+        98 => "Illustration (high)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode VignettingCorrection value (tag 0x2011)
+pub fn decode_vignetting_correction(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        2 => "Auto",
+        0xffffffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DistortionCorrection value (tag 0x2013)
+pub fn decode_distortion_correction(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        2 => "Auto",
+        0xffffffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ReleaseMode value (tag 0xB049)
+pub fn decode_release_mode(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        2 => "Continuous",
+        5 => "Exposure Bracketing",
+        6 => "White Balance Bracketing",
+        8 => "DRO Bracketing",
+        65535 => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MultiFrameNoiseReduction value (tag 0x200B)
+pub fn decode_multi_frame_noise_reduction(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        255 => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode IntelligentAuto value (tag 0xB052)
+pub fn decode_intelligent_auto(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "Advanced",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HDR value (tag 0x200A)
+/// Returns the first element of the HDR pair (level)
+pub fn decode_hdr(value: u16) -> &'static str {
+    match value {
+        0x0 => "Off",
+        0x01 => "Auto",
+        0x10 => "1.0 EV",
+        0x11 => "1.5 EV",
+        0x12 => "2.0 EV",
+        0x13 => "2.5 EV",
+        0x14 => "3.0 EV",
+        0x15 => "3.5 EV",
+        0x16 => "4.0 EV",
+        0x17 => "4.5 EV",
+        0x18 => "5.0 EV",
+        0x19 => "5.5 EV",
+        0x1a => "6.0 EV",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Quality value (tag 0x0102 and 0xB047)
+/// Note: This overlaps with decode_image_quality but with more values
+pub fn decode_quality(value: u32) -> &'static str {
+    match value {
+        0 => "RAW",
+        1 => "Super Fine",
+        2 => "Fine",
+        3 => "Standard",
+        4 => "Economy",
+        5 => "Extra Fine",
+        6 => "RAW + JPEG/HEIF",
+        7 => "Compressed RAW",
+        8 => "Compressed RAW + JPEG",
+        9 => "Light",
+        0xffffffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Format FlashLevel or FlashExposureComp value as signed rational string
+/// ExifTool formats these as "-2/3", "+1/3", "Normal", etc.
+pub fn format_flash_comp(value: i16) -> String {
+    match value {
+        -32768 => "Low".to_string(),
+        -9 => "-9/3".to_string(),
+        -8 => "-8/3".to_string(),
+        -7 => "-7/3".to_string(),
+        -6 => "-6/3".to_string(),
+        -5 => "-5/3".to_string(),
+        -4 => "-4/3".to_string(),
+        -3 => "-3/3".to_string(),
+        -2 => "-2/3".to_string(),
+        -1 => "-1/3".to_string(),
+        0 => "Normal".to_string(),
+        1 => "+1/3".to_string(),
+        2 => "+2/3".to_string(),
+        3 => "+3/3".to_string(),
+        4 => "+4/3".to_string(),
+        5 => "+5/3".to_string(),
+        6 => "+6/3".to_string(),
+        9 => "+9/3".to_string(),
+        128 => "n/a".to_string(),
+        32767 => "High".to_string(),
+        _ => format!("{}", value),
+    }
+}
+
+/// Format LensSpec byte array as a readable string
+/// LensSpec is 8 bytes: [flags1, short_focal, long_focal, max_ap_short, max_ap_long, flags2, ?, ?]
+pub fn format_lens_spec(bytes: &[u8]) -> String {
+    if bytes.len() < 8 {
+        return format!("{:?}", bytes);
+    }
+
+    // Simple formatting: just show the focal length and aperture info
+    let short_focal = bytes[1];
+    let long_focal = bytes[2];
+    let max_ap_short = bytes[3];
+    let max_ap_long = bytes[4];
+
+    if short_focal == long_focal {
+        format!("{}mm F{}", short_focal, max_ap_short as f32 / 10.0)
+    } else {
+        format!(
+            "{}-{}mm F{}-{}",
+            short_focal,
+            long_focal,
+            max_ap_short as f32 / 10.0,
+            max_ap_long as f32 / 10.0
+        )
+    }
+}
+
 /// Parse a single IFD entry from Sony maker notes
 fn parse_ifd_entry(
     data: &[u8],
@@ -701,6 +907,9 @@ fn parse_ifd_entry(
                 } else {
                     ExifValue::Byte(bytes)
                 }
+            } else if tag_id == SONY_LENS_SPEC && bytes.len() >= 8 {
+                // Format LensSpec byte array
+                ExifValue::Ascii(format_lens_spec(&bytes))
             } else {
                 ExifValue::Byte(bytes)
             }
@@ -726,6 +935,14 @@ fn parse_ifd_entry(
             // Apply value decoders for single-value tags
             if values.len() == 1 {
                 let v = values[0];
+
+                // Handle signed values (SSHORT, tag_type == 8)
+                if tag_type == 8 && tag_id == SONY_FLASH_LEVEL {
+                    // FlashLevel is signed int16
+                    let signed_v = v as i16;
+                    return Some((tag_id, ExifValue::Ascii(format_flash_comp(signed_v))));
+                }
+
                 let decoded = match tag_id {
                     SONY_IMAGE_QUALITY => Some(decode_image_quality(v).to_string()),
                     SONY_WHITE_BALANCE => Some(decode_white_balance(v).to_string()),
@@ -742,6 +959,10 @@ fn parse_ifd_entry(
                     }
                     SONY_SCENE_MODE => Some(decode_scene_mode(v).to_string()),
                     SONY_SONY_MODEL_ID => get_sony_model_name(v).map(|s| s.to_string()),
+                    SONY_PICTURE_EFFECT => Some(decode_picture_effect(v).to_string()),
+                    SONY_RELEASE_MODE => Some(decode_release_mode(v).to_string()),
+                    SONY_INTELLIGENT_AUTO => Some(decode_intelligent_auto(v).to_string()),
+                    SONY_QUALITY_2 => Some(decode_quality(v as u32).to_string()),
                     _ => None,
                 };
 
@@ -750,6 +971,9 @@ fn parse_ifd_entry(
                 } else {
                     ExifValue::Short(values)
                 }
+            } else if values.len() == 2 && tag_id == SONY_HDR {
+                // HDR is stored as two u16 values, decode the first one
+                ExifValue::Ascii(decode_hdr(values[0]).to_string())
             } else {
                 ExifValue::Short(values)
             }
@@ -797,6 +1021,17 @@ fn parse_ifd_entry(
                     // Contrast/Saturation/Sharpness as signed value
                     let signed_v = v as i32;
                     ExifValue::Ascii(decode_adjustment(signed_v).to_string())
+                } else if tag_id == SONY_TELECONVERTER {
+                    // Teleconverter uses full u32 range
+                    ExifValue::Ascii(decode_teleconverter(v).to_string())
+                } else if tag_id == SONY_VIGNETTING_CORRECTION {
+                    ExifValue::Ascii(decode_vignetting_correction(v).to_string())
+                } else if tag_id == SONY_DISTORTION_CORRECTION {
+                    ExifValue::Ascii(decode_distortion_correction(v).to_string())
+                } else if tag_id == SONY_MULTI_FRAME_NOISE_REDUCTION {
+                    ExifValue::Ascii(decode_multi_frame_noise_reduction(v).to_string())
+                } else if tag_id == SONY_IMAGE_QUALITY {
+                    ExifValue::Ascii(decode_quality(v).to_string())
                 } else if v <= u16::MAX as u32 {
                     // Then check tags that fit in u16
                     let v16 = v as u16;

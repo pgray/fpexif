@@ -410,12 +410,16 @@ pub fn parse_panasonic_maker_notes(
         {
             // Calculate value size
             let value_size = match tag_type {
-                1 => count as usize,     // BYTE
-                2 => count as usize,     // ASCII
-                3 => count as usize * 2, // SHORT
-                4 => count as usize * 4, // LONG
-                5 => count as usize * 8, // RATIONAL
-                7 => count as usize,     // UNDEFINED
+                1 => count as usize,      // BYTE
+                2 => count as usize,      // ASCII
+                3 => count as usize * 2,  // SHORT
+                4 => count as usize * 4,  // LONG
+                5 => count as usize * 8,  // RATIONAL
+                6 => count as usize,      // SBYTE
+                7 => count as usize,      // UNDEFINED
+                8 => count as usize * 2,  // SSHORT
+                9 => count as usize * 4,  // SLONG
+                10 => count as usize * 8, // SRATIONAL
                 _ => 0,
             };
 
@@ -440,14 +444,26 @@ pub fn parse_panasonic_maker_notes(
                 }
                 2 => {
                     // ASCII
-                    let offset = value_offset as usize;
-                    if offset + count as usize <= data.len() {
-                        let s = String::from_utf8_lossy(&data[offset..offset + count as usize])
+                    if count <= 4 {
+                        // Inline value for short strings
+                        let bytes = match endian {
+                            Endianness::Little => value_offset.to_le_bytes(),
+                            Endianness::Big => value_offset.to_be_bytes(),
+                        };
+                        let s = String::from_utf8_lossy(&bytes[..count as usize])
                             .trim_end_matches('\0')
                             .to_string();
                         ExifValue::Ascii(s)
                     } else {
-                        continue;
+                        let offset = value_offset as usize;
+                        if offset + count as usize <= data.len() {
+                            let s = String::from_utf8_lossy(&data[offset..offset + count as usize])
+                                .trim_end_matches('\0')
+                                .to_string();
+                            ExifValue::Ascii(s)
+                        } else {
+                            continue;
+                        }
                     }
                 }
                 3 => {
@@ -550,11 +566,153 @@ pub fn parse_panasonic_maker_notes(
                         }
                     }
                 }
+                5 => {
+                    // RATIONAL (numerator/denominator pairs)
+                    let offset = value_offset as usize;
+                    if offset + value_size <= data.len() {
+                        let mut values = Vec::new();
+                        let mut cursor = Cursor::new(&data[offset..]);
+                        for _ in 0..count {
+                            if let (Ok(num), Ok(den)) = (
+                                match endian {
+                                    Endianness::Little => cursor.read_u32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_u32::<BigEndian>(),
+                                },
+                                match endian {
+                                    Endianness::Little => cursor.read_u32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_u32::<BigEndian>(),
+                                },
+                            ) {
+                                values.push((num, den));
+                            } else {
+                                break;
+                            }
+                        }
+                        ExifValue::Rational(values)
+                    } else {
+                        continue;
+                    }
+                }
+                6 => {
+                    // SBYTE
+                    if count <= 4 {
+                        let bytes = match endian {
+                            Endianness::Little => value_offset.to_le_bytes(),
+                            Endianness::Big => value_offset.to_be_bytes(),
+                        };
+                        let sbytes: Vec<i8> =
+                            bytes[..count as usize].iter().map(|&b| b as i8).collect();
+                        ExifValue::SByte(sbytes)
+                    } else {
+                        let offset = value_offset as usize;
+                        if offset + count as usize <= data.len() {
+                            let sbytes: Vec<i8> = data[offset..offset + count as usize]
+                                .iter()
+                                .map(|&b| b as i8)
+                                .collect();
+                            ExifValue::SByte(sbytes)
+                        } else {
+                            continue;
+                        }
+                    }
+                }
                 7 => {
                     // UNDEFINED
                     let offset = value_offset as usize;
                     if offset + count as usize <= data.len() {
                         ExifValue::Undefined(data[offset..offset + count as usize].to_vec())
+                    } else {
+                        continue;
+                    }
+                }
+                8 => {
+                    // SSHORT
+                    let mut values = Vec::new();
+                    if count == 1 {
+                        // Inline value
+                        values.push(match endian {
+                            Endianness::Little => (value_offset & 0xFFFF) as i16,
+                            Endianness::Big => (value_offset >> 16) as i16,
+                        });
+                    } else if count == 2 {
+                        // Two inline values
+                        values.push(match endian {
+                            Endianness::Little => (value_offset & 0xFFFF) as i16,
+                            Endianness::Big => (value_offset >> 16) as i16,
+                        });
+                        values.push(match endian {
+                            Endianness::Little => (value_offset >> 16) as i16,
+                            Endianness::Big => (value_offset & 0xFFFF) as i16,
+                        });
+                    } else {
+                        // Values at offset
+                        let offset = value_offset as usize;
+                        if offset + value_size <= data.len() {
+                            let mut cursor = Cursor::new(&data[offset..]);
+                            for _ in 0..count {
+                                if let Ok(v) = match endian {
+                                    Endianness::Little => cursor.read_i16::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_i16::<BigEndian>(),
+                                } {
+                                    values.push(v);
+                                } else {
+                                    break;
+                                }
+                            }
+                        } else {
+                            continue;
+                        }
+                    }
+                    ExifValue::SShort(values)
+                }
+                9 => {
+                    // SLONG
+                    if count == 1 {
+                        ExifValue::SLong(vec![value_offset as i32])
+                    } else {
+                        let offset = value_offset as usize;
+                        if offset + value_size <= data.len() {
+                            let mut values = Vec::new();
+                            let mut cursor = Cursor::new(&data[offset..]);
+                            for _ in 0..count {
+                                if let Ok(v) = match endian {
+                                    Endianness::Little => cursor.read_i32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_i32::<BigEndian>(),
+                                } {
+                                    values.push(v);
+                                } else {
+                                    break;
+                                }
+                            }
+                            ExifValue::SLong(values)
+                        } else {
+                            continue;
+                        }
+                    }
+                }
+                10 => {
+                    // SRATIONAL (signed numerator/denominator pairs)
+                    let offset = value_offset as usize;
+                    if offset + value_size <= data.len() {
+                        let mut values = Vec::new();
+                        let mut cursor = Cursor::new(&data[offset..]);
+                        for _ in 0..count {
+                            if let (Ok(num), Ok(den)) = (
+                                match endian {
+                                    Endianness::Little => cursor.read_i32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_i32::<BigEndian>(),
+                                },
+                                match endian {
+                                    Endianness::Little => cursor.read_i32::<LittleEndian>(),
+                                    Endianness::Big => cursor.read_i32::<BigEndian>(),
+                                },
+                            ) {
+                                values.push((num, den));
+                            } else {
+                                break;
+                            }
+                        }
+                        ExifValue::SRational(values)
                     } else {
                         continue;
                     }
