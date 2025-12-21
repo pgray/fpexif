@@ -1,5 +1,30 @@
 # Sony ARW Maker Notes Analysis and Fix Proposal
 
+## Implementation Status
+
+The following items from this analysis have been implemented:
+
+### Completed
+- **WhiteBalance decoder** (0xB020) - Decodes 0=Auto, 16=Daylight, 32=Cloudy, etc.
+- **ImageQuality decoder** (0xB021) - Decodes 0=RAW, 1=Super Fine, 2=Fine, etc.
+- **HighISONoiseReduction decoder** (0xB025) - Decodes 0=Off, 1=Low, 2=Normal, 3=High
+- **LongExposureNoiseReduction decoder** (0xB04E) - Decodes 0=Off, 1=On, 2=On 2
+- **ImageStabilization decoder** (0xB026) - Decodes 0=Off, 1=On, 2=On (shot only)
+- **Model database** (~115 entries) - DSC, DSLR-A, SLT-A, NEX, ILCE, ILCA, ILME, ZV series
+- **Lens database** (~130 entries) - Minolta AF, Sony A-mount, Sony E-mount
+
+### Pending
+- Core EXIF formatting fixes (CFAPattern, PhotometricInterpretation, etc.)
+- FocusMode decoder
+- ExposureMode decoder
+- DynamicRangeOptimizer decoder
+- AF info structures (AFPoint, AFPointsSelected, etc.)
+- Color calibration data parsing
+- LensSpec byte array formatting
+- CreativeStyle decoding
+
+---
+
 ## Executive Summary
 
 The Sony maker notes implementation now correctly parses IFD structure and reads actual values (fixed in recent update), but needs value description lookups to convert numeric codes to human-readable strings. This analysis identifies the most impactful fixes needed to match ExifTool's output for 31 ARW test files.

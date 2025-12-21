@@ -1,5 +1,26 @@
 # Fujifilm RAF Maker Notes Analysis and Fix Proposal
 
+## Implementation Status
+
+The following items from this analysis have been implemented:
+
+### Completed
+- **Basic IFD parsing** - Core maker note structure parsing is working
+- **Tag definitions** - Comprehensive tag constants defined (37 value mismatches = lowest of all formats)
+- **Film Simulation decoding** - FilmMode values decoded to human-readable names
+- **WhiteBalance decoder** - Auto, Daylight, Cloudy, etc.
+- **Sharpness decoder** - Softest to Hardest scale
+- **Dynamic Range decoder** - Standard, Wide, Auto
+- **Warning flags** - BlurWarning, FocusWarning, ExposureWarning decoders
+
+### Pending
+- FocalLength formatting (always show .0 for whole numbers)
+- AutoDynamicRange tag (0x140B)
+- Grain Effect / Color Chrome Effect tags
+- Computed fields (DOF, CircleOfConfusion, HyperfocalDistance)
+
+---
+
 ## Executive Summary
 
 The Fujifilm maker notes implementation is relatively mature with proper IFD parsing and many tag definitions. The test results show excellent value matching with only **37 value mismatches** across 30 RAF files - the lowest mismatch count among all camera brands tested. The main areas for improvement are missing fields (computed fields and sub-structures) and minor formatting differences.
