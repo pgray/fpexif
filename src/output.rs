@@ -343,6 +343,82 @@ fn should_format_rationals_as_space_separated(tag_id: u16) -> bool {
     )
 }
 
+/// Format GPS coordinate (latitude or longitude) as DMS string
+/// Converts rational array [(41,1), (21,1), (4832,100)] to "41 deg 21' 48.32\" N"
+#[cfg(feature = "serde")]
+fn format_gps_coordinate(coords: &[(u32, u32)], ref_value: Option<&str>) -> String {
+    if coords.len() < 3 {
+        return String::new();
+    }
+
+    let deg = if coords[0].1 != 0 {
+        coords[0].0 as f64 / coords[0].1 as f64
+    } else {
+        0.0
+    };
+    let min = if coords[1].1 != 0 {
+        coords[1].0 as f64 / coords[1].1 as f64
+    } else {
+        0.0
+    };
+    let sec = if coords[2].1 != 0 {
+        coords[2].0 as f64 / coords[2].1 as f64
+    } else {
+        0.0
+    };
+
+    // Format with appropriate precision for seconds
+    let sec_str = if sec.fract() == 0.0 {
+        format!("{:.0}", sec)
+    } else {
+        // Remove trailing zeros but keep at least 2 decimal places
+        let formatted = format!("{:.2}", sec);
+        formatted
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
+    };
+
+    if let Some(ref_val) = ref_value {
+        format!(
+            "{} deg {}' {}\" {}",
+            deg as i32,
+            min as i32,
+            sec_str,
+            ref_val.trim()
+        )
+    } else {
+        format!("{} deg {}' {}\"", deg as i32, min as i32, sec_str)
+    }
+}
+
+/// Format GPS timestamp as HH:MM:SS
+/// Converts rational array [(9,1), (53,1), (44,1)] to "09:53:44"
+#[cfg(feature = "serde")]
+fn format_gps_timestamp(time: &[(u32, u32)]) -> String {
+    if time.len() < 3 {
+        return String::new();
+    }
+
+    let h = if time[0].1 != 0 {
+        time[0].0 / time[0].1
+    } else {
+        0
+    };
+    let m = if time[1].1 != 0 {
+        time[1].0 / time[1].1
+    } else {
+        0
+    };
+    let s = if time[2].1 != 0 {
+        time[2].0 / time[2].1
+    } else {
+        0
+    };
+
+    format!("{:02}:{:02}:{:02}", h, m, s)
+}
+
 /// Format CFA pattern bytes as ExifTool-compatible string
 /// Converts [0,1,1,2] to "[Red,Green][Green,Blue]"
 #[cfg(feature = "serde")]
@@ -615,6 +691,76 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         if !v.is_empty() {
             output.insert("ISO".to_string(), Value::Number(v[0].into()));
         }
+    }
+
+    // Format GPS coordinates with DMS (degrees, minutes, seconds) and direction
+    // GPSLatitude (0x0002) with GPSLatitudeRef (0x0001)
+    if let Some(ExifValue::Rational(coords)) = exif_data.get_tag_by_id(0x0002) {
+        if coords.len() >= 3 {
+            let ref_value = exif_data.get_tag_by_id(0x0001).and_then(|v| match v {
+                ExifValue::Ascii(s) => Some(s.as_str()),
+                _ => None,
+            });
+            let formatted = format_gps_coordinate(coords, ref_value);
+            output.insert("GPSLatitude".to_string(), Value::String(formatted));
+        }
+    }
+
+    // GPSLongitude (0x0004) with GPSLongitudeRef (0x0003)
+    if let Some(ExifValue::Rational(coords)) = exif_data.get_tag_by_id(0x0004) {
+        if coords.len() >= 3 {
+            let ref_value = exif_data.get_tag_by_id(0x0003).and_then(|v| match v {
+                ExifValue::Ascii(s) => Some(s.as_str()),
+                _ => None,
+            });
+            let formatted = format_gps_coordinate(coords, ref_value);
+            output.insert("GPSLongitude".to_string(), Value::String(formatted));
+        }
+    }
+
+    // GPSTimeStamp (0x0007) - format as HH:MM:SS
+    if let Some(ExifValue::Rational(time)) = exif_data.get_tag_by_id(0x0007) {
+        if time.len() >= 3 {
+            let formatted = format_gps_timestamp(time);
+            output.insert("GPSTimeStamp".to_string(), Value::String(formatted));
+        }
+    }
+
+    // GPSAltitude (0x0006) with GPSAltitudeRef (0x0005) - format as "226.6 m Above Sea Level"
+    if let Some(ExifValue::Rational(alt)) = exif_data.get_tag_by_id(0x0006) {
+        if !alt.is_empty() && alt[0].1 != 0 {
+            let altitude = alt[0].0 as f64 / alt[0].1 as f64;
+            let ref_desc = exif_data.get_tag_by_id(0x0005).and_then(|v| match v {
+                ExifValue::Byte(b) if !b.is_empty() => {
+                    Some(crate::tags::get_gps_altitude_ref_description(b[0]))
+                }
+                _ => None,
+            });
+            let formatted = if let Some(ref_str) = ref_desc {
+                format!("{:.1} m {}", altitude, ref_str)
+            } else {
+                format!("{:.1} m", altitude)
+            };
+            output.insert("GPSAltitude".to_string(), Value::String(formatted));
+        }
+    }
+
+    // GPSLatitudeRef (0x0001) - expand N/S to North/South
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x0001) {
+        let expanded = crate::tags::get_gps_latitude_ref_description(ref_val.trim());
+        output.insert(
+            "GPSLatitudeRef".to_string(),
+            Value::String(expanded.to_string()),
+        );
+    }
+
+    // GPSLongitudeRef (0x0003) - expand E/W to East/West
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x0003) {
+        let expanded = crate::tags::get_gps_longitude_ref_description(ref_val.trim());
+        output.insert(
+            "GPSLongitudeRef".to_string(),
+            Value::String(expanded.to_string()),
+        );
     }
 
     // Add maker notes if present
