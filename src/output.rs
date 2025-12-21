@@ -47,14 +47,13 @@ fn format_short_value(value: u16, tag_id: u16) -> Value {
         0xA402 => Value::String(crate::tags::get_exposure_mode_description(value).to_string()),
         0xA403 => Value::String(crate::tags::get_white_balance_description(value).to_string()),
         0xA406 => Value::String(crate::tags::get_scene_capture_type_description(value).to_string()),
-        0xA408 => Value::String(crate::tags::get_contrast_description(value).to_string()),
-        0xA409 => Value::String(crate::tags::get_saturation_description(value).to_string()),
-        0xA40A => Value::String(crate::tags::get_sharpness_description(value).to_string()),
+        0xA407 => Value::String(crate::tags::get_gain_control_description(value).to_string()),
+        // Contrast, Saturation, Sharpness - exiftool outputs raw numeric values
+        0xA408..=0xA40A => Value::Number(value.into()),
         0xA40C => {
             Value::String(crate::tags::get_subject_distance_range_description(value).to_string())
         }
         0xA401 => Value::String(crate::tags::get_custom_rendered_description(value).to_string()),
-        0xA40B => Value::String(crate::tags::get_gain_control_description(value).to_string()),
         0xA217 => Value::String(crate::tags::get_sensing_method_description(value).to_string()),
         0x8830 => Value::String(crate::tags::get_sensitivity_type_description(value).to_string()),
         // DNG CalibrationIlluminant tags use LightSource descriptions
@@ -101,9 +100,14 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
                 .unwrap_or_else(|| Value::String(rounded.to_string()))
         }
         0x920A => {
-            // FocalLength - add mm unit
+            // FocalLength - add mm unit with decimal formatting
             let focal_length = num as f64 / den as f64;
-            Value::String(format!("{} mm", focal_length))
+            // Format with at least one decimal place for exiftool compatibility
+            if focal_length.fract() == 0.0 {
+                Value::String(format!("{:.1} mm", focal_length))
+            } else {
+                Value::String(format!("{} mm", focal_length))
+            }
         }
         0x9203 | 0x9204 => {
             // Other APEX values - show as decimal

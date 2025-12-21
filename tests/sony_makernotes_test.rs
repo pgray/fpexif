@@ -150,11 +150,14 @@ fn test_decode_creative_style_values() {
 fn test_decode_focus_mode_values() {
     use fpexif::makernotes::sony::*;
 
+    // Values from exiftool Sony.pm tag 0x201b
     assert_eq!(decode_focus_mode_exiftool(0), "Manual");
-    assert_eq!(decode_focus_mode_exiftool(1), "AF-S");
-    assert_eq!(decode_focus_mode_exiftool(2), "AF-C");
-    assert_eq!(decode_focus_mode_exiftool(3), "AF-A");
-    assert_eq!(decode_focus_mode_exiftool(4), "DMF");
+    assert_eq!(decode_focus_mode_exiftool(1), "Unknown"); // Value 1 not defined in exiftool
+    assert_eq!(decode_focus_mode_exiftool(2), "AF-S");
+    assert_eq!(decode_focus_mode_exiftool(3), "AF-C");
+    assert_eq!(decode_focus_mode_exiftool(4), "AF-A");
+    assert_eq!(decode_focus_mode_exiftool(6), "DMF");
+    assert_eq!(decode_focus_mode_exiftool(7), "AF-D");
     assert_eq!(decode_focus_mode_exiftool(999), "Unknown");
 }
 

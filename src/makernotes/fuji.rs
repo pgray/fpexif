@@ -633,12 +633,12 @@ pub fn parse_fuji_maker_notes(
                     // SHORT
                     let mut values = Vec::new();
                     if count == 1 {
-                        // Value is in the offset field (first 2 bytes)
-                        values.push((value_offset >> 16) as u16);
-                    } else if count == 2 {
-                        // Both values are in the offset field
-                        values.push((value_offset >> 16) as u16);
+                        // Value is in the offset field - lower 16 bits (little-endian)
                         values.push((value_offset & 0xFFFF) as u16);
+                    } else if count == 2 {
+                        // Both values are in the offset field - first is low 16 bits, second is high 16 bits
+                        values.push((value_offset & 0xFFFF) as u16);
+                        values.push((value_offset >> 16) as u16);
                     } else {
                         // Value is at offset
                         let offset = value_offset as usize;

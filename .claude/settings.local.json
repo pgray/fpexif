@@ -28,7 +28,8 @@
       "Bash(./target/debug/fpexif:*)",
       "Bash(cat:*)",
       "Bash(FPEXIF_TEST_FILES=/fpexif/raws timeout 120 cargo test:*)",
-      "Bash(FPEXIF_TEST_FILES=/fpexif/raws timeout 60 cargo test:*)"
+      "Bash(FPEXIF_TEST_FILES=/fpexif/raws timeout 60 cargo test:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

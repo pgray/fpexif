@@ -568,13 +568,11 @@ pub fn decode_dynamic_range_optimizer_exiv2(value: u16) -> &'static str {
 pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Manual",
-        1 => "AF-S",
-        2 => "AF-C",
-        3 => "AF-A",
-        4 => "DMF",
-        5 => "AF-D",
-        6 => "Single-shot AF",
-        7 => "Automatic AF",
+        2 => "AF-S",
+        3 => "AF-C",
+        4 => "AF-A",
+        6 => "DMF",
+        7 => "AF-D",
         _ => "Unknown",
     }
 }

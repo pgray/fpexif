@@ -1122,64 +1122,66 @@ pub fn get_metering_mode_description(value: u16) -> &'static str {
     }
 }
 
-/// Human-readable descriptions for various EXIF light source values
+/// Human-readable descriptions for various EXIF light source values (exiftool-compatible)
 pub fn get_light_source_description(value: u16) -> &'static str {
     match value {
         0 => "Unknown",
         1 => "Daylight",
         2 => "Fluorescent",
-        3 => "Tungsten (incandescent light)",
+        3 => "Tungsten (Incandescent)",
         4 => "Flash",
-        9 => "Fine weather",
-        10 => "Cloudy weather",
+        9 => "Fine Weather",
+        10 => "Cloudy",
         11 => "Shade",
-        12 => "Daylight fluorescent (D 5700 – 7100K)",
-        13 => "Day white fluorescent (N 4600 – 5400K)",
-        14 => "Cool white fluorescent (W 3900 – 4500K)",
-        15 => "White fluorescent (WW 3200 – 3700K)",
-        17 => "Standard light A",
-        18 => "Standard light B",
-        19 => "Standard light C",
+        12 => "Daylight Fluorescent",
+        13 => "Day White Fluorescent",
+        14 => "Cool White Fluorescent",
+        15 => "White Fluorescent",
+        16 => "Warm White Fluorescent",
+        17 => "Standard Light A",
+        18 => "Standard Light B",
+        19 => "Standard Light C",
         20 => "D55",
         21 => "D65",
         22 => "D75",
         23 => "D50",
-        24 => "ISO studio tungsten",
-        255 => "Other light source",
-        _ => "Reserved",
+        24 => "ISO Studio Tungsten",
+        255 => "Other",
+        _ => "Unknown",
     }
 }
 
-/// Human-readable descriptions for various EXIF flash values
+/// Human-readable descriptions for various EXIF flash values (exiftool-compatible)
 pub fn get_flash_description(value: u16) -> &'static str {
     match value {
-        0x0000 => "Flash did not fire",
-        0x0001 => "Flash fired",
-        0x0005 => "Strobe return light not detected",
-        0x0007 => "Strobe return light detected",
-        0x0009 => "Flash fired, compulsory flash mode",
-        0x000D => "Flash fired, compulsory flash mode, return light not detected",
-        0x000F => "Flash fired, compulsory flash mode, return light detected",
-        0x0010 => "Off, Did not fire",
-        0x0018 => "Flash did not fire, auto mode",
-        0x0019 => "Flash fired, auto mode",
-        0x001D => "Flash fired, auto mode, return light not detected",
-        0x001F => "Flash fired, auto mode, return light detected",
-        0x0020 => "No flash function",
-        0x0041 => "Flash fired, red-eye reduction mode",
-        0x0045 => "Flash fired, red-eye reduction mode, return light not detected",
-        0x0047 => "Flash fired, red-eye reduction mode, return light detected",
-        0x0049 => "Flash fired, compulsory flash mode, red-eye reduction mode",
-        0x004D => {
-            "Flash fired, compulsory flash mode, red-eye reduction mode, return light not detected"
-        }
-        0x004F => {
-            "Flash fired, compulsory flash mode, red-eye reduction mode, return light detected"
-        }
-        0x0059 => "Flash fired, auto mode, red-eye reduction mode",
-        0x005D => "Flash fired, auto mode, return light not detected, red-eye reduction mode",
-        0x005F => "Flash fired, auto mode, return light detected, red-eye reduction mode",
-        _ => "Unknown flash mode",
+        0x00 => "No Flash",
+        0x01 => "Fired",
+        0x05 => "Fired, Return not detected",
+        0x07 => "Fired, Return detected",
+        0x08 => "On, Did not fire",
+        0x09 => "On, Fired",
+        0x0D => "On, Return not detected",
+        0x0F => "On, Return detected",
+        0x10 => "Off, Did not fire",
+        0x14 => "Off, Did not fire, Return not detected",
+        0x18 => "Auto, Did not fire",
+        0x19 => "Auto, Fired",
+        0x1D => "Auto, Fired, Return not detected",
+        0x1F => "Auto, Fired, Return detected",
+        0x20 => "No flash function",
+        0x30 => "Off, No flash function",
+        0x41 => "Fired, Red-eye reduction",
+        0x45 => "Fired, Red-eye reduction, Return not detected",
+        0x47 => "Fired, Red-eye reduction, Return detected",
+        0x49 => "On, Red-eye reduction",
+        0x4D => "On, Red-eye reduction, Return not detected",
+        0x4F => "On, Red-eye reduction, Return detected",
+        0x50 => "Off, Red-eye reduction",
+        0x58 => "Auto, Did not fire, Red-eye reduction",
+        0x59 => "Auto, Fired, Red-eye reduction",
+        0x5D => "Auto, Fired, Red-eye reduction, Return not detected",
+        0x5F => "Auto, Fired, Red-eye reduction, Return detected",
+        _ => "Unknown",
     }
 }
 
