@@ -198,12 +198,16 @@ pub fn is_critical_missing_field(field: &str) -> bool {
         || field.starts_with("Panasonic")
         || field.starts_with("Pentax")
         || field.starts_with("Fuji")
+        || field.starts_with("Kodak")
+        || field.starts_with("Minolta")
         || field.starts_with("Exif.Canon")
         || field.starts_with("Exif.Nikon")
         || field.starts_with("Exif.Sony")
         || field.starts_with("Exif.Fuji")
         || field.starts_with("Exif.Olympus")
-        || field.starts_with("Exif.Panasonic");
+        || field.starts_with("Exif.Panasonic")
+        || field.starts_with("Exif.Kodak")
+        || field.starts_with("Exif.Minolta");
 
     // Derived/calculated fields that exiftool adds
     let is_derived = field == "Aperture"
@@ -241,11 +245,19 @@ pub fn is_critical_missing_field(field: &str) -> bool {
     // MakerNote raw data
     let is_makernote = field.contains("MakerNote");
 
+    // Kodak-specific IFD fields (from KodakIFD sub-directory)
+    let is_kodak_ifd = field == "KodakVersion"
+        || field == "BatteryLevel"
+        || field == "CFAPattern2"
+        || field == "UnknownEV"
+        || field.starts_with("KodakIFD");
+
     !(has_brand_prefix
         || is_derived
         || is_file_meta
         || is_thumbnail
         || is_interop
         || is_iptc_xmp
-        || is_makernote)
+        || is_makernote
+        || is_kodak_ifd)
 }

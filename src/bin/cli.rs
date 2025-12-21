@@ -224,11 +224,25 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                     0xA403 => tags::get_white_balance_description(v[0]).to_string(),
                     0xA406 => tags::get_scene_capture_type_description(v[0]).to_string(),
                     0xA407 => tags::get_gain_control_description(v[0]).to_string(),
-                    // Contrast, Saturation, Sharpness - exiftool outputs raw numeric values
-                    0xA408..=0xA40A => v[0].to_string(),
+                    // Contrast (0xA408), Saturation (0xA409)
+                    0xA408 | 0xA409 => match v[0] {
+                        0 => "Normal",
+                        1 => "Low",
+                        2 => "High",
+                        _ => "Unknown",
+                    }
+                    .to_string(),
+                    // Sharpness (0xA40A)
+                    0xA40A => match v[0] {
+                        0 => "Normal",
+                        1 => "Soft",
+                        2 => "Hard",
+                        _ => "Unknown",
+                    }
+                    .to_string(),
                     0xA40C => tags::get_subject_distance_range_description(v[0]).to_string(),
                     0xA401 => tags::get_custom_rendered_description(v[0]).to_string(),
-                    0xA217 => tags::get_sensing_method_description(v[0]).to_string(),
+                    0x9217 | 0xA217 => tags::get_sensing_method_description(v[0]).to_string(),
                     0x8830 => tags::get_sensitivity_type_description(v[0]).to_string(),
                     _ => format_values_space(v),
                 }
@@ -242,10 +256,21 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                 let (n, d) = v[0];
                 if d != 0 {
                     match tag_id {
+                        0x829A => {
+                            // ExposureTime - show as 1/n fraction
+                            let exposure_time = n as f64 / d as f64;
+                            let approx_den = (1.0 / exposure_time).round() as u32;
+                            format!("1/{}", approx_den)
+                        }
                         0x920A => {
                             // FocalLength - format with decimal and mm unit
                             let focal_length = n as f64 / d as f64;
                             format!("{:.1} mm", focal_length)
+                        }
+                        0x9206 => {
+                            // SubjectDistance - format with m unit
+                            let distance = n as f64 / d as f64;
+                            format!("{} m", distance)
                         }
                         _ => {
                             let val = n as f64 / d as f64;

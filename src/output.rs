@@ -48,13 +48,32 @@ fn format_short_value(value: u16, tag_id: u16) -> Value {
         0xA403 => Value::String(crate::tags::get_white_balance_description(value).to_string()),
         0xA406 => Value::String(crate::tags::get_scene_capture_type_description(value).to_string()),
         0xA407 => Value::String(crate::tags::get_gain_control_description(value).to_string()),
-        // Contrast, Saturation, Sharpness - exiftool outputs raw numeric values
-        0xA408..=0xA40A => Value::Number(value.into()),
+        // Contrast (0xA408), Saturation (0xA409), Sharpness (0xA40A)
+        0xA408 | 0xA409 => Value::String(
+            match value {
+                0 => "Normal",
+                1 => "Low",
+                2 => "High",
+                _ => "Unknown",
+            }
+            .to_string(),
+        ),
+        0xA40A => Value::String(
+            match value {
+                0 => "Normal",
+                1 => "Soft",
+                2 => "Hard",
+                _ => "Unknown",
+            }
+            .to_string(),
+        ),
         0xA40C => {
             Value::String(crate::tags::get_subject_distance_range_description(value).to_string())
         }
         0xA401 => Value::String(crate::tags::get_custom_rendered_description(value).to_string()),
-        0xA217 => Value::String(crate::tags::get_sensing_method_description(value).to_string()),
+        0x9217 | 0xA217 => {
+            Value::String(crate::tags::get_sensing_method_description(value).to_string())
+        }
         0x8830 => Value::String(crate::tags::get_sensitivity_type_description(value).to_string()),
         // DNG CalibrationIlluminant tags use LightSource descriptions
         0xC65A | 0xC65B => {
@@ -74,13 +93,17 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
     match tag_id {
         0x829A => {
             // ExposureTime - show as simplified fraction
+            // ExifTool approximates to 1/n form for readability
             let gcd_val = gcd(num, den);
             let simplified_num = num / gcd_val;
             let simplified_den = den / gcd_val;
             if simplified_num == 1 {
                 Value::String(format!("1/{}", simplified_den))
             } else {
-                Value::String(format!("{}/{}", simplified_num, simplified_den))
+                // Approximate to 1/n form: calculate equivalent denominator
+                let exposure_time = num as f64 / den as f64;
+                let approx_den = (1.0 / exposure_time).round() as u32;
+                Value::String(format!("1/{}", approx_den))
             }
         }
         0x9201 => {
@@ -115,6 +138,11 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
             serde_json::Number::from_f64(decimal)
                 .map(Value::Number)
                 .unwrap_or_else(|| Value::String(decimal.to_string()))
+        }
+        0x9206 => {
+            // SubjectDistance - add " m" suffix
+            let distance = num as f64 / den as f64;
+            Value::String(format!("{} m", distance))
         }
         _ => {
             // Default: show as decimal
