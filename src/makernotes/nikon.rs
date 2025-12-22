@@ -53,17 +53,34 @@ pub const NIKON_DIGITAL_ZOOM: u16 = 0x0086;
 pub const NIKON_FLASH_MODE: u16 = 0x0087;
 pub const NIKON_AF_INFO: u16 = 0x0088;
 pub const NIKON_SHOT_INFO: u16 = 0x0091;
+pub const NIKON_HUE_ADJUSTMENT: u16 = 0x0092;
+pub const NIKON_NEF_COMPRESSION: u16 = 0x0093;
+pub const NIKON_SATURATION: u16 = 0x0094;
+pub const NIKON_NOISE_REDUCTION: u16 = 0x0095;
 pub const NIKON_COLOR_BALANCE: u16 = 0x0097;
 pub const NIKON_LENS_DATA: u16 = 0x0098;
 pub const NIKON_RAW_IMAGE_CENTER: u16 = 0x0099;
 pub const NIKON_FLASH_INFO: u16 = 0x00A8;
 pub const NIKON_DATE_STAMP_MODE: u16 = 0x009D;
+pub const NIKON_RETOUCH_HISTORY: u16 = 0x009E;
 pub const NIKON_SERIAL_NUMBER_2: u16 = 0x00A0;
 pub const NIKON_IMAGE_DATA_SIZE: u16 = 0x00A2;
 pub const NIKON_IMAGE_COUNT: u16 = 0x00A5;
 pub const NIKON_DELETED_IMAGE_COUNT: u16 = 0x00A6;
 pub const NIKON_SHUTTER_COUNT: u16 = 0x00A7;
+pub const NIKON_IMAGE_OPTIMIZATION: u16 = 0x00A9;
+pub const NIKON_SATURATION_2: u16 = 0x00AA;
+pub const NIKON_VARI_PROGRAM: u16 = 0x00AB;
+pub const NIKON_IMAGE_STABILIZATION: u16 = 0x00AC;
+pub const NIKON_AF_RESPONSE: u16 = 0x00AD;
+pub const NIKON_SILENT_PHOTOGRAPHY: u16 = 0x00BF;
 pub const NIKON_LIGHT_SOURCE: u16 = 0x0090;
+pub const NIKON_SHOOTING_MODE: u16 = 0x0089;
+pub const NIKON_AUTO_BRACKET_RELEASE: u16 = 0x008A;
+pub const NIKON_LENS_F_STOPS: u16 = 0x008B;
+pub const NIKON_CONTRAST_CURVE: u16 = 0x008C;
+pub const NIKON_COLOR_HUE: u16 = 0x008D;
+pub const NIKON_SCENE_MODE: u16 = 0x008F;
 
 /// Get the name of a Nikon MakerNote tag
 pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -92,18 +109,50 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_FLASH_MODE => Some("FlashMode"),
         NIKON_AF_INFO => Some("AFInfo"),
         NIKON_SHOT_INFO => Some("ShotInfo"),
+        NIKON_HUE_ADJUSTMENT => Some("HueAdjustment"),
+        NIKON_NEF_COMPRESSION => Some("NEFCompression"),
+        NIKON_SATURATION => Some("Saturation"),
+        NIKON_NOISE_REDUCTION => Some("NoiseReduction"),
         NIKON_COLOR_BALANCE => Some("ColorBalance"),
         NIKON_LENS_DATA => Some("LensData"),
         NIKON_RAW_IMAGE_CENTER => Some("RawImageCenter"),
         NIKON_FLASH_INFO => Some("FlashInfo"),
         NIKON_HIGH_ISO_NOISE_REDUCTION => Some("HighISONoiseReduction"),
         NIKON_DATE_STAMP_MODE => Some("DateStampMode"),
+        NIKON_RETOUCH_HISTORY => Some("RetouchHistory"),
         NIKON_LIGHT_SOURCE => Some("LightSource"),
+        NIKON_SHOOTING_MODE => Some("ShootingMode"),
+        NIKON_AUTO_BRACKET_RELEASE => Some("AutoBracketRelease"),
+        NIKON_LENS_F_STOPS => Some("LensFStops"),
+        NIKON_CONTRAST_CURVE => Some("ContrastCurve"),
+        NIKON_COLOR_HUE => Some("ColorHue"),
+        NIKON_SCENE_MODE => Some("SceneMode"),
         NIKON_SERIAL_NUMBER_2 => Some("SerialNumber"),
         NIKON_IMAGE_DATA_SIZE => Some("ImageDataSize"),
         NIKON_IMAGE_COUNT => Some("ImageCount"),
         NIKON_DELETED_IMAGE_COUNT => Some("DeletedImageCount"),
         NIKON_SHUTTER_COUNT => Some("ShutterCount"),
+        NIKON_IMAGE_OPTIMIZATION => Some("ImageOptimization"),
+        NIKON_SATURATION_2 => Some("Saturation"),
+        NIKON_VARI_PROGRAM => Some("VariProgram"),
+        NIKON_IMAGE_STABILIZATION => Some("ImageStabilization"),
+        NIKON_AF_RESPONSE => Some("AFResponse"),
+        NIKON_SILENT_PHOTOGRAPHY => Some("SilentPhotography"),
+        NIKON_WHITE_BALANCE_FINE => Some("WhiteBalanceFine"),
+        NIKON_PROGRAM_SHIFT => Some("ProgramShift"),
+        NIKON_EXPOSURE_DIFFERENCE => Some("ExposureDifference"),
+        NIKON_ISO_SELECTION => Some("ISOSelection"),
+        NIKON_FLASH_EXPOSURE_COMP => Some("FlashExposureComp"),
+        NIKON_ISO_SETTING_2 => Some("ISO2"),
+        NIKON_IMAGE_BOUNDARY => Some("ImageBoundary"),
+        NIKON_FLASH_EXPOSURE_BRACKET_VALUE => Some("FlashExposureBracketValue"),
+        NIKON_EXPOSURE_BRACKET_VALUE => Some("ExposureBracketValue"),
+        NIKON_CROP_HI_SPEED => Some("CropHiSpeed"),
+        NIKON_EXPOSURE_TUNING => Some("ExposureTuning"),
+        NIKON_IMAGE_AUTHENTICATION => Some("ImageAuthentication"),
+        NIKON_FACE_DETECT => Some("FaceDetect"),
+        NIKON_WORLD_TIME => Some("WorldTime"),
+        NIKON_ISO_INFO => Some("ISOInfo"),
         _ => None,
     }
 }
@@ -214,17 +263,7 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
 /// Decode Nikon ASCII tag values to human-readable strings
 fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
     match tag_id {
-        NIKON_QUALITY => match value.trim() {
-            "RAW" => "RAW",
-            "FINE" => "Fine",
-            "NORMAL" => "Normal",
-            "BASIC" => "Basic",
-            "RAW+FINE" | "RAW + FINE" => "RAW + Fine",
-            "RAW+NORMAL" | "RAW + NORMAL" => "RAW + Normal",
-            "RAW+BASIC" | "RAW + BASIC" => "RAW + Basic",
-            _ => value.trim(),
-        }
-        .to_string(),
+        NIKON_QUALITY => decode_quality_exiftool(value).to_string(),
         NIKON_WHITE_BALANCE => match value.trim() {
             "AUTO" | "AUTO1" | "AUTO2" => "Auto",
             "SUNNY" | "DIRECT SUNLIGHT" => "Daylight",
@@ -237,43 +276,13 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
             _ => value.trim(),
         }
         .to_string(),
-        NIKON_FOCUS_MODE => match value.trim() {
-            "AF-S" => "AF-S",
-            "AF-C" => "AF-C",
-            "AF-A" => "AF-A",
-            "MF" | "MANUAL" => "Manual",
-            _ => value.trim(),
-        }
-        .to_string(),
-        NIKON_FLASH_SETTING => match value.trim() {
-            "NORMAL" => "Normal",
-            "SLOW" => "Slow",
-            "REAR" => "Rear",
-            "REAR SLOW" => "Rear Slow",
-            "RED-EYE" => "Red-eye",
-            "RED-EYE SLOW" => "Red-eye Slow",
-            "SLOW REAR" => "Slow Rear",
-            "" => "Normal",
-            _ => value.trim(),
-        }
-        .to_string(),
-        NIKON_SHARPNESS => match value.trim() {
-            "AUTO" => "Auto",
-            "NORMAL" => "Normal",
-            "LOW" => "Soft",
-            "MED.L" | "MEDIUM LOW" => "Medium Low",
-            "MED.H" | "MEDIUM HIGH" => "Medium High",
-            "HIGH" => "Hard",
-            "NONE" => "None",
-            _ => value.trim(),
-        }
-        .to_string(),
-        NIKON_COLOR_MODE => match value.trim() {
-            "COLOR" => "Color",
-            "B&W" | "B & W" | "BLACK & WHITE" => "Black & White",
-            _ => value.trim(),
-        }
-        .to_string(),
+        NIKON_FOCUS_MODE => decode_focus_mode_exiftool(value).to_string(),
+        NIKON_FLASH_SETTING => decode_flash_setting_exiftool(value).to_string(),
+        NIKON_SHARPNESS => decode_sharpening_exiftool(value).to_string(),
+        NIKON_COLOR_MODE => decode_color_mode_exiftool(value),
+        NIKON_FLASH_TYPE => decode_flash_type_exiftool(value),
+        NIKON_NOISE_REDUCTION => decode_noise_reduction_exiftool(value),
+        NIKON_IMAGE_PROCESSING => decode_image_processing_exiftool(value),
         NIKON_LIGHT_SOURCE => match value.trim() {
             "NATURAL" => "Natural",
             "SPEEDLIGHT" => "Speedlight",
@@ -282,6 +291,8 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
             _ => value.trim(),
         }
         .to_string(),
+        NIKON_ISO_SELECTION => decode_iso_selection_exiftool(value).to_string(),
+        NIKON_IMAGE_STABILIZATION => decode_image_stabilization_exiftool(value).to_string(),
         _ => value.trim().to_string(),
     }
 }
@@ -313,6 +324,79 @@ pub fn decode_active_d_lighting_exiv2(value: u16) -> &'static str {
         65535 => "Auto",
         _ => "Unknown",
     }
+}
+
+/// Decode JPG Compression value - ExifTool format
+/// From Nikon.pm PrintConv for tag 0x0044 in WorldTime
+pub fn decode_jpg_compression_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Size Priority",
+        3 => "Optimal Quality",
+        _ => "Unknown",
+    }
+}
+
+/// Decode JPG Compression value - exiv2 format
+/// exiv2 does not define this tag, using ExifTool values
+pub fn decode_jpg_compression_exiv2(value: u16) -> &'static str {
+    decode_jpg_compression_exiftool(value)
+}
+
+/// Decode VR Type value - ExifTool format
+/// From Nikon.pm VRInfo subdirectory, offset 8
+pub fn decode_vr_type_exiftool(value: u8) -> &'static str {
+    match value {
+        2 => "In-body",
+        3 => "In-body + Lens",
+        _ => "Unknown",
+    }
+}
+
+/// Decode VR Type value - exiv2 format
+/// exiv2 does not define VRType, using ExifTool values
+pub fn decode_vr_type_exiv2(value: u8) -> &'static str {
+    decode_vr_type_exiftool(value)
+}
+
+/// Decode Daylight Savings value - ExifTool format
+/// From Nikon.pm WorldTime subdirectory, offset 2
+pub fn decode_daylight_savings_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "No",
+        1 => "Yes",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Daylight Savings value - exiv2 format
+/// Values based on exiv2 nikonmn_int.cpp nikonYesNo[]
+pub fn decode_daylight_savings_exiv2(value: u8) -> &'static str {
+    match value {
+        0 => "No",
+        1 => "Yes",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Image Stabilization ASCII value - ExifTool format
+/// Tag 0x00ac is ASCII string type, this decodes common string values
+/// From Nikon.pm - tag 0x00ac is just stored as string, but some cameras
+/// store numeric-like strings that can be decoded
+pub fn decode_image_stabilization_exiftool(value: &str) -> &'static str {
+    match value.trim() {
+        "0" | "OFF" => "Off",
+        "1" | "ON" => "On",
+        "2" | "ON (2)" => "On (2)",
+        "3" | "ON (3)" => "On (3)",
+        "4" | "ON (4)" => "On (4)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Image Stabilization ASCII value - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_image_stabilization_exiv2(value: &str) -> &'static str {
+    decode_image_stabilization_exiftool(value)
 }
 
 /// Decode Color Space value (tag 0x001E) - ExifTool format
@@ -388,6 +472,46 @@ pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
 }
 // decode_date_stamp_mode_exiv2 - not defined in exiv2
 
+/// Decode NEF Compression value (tag 0x0093) - ExifTool format
+pub fn decode_nef_compression_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "Lossy (type 1)",
+        2 => "Uncompressed",
+        3 => "Lossless",
+        4 => "Lossy (type 2)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode NEF Compression value (tag 0x0093) - exiv2 format
+pub fn decode_nef_compression_exiv2(value: u16) -> &'static str {
+    decode_nef_compression_exiftool(value)
+}
+
+/// Decode Retouch History value (tag 0x009E) - ExifTool format
+pub fn decode_retouch_history_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        3 => "B & W",
+        4 => "Sepia",
+        5 => "Trim",
+        6 => "Small Picture",
+        7 => "D-Lighting",
+        8 => "Red Eye",
+        9 => "Cyanotype",
+        10 => "Sky Light",
+        11 => "Warm Tone",
+        12 => "Color Custom",
+        13 => "Image Overlay",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Retouch History - exiv2 format (same values)
+pub fn decode_retouch_history_exiv2(value: u16) -> &'static str {
+    decode_retouch_history_exiftool(value)
+}
+
 /// Decode Flash Mode value (tag 0x0087) - ExifTool format
 pub fn decode_flash_mode_exiftool(value: u8) -> &'static str {
     match value {
@@ -400,6 +524,295 @@ pub fn decode_flash_mode_exiftool(value: u8) -> &'static str {
         18 => "LED Light",
         _ => "Unknown",
     }
+}
+
+/// Decode Shooting Mode bitmask (tag 0x0089) - ExifTool format
+/// This is a bitmask with special handling for single-frame mode
+pub fn decode_shooting_mode_exiftool(value: u16) -> String {
+    // Check for single-frame mode (no bits 0,1,2,7 set)
+    if value & 0x87 == 0 {
+        if value == 0 {
+            return "Single-Frame".to_string();
+        }
+        // Has other bits but not continuous mode bits
+        let mut result = "Single-Frame".to_string();
+        let decoded_bits = decode_shooting_mode_bits(value, false);
+        if !decoded_bits.is_empty() {
+            result.push_str(", ");
+            result.push_str(&decoded_bits);
+        }
+        return result;
+    }
+
+    decode_shooting_mode_bits(value, false)
+}
+
+/// Decode Shooting Mode bitmask (tag 0x0089) - exiv2 format
+/// exiv2 decodes all bits without special single-frame handling
+pub fn decode_shooting_mode_exiv2(value: u16) -> String {
+    decode_shooting_mode_bits(value, true)
+}
+
+/// Helper to decode shooting mode bits
+fn decode_shooting_mode_bits(value: u16, _is_exiv2: bool) -> String {
+    let mut modes = Vec::new();
+
+    if value & 0x0001 != 0 {
+        modes.push("Continuous");
+    }
+    if value & 0x0002 != 0 {
+        modes.push("Delay");
+    }
+    if value & 0x0004 != 0 {
+        modes.push("PC Control");
+    }
+    if value & 0x0008 != 0 {
+        modes.push("Self-timer");
+    }
+    if value & 0x0010 != 0 {
+        modes.push("Exposure Bracketing");
+    }
+    if value & 0x0020 != 0 {
+        // Note: For D70, bit 5 means "Unused LE-NR Slowdown"
+        // For other models it means "Auto ISO"
+        modes.push("Auto ISO");
+    }
+    if value & 0x0040 != 0 {
+        modes.push("White-Balance Bracketing");
+    }
+    if value & 0x0080 != 0 {
+        modes.push("IR Control");
+    }
+    if value & 0x0100 != 0 {
+        modes.push("D-Lighting Bracketing");
+    }
+
+    if modes.is_empty() {
+        "Unknown".to_string()
+    } else {
+        modes.join(", ")
+    }
+}
+
+/// Decode Auto Bracket Release value (tag 0x008A) - ExifTool format
+pub fn decode_auto_bracket_release_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Auto Release",
+        2 => "Manual Release",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Auto Bracket Release value (tag 0x008A) - exiv2 format
+pub fn decode_auto_bracket_release_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Auto release",
+        2 => "Manual release",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Quality value (tag 0x0004) - ExifTool format
+/// From Nikon.pm - tag 0x0004 is ASCII string type
+/// Note: ExifTool stores these as-is, we preserve the original for unrecognized values
+pub fn decode_quality_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "RAW" => "RAW",
+        "FINE" => "Fine",
+        "NORMAL" => "Normal",
+        "BASIC" => "Basic",
+        "RAW+FINE" | "RAW + FINE" => "RAW + Fine",
+        "RAW+NORMAL" | "RAW + NORMAL" => "RAW + Normal",
+        "RAW+BASIC" | "RAW + BASIC" => "RAW + Basic",
+        "NRW" => "NRW",                       // Nikon RAW format for Coolpix
+        _ => return value.trim().to_string(), // Return original value for unknown
+    };
+    result.to_string()
+}
+
+/// Decode Quality value (tag 0x0004) - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_quality_exiv2(value: &str) -> String {
+    decode_quality_exiftool(value)
+}
+
+/// Decode FocusMode value (tag 0x0007) - ExifTool format
+/// From Nikon.pm - tag 0x0007 is ASCII string type
+pub fn decode_focus_mode_exiftool(value: &str) -> String {
+    let val = value.trim();
+    let result = match val {
+        "AF-S" | "AF-S  " => "AF-S",
+        "AF-C" | "AF-C  " => "AF-C",
+        "AF-A" | "AF-A  " => "AF-A",
+        "MF" | "MANUAL" | "Manual" => "Manual",
+        _ => return val.to_string(), // Return original value
+    };
+    result.to_string()
+}
+
+/// Decode FocusMode value (tag 0x0007) - exiv2 format
+/// From nikonmn_int.cpp print0x0007
+pub fn decode_focus_mode_exiv2(value: &str) -> String {
+    let val = value.trim();
+    match val {
+        "AF-C  " => "Continuous autofocus".to_string(),
+        "AF-S  " => "Single autofocus".to_string(),
+        "AF-A  " => "Automatic".to_string(),
+        _ => decode_focus_mode_exiftool(value),
+    }
+}
+
+/// Decode FlashSetting/FlashSyncMode value (tag 0x0008) - ExifTool format
+/// From Nikon.pm - values: "Normal", "Slow", "Rear Slow", "RED-EYE", "RED-EYE SLOW"
+pub fn decode_flash_setting_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "NORMAL" => "Normal",
+        "SLOW" => "Slow",
+        "REAR" | "REAR SLOW" => "Rear Slow",
+        "RED-EYE" | "REDEYE" => "Red-eye",
+        "RED-EYE SLOW" | "REDEYE SLOW" => "Red-eye Slow",
+        "SLOW REAR" => "Slow Rear",
+        "" => "Normal",
+        _ => return value.trim().to_string(), // Return original value
+    };
+    result.to_string()
+}
+
+/// Decode FlashSetting value (tag 0x0008) - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_flash_setting_exiv2(value: &str) -> String {
+    decode_flash_setting_exiftool(value)
+}
+
+/// Decode Sharpening/Sharpness value (tag 0x0006) - ExifTool format
+/// From Nikon.pm - tag 0x0006 is ASCII string type
+pub fn decode_sharpening_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "AUTO" => "Auto",
+        "NORMAL" => "Normal",
+        "LOW" | "SOFT" => "Soft",
+        "MED.L" | "MEDIUM LOW" | "MEDIUMLOW" => "Medium Low",
+        "MED.H" | "MEDIUM HIGH" | "MEDIUMHIGH" => "Medium High",
+        "HIGH" | "HARD" => "Hard",
+        "NONE" => "None",
+        _ => return value.trim().to_string(), // Return original value
+    };
+    result.to_string()
+}
+
+/// Decode Sharpening value (tag 0x0006) - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_sharpening_exiv2(value: &str) -> String {
+    decode_sharpening_exiftool(value)
+}
+
+/// Decode Saturation value (tag 0x0094) - ExifTool format
+/// From Nikon.pm - tag 0x0094 is signed short, no PrintConv (just raw value)
+/// Note: ExifTool displays this as a raw signed integer value
+pub fn decode_saturation_exiftool(value: i16) -> String {
+    format!("{:+}", value)
+}
+
+/// Decode Saturation value (tag 0x0094) - exiv2 format
+/// From nikonmn_int.cpp - tag 0x0094 is signed short, no special decoding
+pub fn decode_saturation_exiv2(value: i16) -> String {
+    decode_saturation_exiftool(value)
+}
+
+/// Decode ISOSelection value (tag 0x000F) - ExifTool format
+/// From Nikon.pm - tag 0x000F is ASCII string type
+pub fn decode_iso_selection_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "AUTO" => "Auto",
+        "MANUAL" | "MAN" => "Manual",
+        _ => return value.trim().to_string(), // Return original value
+    };
+    result.to_string()
+}
+
+/// Decode ISOSelection value (tag 0x000F) - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_iso_selection_exiv2(value: &str) -> String {
+    decode_iso_selection_exiftool(value)
+}
+
+/// Decode VRMode value - ExifTool format
+/// From Nikon.pm vRModeZ9 hash
+pub fn decode_vr_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Normal",
+        2 => "Sport",
+        3 => "Active", // observed in some models
+        _ => "Unknown",
+    }
+}
+
+/// Decode VRMode value - exiv2 format
+/// From nikonmn_int.cpp VRInfo PrintConv
+pub fn decode_vr_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Normal",
+        2 => "Sport",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AutoDistortionControl value - ExifTool format
+/// From Nikon.pm - various tags reference this
+pub fn decode_auto_distortion_control_exiftool(value: u16) -> &'static str {
+    match value {
+        0 | 2 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AutoDistortionControl value - exiv2 format
+pub fn decode_auto_distortion_control_exiv2(value: u16) -> &'static str {
+    decode_auto_distortion_control_exiftool(value)
+}
+
+/// Decode HDR mode value - ExifTool format
+/// From Nikon.pm multipleExposureModeZ9 hash
+pub fn decode_hdr_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "On (series)", // Multiple exposure series
+        _ => "Unknown",
+    }
+}
+
+/// Decode HDR mode value - exiv2 format
+pub fn decode_hdr_mode_exiv2(value: u16) -> &'static str {
+    decode_hdr_mode_exiftool(value)
+}
+
+/// Decode HDR level value - ExifTool format
+/// From Nikon.pm hdrLevelZ8 hash
+pub fn decode_hdr_level_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        1 => "Extra Low",
+        2 => "Low",
+        3 => "Normal",
+        4 => "High",
+        5 => "Extra High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HDR level value - exiv2 format
+pub fn decode_hdr_level_exiv2(value: u16) -> &'static str {
+    decode_hdr_level_exiftool(value)
 }
 
 /// Nikon decryption lookup tables (from ExifTool)
@@ -573,6 +986,164 @@ pub fn parse_shot_info_shutter_count(serial: u32, shutter_count: u32, data: &[u8
     };
 
     Some(count)
+}
+
+/// Decode Image Authentication value (tag 0x0020) - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Nikon.pm
+pub fn decode_image_authentication_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Image Authentication value (tag 0x0020) - exiv2 format
+/// Values based on exiv2 nikonmn_int.cpp nikonOffOn[]
+pub fn decode_image_authentication_exiv2(value: u8) -> &'static str {
+    decode_image_authentication_exiftool(value)
+}
+
+/// Decode Silent Photography value (tag 0x00BF) - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Nikon.pm
+pub fn decode_silent_photography_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Silent Photography value (tag 0x00BF) - exiv2 format
+/// exiv2 does not define this tag, using ExifTool values
+pub fn decode_silent_photography_exiv2(value: u16) -> &'static str {
+    decode_silent_photography_exiftool(value)
+}
+
+/// Decode Crop Hi Speed value (tag 0x001B) - ExifTool format
+/// Source: exiftool/lib/Image/ExifTool/Nikon.pm cropHiSpeed hash
+pub fn decode_crop_hi_speed_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "1.3x Crop",
+        2 => "DX Crop",
+        3 => "5:4 Crop",
+        4 => "3:2 Crop",
+        6 => "16:9 Crop",
+        8 => "2.7x Crop",
+        9 => "DX Movie 16:9 Crop",
+        10 => "1.3x Movie Crop",
+        11 => "FX Uncropped",
+        12 => "DX Uncropped",
+        13 => "2.8x Movie Crop",
+        14 => "1.4x Movie Crop",
+        15 => "1.5x Movie Crop",
+        17 => "FX 1:1 Crop",
+        18 => "DX 1:1 Crop",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Crop Hi Speed value (tag 0x001B) - exiv2 format
+/// exiv2 does not define this tag, using ExifTool values
+pub fn decode_crop_hi_speed_exiv2(value: u16) -> &'static str {
+    decode_crop_hi_speed_exiftool(value)
+}
+
+/// Decode Vibration Reduction value - ExifTool format
+/// From Nikon.pm VRInfo subdirectory, offset 4
+pub fn decode_vibration_reduction_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "n/a",
+        1 => "On",
+        2 => "Off",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Vibration Reduction value - exiv2 format
+/// exiv2 does not have VibrationReduction tag, using ExifTool values
+pub fn decode_vibration_reduction_exiv2(value: u8) -> &'static str {
+    decode_vibration_reduction_exiftool(value)
+}
+
+/// Decode Flash Type ASCII value (tag 0x0009) - ExifTool format
+/// From Nikon.pm - tag 0x0009 is ASCII string type
+pub fn decode_flash_type_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "" => "None",
+        "NEW" => "New",
+        "NORMAL" => "Built-in",
+        "EXTERNAL" | "STROBE" => "External",
+        _ => return value.trim().to_string(),
+    };
+    result.to_string()
+}
+
+/// Decode Flash Type ASCII value (tag 0x0009) - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_flash_type_exiv2(value: &str) -> String {
+    decode_flash_type_exiftool(value)
+}
+
+/// Decode Color Mode ASCII value (tag 0x0003) - ExifTool format
+/// From Nikon.pm - tag 0x0003 is ASCII string type
+/// This is already handled in decode_nikon_ascii_value, but provided here for completeness
+pub fn decode_color_mode_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "COLOR" | "COLOUR" => "Color",
+        "B&W" | "B & W" | "BLACK & WHITE" => "Black & White",
+        _ => return value.trim().to_string(),
+    };
+    result.to_string()
+}
+
+/// Decode Color Mode ASCII value (tag 0x0003) - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_color_mode_exiv2(value: &str) -> String {
+    decode_color_mode_exiftool(value)
+}
+
+/// Decode Noise Reduction ASCII value (tag 0x0095) - ExifTool format
+/// From Nikon.pm - tag 0x0095 is ASCII string type
+/// Values: "Off" or "FPNR" (long exposure noise reduction)
+pub fn decode_noise_reduction_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "OFF" => "Off",
+        "FPNR" => "Long Exposure NR",
+        "ON" => "On",
+        _ => return value.trim().to_string(),
+    };
+    result.to_string()
+}
+
+/// Decode Noise Reduction ASCII value (tag 0x0095) - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_noise_reduction_exiv2(value: &str) -> String {
+    decode_noise_reduction_exiftool(value)
+}
+
+/// Decode Image Processing ASCII value (tag 0x0019/0x001A) - ExifTool format
+/// From Nikon.pm - tag is ASCII string type
+pub fn decode_image_processing_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "OFF" => "Off",
+        "ON" => "On",
+        "MINIMAL" => "Minimal",
+        "AUTO" => "Auto",
+        _ => return value.trim().to_string(),
+    };
+    result.to_string()
+}
+
+/// Decode Image Processing ASCII value - exiv2 format
+/// exiv2 treats this as plain ASCII string, using ExifTool interpretations
+pub fn decode_image_processing_exiv2(value: &str) -> String {
+    decode_image_processing_exiftool(value)
 }
 
 /// Decode Lens Type bitfield (tag 0x0083) - ExifTool format
@@ -846,11 +1417,13 @@ pub fn parse_nikon_maker_notes(
                 1 => {
                     // BYTE
                     let bytes = value_bytes[..count as usize].to_vec();
-                    // Apply decoder for lens type
+                    // Apply decoder for specific tags
                     if tag_id == NIKON_LENS_TYPE && !bytes.is_empty() {
                         ExifValue::Ascii(decode_lens_type_exiftool(bytes[0]))
                     } else if tag_id == NIKON_FLASH_MODE && !bytes.is_empty() {
                         ExifValue::Ascii(decode_flash_mode_exiftool(bytes[0]).to_string())
+                    } else if tag_id == NIKON_IMAGE_AUTHENTICATION && !bytes.is_empty() {
+                        ExifValue::Ascii(decode_image_authentication_exiftool(bytes[0]).to_string())
                     } else {
                         ExifValue::Byte(bytes)
                     }
@@ -899,6 +1472,19 @@ pub fn parse_nikon_maker_notes(
                             NIKON_DATE_STAMP_MODE => {
                                 Some(decode_date_stamp_mode_exiftool(v).to_string())
                             }
+                            NIKON_NEF_COMPRESSION => {
+                                Some(decode_nef_compression_exiftool(v).to_string())
+                            }
+                            NIKON_RETOUCH_HISTORY => {
+                                Some(decode_retouch_history_exiftool(v).to_string())
+                            }
+                            NIKON_SHOOTING_MODE => Some(decode_shooting_mode_exiftool(v)),
+                            NIKON_AUTO_BRACKET_RELEASE => {
+                                Some(decode_auto_bracket_release_exiftool(v).to_string())
+                            }
+                            NIKON_SILENT_PHOTOGRAPHY => {
+                                Some(decode_silent_photography_exiftool(v).to_string())
+                            }
                             _ => None,
                         };
 
@@ -907,6 +1493,9 @@ pub fn parse_nikon_maker_notes(
                         } else {
                             ExifValue::Short(values)
                         }
+                    } else if tag_id == NIKON_CROP_HI_SPEED && !values.is_empty() {
+                        // CropHiSpeed is a 7-element array, decode the first value
+                        ExifValue::Ascii(decode_crop_hi_speed_exiftool(values[0]).to_string())
                     } else {
                         ExifValue::Short(values)
                     }

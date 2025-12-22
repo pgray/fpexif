@@ -34,7 +34,10 @@
       "Bash(for f in /fpexif/raws/RAW_CANON_5D2.CR2 /fpexif/raws/RAW_NIKON_D800.NEF /fpexif/raws/RAW_SONY_A7M2.ARW /fpexif/raws/RAW_FUJI_X100S.RAF)",
       "Bash(do echo \"=== $f ===\")",
       "Bash(done)",
-      "Bash(FPEXIF_TEST_FILES=/fpexif/raws timeout 90 cargo test:*)"
+      "Bash(FPEXIF_TEST_FILES=/fpexif/raws timeout 90 cargo test:*)",
+      "Bash(./bin/mfr-test:*)",
+      "Bash(./bin/fpexif:*)",
+      "Bash(deno run:*)"
     ],
     "deny": [],
     "ask": []
