@@ -85,6 +85,409 @@ pub const CANON_MULTI_EXP: u16 = 0x4021;
 pub const CANON_FILTER_INFO: u16 = 0x4024;
 pub const CANON_HDR_INFO: u16 = 0x4025;
 pub const CANON_AF_CONFIG: u16 = 0x4028;
+pub const CANON_RAW_BURST_MODE_ROLL: u16 = 0x4029;
+pub const CANON_LOG_INFO: u16 = 0x4040;
+
+// CameraSettings sub-array tags (indices in tag 0x0001)
+pub const CS_MACRO_MODE: u16 = 0x0001;
+pub const CS_SELF_TIMER: u16 = 0x0002;
+pub const CS_QUALITY: u16 = 0x0003;
+pub const CS_FLASH_MODE: u16 = 0x0004;
+pub const CS_CONTINUOUS_DRIVE: u16 = 0x0005;
+pub const CS_FOCUS_MODE: u16 = 0x0007;
+pub const CS_RECORD_MODE: u16 = 0x0009;
+pub const CS_IMAGE_SIZE: u16 = 0x000A;
+pub const CS_EASY_MODE: u16 = 0x000B;
+pub const CS_DIGITAL_ZOOM: u16 = 0x000C;
+pub const CS_CONTRAST: u16 = 0x000D;
+pub const CS_SATURATION: u16 = 0x000E;
+pub const CS_SHARPNESS: u16 = 0x000F;
+pub const CS_ISO_SPEED: u16 = 0x0010;
+pub const CS_METERING_MODE: u16 = 0x0011;
+pub const CS_FOCUS_TYPE: u16 = 0x0012;
+pub const CS_AF_POINT: u16 = 0x0013;
+pub const CS_EXPOSURE_PROGRAM: u16 = 0x0014;
+pub const CS_LENS_TYPE: u16 = 0x0016;
+pub const CS_MAX_FOCAL_LENGTH: u16 = 0x0017;
+pub const CS_MIN_FOCAL_LENGTH: u16 = 0x0018;
+pub const CS_FOCAL_UNITS: u16 = 0x0019;
+pub const CS_MAX_APERTURE: u16 = 0x001A;
+pub const CS_MIN_APERTURE: u16 = 0x001B;
+pub const CS_FLASH_ACTIVITY: u16 = 0x001C;
+pub const CS_FLASH_BITS: u16 = 0x001D;
+pub const CS_FOCUS_CONTINUOUS: u16 = 0x0020;
+pub const CS_AE_SETTING: u16 = 0x0021;
+pub const CS_IMAGE_STABILIZATION: u16 = 0x0022;
+pub const CS_DISPLAY_APERTURE: u16 = 0x0023;
+pub const CS_ZOOM_SOURCE_WIDTH: u16 = 0x0024;
+pub const CS_ZOOM_TARGET_WIDTH: u16 = 0x0025;
+pub const CS_SPOT_METERING_MODE: u16 = 0x0027;
+pub const CS_PHOTO_EFFECT: u16 = 0x0028;
+pub const CS_MANUAL_FLASH_OUTPUT: u16 = 0x0029;
+pub const CS_COLOR_TONE: u16 = 0x002A;
+pub const CS_SRAW_QUALITY: u16 = 0x002E;
+
+// ShotInfo sub-array tags (indices in tag 0x0004)
+pub const SI_AUTO_ISO: u16 = 0x0001;
+pub const SI_BASE_ISO: u16 = 0x0002;
+pub const SI_MEASURED_EV: u16 = 0x0003;
+pub const SI_TARGET_APERTURE: u16 = 0x0004;
+pub const SI_TARGET_EXPOSURE_TIME: u16 = 0x0005;
+pub const SI_EXPOSURE_COMPENSATION: u16 = 0x0006;
+pub const SI_WHITE_BALANCE: u16 = 0x0007;
+pub const SI_SLOW_SHUTTER: u16 = 0x0008;
+pub const SI_SEQUENCE_NUMBER: u16 = 0x0009;
+pub const SI_OPTICAL_ZOOM_CODE: u16 = 0x000A;
+pub const SI_CAMERA_TEMPERATURE: u16 = 0x000C;
+pub const SI_FLASH_GUIDE_NUMBER: u16 = 0x000D;
+pub const SI_AF_POINTS_IN_FOCUS: u16 = 0x000E;
+pub const SI_FLASH_EXPOSURE_COMP: u16 = 0x000F;
+pub const SI_AUTO_EXPOSURE_BRACKETING: u16 = 0x0010;
+pub const SI_AEB_BRACKET_VALUE: u16 = 0x0011;
+pub const SI_CONTROL_MODE: u16 = 0x0012;
+pub const SI_FOCUS_DISTANCE_UPPER: u16 = 0x0013;
+pub const SI_FOCUS_DISTANCE_LOWER: u16 = 0x0014;
+pub const SI_FMICRO_ADJ: u16 = 0x0015;
+pub const SI_BULB_DURATION: u16 = 0x0018;
+pub const SI_SELF_TIMER_2: u16 = 0x001D;
+
+// FocalLength sub-array tags (indices in tag 0x0002)
+pub const FL_FOCAL_TYPE: u16 = 0x0000;
+pub const FL_FOCAL_LENGTH: u16 = 0x0001;
+pub const FL_FOCAL_PLANE_X_SIZE: u16 = 0x0002;
+pub const FL_FOCAL_PLANE_Y_SIZE: u16 = 0x0003;
+
+// ProcessingInfo sub-array tags (indices in tag 0x00A0)
+pub const PR_TONE_CURVE: u16 = 0x0001;
+pub const PR_SHARPNESS: u16 = 0x0002;
+pub const PR_SHARPNESS_FREQUENCY: u16 = 0x0003;
+pub const PR_SENSOR_RED_LEVEL: u16 = 0x0004;
+pub const PR_SENSOR_BLUE_LEVEL: u16 = 0x0005;
+pub const PR_WHITE_BALANCE_RED: u16 = 0x0006;
+pub const PR_WHITE_BALANCE_BLUE: u16 = 0x0007;
+pub const PR_WHITE_BALANCE: u16 = 0x0008;
+pub const PR_COLOR_TEMPERATURE: u16 = 0x0009;
+pub const PR_PICTURE_STYLE: u16 = 0x000A;
+pub const PR_DIGITAL_GAIN: u16 = 0x000B;
+pub const PR_WB_SHIFT_AB: u16 = 0x000C;
+pub const PR_WB_SHIFT_GM: u16 = 0x000D;
+
+// FileInfo sub-array tags (indices in tag 0x0093)
+pub const FI_FILE_NUMBER: u16 = 0x0001;
+pub const FI_BRACKET_MODE: u16 = 0x0003;
+pub const FI_BRACKET_VALUE: u16 = 0x0004;
+pub const FI_BRACKET_SHOT_NUMBER: u16 = 0x0005;
+pub const FI_RAW_JPG_QUALITY: u16 = 0x0006;
+pub const FI_RAW_JPG_SIZE: u16 = 0x0007;
+pub const FI_NOISE_REDUCTION: u16 = 0x0008;
+pub const FI_WB_BRACKET_MODE: u16 = 0x0009;
+pub const FI_WB_BRACKET_VALUE_AB: u16 = 0x000C;
+pub const FI_WB_BRACKET_VALUE_GM: u16 = 0x000D;
+pub const FI_FILTER_EFFECT: u16 = 0x000E;
+pub const FI_TONING_EFFECT: u16 = 0x000F;
+pub const FI_MACRO_MAGNIFICATION: u16 = 0x0010;
+pub const FI_LIVE_VIEW_SHOOTING: u16 = 0x0013;
+pub const FI_FOCUS_DISTANCE_UPPER_2: u16 = 0x0014;
+pub const FI_FOCUS_DISTANCE_LOWER_2: u16 = 0x0015;
+pub const FI_FLASH_EXPOSURE_LOCK: u16 = 0x0019;
+
+// LightingOpt sub-array tags (indices in tag 0x4018)
+pub const LO_PERIPHERAL_LIGHTING: u16 = 0x0000;
+pub const LO_PERIPHERAL_LIGHTING_VALUE: u16 = 0x0001;
+pub const LO_AUTO_LIGHTING_OPTIMIZER: u16 = 0x0002;
+pub const LO_HIGH_ISO_NOISE_REDUCTION: u16 = 0x0003;
+pub const LO_HIGHLIGHT_TONE_PRIORITY: u16 = 0x0004;
+pub const LO_LONG_EXPOSURE_NOISE_REDUCTION: u16 = 0x0005;
+
+// AFConfig sub-array tags (indices in tag 0x4028)
+pub const AFC_AF_CONFIG_TOOL: u16 = 0x0000;
+pub const AFC_AF_TRACK_SENSITIVITY: u16 = 0x0001;
+pub const AFC_AF_ACCEL_TRACK: u16 = 0x0002;
+pub const AFC_AF_POINT_SWITCHING: u16 = 0x0003;
+pub const AFC_AI_SERVO_FIRST_IMAGE: u16 = 0x0004;
+pub const AFC_AI_SERVO_SECOND_IMAGE: u16 = 0x0005;
+pub const AFC_USABLE_AF_POINTS: u16 = 0x0006;
+
+// VignettingCorr sub-array tags (indices in tag 0x4015)
+pub const VC_PERIPHERAL_ILLUMINATION_CORR: u16 = 0x0000;
+pub const VC_DISTORTION_CORRECTION: u16 = 0x0001;
+pub const VC_CHROMATIC_ABERRATION_CORR: u16 = 0x0002;
+pub const VC_PERIPHERAL_ILLUMINATION_CORR_2: u16 = 0x0003;
+pub const VC_DIFFRACTION_CORRECTION: u16 = 0x0004;
+
+// LensInfo sub-array tags (indices in tag 0x4019)
+pub const LI_LENS_SERIAL_NUMBER: u16 = 0x0000;
+
+// MultiExp sub-array tags (indices in tag 0x4021)
+pub const ME_MULTI_EXPOSURE_MODE: u16 = 0x0000;
+pub const ME_MULTI_EXPOSURE_SHOTS: u16 = 0x0001;
+pub const ME_MULTI_EXPOSURE_CONTROL: u16 = 0x0002;
+
+// HDRInfo sub-array tags (indices in tag 0x4025)
+pub const HDR_MODE: u16 = 0x0000;
+pub const HDR_STRENGTH: u16 = 0x0001;
+pub const HDR_EFFECT: u16 = 0x0002;
+
+// Additional CameraSettings tags
+pub const CS_FLASH_DETAILS: u16 = 0x001E;
+pub const CS_FOCUS_MODE_2: u16 = 0x0032;
+pub const CS_MANUAL_AF_POINT_SEL: u16 = 0x0034;
+pub const CS_AF_AREA_MODE: u16 = 0x0033;
+
+// AspectInfo sub-array tags (indices in tag 0x009A)
+pub const AI_ASPECT_RATIO: u16 = 0x0000;
+pub const AI_CROPPED_IMAGE_WIDTH: u16 = 0x0001;
+pub const AI_CROPPED_IMAGE_HEIGHT: u16 = 0x0002;
+pub const AI_CROPPED_IMAGE_LEFT: u16 = 0x0003;
+pub const AI_CROPPED_IMAGE_TOP: u16 = 0x0004;
+
+// CustomFunctions tags
+pub const CF_SET_BUTTON_FUNCTION: u16 = 0x0101;
+pub const CF_LONG_EXPOSURE_NOISE_REDUCTION: u16 = 0x0102;
+pub const CF_FLASH_SYNC_SPEED: u16 = 0x0103;
+pub const CF_SHUTTER_AE_LOCK_BUTTON: u16 = 0x0104;
+pub const CF_MIRROR_LOCKUP: u16 = 0x0105;
+pub const CF_TV_AV_SETTING: u16 = 0x0106;
+pub const CF_AF_ASSIST_BEAM_FIRING: u16 = 0x0107;
+pub const CF_SAFETY_SHIFT: u16 = 0x0108;
+pub const CF_LCD_DISPLAY_AT_POWER_ON: u16 = 0x0109;
+pub const CF_AEB_SEQUENCE: u16 = 0x0110;
+pub const CF_SHUTTER_CURTAIN_SYNC: u16 = 0x0111;
+
+// MovieInfo sub-array tags (indices in tag 0x0011)
+pub const MI_MOVIE_FRAME_WIDTH: u16 = 0x0000;
+pub const MI_MOVIE_FRAME_HEIGHT: u16 = 0x0001;
+pub const MI_MOVIE_FRAME_RATE: u16 = 0x0002;
+pub const MI_MOVIE_FRAME_COUNT: u16 = 0x0003;
+pub const MI_MOVIE_AUDIO_DURATION: u16 = 0x0004;
+
+// AFInfo2 sub-array tags (indices in tag 0x0026)
+pub const AF2_NUM_AF_POINTS: u16 = 0x0000;
+pub const AF2_VALID_AF_POINTS: u16 = 0x0001;
+pub const AF2_IMG_WIDTH: u16 = 0x0002;
+pub const AF2_IMG_HEIGHT: u16 = 0x0003;
+pub const AF2_AF_IMG_WIDTH: u16 = 0x0004;
+pub const AF2_AF_IMG_HEIGHT: u16 = 0x0005;
+pub const AF2_AF_AREA_WIDTHS: u16 = 0x0006;
+pub const AF2_AF_AREA_HEIGHTS: u16 = 0x0007;
+pub const AF2_AF_AREA_X_POSITIONS: u16 = 0x0008;
+pub const AF2_AF_AREA_Y_POSITIONS: u16 = 0x0009;
+pub const AF2_AF_POINTS_IN_FOCUS: u16 = 0x000A;
+pub const AF2_AF_POINTS_SELECTED: u16 = 0x000B;
+pub const AF2_PRIMARY_AF_POINT: u16 = 0x000C;
+
+// ColorBalance sub-array tags (indices in tag 0x00A9)
+pub const CB_WB_RGGB_LEVELS_AS_SHOT: u16 = 0x0000;
+pub const CB_COLOR_TEMP_AS_SHOT: u16 = 0x0001;
+pub const CB_WB_RGGB_LEVELS_AUTO: u16 = 0x0002;
+pub const CB_COLOR_TEMP_AUTO: u16 = 0x0003;
+pub const CB_WB_RGGB_LEVELS_MEASURED: u16 = 0x0004;
+pub const CB_COLOR_TEMP_MEASURED: u16 = 0x0005;
+pub const CB_WB_RGGB_LEVELS_DAYLIGHT: u16 = 0x0006;
+pub const CB_COLOR_TEMP_DAYLIGHT: u16 = 0x0007;
+pub const CB_WB_RGGB_LEVELS_SHADE: u16 = 0x0008;
+pub const CB_COLOR_TEMP_SHADE: u16 = 0x0009;
+pub const CB_WB_RGGB_LEVELS_CLOUDY: u16 = 0x000A;
+pub const CB_COLOR_TEMP_CLOUDY: u16 = 0x000B;
+pub const CB_WB_RGGB_LEVELS_TUNGSTEN: u16 = 0x000C;
+pub const CB_COLOR_TEMP_TUNGSTEN: u16 = 0x000D;
+pub const CB_WB_RGGB_LEVELS_FLUORESCENT: u16 = 0x000E;
+pub const CB_COLOR_TEMP_FLUORESCENT: u16 = 0x000F;
+pub const CB_WB_RGGB_LEVELS_KELVIN: u16 = 0x0010;
+pub const CB_COLOR_TEMP_KELVIN: u16 = 0x0011;
+pub const CB_WB_RGGB_LEVELS_FLASH: u16 = 0x0012;
+pub const CB_COLOR_TEMP_FLASH: u16 = 0x0013;
+
+// SensorInfo sub-array tags (indices in tag 0x00E0)
+pub const SE_SENSOR_WIDTH: u16 = 0x0001;
+pub const SE_SENSOR_HEIGHT: u16 = 0x0002;
+pub const SE_SENSOR_LEFT_BORDER: u16 = 0x0005;
+pub const SE_SENSOR_TOP_BORDER: u16 = 0x0006;
+pub const SE_SENSOR_RIGHT_BORDER: u16 = 0x0007;
+pub const SE_SENSOR_BOTTOM_BORDER: u16 = 0x0008;
+pub const SE_BLACK_MASK_LEFT_BORDER: u16 = 0x0009;
+pub const SE_BLACK_MASK_TOP_BORDER: u16 = 0x000A;
+pub const SE_BLACK_MASK_RIGHT_BORDER: u16 = 0x000B;
+pub const SE_BLACK_MASK_BOTTOM_BORDER: u16 = 0x000C;
+
+// FilterInfo sub-array tags (indices in tag 0x4024)
+pub const FLT_MINIATURE_FILTER_ORIENTATION: u16 = 0x0000;
+pub const FLT_MINIATURE_FILTER_POSITION: u16 = 0x0001;
+pub const FLT_MINIATURE_FILTER_PARAMETER: u16 = 0x0002;
+pub const FLT_FISHEYE_EFFECT: u16 = 0x0003;
+pub const FLT_TOY_CAMERA_EFFECT: u16 = 0x0004;
+pub const FLT_SOFT_FOCUS_EFFECT: u16 = 0x0005;
+
+// AmbianceInfo sub-array tags (indices in tag 0x4020)
+pub const AM_AMBIANCE_SELECTION: u16 = 0x0000;
+pub const AM_AMBIANCE_EFFECT: u16 = 0x0001;
+
+// PictureStyleUserDef sub-array tags (indices in tag 0x4008)
+pub const PS_USER_DEF_1: u16 = 0x0000;
+pub const PS_USER_DEF_2: u16 = 0x0001;
+pub const PS_USER_DEF_3: u16 = 0x0002;
+
+// AFMicroAdj sub-array tags (indices in tag 0x4013)
+pub const AFMA_AF_MICRO_ADJ_MODE: u16 = 0x0000;
+pub const AFMA_AF_MICRO_ADJ_VALUE: u16 = 0x0001;
+
+// Additional main IFD tags
+pub const CANON_FACE_INFO_1: u16 = 0x0030;
+pub const CANON_FACE_INFO_2: u16 = 0x0031;
+pub const CANON_ORIGINAL_FILENAME: u16 = 0x003A;
+pub const CANON_EMBEDDED_IMAGE_QUALITY: u16 = 0x0071;
+pub const CANON_MV_INFO: u16 = 0x4007;
+pub const CANON_CANON_FLASHINFO: u16 = 0x00C4;
+pub const CANON_INTERNAL_SERIAL_NUMBER: u16 = 0x0096;
+
+// Additional CropInfo tags (indices in tag 0x0098)
+pub const CR_CROP_LEFT_MARGIN: u16 = 0x0000;
+pub const CR_CROP_RIGHT_MARGIN: u16 = 0x0001;
+pub const CR_CROP_TOP_MARGIN: u16 = 0x0002;
+pub const CR_CROP_BOTTOM_MARGIN: u16 = 0x0003;
+
+// Panorama sub-array tags (indices in tag 0x0005)
+pub const PA_PANORAMA_FRAME_NUMBER: u16 = 0x0000;
+pub const PA_PANORAMA_DIRECTION: u16 = 0x0001;
+
+// FaceDetect sub-array tags (indices in tag 0x0024)
+pub const FD_NUM_FACES_DETECTED: u16 = 0x0000;
+pub const FD_FACE_DETECT_FRAME_SIZE: u16 = 0x0001;
+pub const FD_FACE_1_POSITION: u16 = 0x0002;
+pub const FD_FACE_2_POSITION: u16 = 0x0003;
+pub const FD_FACE_3_POSITION: u16 = 0x0004;
+pub const FD_FACE_4_POSITION: u16 = 0x0005;
+pub const FD_FACE_5_POSITION: u16 = 0x0006;
+
+// PreviewImageInfo sub-array tags (indices in tag 0x00B6)
+pub const PI_PREVIEW_QUALITY: u16 = 0x0000;
+pub const PI_PREVIEW_IMAGE_LENGTH: u16 = 0x0001;
+pub const PI_PREVIEW_IMAGE_WIDTH: u16 = 0x0002;
+pub const PI_PREVIEW_IMAGE_HEIGHT: u16 = 0x0003;
+pub const PI_PREVIEW_IMAGE_START: u16 = 0x0004;
+pub const PI_FOCAL_PLANE_X_RESOLUTION: u16 = 0x0005;
+pub const PI_FOCAL_PLANE_Y_RESOLUTION: u16 = 0x0006;
+
+// ModifiedInfo sub-array tags (indices in tag 0x00B1)
+pub const MD_MODIFIED_TONE_CURVE: u16 = 0x0000;
+pub const MD_MODIFIED_SHARPNESS: u16 = 0x0001;
+pub const MD_MODIFIED_SHARPNESS_FREQ: u16 = 0x0002;
+pub const MD_MODIFIED_SENSOR_RED_LEVEL: u16 = 0x0003;
+pub const MD_MODIFIED_SENSOR_BLUE_LEVEL: u16 = 0x0004;
+pub const MD_MODIFIED_WHITE_BALANCE_RED: u16 = 0x0005;
+pub const MD_MODIFIED_WHITE_BALANCE_BLUE: u16 = 0x0006;
+pub const MD_MODIFIED_WHITE_BALANCE: u16 = 0x0007;
+pub const MD_MODIFIED_COLOR_TEMP: u16 = 0x0008;
+pub const MD_MODIFIED_PICTURE_STYLE: u16 = 0x0009;
+pub const MD_MODIFIED_DIGITAL_GAIN: u16 = 0x000A;
+
+// VignettingCorr2 sub-array tags (indices in tag 0x4016)
+pub const VC2_PERIPHERAL_LIGHTING_SETTING: u16 = 0x0000;
+pub const VC2_CHROMATIC_ABERRATION_SETTING: u16 = 0x0001;
+pub const VC2_DISTORTION_SETTING: u16 = 0x0002;
+
+// FlashInfo sub-array tags (indices in tag 0x0003)
+pub const FLS_FLASH_GUIDE_NUMBER: u16 = 0x0000;
+pub const FLS_FLASH_THRESHOLD: u16 = 0x0001;
+
+// TimeInfo sub-array tags (indices in tag 0x0035)
+pub const TI_TIME_ZONE: u16 = 0x0000;
+pub const TI_TIME_ZONE_CITY: u16 = 0x0001;
+pub const TI_DAYLIGHT_SAVINGS: u16 = 0x0002;
+
+// ContrastInfo sub-array tags (indices in tag 0x0027)
+pub const CI_INCREMENTAL_COLOR_TEMP: u16 = 0x0004;
+pub const CI_INCREMENTAL_TINT: u16 = 0x0005;
+
+// Additional FileInfo tags
+pub const FI_SHUTTER_MODE: u16 = 0x0016;
+pub const FI_RAW_BURST_IMAGE_COUNT: u16 = 0x0017;
+pub const FI_RAW_BURST_SHOT_NUM: u16 = 0x0018;
+pub const FI_HDR: u16 = 0x001E;
+
+// Additional LightingOpt tags
+pub const LO_DIGITAL_LENS_OPTIMIZER: u16 = 0x0006;
+pub const LO_DLO_DATA: u16 = 0x0007;
+pub const LO_DLO_SETTING_APPLIED: u16 = 0x0009;
+
+// Extended ColorData indices (tag 0x4001)
+pub const CD_COLOR_DATA_VERSION: u16 = 0x0000;
+pub const CD_WB_RGGB_LEVELS_AS_SHOT: u16 = 0x0003;
+pub const CD_COLOR_TEMP_AS_SHOT: u16 = 0x0007;
+pub const CD_WB_RGGB_LEVELS_AUTO: u16 = 0x0008;
+pub const CD_COLOR_TEMP_AUTO: u16 = 0x000C;
+pub const CD_WB_RGGB_LEVELS_MEASURED: u16 = 0x000D;
+pub const CD_COLOR_TEMP_MEASURED: u16 = 0x0011;
+pub const CD_WB_RGGB_BLACK_LEVELS: u16 = 0x0012;
+pub const CD_LINEAR_RESPONSE_LIMIT: u16 = 0x0016;
+pub const CD_CAMERA_COLOR_CALIBRATION_01: u16 = 0x0017;
+pub const CD_CAMERA_COLOR_CALIBRATION_02: u16 = 0x0018;
+pub const CD_CAMERA_COLOR_CALIBRATION_03: u16 = 0x0019;
+pub const CD_CAMERA_COLOR_CALIBRATION_04: u16 = 0x001A;
+pub const CD_CAMERA_COLOR_CALIBRATION_05: u16 = 0x001B;
+pub const CD_CAMERA_COLOR_CALIBRATION_06: u16 = 0x001C;
+pub const CD_CAMERA_COLOR_CALIBRATION_07: u16 = 0x001D;
+pub const CD_CAMERA_COLOR_CALIBRATION_08: u16 = 0x001E;
+pub const CD_CAMERA_COLOR_CALIBRATION_09: u16 = 0x001F;
+pub const CD_CAMERA_COLOR_CALIBRATION_10: u16 = 0x0020;
+pub const CD_CAMERA_COLOR_CALIBRATION_11: u16 = 0x0021;
+pub const CD_CAMERA_COLOR_CALIBRATION_12: u16 = 0x0022;
+pub const CD_CAMERA_COLOR_CALIBRATION_13: u16 = 0x0023;
+pub const CD_CAMERA_COLOR_CALIBRATION_14: u16 = 0x0024;
+pub const CD_CAMERA_COLOR_CALIBRATION_15: u16 = 0x0025;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_01: u16 = 0x0026;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_02: u16 = 0x0027;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_03: u16 = 0x0028;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_04: u16 = 0x0029;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_05: u16 = 0x002A;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_06: u16 = 0x002B;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_07: u16 = 0x002C;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_08: u16 = 0x002D;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_09: u16 = 0x002E;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_10: u16 = 0x002F;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_11: u16 = 0x0030;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_12: u16 = 0x0031;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_13: u16 = 0x0032;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_14: u16 = 0x0033;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_15: u16 = 0x0034;
+pub const CD_AVERAGE_BLACK_LEVEL: u16 = 0x0035;
+
+// Additional AFInfo2 tags
+pub const AF2_AF_STATUS_ARRAY: u16 = 0x000D;
+
+// Extended CameraSettings tags
+pub const CS_ND_FILTER: u16 = 0x0015;
+pub const CS_FOCUS_RANGE: u16 = 0x0033;
+
+// Extended ShotInfo tags
+pub const SI_AF_AREA_WIDTH: u16 = 0x0019;
+pub const SI_AF_AREA_HEIGHT: u16 = 0x001A;
+pub const SI_AF_AREA_X_POSITIONS: u16 = 0x001B;
+pub const SI_AF_AREA_Y_POSITIONS: u16 = 0x001C;
+pub const SI_AUTO_ROTATE: u16 = 0x001E;
+
+// Additional main tags
+pub const CANON_MEASURED_EV_2: u16 = 0x00A6;
+pub const CANON_FLASH_INFO_2: u16 = 0x0018;
+pub const CANON_MEASURED_RGGB: u16 = 0x00AB;
+pub const CANON_WB_PACKET: u16 = 0x00AD;
+pub const CANON_HIGHLIGHT_SHADOW_ADJUST: u16 = 0x00AC;
+pub const CANON_SENSOR_CALIBRATION: u16 = 0x00E5;
+pub const CANON_ROLLING_SHUTTER_INFO: u16 = 0x00E6;
+pub const CANON_CCDT_INFO: u16 = 0x00E2;
+pub const CANON_VRD_STAMP_INFO: u16 = 0x00D1;
+pub const CANON_DIGITAL_INFO: u16 = 0x00E4;
+pub const CANON_LENS_SERIAL_INFO: u16 = 0x00E8;
+pub const CANON_CANON_VRD_RECIPE: u16 = 0x00DF;
+pub const CANON_MK_NOTES_VERSION: u16 = 0x0001;
+pub const CANON_ISO_SPEED_RATING: u16 = 0x000A;
+pub const CANON_LONG_EXP_NR_ON: u16 = 0x00E7;
+pub const CANON_USER_COMMENT: u16 = 0x00F7;
+pub const CANON_WB_INFO_2: u16 = 0x002A;
+pub const CANON_AF_POINTS_IN_FOCUS: u16 = 0x002C;
+pub const CANON_MY_COLOR_MODE: u16 = 0x002D;
+pub const CANON_FACE_DETECT_INFO: u16 = 0x002E;
+pub const CANON_THUMBNAIL_IMAGE: u16 = 0x0032;
 
 /// Get Canon lens name from lens type ID
 /// Based on ExifTool's canonLensTypes database

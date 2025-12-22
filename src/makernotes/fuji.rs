@@ -50,6 +50,29 @@ pub const FUJI_RAW_IMAGE_FULL_SIZE: u16 = 0x0100;
 pub const FUJI_RAW_IMAGE_CROP_TOP_LEFT: u16 = 0x0110;
 pub const FUJI_RAW_IMAGE_CROPPED_SIZE: u16 = 0x0111;
 pub const FUJI_RAW_IMAGE_ASPECT_RATIO: u16 = 0x0115;
+pub const FUJI_NOISE_REDUCTION: u16 = 0x100B;
+pub const FUJI_HIGH_ISO_NOISE_REDUCTION: u16 = 0x100E;
+pub const FUJI_CLARITY: u16 = 0x100F;
+pub const FUJI_SHADOW_TONE: u16 = 0x1040;
+pub const FUJI_HIGHLIGHT_TONE: u16 = 0x1041;
+pub const FUJI_COLOR_CHROME_EFFECT: u16 = 0x1048;
+pub const FUJI_GRAIN_EFFECT_SIZE: u16 = 0x104C;
+pub const FUJI_CROP_MODE: u16 = 0x104D;
+pub const FUJI_COLOR_CHROME_FX_BLUE: u16 = 0x104E;
+pub const FUJI_SHUTTER_TYPE: u16 = 0x1050;
+pub const FUJI_PANORAMA_DIRECTION: u16 = 0x1154;
+pub const FUJI_ADVANCED_FILTER: u16 = 0x1201;
+pub const FUJI_FINE_PIX_COLOR: u16 = 0x1210;
+pub const FUJI_SCENE_RECOGNITION: u16 = 0x1425;
+pub const FUJI_IMAGE_GENERATION: u16 = 0x1436;
+pub const FUJI_GRAIN_EFFECT_ROUGHNESS: u16 = 0x104B;
+pub const FUJI_WHITE_BALANCE_FINE_TUNE: u16 = 0x100A;
+pub const FUJI_FLASH_FIRING: u16 = 0x1008;
+pub const FUJI_IMAGE_HEIGHT: u16 = 0x1009;
+pub const FUJI_IMAGE_WIDTH: u16 = 0x1007;
+pub const FUJI_OUTPUT_IMAGE_SIZE: u16 = 0x1304;
+pub const FUJI_CONTINUOUS_DRIVE: u16 = 0x1103;
+pub const FUJI_VIDEO_MODE: u16 = 0x1303;
 pub const FUJI_LENS_MOUNT_TYPE: u16 = 0x1600;
 pub const FUJI_RATINGS_INFO: u16 = 0xB211;
 pub const FUJI_GE_IMAGE_SIZE: u16 = 0xB212;
@@ -66,6 +89,9 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_CONTRAST => Some("Contrast"),
         FUJI_COLOR_TEMPERATURE => Some("ColorTemperature"),
         FUJI_CONTRAST_DETECTION_AF => Some("ContrastDetectionAF"),
+        FUJI_NOISE_REDUCTION => Some("NoiseReduction"),
+        FUJI_HIGH_ISO_NOISE_REDUCTION => Some("HighIsoNoiseReduction"),
+        FUJI_CLARITY => Some("Clarity"),
         FUJI_FLASH_MODE => Some("FlashMode"),
         FUJI_FLASH_EXPOSURE_COMP => Some("FlashExposureComp"),
         FUJI_MACRO => Some("Macro"),
@@ -76,11 +102,29 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_PICTURE_MODE => Some("PictureMode"),
         FUJI_EXR_AUTO => Some("EXRAuto"),
         FUJI_EXR_MODE => Some("EXRMode"),
+        FUJI_SHADOW_TONE => Some("ShadowTone"),
+        FUJI_HIGHLIGHT_TONE => Some("HighlightTone"),
+        FUJI_COLOR_CHROME_EFFECT => Some("ColorChromeEffect"),
+        FUJI_GRAIN_EFFECT_SIZE => Some("GrainEffectSize"),
+        FUJI_CROP_MODE => Some("CropMode"),
+        FUJI_COLOR_CHROME_FX_BLUE => Some("ColorChromeFXBlue"),
+        FUJI_SHUTTER_TYPE => Some("ShutterType"),
+        FUJI_GRAIN_EFFECT_ROUGHNESS => Some("GrainEffectRoughness"),
+        FUJI_WHITE_BALANCE_FINE_TUNE => Some("WhiteBalanceFineTune"),
+        FUJI_FLASH_FIRING => Some("FlashFiring"),
+        FUJI_IMAGE_HEIGHT => Some("ImageHeight"),
+        FUJI_IMAGE_WIDTH => Some("ImageWidth"),
+        FUJI_OUTPUT_IMAGE_SIZE => Some("OutputImageSize"),
+        FUJI_CONTINUOUS_DRIVE => Some("ContinuousDrive"),
+        FUJI_VIDEO_MODE => Some("VideoMode"),
         FUJI_AUTO_BRACKETING => Some("AutoBracketing"),
         FUJI_SEQUENCE_NUMBER => Some("SequenceNumber"),
         FUJI_BLUR_WARNING => Some("BlurWarning"),
         FUJI_FOCUS_WARNING => Some("FocusWarning"),
         FUJI_EXPOSURE_WARNING => Some("ExposureWarning"),
+        FUJI_PANORAMA_DIRECTION => Some("PanoramaDirection"),
+        FUJI_ADVANCED_FILTER => Some("AdvancedFilter"),
+        FUJI_FINE_PIX_COLOR => Some("FinePixColor"),
         FUJI_DYNAMIC_RANGE => Some("DynamicRange"),
         FUJI_FILM_MODE => Some("FilmMode"),
         FUJI_DYNAMIC_RANGE_SETTING => Some("DynamicRangeSetting"),
@@ -89,6 +133,8 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_MAX_FOCAL_LENGTH => Some("MaxFocalLength"),
         FUJI_MAX_APERTURE_AT_MIN_FOCAL => Some("MaxApertureAtMinFocal"),
         FUJI_MAX_APERTURE_AT_MAX_FOCAL => Some("MaxApertureAtMaxFocal"),
+        FUJI_SCENE_RECOGNITION => Some("SceneRecognition"),
+        FUJI_IMAGE_GENERATION => Some("ImageGeneration"),
         FUJI_FILE_SOURCE => Some("FileSource"),
         FUJI_ORDER_NUMBER => Some("OrderNumber"),
         FUJI_FRAME_NUMBER => Some("FrameNumber"),
@@ -627,6 +673,166 @@ pub fn decode_internal_serial_number(raw: &str) -> String {
 
     // Fallback: return as-is
     trimmed.to_string()
+}
+
+/// Decode NoiseReduction value (tag 0x100B) - ExifTool/exiv2 format
+pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
+    match value {
+        64 => "Low",
+        128 => "Normal",
+        256 => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HighIsoNoiseReduction value (tag 0x100E) - exiv2 format
+pub fn decode_high_iso_noise_reduction_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "0 (normal)",
+        256 => "+2 (strong)",
+        384 => "+1 (medium strong)",
+        448 => "+3 (very strong)",
+        480 => "+4 (strongest)",
+        512 => "-2 (weak)",
+        640 => "-1 (medium weak)",
+        704 => "-3 (very weak)",
+        736 => "-4 (weakest)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Clarity value (tag 0x100F) - exiv2 format
+pub fn decode_clarity_exiv2(value: i16) -> &'static str {
+    match value {
+        -5000 => "-5",
+        -4000 => "-4",
+        -3000 => "-3",
+        -2000 => "-2",
+        -1000 => "-1",
+        0 => "0",
+        1000 => "+1",
+        2000 => "+2",
+        3000 => "+3",
+        4000 => "+4",
+        5000 => "+5",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ShadowTone/HighlightTone value (tags 0x1040/0x1041) - exiv2 format
+pub fn decode_shadow_highlight_tone_exiv2(value: i16) -> &'static str {
+    match value {
+        -64 => "+4",
+        -56 => "+3.5",
+        -48 => "+3",
+        -40 => "+2.5",
+        -32 => "+2",
+        -24 => "+1.5",
+        -16 => "+1",
+        -8 => "+0.5",
+        0 => "0",
+        8 => "-0.5",
+        16 => "-1",
+        24 => "-1.5",
+        32 => "-2",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ColorChromeEffect/GrainEffectSize/ColorChromeFXBlue value - exiv2 format
+pub fn decode_off_weak_strong_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        32 => "Weak",
+        64 => "Strong",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ShutterType value (tag 0x1050) - exiv2 format
+pub fn decode_shutter_type_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Mechanical",
+        1 => "Electronic",
+        2 => "Electronic (long shutter speed)",
+        3 => "Electronic Front Curtain",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CropMode value (tag 0x104D) - exiv2 format
+pub fn decode_crop_mode_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "None",
+        1 => "Full frame",
+        2 => "Sports Finder Mode",
+        4 => "Electronic Shutter 1.25x Crop",
+        _ => "Unknown",
+    }
+}
+
+/// Decode PanoramaDirection value (tag 0x1154) - exiv2 format
+pub fn decode_panorama_direction_exiv2(value: u16) -> &'static str {
+    match value {
+        1 => "Right",
+        2 => "Up",
+        3 => "Left",
+        4 => "Down",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AdvancedFilter value (tag 0x1201) - exiv2 format
+pub fn decode_advanced_filter_exiv2(value: u32) -> &'static str {
+    match value {
+        0x10000 => "Pop Color",
+        0x20000 => "Hi Key",
+        0x30000 => "Toy Camera",
+        0x40000 => "Miniature",
+        0x50000 => "Dynamic Tone",
+        0x60001 => "Partial Color Red",
+        0x60002 => "Partial Color Yellow",
+        0x60003 => "Partial Color Green",
+        0x60004 => "Partial Color Blue",
+        0x60005 => "Partial Color Orange",
+        0x60006 => "Partial Color Purple",
+        0x70000 => "Soft Focus",
+        0x90000 => "Low Key",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FinePixColor value (tag 0x1210) - exiv2 format
+pub fn decode_fine_pix_color_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        16 => "Chrome",
+        48 => "Black & white",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SceneRecognition value (tag 0x1425) - exiv2 format
+pub fn decode_scene_recognition_exiv2(value: u16) -> &'static str {
+    match value {
+        0x000 => "Unrecognized",
+        0x100 => "Portrait Image",
+        0x103 => "Night Portrait",
+        0x105 => "Backlit Portrait",
+        0x200 => "Landscape Image",
+        0x300 => "Night Scene",
+        0x400 => "Macro",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageGeneration value (tag 0x1436) - exiv2 format
+pub fn decode_image_generation_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Original Image",
+        1 => "Re-developed from RAW",
+        _ => "Unknown",
+    }
 }
 
 /// Parse Fujifilm maker notes

@@ -81,6 +81,422 @@ pub const NIKON_LENS_F_STOPS: u16 = 0x008B;
 pub const NIKON_CONTRAST_CURVE: u16 = 0x008C;
 pub const NIKON_COLOR_HUE: u16 = 0x008D;
 pub const NIKON_SCENE_MODE: u16 = 0x008F;
+pub const NIKON_TONE_COMP: u16 = 0x0081;
+pub const NIKON_SENSOR_PIXEL_SIZE: u16 = 0x009A;
+pub const NIKON_UNKNOWN_TAG_9B: u16 = 0x009B;
+pub const NIKON_SCENE_ASSIST: u16 = 0x009C;
+pub const NIKON_TONING_EFFECT: u16 = 0x00B3;
+pub const NIKON_BAROMETER_INFO: u16 = 0x00C3;
+pub const NIKON_PRINT_IM: u16 = 0x0E00;
+pub const NIKON_CAPTURE_DATA: u16 = 0x0E01;
+pub const NIKON_CAPTURE_VERSION: u16 = 0x0E09;
+pub const NIKON_CAPTURE_OFFSETS: u16 = 0x0E0E;
+pub const NIKON_SCAN_IFD: u16 = 0x0E10;
+pub const NIKON_ICC_PROFILE: u16 = 0x0E1D;
+pub const NIKON_CAPTURE_OUTPUT: u16 = 0x0E1E;
+pub const NIKON_HDR_INFO: u16 = 0x00B0;
+pub const NIKON_MULTI_EXPOSURE: u16 = 0x00B1;
+pub const NIKON_LOCATION_INFO: u16 = 0x00B5;
+pub const NIKON_BLACK_LEVEL: u16 = 0x00B6;
+pub const NIKON_AF_INFO_2: u16 = 0x00B7;
+pub const NIKON_FILE_INFO: u16 = 0x00B8;
+pub const NIKON_AF_TUNE: u16 = 0x00B9;
+pub const NIKON_RETOUCH_INFO: u16 = 0x00BB;
+pub const NIKON_PICTURE_CONTROL_VERSION: u16 = 0x00BC;
+pub const NIKON_SILENT_PHOTO: u16 = 0x00BD;
+pub const NIKON_SHUTTER_MODE: u16 = 0x0034;
+pub const NIKON_MECHANICAL_SHUTTER_COUNT: u16 = 0x0037;
+
+// PictureControl sub-IFD tags (indices in tag 0x0023)
+pub const PC_VERSION: u16 = 0x0000;
+pub const PC_NAME: u16 = 0x0004;
+pub const PC_BASE: u16 = 0x0018;
+pub const PC_ADJUST: u16 = 0x0030;
+pub const PC_QUICK_ADJUST: u16 = 0x0031;
+pub const PC_SHARPNESS: u16 = 0x0032;
+pub const PC_CLARITY: u16 = 0x0033;
+pub const PC_CONTRAST: u16 = 0x0034;
+pub const PC_BRIGHTNESS: u16 = 0x0035;
+pub const PC_SATURATION: u16 = 0x0036;
+pub const PC_HUE_ADJUSTMENT: u16 = 0x0037;
+pub const PC_FILTER_EFFECT: u16 = 0x0038;
+pub const PC_TONING_EFFECT: u16 = 0x0039;
+pub const PC_TONING_SATURATION: u16 = 0x003A;
+
+// WorldTime sub-IFD tags (indices in tag 0x0024)
+pub const WT_TIMEZONE: u16 = 0x0000;
+pub const WT_DAYLIGHT_SAVINGS: u16 = 0x0002;
+pub const WT_DATE_DISPLAY_FORMAT: u16 = 0x0003;
+
+// ISOInfo sub-IFD tags (indices in tag 0x0025)
+pub const II_ISO: u16 = 0x0000;
+pub const II_ISO_EXPANSION: u16 = 0x0004;
+pub const II_ISO2: u16 = 0x0006;
+pub const II_ISO_EXPANSION2: u16 = 0x000A;
+
+// VRInfo sub-IFD tags (indices in tag 0x001F)
+pub const VR_VERSION: u16 = 0x0000;
+pub const VR_VIBRATION_REDUCTION: u16 = 0x0004;
+pub const VR_TYPE: u16 = 0x0008;
+
+// AFInfo sub-IFD tags (indices in tag 0x0088)
+pub const AF_AREA_MODE: u16 = 0x0000;
+pub const AF_POINT: u16 = 0x0001;
+pub const AF_POINTS_IN_FOCUS: u16 = 0x0002;
+
+// ShotInfo sub-IFD tags (varies by version, common ones)
+pub const SI_VERSION: u16 = 0x0000;
+pub const SI_FIRMWARE_VERSION: u16 = 0x0004;
+pub const SI_SHOOTING_MODE: u16 = 0x000A;
+pub const SI_AUTO_FOCUS_MODE: u16 = 0x000B;
+pub const SI_SHUTTER_COUNT: u16 = 0x000C;
+pub const SI_AUTO_FLASH_MODE: u16 = 0x000D;
+pub const SI_AUTO_FLASH_COMP: u16 = 0x000E;
+pub const SI_AUTO_FOCUS_POINT: u16 = 0x000F;
+pub const SI_FLASH_TYPE_2: u16 = 0x0010;
+pub const SI_AUTO_BRACKET_MODE: u16 = 0x0011;
+pub const SI_AUTO_BRACKET_VALUE: u16 = 0x0012;
+pub const SI_ISO_AUTO: u16 = 0x0014;
+pub const SI_AUTO_AREA_ZOOM: u16 = 0x0015;
+pub const SI_PHOTO_INFO_DISPLAY: u16 = 0x0016;
+pub const SI_IMAGE_STABILIZATION: u16 = 0x0017;
+pub const SI_AF_AREA_MODE_2: u16 = 0x0018;
+pub const SI_VR_MODE: u16 = 0x0019;
+pub const SI_ACTIVE_D_LIGHTING_2: u16 = 0x001A;
+pub const SI_HIGH_ISO_NR: u16 = 0x001B;
+pub const SI_VIGNETTE_CONTROL: u16 = 0x001C;
+pub const SI_AUTO_DISTORTION: u16 = 0x001D;
+pub const SI_DIFFRACTION_COMP: u16 = 0x001E;
+pub const SI_FLASH_FOCAL_LENGTH: u16 = 0x001F;
+pub const SI_FACE_DETECT: u16 = 0x0020;
+pub const SI_ROLL_ANGLE: u16 = 0x0021;
+pub const SI_PITCH_ANGLE: u16 = 0x0022;
+pub const SI_YAW_ANGLE: u16 = 0x0023;
+pub const SI_FLASH_SHUTTER_SPEED: u16 = 0x0024;
+pub const SI_ILLUMINATION: u16 = 0x0025;
+
+// LensData sub-IFD tags (common indices)
+pub const LD_VERSION: u16 = 0x0000;
+pub const LD_EXIT_PUPIL_POSITION: u16 = 0x0004;
+pub const LD_AF_APERTURE: u16 = 0x0005;
+pub const LD_FOCUS_POSITION: u16 = 0x0008;
+pub const LD_FOCUS_DISTANCE: u16 = 0x0009;
+pub const LD_FOCAL_LENGTH: u16 = 0x000A;
+pub const LD_LENS_ID_NUMBER: u16 = 0x000B;
+pub const LD_LENS_F_STOPS: u16 = 0x000C;
+pub const LD_MIN_FOCAL_LENGTH: u16 = 0x000D;
+pub const LD_MAX_FOCAL_LENGTH: u16 = 0x000E;
+pub const LD_MAX_APERTURE_AT_MIN_FOCAL: u16 = 0x000F;
+pub const LD_MAX_APERTURE_AT_MAX_FOCAL: u16 = 0x0010;
+pub const LD_MCU_VERSION: u16 = 0x0011;
+pub const LD_EFFECTIVE_MAX_APERTURE: u16 = 0x0012;
+
+// ColorBalance sub-IFD tags (indices in tag 0x0097)
+pub const CB_VERSION: u16 = 0x0000;
+pub const CB_WB_RB_LEVELS: u16 = 0x0004;
+pub const CB_WB_GR_LEVEL: u16 = 0x0008;
+pub const CB_WB_GB_LEVEL: u16 = 0x000A;
+
+// FlashInfo sub-IFD tags (common indices)
+pub const FI_VERSION: u16 = 0x0000;
+pub const FI_FLASH_SOURCE: u16 = 0x0004;
+pub const FI_EXTERNAL_FLASH_FIRMWARE: u16 = 0x0005;
+pub const FI_EXTERNAL_FLASH_FLAGS: u16 = 0x0008;
+pub const FI_FLASH_COMMANDER_MODE: u16 = 0x0009;
+pub const FI_FLASH_CONTROL_MODE: u16 = 0x000A;
+pub const FI_FLASH_OUTPUT: u16 = 0x000B;
+pub const FI_FLASH_COMP_BUILTIN: u16 = 0x000C;
+pub const FI_FLASH_COMP_EXTERNAL: u16 = 0x000D;
+pub const FI_FLASH_COMP_OTHER: u16 = 0x000E;
+pub const FI_FLASH_GUID_NUMBER: u16 = 0x000F;
+pub const FI_FLASH_GROUP_A_CONTROL_MODE: u16 = 0x0010;
+pub const FI_FLASH_GROUP_B_CONTROL_MODE: u16 = 0x0011;
+pub const FI_FLASH_GROUP_C_CONTROL_MODE: u16 = 0x0012;
+pub const FI_FLASH_GROUP_A_OUTPUT: u16 = 0x0013;
+pub const FI_FLASH_GROUP_B_OUTPUT: u16 = 0x0014;
+pub const FI_FLASH_GROUP_C_OUTPUT: u16 = 0x0015;
+pub const FI_FLASH_GROUP_A_COMP: u16 = 0x0016;
+pub const FI_FLASH_GROUP_B_COMP: u16 = 0x0017;
+pub const FI_FLASH_GROUP_C_COMP: u16 = 0x0018;
+pub const FI_EXTERNAL_FLASH_FLAGS_2: u16 = 0x0019;
+pub const FI_FLASH_COLOR_FILTER: u16 = 0x001A;
+
+// MultiExposure sub-IFD tags (indices in tag 0x00B1)
+pub const ME_VERSION: u16 = 0x0000;
+pub const ME_MULTI_EXPOSURE_MODE: u16 = 0x0004;
+pub const ME_MULTI_EXPOSURE_SHOTS: u16 = 0x0005;
+pub const ME_MULTI_EXPOSURE_AUTO_GAIN: u16 = 0x0006;
+
+// HDRInfo sub-IFD tags (indices in tag 0x00B0)
+pub const HDR_VERSION: u16 = 0x0000;
+pub const HDR_HDR: u16 = 0x0004;
+pub const HDR_LEVEL: u16 = 0x0005;
+pub const HDR_SMOOTHING: u16 = 0x0006;
+pub const HDR_LEVEL_2: u16 = 0x0007;
+
+// AFInfo2 sub-IFD tags (indices in tag 0x00B7)
+pub const AF2_VERSION: u16 = 0x0000;
+pub const AF2_CONTRAST_DETECT_AF: u16 = 0x0004;
+pub const AF2_AF_AREA_MODE: u16 = 0x0005;
+pub const AF2_PHASE_DETECT_AF: u16 = 0x0006;
+pub const AF2_PRIMARY_AF_POINT: u16 = 0x0007;
+pub const AF2_AF_POINTS_USED: u16 = 0x0008;
+pub const AF2_AF_IMAGE_WIDTH: u16 = 0x0010;
+pub const AF2_AF_IMAGE_HEIGHT: u16 = 0x0012;
+pub const AF2_AF_AREA_X_POSITION: u16 = 0x0014;
+pub const AF2_AF_AREA_Y_POSITION: u16 = 0x0016;
+pub const AF2_AF_AREA_WIDTH: u16 = 0x0018;
+pub const AF2_AF_AREA_HEIGHT: u16 = 0x001A;
+pub const AF2_CONTRAST_DETECT_AF_IN_FOCUS: u16 = 0x001C;
+
+// FileInfo sub-IFD tags (indices in tag 0x00B8)
+pub const FILE_VERSION: u16 = 0x0000;
+pub const FILE_DIRECTORY_NUMBER: u16 = 0x0002;
+pub const FILE_FILE_NUMBER: u16 = 0x0004;
+
+// AFTune sub-IFD tags (indices in tag 0x00B9)
+pub const AFT_AF_FINE_TUNE: u16 = 0x0000;
+pub const AFT_AF_FINE_TUNE_INDEX: u16 = 0x0001;
+pub const AFT_AF_FINE_TUNE_ADJ: u16 = 0x0002;
+
+// LocationInfo sub-IFD tags (indices in tag 0x00B5)
+pub const LOC_VERSION: u16 = 0x0000;
+pub const LOC_LATITUDE: u16 = 0x0001;
+pub const LOC_LONGITUDE: u16 = 0x0002;
+pub const LOC_ALTITUDE: u16 = 0x0003;
+pub const LOC_SPEED: u16 = 0x0004;
+pub const LOC_GPS_DATE_TIME: u16 = 0x0005;
+
+// RetouchInfo sub-IFD tags (indices in tag 0x00BB)
+pub const RET_VERSION: u16 = 0x0000;
+pub const RET_RETOUCH_HISTORY: u16 = 0x0004;
+
+// Additional main IFD tags
+pub const NIKON_SENSOR_TYPE: u16 = 0x00A1;
+pub const NIKON_AF_POINT_SELECT: u16 = 0x00A3;
+pub const NIKON_FLASH_DATA: u16 = 0x00A4;
+pub const NIKON_SUBJECT_DIST_RANGE: u16 = 0x00B2;
+pub const NIKON_DIGITAL_VARI_PROGRAM: u16 = 0x00B4;
+pub const NIKON_GPS_INFO: u16 = 0x00AE;
+pub const NIKON_DUST_REFERENCE_DATA: u16 = 0x00AF;
+
+// More ShotInfo tags for completeness
+pub const SI_DIGITAL_VARI_PROGRAM_2: u16 = 0x0030;
+pub const SI_PRIMARY_AF_POINT: u16 = 0x0031;
+pub const SI_AF_POINT_ACTIVE: u16 = 0x0032;
+pub const SI_AF_PRIMARY_IN_FOCUS: u16 = 0x0033;
+pub const SI_CONTRAST_DETECT_AF: u16 = 0x0034;
+pub const SI_AF_AREA_MODE_3: u16 = 0x0035;
+pub const SI_LENS_TYPE_2: u16 = 0x0036;
+pub const SI_TIME_ZONE: u16 = 0x0037;
+
+// Extended LensData tags
+pub const LD_LENS_TYPE: u16 = 0x0013;
+pub const LD_MIN_FOCUS_DISTANCE: u16 = 0x0014;
+pub const LD_AF_DRIVE: u16 = 0x0015;
+pub const LD_LENS_SERIAL: u16 = 0x0016;
+
+// Extended ColorBalance tags
+pub const CB_WB_RGGB_LEVELS: u16 = 0x000C;
+pub const CB_WB_GRBG_LEVELS: u16 = 0x0010;
+
+// Extended FlashInfo tags
+pub const FI_FLASH_READY: u16 = 0x001B;
+pub const FI_FLASH_SYNC: u16 = 0x001C;
+pub const FI_FLASH_CURTAIN: u16 = 0x001D;
+pub const FI_REPEATING_FLASH_COUNT: u16 = 0x001E;
+pub const FI_REPEATING_FLASH_RATE: u16 = 0x001F;
+pub const FI_REPEATING_FLASH_OUTPUT: u16 = 0x0020;
+
+// Extended HDRInfo tags
+pub const HDR_D_LIGHTING_HQ: u16 = 0x0008;
+pub const HDR_NEF_LINKED: u16 = 0x0009;
+
+// Extended AFInfo2 tags
+pub const AF2_FOCUS_PRIORITY: u16 = 0x001E;
+pub const AF2_AF_TRACKING: u16 = 0x0020;
+pub const AF2_3D_TRACKING_WATCH_AREA: u16 = 0x0022;
+pub const AF2_AF_ACTIVATION: u16 = 0x0024;
+
+// Extended FileInfo tags
+pub const FILE_FILE_TYPE: u16 = 0x0006;
+pub const FILE_SEQUENCE_NUMBER: u16 = 0x0008;
+
+// Extended LocationInfo tags
+pub const LOC_DIRECTION: u16 = 0x0006;
+pub const LOC_DATE: u16 = 0x0007;
+pub const LOC_TIME: u16 = 0x0008;
+pub const LOC_MAP_DATUM: u16 = 0x0009;
+
+// More extended main IFD tags
+pub const NIKON_NEF_BIT_DEPTH: u16 = 0x009F;
+pub const NIKON_EXTRA_INFO: u16 = 0x00A0;
+pub const NIKON_ORIENTATION: u16 = 0x0036;
+pub const NIKON_CAPTURE_OFFSET: u16 = 0x0E02;
+pub const NIKON_CAPTURE_INFO: u16 = 0x0E03;
+pub const NIKON_CAPTURE_EDIT_VERSIONS: u16 = 0x0E04;
+pub const NIKON_CAPTURE_NX_VERSION: u16 = 0x0E05;
+pub const NIKON_CAPTURE_COLOR: u16 = 0x0E06;
+pub const NIKON_CAPTURE_TONE: u16 = 0x0E07;
+pub const NIKON_CAPTURE_SHARPENER: u16 = 0x0E08;
+pub const NIKON_CAPTURE_NX_COLOR_MODE: u16 = 0x0E0A;
+pub const NIKON_CAPTURE_NX_OUTPUT: u16 = 0x0E0B;
+pub const NIKON_CAPTURE_NX_TONE_CURVE: u16 = 0x0E0C;
+pub const NIKON_CAPTURE_NX_DEE: u16 = 0x0E0D;
+pub const NIKON_SCAN_INDEX: u16 = 0x0E11;
+pub const NIKON_SCAN_SERIAL_INFO: u16 = 0x0E12;
+pub const NIKON_SCAN_PREVIEW: u16 = 0x0E13;
+pub const NIKON_SCAN_NEGATIVE_SIZE: u16 = 0x0E14;
+pub const NIKON_SCAN_EXPOSURE_INFO: u16 = 0x0E15;
+
+// More ShotInfo extended tags
+pub const SI_AF_STATUS: u16 = 0x0040;
+pub const SI_AF_FINE_TUNE_2: u16 = 0x0041;
+pub const SI_HAZE_CONTROL: u16 = 0x0042;
+pub const SI_PICTURE_CONTROL_ADJUST: u16 = 0x0043;
+pub const SI_CLARITY: u16 = 0x0044;
+pub const SI_MID_RANGE_SHARPNESS: u16 = 0x0045;
+pub const SI_SECONDARY_SLOT_FUNCTION: u16 = 0x0046;
+pub const SI_ELECTRONIC_FRONT_CURTAIN: u16 = 0x0047;
+pub const SI_BRACKETING_PROGRAM: u16 = 0x0048;
+pub const SI_EXPOSURE_PROGRAM_2: u16 = 0x0049;
+pub const SI_TIMER_RECORDING: u16 = 0x004A;
+pub const SI_SILENT_SHOOTING: u16 = 0x004B;
+pub const SI_FLICKER_REDUCTION: u16 = 0x004C;
+pub const SI_NEGATIVE_DIGITIZER: u16 = 0x004D;
+pub const SI_SKIN_SOFTENING: u16 = 0x004E;
+pub const SI_PORTRAIT_IMPRESSION_BALANCE: u16 = 0x004F;
+
+// Extended PictureControl tags
+pub const PC_SHARPENING: u16 = 0x003B;
+pub const PC_CLARITY_2: u16 = 0x003C;
+pub const PC_MID_RANGE_SHARPNESS: u16 = 0x003D;
+
+// Extended LensData (for newer lenses)
+pub const LD_LENS_ID: u16 = 0x0020;
+pub const LD_FOCUS_POSITION_2: u16 = 0x0021;
+pub const LD_APERTURE: u16 = 0x0022;
+pub const LD_VR_MODE: u16 = 0x0023;
+
+// Additional ColorBalance/WhiteBalance tags
+pub const CB_WB_PRESET: u16 = 0x0014;
+pub const CB_WB_FINE_TUNE: u16 = 0x0015;
+pub const CB_WB_RGB_LEVELS: u16 = 0x0016;
+
+// Preview sub-IFD tags (in tag 0x0011)
+pub const PRV_IFD_VERSION: u16 = 0x0000;
+pub const PRV_COMPRESSION: u16 = 0x0103;
+pub const PRV_IMAGE_WIDTH: u16 = 0x0100;
+pub const PRV_IMAGE_HEIGHT: u16 = 0x0101;
+pub const PRV_BITS_PER_SAMPLE: u16 = 0x0102;
+pub const PRV_STRIP_OFFSETS: u16 = 0x0111;
+pub const PRV_SAMPLES_PER_PIXEL: u16 = 0x0115;
+pub const PRV_ROWS_PER_STRIP: u16 = 0x0116;
+pub const PRV_STRIP_BYTE_COUNTS: u16 = 0x0117;
+pub const PRV_JPEG_INTERCHANGE_FORMAT: u16 = 0x0201;
+pub const PRV_JPEG_INTERCHANGE_FORMAT_LENGTH: u16 = 0x0202;
+pub const PRV_YCB_CR_POSITIONING: u16 = 0x0213;
+
+// Additional main IFD tags (0x00xx range)
+pub const NIKON_AE_BRACKET_COMP: u16 = 0x0026;
+pub const NIKON_EXPOSURE_SEQUENCE_NUMBER: u16 = 0x0027;
+pub const NIKON_COLOR_BALANCE_A2: u16 = 0x0028;
+pub const NIKON_SILHOUETTE: u16 = 0x0029;
+pub const NIKON_FOCUS_SHIFT: u16 = 0x002C;
+pub const NIKON_POWER_UP_TIME: u16 = 0x002D;
+pub const NIKON_AF_INFO_3: u16 = 0x002E;
+pub const NIKON_FLASH_INFO_2: u16 = 0x002F;
+pub const NIKON_COLOR_TEMP_AUTO: u16 = 0x0035;
+pub const NIKON_ACTIVE_D_LIGHTING_2: u16 = 0x0039;
+
+// Additional ShotInfo extended tags (0x005x-0x00Ax)
+pub const SI_AF_AREA_MODE_4: u16 = 0x0050;
+pub const SI_VIBRATION_REDUCTION_2: u16 = 0x0051;
+pub const SI_CONTRAST: u16 = 0x0052;
+pub const SI_SATURATION: u16 = 0x0053;
+pub const SI_HUE: u16 = 0x0054;
+pub const SI_SHARPNESS: u16 = 0x0055;
+pub const SI_BRIGHTNESS: u16 = 0x0056;
+pub const SI_NOISE_REDUCTION: u16 = 0x0057;
+pub const SI_ISO_SENSITIVITY: u16 = 0x0058;
+pub const SI_EXPOSURE_COMP: u16 = 0x0059;
+pub const SI_WB_FINE_TUNE_VALUE: u16 = 0x005A;
+pub const SI_WB_PRESET: u16 = 0x005B;
+pub const SI_COLOR_SPACE: u16 = 0x005C;
+pub const SI_AF_LOCK_MODE: u16 = 0x005D;
+pub const SI_FLASH_SYNC_SPEED: u16 = 0x005E;
+pub const SI_AE_LOCK_MODE: u16 = 0x005F;
+
+// Additional PictureControl extended tags
+pub const PC_VERSION_2: u16 = 0x003E;
+pub const PC_ORIGINAL: u16 = 0x003F;
+pub const PC_MODIFIED: u16 = 0x0040;
+pub const PC_A_VALUE: u16 = 0x0041;
+pub const PC_B_VALUE: u16 = 0x0042;
+
+// Additional LensData extended tags
+pub const LD_AF_STATUS: u16 = 0x0024;
+pub const LD_AF_TRACKING_STATUS: u16 = 0x0025;
+pub const LD_AF_RESULT: u16 = 0x0026;
+pub const LD_FOCUS_RESULT: u16 = 0x0027;
+pub const LD_DRIVE_MOTOR: u16 = 0x0028;
+pub const LD_VR_DATA: u16 = 0x0029;
+
+// Additional FlashInfo extended tags
+pub const FI_HIGH_SPEED_SYNC: u16 = 0x0021;
+pub const FI_FLASH_EXPOSURE_LOCK: u16 = 0x0022;
+pub const FI_FLASH_EXPOSURE_DELTA: u16 = 0x0023;
+pub const FI_BUILT_IN_FLASH_VALUE: u16 = 0x0024;
+pub const FI_EXTERNAL_FLASH_VALUE: u16 = 0x0025;
+pub const FI_FLASH_ISO: u16 = 0x0026;
+
+// Additional AFInfo2 extended tags
+pub const AF2_AF_FINE_TUNE_ADJ: u16 = 0x0026;
+pub const AF2_AF_FINE_TUNE_INDEX_2: u16 = 0x0028;
+pub const AF2_FOCUS_MODE: u16 = 0x002A;
+pub const AF2_FOCUS_STATUS: u16 = 0x002C;
+pub const AF2_AF_MICRO_ADJ_MODE: u16 = 0x002E;
+pub const AF2_AF_MICRO_ADJ_VALUE: u16 = 0x0030;
+
+// Additional MultiExposure tags
+pub const ME_OVERLAY_MODE: u16 = 0x0007;
+pub const ME_AUTO_GAIN_CONTROL: u16 = 0x0008;
+pub const ME_OVERLAY_SHOT: u16 = 0x0009;
+
+// Additional HDRInfo tags
+pub const HDR_EXPOSURE_DIFF: u16 = 0x000A;
+pub const HDR_SHOT_INFO: u16 = 0x000B;
+pub const HDR_EXTRA_SHOTS: u16 = 0x000C;
+
+// Additional AFTune tags
+pub const AFT_SAVED_VALUE: u16 = 0x0003;
+pub const AFT_AF_FINE_TUNE_DISABLE: u16 = 0x0004;
+
+// Additional ShotInfo D5/D500/D850 series tags
+pub const SI_EXP_DELAY_MODE: u16 = 0x0060;
+pub const SI_SHUTTER_DELAY: u16 = 0x0061;
+pub const SI_EXPOSURE_TIME: u16 = 0x0062;
+pub const SI_FOCUS_DISTANCE_2: u16 = 0x0063;
+pub const SI_AF_POINT_SELECTION: u16 = 0x0064;
+pub const SI_HIGHLIGHT_PROTECTION: u16 = 0x0065;
+pub const SI_FOCUS_TRACKING_LOCK_ON: u16 = 0x0066;
+pub const SI_AUTO_ISO_CENTER_PRIORITY: u16 = 0x0067;
+
+// Capture NX/NX2 extended tags
+pub const NIKON_NX_TONE_COMP: u16 = 0x0E0F;
+pub const NIKON_NX_COLOR_BALANCE: u16 = 0x0E17;
+pub const NIKON_NX_NOISE_REDUCTION: u16 = 0x0E18;
+pub const NIKON_NX_ACTIVE_D_LIGHTING: u16 = 0x0E19;
+pub const NIKON_NX_CAPTURE_LENS: u16 = 0x0E1A;
+pub const NIKON_NX_CAPTURE_CAMERA: u16 = 0x0E1B;
+pub const NIKON_NX_CAPTURE_SERIAL: u16 = 0x0E1C;
+
+// Additional Z-series mirrorless tags
+pub const NIKON_SUBJECT_DETECTION: u16 = 0x00C0;
+pub const NIKON_FOCUS_PEAKING: u16 = 0x00C1;
+pub const NIKON_AF_C_PRIORITY: u16 = 0x00C2;
+pub const NIKON_VIEWFINDER_WARNING: u16 = 0x00C4;
+pub const NIKON_EYE_DETECTION: u16 = 0x00C5;
 
 /// Get the name of a Nikon MakerNote tag
 pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {

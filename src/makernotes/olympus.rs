@@ -105,9 +105,13 @@ pub const CS_PICTURE_MODE_SHARPNESS: u16 = 0x0524;
 pub const CS_PICTURE_MODE_BW_FILTER: u16 = 0x0525;
 pub const CS_PICTURE_MODE_TONE: u16 = 0x0526;
 pub const CS_NOISE_FILTER: u16 = 0x0527;
+pub const CS_PICTURE_MODE_HUE: u16 = 0x0522;
+pub const CS_ART_FILTER: u16 = 0x0529;
+pub const CS_MAGIC_FILTER: u16 = 0x052C;
 pub const CS_DRIVE_MODE: u16 = 0x0600;
 pub const CS_PANORAMA_MODE: u16 = 0x0601;
 pub const CS_IMAGE_QUALITY2: u16 = 0x0603;
+pub const CS_IMAGE_STABILIZATION: u16 = 0x0604;
 
 // Raw Development IFD tags (0x2030)
 pub const RD_VERSION: u16 = 0x0000;
@@ -151,6 +155,8 @@ pub const IP_CROP_HEIGHT: u16 = 0x0615;
 pub const IP_NOISE_REDUCTION2: u16 = 0x1010;
 pub const IP_DISTORTION_CORRECTION2: u16 = 0x1011;
 pub const IP_SHADING_COMPENSATION2: u16 = 0x1012;
+pub const IP_MULTIPLE_EXPOSURE_MODE: u16 = 0x101C;
+pub const IP_ASPECT_RATIO: u16 = 0x1112;
 pub const IP_FACES_DETECTED: u16 = 0x1200;
 pub const IP_FACE_DETECT_AREA: u16 = 0x1201;
 
@@ -266,8 +272,11 @@ fn get_camera_settings_tag_name(tag_id: u16) -> Option<&'static str> {
         CS_AF_SEARCH => Some("AFSearch"),
         CS_AF_AREAS => Some("AFAreas"),
         CS_AF_POINT_SELECTED => Some("AFPointSelected"),
+        CS_AF_FINE_TUNE => Some("AFFineTune"),
         CS_FLASH_MODE => Some("FlashMode"),
         CS_FLASH_EXPOSURE_COMP => Some("FlashExposureComp"),
+        CS_FLASH_REMOTE_CONTROL => Some("FlashRemoteControl"),
+        CS_FLASH_CONTROL_MODE => Some("FlashControlMode"),
         CS_WHITE_BALANCE => Some("WhiteBalance2"),
         CS_WHITE_BALANCE_TEMPERATURE => Some("WhiteBalanceTemperature"),
         CS_WHITE_BALANCE_BRACKET => Some("WhiteBalanceBracket"),
@@ -283,14 +292,18 @@ fn get_camera_settings_tag_name(tag_id: u16) -> Option<&'static str> {
         CS_GRADATION => Some("Gradation"),
         CS_PICTURE_MODE => Some("PictureMode"),
         CS_PICTURE_MODE_SATURATION => Some("PictureModeSaturation"),
+        CS_PICTURE_MODE_HUE => Some("PictureModeHue"),
         CS_PICTURE_MODE_CONTRAST => Some("PictureModeContrast"),
         CS_PICTURE_MODE_SHARPNESS => Some("PictureModeSharpness"),
         CS_PICTURE_MODE_BW_FILTER => Some("PictureModeBWFilter"),
         CS_PICTURE_MODE_TONE => Some("PictureModeTone"),
         CS_NOISE_FILTER => Some("NoiseFilter"),
+        CS_ART_FILTER => Some("ArtFilter"),
+        CS_MAGIC_FILTER => Some("MagicFilter"),
         CS_DRIVE_MODE => Some("DriveMode"),
         CS_PANORAMA_MODE => Some("PanoramaMode"),
         CS_IMAGE_QUALITY2 => Some("ImageQuality2"),
+        CS_IMAGE_STABILIZATION => Some("ImageStabilization"),
         _ => None,
     }
 }
@@ -342,6 +355,8 @@ fn get_image_processing_tag_name(tag_id: u16) -> Option<&'static str> {
         IP_NOISE_REDUCTION2 => Some("NoiseReduction2"),
         IP_DISTORTION_CORRECTION2 => Some("DistortionCorrection2"),
         IP_SHADING_COMPENSATION2 => Some("ShadingCompensation2"),
+        IP_MULTIPLE_EXPOSURE_MODE => Some("MultipleExposureMode"),
+        IP_ASPECT_RATIO => Some("AspectRatio"),
         IP_FACES_DETECTED => Some("FacesDetected"),
         IP_FACE_DETECT_AREA => Some("FaceDetectArea"),
         _ => None,
@@ -806,6 +821,181 @@ pub fn decode_ae_lock_exiftool(value: u16) -> &'static str {
     }
 }
 // decode_ae_lock_exiv2 - same as exiftool, no separate function needed
+
+/// Decode FlashRemoteControl value (CS 0x0403) - ExifTool format
+pub fn decode_flash_remote_control_exiftool(value: u16) -> &'static str {
+    match value {
+        0x0 => "Off",
+        0x1 => "Channel 1, Low",
+        0x2 => "Channel 2, Low",
+        0x3 => "Channel 3, Low",
+        0x4 => "Channel 4, Low",
+        0x9 => "Channel 1, Mid",
+        0xa => "Channel 2, Mid",
+        0xb => "Channel 3, Mid",
+        0xc => "Channel 4, Mid",
+        0x11 => "Channel 1, High",
+        0x12 => "Channel 2, High",
+        0x13 => "Channel 3, High",
+        0x14 => "Channel 4, High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FlashRemoteControl value (CS 0x0403) - exiv2 format
+pub fn decode_flash_remote_control_exiv2(value: u16) -> &'static str {
+    decode_flash_remote_control_exiftool(value) // Same values
+}
+
+/// Decode FlashControlMode value (CS 0x0404) - ExifTool format
+pub fn decode_flash_control_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        3 => "TTL",
+        4 => "Auto",
+        5 => "Manual",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FlashControlMode value (CS 0x0404) - exiv2 format
+pub fn decode_flash_control_mode_exiv2(value: u16) -> &'static str {
+    decode_flash_control_mode_exiftool(value) // Same values
+}
+
+/// Decode ModifiedSaturation value (CS 0x0504) - ExifTool format
+pub fn decode_modified_saturation_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "CM1 (Red Enhance)",
+        2 => "CM2 (Green Enhance)",
+        3 => "CM3 (Blue Enhance)",
+        4 => "CM4 (Skin Tones)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ModifiedSaturation value (CS 0x0504) - exiv2 format
+pub fn decode_modified_saturation_exiv2(value: u16) -> &'static str {
+    decode_modified_saturation_exiftool(value) // Same values
+}
+
+/// Decode ArtFilter value (CS 0x0529) - ExifTool format
+pub fn decode_art_filter_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Soft Focus",
+        2 => "Pop Art",
+        3 => "Pale & Light Color",
+        4 => "Light Tone",
+        5 => "Pin Hole",
+        6 => "Grainy Film",
+        9 => "Diorama",
+        10 => "Cross Process",
+        12 => "Fish Eye",
+        13 => "Drawing",
+        14 => "Gentle Sepia",
+        15 => "Pale & Light Color II",
+        16 => "Pop Art II",
+        17 => "Pin Hole II",
+        18 => "Pin Hole III",
+        19 => "Grainy Film II",
+        20 => "Dramatic Tone",
+        21 => "Punk",
+        22 => "Soft Focus 2",
+        23 => "Sparkle",
+        24 => "Watercolor",
+        25 => "Key Line",
+        26 => "Key Line II",
+        27 => "Miniature",
+        28 => "Reflection",
+        29 => "Fragmented",
+        31 => "Cross Process II",
+        32 => "Dramatic Tone II",
+        33 => "Watercolor I",
+        34 => "Watercolor II",
+        35 => "Diorama II",
+        36 => "Vintage",
+        37 => "Vintage II",
+        38 => "Vintage III",
+        39 => "Partial Color",
+        40 => "Partial Color II",
+        41 => "Partial Color III",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ArtFilter value (CS 0x0529) - exiv2 format
+pub fn decode_art_filter_exiv2(value: u16) -> &'static str {
+    decode_art_filter_exiftool(value) // Same values
+}
+
+/// Decode ImageStabilization value (CS 0x0604) - ExifTool format
+pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On, Mode 1",
+        2 => "On, Mode 2",
+        3 => "On, Mode 3",
+        4 => "On, Mode 4",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageStabilization value (CS 0x0604) - exiv2 format
+pub fn decode_image_stabilization_exiv2(value: u16) -> &'static str {
+    decode_image_stabilization_exiftool(value) // Same values
+}
+
+/// Decode MultipleExposureMode value (IP 0x101C) - ExifTool format
+pub fn decode_multiple_exposure_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        2 => "On (2 frames)",
+        3 => "On (3 frames)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MultipleExposureMode value (IP 0x101C) - exiv2 format
+pub fn decode_multiple_exposure_mode_exiv2(value: u16) -> &'static str {
+    decode_multiple_exposure_mode_exiftool(value) // Same values
+}
+
+/// Decode AspectRatio value (IP 0x1112) - ExifTool format
+pub fn decode_aspect_ratio_exiftool(value: u16) -> &'static str {
+    match value {
+        1 => "4:3",
+        2 => "3:2",
+        3 => "16:9",
+        4 => "6:6",
+        5 => "5:4",
+        6 => "7:6",
+        7 => "6:5",
+        8 => "7:5",
+        9 => "3:4",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AspectRatio value (IP 0x1112) - exiv2 format
+pub fn decode_aspect_ratio_exiv2(value: u16) -> &'static str {
+    decode_aspect_ratio_exiftool(value) // Same values
+}
+
+/// Decode ExternalFlashBounce value (FI 0x1203) - ExifTool format
+pub fn decode_external_flash_bounce_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Bounce or Off",
+        1 => "Direct",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ExternalFlashBounce value (FI 0x1203) - exiv2 format
+pub fn decode_external_flash_bounce_exiv2(value: u16) -> &'static str {
+    decode_external_flash_bounce_exiftool(value) // Same values
+}
 
 // =============================================================================
 // IFD Parsing Functions
