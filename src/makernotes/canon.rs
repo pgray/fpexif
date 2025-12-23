@@ -3877,6 +3877,37 @@ pub fn decode_af_info2_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
             ExifValue::Short(vec![num_af_points]),
         );
 
+        // ValidAFPoints (index 3)
+        if data.len() > 3 {
+            decoded.insert("ValidAFPoints".to_string(), ExifValue::Short(vec![data[3]]));
+        }
+
+        // AFImageWidth (index 4)
+        if data.len() > 4 {
+            decoded.insert("AFImageWidth".to_string(), ExifValue::Short(vec![data[4]]));
+        }
+
+        // AFImageHeight (index 5)
+        if data.len() > 5 {
+            decoded.insert("AFImageHeight".to_string(), ExifValue::Short(vec![data[5]]));
+        }
+
+        // CanonImageWidth (index 6)
+        if data.len() > 6 {
+            decoded.insert(
+                "CanonImageWidth".to_string(),
+                ExifValue::Short(vec![data[6]]),
+            );
+        }
+
+        // CanonImageHeight (index 7)
+        if data.len() > 7 {
+            decoded.insert(
+                "CanonImageHeight".to_string(),
+                ExifValue::Short(vec![data[7]]),
+            );
+        }
+
         // AF area arrays start at index 8 (after the header fields)
         let base = 8usize;
         let n = num_af_points as usize;
@@ -4200,6 +4231,153 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
     decoded
 }
 
+/// Decode Canon AFMicroAdj array sub-fields
+pub fn decode_af_micro_adj(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    if data.is_empty() {
+        return decoded;
+    }
+
+    // AFMicroAdj structure:
+    // Index 0: Version (e.g., 20)
+    // Index 1: AFMicroAdjMode
+    // Index 2: AFMicroAdjValue (for mode 1)
+    // Index 3-4: Additional adjustment values
+
+    // AFMicroAdjMode (index 1)
+    if data.len() > 1 {
+        let mode = data[1];
+        let mode_str = match mode {
+            0 => "Disable",
+            1 => "Adjust all by same amount",
+            2 => "Adjust by lens",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "AFMicroAdjMode".to_string(),
+            ExifValue::Ascii(mode_str.to_string()),
+        );
+
+        // AFMicroAdjValue (index 2)
+        if data.len() > 2 {
+            let value = data[2] as i16;
+            decoded.insert(
+                "AFMicroAdjValue".to_string(),
+                ExifValue::SShort(vec![value]),
+            );
+
+            // AFMicroadjustment - composite string
+            if data.len() > 4 {
+                let adj_str = format!(
+                    "{}; {}; {}; {}; {}",
+                    mode_str,
+                    data[2] as i16,
+                    data[3] as i16,
+                    data[4] as i16,
+                    if data.len() > 5 { data[5] as i16 } else { 0 }
+                );
+                decoded.insert("AFMicroadjustment".to_string(), ExifValue::Ascii(adj_str));
+            }
+        }
+    }
+
+    decoded
+}
+
+/// Decode Canon ColorInfo array sub-fields (tag 0x4003)
+/// Contains per-style ColorTone, Contrast, Saturation, Sharpness
+pub fn decode_color_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    if data.len() < 40 {
+        return decoded;
+    }
+
+    // ColorInfo structure has style settings at specific offsets
+    // Based on ExifTool Canon.pm ColorInfo structure
+
+    // Per-style settings - each style has 4 parameters at fixed offsets
+    // The structure varies by firmware, but typically:
+    // ColorTone, Contrast, Saturation, Sharpness for each style
+
+    let styles = [
+        "Standard",
+        "Portrait",
+        "Landscape",
+        "Neutral",
+        "Faithful",
+        "Monochrome",
+        "UserDef1",
+        "UserDef2",
+        "UserDef3",
+    ];
+
+    // For 50D, the offsets are approximately:
+    // Standard: 4-7, Portrait: 8-11, Landscape: 12-15, etc.
+    for (i, style) in styles.iter().enumerate() {
+        let base = 4 + i * 4;
+        if data.len() > base + 3 {
+            // Sharpness
+            decoded.insert(
+                format!("Sharpness{}", style),
+                ExifValue::SShort(vec![data[base] as i16]),
+            );
+            // Contrast
+            decoded.insert(
+                format!("Contrast{}", style),
+                ExifValue::SShort(vec![data[base + 1] as i16]),
+            );
+            // Saturation
+            decoded.insert(
+                format!("Saturation{}", style),
+                ExifValue::SShort(vec![data[base + 2] as i16]),
+            );
+            // ColorTone
+            decoded.insert(
+                format!("ColorTone{}", style),
+                ExifValue::SShort(vec![data[base + 3] as i16]),
+            );
+        }
+    }
+
+    // FilterEffect and ToningEffect for Monochrome and UserDef styles
+    // These are at higher offsets
+    let mono_styles = ["Monochrome", "UserDef1", "UserDef2", "UserDef3"];
+    for (i, style) in mono_styles.iter().enumerate() {
+        let base = 40 + i * 2;
+        if data.len() > base + 1 {
+            let filter_effect = match data[base] {
+                0 => "None",
+                1 => "Yellow",
+                2 => "Orange",
+                3 => "Red",
+                4 => "Green",
+                _ => "Unknown",
+            };
+            decoded.insert(
+                format!("FilterEffect{}", style),
+                ExifValue::Ascii(filter_effect.to_string()),
+            );
+
+            let toning_effect = match data[base + 1] {
+                0 => "None",
+                1 => "Sepia",
+                2 => "Blue",
+                3 => "Purple",
+                4 => "Green",
+                _ => "Unknown",
+            };
+            decoded.insert(
+                format!("ToningEffect{}", style),
+                ExifValue::Ascii(toning_effect.to_string()),
+            );
+        }
+    }
+
+    decoded
+}
+
 /// Parse Canon maker notes
 ///
 /// Canon maker notes use TIFF-relative offsets, so we need access to the full
@@ -4250,18 +4428,38 @@ pub fn parse_canon_maker_notes(
                     | CANON_AF_INFO_2
                     | CANON_PROCESSING_INFO
                     | CANON_COLOR_DATA
+                    | CANON_AF_MICRO_ADJ
+                    | CANON_COLOR_INFO
             );
 
             if should_decode {
-                if let ExifValue::Short(ref shorts) = value {
+                // Extract shorts from Short, SShort, or Long values
+                // Some Canon tags use LONG type but contain small values that should be decoded as shorts
+                let shorts_data: Option<Vec<u16>> = match &value {
+                    ExifValue::Short(shorts) => Some(shorts.clone()),
+                    ExifValue::SShort(sshorts) => Some(sshorts.iter().map(|&v| v as u16).collect()),
+                    ExifValue::Long(longs) => {
+                        // Convert longs to u16 (clamping to 16-bit range)
+                        Some(longs.iter().map(|&v| v as u16).collect())
+                    }
+                    ExifValue::SLong(slongs) => {
+                        // Convert signed longs to u16
+                        Some(slongs.iter().map(|&v| v as u16).collect())
+                    }
+                    _ => None,
+                };
+
+                if let Some(shorts) = shorts_data {
                     let decoded = match tag_id {
-                        CANON_CAMERA_SETTINGS => decode_camera_settings(shorts),
-                        CANON_SHOT_INFO => decode_shot_info(shorts),
-                        CANON_FOCAL_LENGTH => decode_focal_length(shorts),
-                        CANON_FILE_INFO => decode_file_info(shorts),
-                        CANON_AF_INFO_2 => decode_af_info2(shorts),
-                        CANON_PROCESSING_INFO => decode_processing_info(shorts),
-                        CANON_COLOR_DATA => decode_color_data(shorts),
+                        CANON_CAMERA_SETTINGS => decode_camera_settings(&shorts),
+                        CANON_SHOT_INFO => decode_shot_info(&shorts),
+                        CANON_FOCAL_LENGTH => decode_focal_length(&shorts),
+                        CANON_FILE_INFO => decode_file_info(&shorts),
+                        CANON_AF_INFO_2 => decode_af_info2(&shorts),
+                        CANON_PROCESSING_INFO => decode_processing_info(&shorts),
+                        CANON_COLOR_DATA => decode_color_data(&shorts),
+                        CANON_AF_MICRO_ADJ => decode_af_micro_adj(&shorts),
+                        CANON_COLOR_INFO => decode_color_info(&shorts),
                         _ => HashMap::new(),
                     };
 

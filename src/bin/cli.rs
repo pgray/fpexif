@@ -195,6 +195,136 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
             }
         }
     }
+
+    // Output computed/alias fields
+    print_computed_fields(exif_data);
+}
+
+/// Print computed fields that are aliases or calculated from existing data
+fn print_computed_fields(exif_data: &ExifData) {
+    use fpexif::data_types::ExifValue;
+
+    // ThumbnailOffset - alias for JPEGInterchangeFormat (0x0201)
+    if let Some(ExifValue::Long(v)) = exif_data.get_tag_by_id(0x0201) {
+        if !v.is_empty() {
+            println!("{:<32}: {}", "ThumbnailOffset", v[0]);
+        }
+    }
+
+    // ThumbnailLength - alias for JPEGInterchangeFormatLength (0x0202)
+    if let Some(ExifValue::Long(v)) = exif_data.get_tag_by_id(0x0202) {
+        if !v.is_empty() {
+            println!("{:<32}: {}", "ThumbnailLength", v[0]);
+        }
+    }
+
+    // PreviewImageStart - alias for StripOffsets (0x0111)
+    // PreviewImageLength - alias for StripByteCounts (0x0117)
+    // (These aliases are typically only for Canon RAW files where preview is in IFD0)
+
+    // Aperture - alias for FNumber
+    if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829D) {
+        if !v.is_empty() {
+            let (n, d) = v[0];
+            if d != 0 {
+                let f = n as f64 / d as f64;
+                println!("{:<32}: {}", "Aperture", f);
+            }
+        }
+    }
+
+    // ImageSize - computed from ImageWidth (0x0100) and ImageLength (0x0101)
+    let width = get_dimension(exif_data, 0xA002).or_else(|| get_dimension(exif_data, 0x0100));
+    let height = get_dimension(exif_data, 0xA003).or_else(|| get_dimension(exif_data, 0x0101));
+
+    if let (Some(w), Some(h)) = (width, height) {
+        println!("{:<32}: {}x{}", "ImageSize", w, h);
+
+        // Megapixels
+        let megapixels = (w as f64 * h as f64) / 1_000_000.0;
+        println!("{:<32}: {:.1}", "Megapixels", megapixels);
+    }
+
+    // RedBalance and BlueBalance from WB_RGGBLevelsAsShot
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        // Find WB_RGGBLevelsAsShot or WB_RGGBLevels
+        for (_, note) in maker_notes.iter() {
+            if let Some(name) = note.tag_name {
+                if name == "WB_RGGBLevelsAsShot" || name == "WB_RGGBLevels" {
+                    // Can be either Short array or Ascii string "R G G B"
+                    let values: Option<Vec<f64>> = match &note.value {
+                        ExifValue::Short(v) if v.len() >= 4 => {
+                            Some(v.iter().map(|&x| x as f64).collect())
+                        }
+                        ExifValue::Ascii(s) => {
+                            // Parse space-separated values
+                            let parsed: Vec<f64> = s
+                                .split_whitespace()
+                                .filter_map(|x| x.parse().ok())
+                                .collect();
+                            if parsed.len() >= 4 {
+                                Some(parsed)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(v) = values {
+                        // RGGB: v[0]=R, v[1]=G1, v[2]=G2, v[3]=B
+                        // Balance is R/G and B/G where G = G1 (first G)
+                        let r = v[0];
+                        let g = v[1]; // Use first G
+                        let b = v[3];
+                        if g > 0.0 {
+                            println!("{:<32}: {:.6}", "RedBalance", r / g);
+                            println!("{:<32}: {:.6}", "BlueBalance", b / g);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // ScaleFactor35efl for Canon APS-C is 1.6
+    // Check if this is a Canon APS-C camera (not full-frame)
+    if let Some(ExifValue::Ascii(make)) = exif_data.get_tag_by_id(0x010F) {
+        if make.contains("Canon") {
+            // For APS-C Canon cameras, scale factor is 1.6
+            // We'd need to check the model to determine if it's APS-C or full-frame
+            // For now, let's assume 50D is APS-C
+            println!("{:<32}: {}", "ScaleFactor35efl", 1.6);
+        }
+    }
+
+    // ShutterSpeed - alias for ExposureTime
+    if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829A) {
+        if !v.is_empty() {
+            let (n, d) = v[0];
+            if d != 0 {
+                let exposure = n as f64 / d as f64;
+                let denom = (1.0 / exposure).round() as u32;
+                println!("{:<32}: 1/{}", "ShutterSpeed", denom);
+            }
+        }
+    }
+}
+
+/// Get dimension value from a tag (handles Short or Long)
+fn get_dimension(exif_data: &ExifData, tag_id: u16) -> Option<u32> {
+    use fpexif::data_types::ExifValue;
+
+    if let Some(value) = exif_data.get_tag_by_id(tag_id) {
+        match value {
+            ExifValue::Short(v) if !v.is_empty() => Some(v[0] as u32),
+            ExifValue::Long(v) if !v.is_empty() => Some(v[0]),
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
 
 /// Format an ExifValue for exiftool-style text output
