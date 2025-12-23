@@ -43,12 +43,12 @@ fn test_decode_camera_settings() {
         panic!("FlashMode should be Ascii");
     }
 
-    // Check drive mode
-    assert!(decoded.contains_key("DriveMode"));
-    if let Some(ExifValue::Ascii(drive)) = decoded.get("DriveMode") {
+    // Check continuous drive (formerly called DriveMode, renamed to match ExifTool)
+    assert!(decoded.contains_key("ContinuousDrive"));
+    if let Some(ExifValue::Ascii(drive)) = decoded.get("ContinuousDrive") {
         assert_eq!(drive, "Continuous Shooting");
     } else {
-        panic!("DriveMode should be Ascii");
+        panic!("ContinuousDrive should be Ascii");
     }
 
     // Check focus mode
@@ -186,12 +186,12 @@ fn test_canon_s90_real_file() {
         "Should have Quality tag (decoded from CameraSettings)"
     );
 
-    let has_drive_mode = maker_notes
+    let has_continuous_drive = maker_notes
         .values()
-        .any(|tag| tag.tag_name == Some("DriveMode"));
+        .any(|tag| tag.tag_name == Some("ContinuousDrive"));
     assert!(
-        has_drive_mode,
-        "Should have DriveMode tag (decoded from CameraSettings)"
+        has_continuous_drive,
+        "Should have ContinuousDrive tag (decoded from CameraSettings)"
     );
 
     // Check for decoded sub-fields from FocalLength

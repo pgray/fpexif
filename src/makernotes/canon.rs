@@ -1,6 +1,7 @@
 // makernotes/canon.rs - Canon maker notes parsing
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use std::collections::HashMap;
@@ -561,25 +562,21 @@ fn canon_ev(val: i16) -> f64 {
 // Only _exiv2 versions created where values actually differ from ExifTool
 // =============================================================================
 
-/// Decode MacroMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_macro_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// MacroMode: Canon.pm PrintConv / canonmn_int.cpp canonCsMacro
+// Differs: exiftool uses "Macro"/"Normal", exiv2 uses "On"/"Off"
+define_tag_decoder! {
+    macro_mode,
+    exiftool: {
         1 => "Macro",
         2 => "Normal",
-        _ => "Unknown",
-    }
-}
-
-/// Decode MacroMode - exiv2 format (from canonmn_int.cpp canonCsMacro)
-/// Differs: exiftool uses "Macro"/"Normal", exiv2 uses "On"/"Off"
-pub fn decode_macro_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "On",
         2 => "Off",
-        _ => "Unknown",
     }
 }
 
+// Note: Quality decoder uses i16 so it can handle -1, keeping manual implementation
 /// Decode Quality - ExifTool format (from Canon.pm PrintConv)
 pub fn decode_quality_exiftool(value: u16) -> &'static str {
     match value {
@@ -611,9 +608,10 @@ pub fn decode_quality_exiv2(value: u16) -> &'static str {
     }
 }
 
-/// Decode FlashMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FlashMode: Canon.pm PrintConv / canonmn_int.cpp canonCsFlashMode
+define_tag_decoder! {
+    flash_mode,
+    exiftool: {
         0 => "Flash Not Fired",
         1 => "Auto",
         2 => "On",
@@ -622,14 +620,8 @@ pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
         5 => "Auto + Red-eye reduction",
         6 => "On + Red-eye reduction",
         16 => "External flash",
-        _ => "Unknown",
-    }
-}
-
-/// Decode FlashMode - exiv2 format (from canonmn_int.cpp canonCsFlashMode)
-/// Differs: different wording for several values
-pub fn decode_flash_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "Auto",
         2 => "On",
@@ -638,13 +630,13 @@ pub fn decode_flash_mode_exiv2(value: u16) -> &'static str {
         5 => "Auto + red-eye",
         6 => "On + red-eye",
         16 => "External",
-        _ => "Unknown",
     }
 }
 
-/// Decode DriveMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_drive_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// DriveMode: Canon.pm PrintConv / canonmn_int.cpp canonCsDriveMode
+define_tag_decoder! {
+    drive_mode,
+    exiftool: {
         0 => "Single-frame Shooting",
         1 => "Continuous Shooting",
         2 => "Movie",
@@ -654,14 +646,8 @@ pub fn decode_drive_mode_exiftool(value: u16) -> &'static str {
         6 => "Silent Single Shooting",
         9 => "Single-frame Shooting, Silent",
         10 => "Continuous Shooting, Silent",
-        _ => "Unknown",
-    }
-}
-
-/// Decode DriveMode - exiv2 format (from canonmn_int.cpp canonCsDriveMode)
-/// Differs: different wording
-pub fn decode_drive_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Single / timer",
         1 => "Continuous",
         2 => "Movie",
@@ -671,13 +657,13 @@ pub fn decode_drive_mode_exiv2(value: u16) -> &'static str {
         6 => "Silent Single",
         9 => "Single, Silent",
         10 => "Continuous, Silent",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusMode: Canon.pm PrintConv / canonmn_int.cpp canonCsFocusMode
+define_tag_decoder! {
+    focus_mode,
+    exiftool: {
         0 => "One-shot AF",
         1 => "AI Servo AF",
         2 => "AI Focus AF",
@@ -687,14 +673,8 @@ pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
         6 => "Manual Focus",
         16 => "Pan Focus",
         256 => "Manual",
-        _ => "Unknown",
-    }
-}
-
-/// Decode FocusMode - exiv2 format (from canonmn_int.cpp canonCsFocusMode)
-/// Differs: different wording and additional values (512, 519)
-pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "One shot AF",
         1 => "AI servo AF",
         2 => "AI focus AF",
@@ -706,37 +686,31 @@ pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
         256 => "AF + MF",
         512 => "Movie Snap Focus",
         519 => "Movie Servo AF",
-        _ => "Unknown",
     }
 }
 
-/// Decode MeteringMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_metering_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// MeteringMode: Canon.pm PrintConv / canonmn_int.cpp canonCsMeteringMode
+define_tag_decoder! {
+    metering_mode,
+    exiftool: {
         3 => "Evaluative",
         4 => "Partial",
         5 => "Center-weighted average",
-        _ => "Unknown",
-    }
-}
-
-/// Decode MeteringMode - exiv2 format (from canonmn_int.cpp canonCsMeteringMode)
-/// Differs: exiv2 has additional values (0=Default, 1=Spot, 2=Average)
-pub fn decode_metering_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Default",
         1 => "Spot",
         2 => "Average",
         3 => "Evaluative",
         4 => "Partial",
         5 => "Center-weighted average",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusRange - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_focus_range_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusRange: Canon.pm PrintConv / canonmn_int.cpp canonCsFocusType
+define_tag_decoder! {
+    focus_range,
+    exiftool: {
         0 => "Manual",
         1 => "Auto",
         2 => "Not Known",
@@ -748,14 +722,8 @@ pub fn decode_focus_range_exiftool(value: u16) -> &'static str {
         11 => "Pan Focus",
         14 => "Super Macro",
         15 => "Infinity",
-        _ => "Unknown",
-    }
-}
-
-/// Decode FocusRange (FocusType in exiv2) - exiv2 format (from canonmn_int.cpp canonCsFocusType)
-/// Differs: different capitalization and value ordering (4-10 shifted)
-pub fn decode_focus_range_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Manual",
         1 => "Auto",
         2 => "Not known",
@@ -767,13 +735,13 @@ pub fn decode_focus_range_exiv2(value: u16) -> &'static str {
         8 => "Pan focus",
         9 => "Super macro",
         10 => "Infinity",
-        _ => "Unknown",
     }
 }
 
-/// Decode ExposureMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ExposureMode: Canon.pm PrintConv / canonmn_int.cpp canonCsExposureProgram
+define_tag_decoder! {
+    exposure_mode,
+    exiftool: {
         0 => "Easy",
         1 => "Program AE",
         2 => "Shutter speed priority AE",
@@ -782,14 +750,8 @@ pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
         5 => "Depth-of-field AE",
         6 => "M-Dep",
         7 => "Bulb",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ExposureMode (ExposureProgram in exiv2) - exiv2 format (from canonmn_int.cpp canonCsExposureProgram)
-/// Differs: different wording with mode abbreviations in parentheses
-pub fn decode_exposure_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Easy shooting (Auto)",
         1 => "Program (P)",
         2 => "Shutter priority (Tv)",
@@ -798,13 +760,13 @@ pub fn decode_exposure_mode_exiv2(value: u16) -> &'static str {
         5 => "A-DEP",
         6 => "M-DEP",
         7 => "Bulb",
-        _ => "Unknown",
     }
 }
 
-/// Decode ImageStabilization - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
-    match value {
+// ImageStabilization: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    image_stabilization,
+    both: {
         0 => "Off",
         1 => "On",
         2 => "Shoot Only",
@@ -816,29 +778,25 @@ pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
         259 => "Panning (2)",
         260 => "Dynamic (2)",
         0xFFFF => "n/a",
-        _ => "Unknown",
     }
 }
 
-// ImageStabilization exiv2 - same as exiftool, no separate function needed
-
-/// Decode ManualFlashOutput - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_manual_flash_output_exiftool(value: u16) -> &'static str {
-    match value {
+// ManualFlashOutput: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    manual_flash_output,
+    both: {
         0x0000 => "n/a",
         0x0500 => "Full",
         0x0502 => "Medium",
         0x0504 => "Low",
         0x7FFF => "n/a",
-        _ => "Unknown",
     }
 }
 
-// ManualFlashOutput exiv2 - same as exiftool, no separate function needed
-
-/// Decode WhiteBalance - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
-    match value {
+// WhiteBalance: Canon.pm PrintConv / canonmn_int.cpp canonSiWhiteBalance
+define_tag_decoder! {
+    white_balance,
+    exiftool: {
         0 => "Auto",
         1 => "Daylight",
         2 => "Cloudy",
@@ -856,14 +814,8 @@ pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
         15 => "Custom 1",
         16 => "Custom 2",
         17 => "Underwater",
-        _ => "Unknown",
-    }
-}
-
-/// Decode WhiteBalance - exiv2 format (from canonmn_int.cpp canonSiWhiteBalance)
-/// Differs: additional values and slightly different naming (PC Set 1 vs PC Set1)
-pub fn decode_white_balance_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Auto",
         1 => "Daylight",
         2 => "Cloudy",
@@ -886,67 +838,40 @@ pub fn decode_white_balance_exiv2(value: u16) -> &'static str {
         20 => "PC Set 4",
         21 => "PC Set 5",
         23 => "Auto (ambience priority)",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocalType - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_focal_type_exiftool(value: u16) -> &'static str {
-    match value {
+// FocalType: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    focal_type,
+    both: {
         0 => "n/a",
         1 => "Fixed",
         2 => "Zoom",
-        _ => "Unknown",
     }
 }
 
-// FocalType exiv2 - same as exiftool, no separate function needed
-
-/// Decode SlowShutter - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_slow_shutter_exiftool(value: u16) -> &'static str {
-    match value {
+// SlowShutter: Canon.pm PrintConv / canonmn_int.cpp slowShutter
+define_tag_decoder! {
+    slow_shutter,
+    both: {
         0 => "Off",
         1 => "Night Scene",
         2 => "On",
         3 => "None",
-        0xFFFF => "n/a", // -1 as u16
-        _ => "Unknown",
+        0xFFFF => "n/a",
     }
 }
 
-/// Decode SlowShutter - exiv2 format (from canonmn_int.cpp slowShutter)
-pub fn decode_slow_shutter_exiv2(value: u16) -> &'static str {
-    match value {
-        0 => "Off",
-        1 => "Night Scene",
-        2 => "On",
-        3 => "None",
-        65535 => "n/a", // -1 as u16
-        _ => "Unknown",
-    }
-}
-
-/// Decode AutoExposureBracketing - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_auto_exposure_bracketing_exiftool(value: u16) -> &'static str {
-    match value {
+// AutoExposureBracketing: Canon.pm PrintConv / canonmn_int.cpp autoExposureBracketing
+define_tag_decoder! {
+    auto_exposure_bracketing,
+    both: {
         0 => "Off",
         1 => "On (shot 1)",
         2 => "On (shot 2)",
         3 => "On (shot 3)",
-        0xFFFF => "On", // -1 as u16
-        _ => "Unknown",
-    }
-}
-
-/// Decode AutoExposureBracketing - exiv2 format (from canonmn_int.cpp autoExposureBracketing)
-pub fn decode_auto_exposure_bracketing_exiv2(value: u16) -> &'static str {
-    match value {
-        0 => "Off",
-        1 => "On (shot 1)",
-        2 => "On (shot 2)",
-        3 => "On (shot 3)",
-        65535 => "On",
-        _ => "Unknown",
+        0xFFFF => "On",
     }
 }
 
@@ -2055,10 +1980,12 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
-    // Drive mode (index 5)
+    // Continuous drive (index 5)
+    // Note: ExifTool calls this "ContinuousDrive", not "DriveMode"
+    // The composite "DriveMode" tag is computed elsewhere
     if data.len() > 5 {
         decoded.insert(
-            "DriveMode".to_string(),
+            "ContinuousDrive".to_string(),
             ExifValue::Ascii(decode_drive_mode_exiftool(data[5]).to_string()),
         );
     }
@@ -2420,10 +2347,11 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
-    // Drive mode (index 5)
+    // Continuous drive (index 5)
+    // Note: This is "ContinuousDrive", not "DriveMode"
     if data.len() > 5 {
         decoded.insert(
-            "DriveMode".to_string(),
+            "ContinuousDrive".to_string(),
             ExifValue::Ascii(decode_drive_mode_exiv2(data[5]).to_string()),
         );
     }

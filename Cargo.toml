@@ -17,6 +17,8 @@ hex = "0.4"
 byteorder = "1.4"
 # For better error handling
 thiserror = "1.0"
+# For macro token pasting
+paste = "1.0"
 # Optional: for command line interface
 clap = { version = "4.0", optional = true, features = ["derive"] }
 # Optional: for WebAssembly bindings
