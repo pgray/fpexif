@@ -1020,10 +1020,11 @@ pub fn decode_quality_exiv2(value: u16) -> &'static str {
 }
 
 // FlashMode: Canon.pm PrintConv / canonmn_int.cpp canonCsFlashMode
+// Note: ExifTool uses "Off" for value 0 per actual -j output
 define_tag_decoder! {
     flash_mode,
     exiftool: {
-        0 => "Flash Not Fired",
+        0 => "Off",
         1 => "Auto",
         2 => "On",
         3 => "Red-eye reduction",
@@ -2257,10 +2258,10 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
-    // Flash mode (index 4)
+    // Flash mode (index 4) - ExifTool calls this "CanonFlashMode"
     if data.len() > 4 {
         decoded.insert(
-            "FlashMode".to_string(),
+            "CanonFlashMode".to_string(),
             ExifValue::Ascii(decode_flash_mode_exiftool(data[4]).to_string()),
         );
     }
@@ -2365,12 +2366,22 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
-    // Exposure mode (index 20)
+    // Exposure mode (index 20) - ExifTool calls this "CanonExposureMode"
     if data.len() > 20 {
         decoded.insert(
-            "ExposureMode".to_string(),
+            "CanonExposureMode".to_string(),
             ExifValue::Ascii(decode_exposure_mode_exiftool(data[20]).to_string()),
         );
+    }
+
+    // Lens type (index 22) - decode to lens name
+    if data.len() > 22 && data[22] > 0 {
+        if let Some(lens_name) = get_canon_lens_name(data[22]) {
+            decoded.insert(
+                "LensType".to_string(),
+                ExifValue::Ascii(lens_name.to_string()),
+            );
+        }
     }
 
     // Focal units per mm (index 25) - needed for calculating actual focal lengths
@@ -2661,10 +2672,10 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
-    // Flash mode (index 4)
+    // Flash mode (index 4) - CanonFlashMode for consistency
     if data.len() > 4 {
         decoded.insert(
-            "FlashMode".to_string(),
+            "CanonFlashMode".to_string(),
             ExifValue::Ascii(decode_flash_mode_exiv2(data[4]).to_string()),
         );
     }
@@ -2766,12 +2777,22 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
-    // Exposure mode (index 20)
+    // Exposure mode (index 20) - CanonExposureMode for consistency
     if data.len() > 20 {
         decoded.insert(
-            "ExposureMode".to_string(),
+            "CanonExposureMode".to_string(),
             ExifValue::Ascii(decode_exposure_mode_exiv2(data[20]).to_string()),
         );
+    }
+
+    // Lens type (index 22) - decode to lens name
+    if data.len() > 22 && data[22] > 0 {
+        if let Some(lens_name) = get_canon_lens_name(data[22]) {
+            decoded.insert(
+                "LensType".to_string(),
+                ExifValue::Ascii(lens_name.to_string()),
+            );
+        }
     }
 
     // Focal units per mm (index 25)
