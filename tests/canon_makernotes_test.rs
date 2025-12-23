@@ -35,12 +35,12 @@ fn test_decode_camera_settings() {
         panic!("Quality should be Ascii");
     }
 
-    // Check flash mode
-    assert!(decoded.contains_key("FlashMode"));
-    if let Some(ExifValue::Ascii(flash)) = decoded.get("FlashMode") {
-        assert_eq!(flash, "Flash Not Fired");
+    // Check flash mode (renamed to CanonFlashMode to match ExifTool)
+    assert!(decoded.contains_key("CanonFlashMode"));
+    if let Some(ExifValue::Ascii(flash)) = decoded.get("CanonFlashMode") {
+        assert_eq!(flash, "Off");
     } else {
-        panic!("FlashMode should be Ascii");
+        panic!("CanonFlashMode should be Ascii");
     }
 
     // Check continuous drive (formerly called DriveMode, renamed to match ExifTool)
@@ -67,8 +67,8 @@ fn test_decode_camera_settings() {
     // Check focus range
     assert!(decoded.contains_key("FocusRange"));
 
-    // Check exposure mode
-    assert!(decoded.contains_key("ExposureMode"));
+    // Check exposure mode (renamed to CanonExposureMode to match ExifTool)
+    assert!(decoded.contains_key("CanonExposureMode"));
 
     // Check focal length values
     assert!(decoded.contains_key("MaxFocalLength"));
@@ -245,28 +245,28 @@ fn test_decode_camera_settings_exposure_modes() {
     // Program AE
     settings[20] = 1;
     let decoded = decode_camera_settings(&settings);
-    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("CanonExposureMode") {
         assert_eq!(mode, "Program AE");
     }
 
     // Shutter priority
     settings[20] = 2;
     let decoded = decode_camera_settings(&settings);
-    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("CanonExposureMode") {
         assert_eq!(mode, "Shutter speed priority AE");
     }
 
     // Aperture priority
     settings[20] = 3;
     let decoded = decode_camera_settings(&settings);
-    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("CanonExposureMode") {
         assert_eq!(mode, "Aperture-priority AE");
     }
 
     // Manual
     settings[20] = 4;
     let decoded = decode_camera_settings(&settings);
-    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("CanonExposureMode") {
         assert_eq!(mode, "Manual");
     }
 }
