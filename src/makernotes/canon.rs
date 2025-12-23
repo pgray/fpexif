@@ -1020,10 +1020,11 @@ pub fn decode_quality_exiv2(value: u16) -> &'static str {
 }
 
 // FlashMode: Canon.pm PrintConv / canonmn_int.cpp canonCsFlashMode
+// Note: ExifTool uses "Off" for value 0 per actual -j output
 define_tag_decoder! {
     flash_mode,
     exiftool: {
-        0 => "Flash Not Fired",
+        0 => "Off",
         1 => "Auto",
         2 => "On",
         3 => "Red-eye reduction",
@@ -1883,6 +1884,29 @@ define_tag_decoder! {
     }
 }
 
+// ToneCurve: Canon.pm toneCurve
+define_tag_decoder! {
+    tone_curve,
+    both: {
+        0 => "Standard",
+        1 => "Manual",
+        2 => "Custom",
+    }
+}
+
+// SharpnessFrequency: Canon.pm sharpnessFrequency
+define_tag_decoder! {
+    sharpness_frequency,
+    both: {
+        0 => "n/a",
+        1 => "Lowest",
+        2 => "Low",
+        3 => "Standard",
+        4 => "High",
+        5 => "Highest",
+    }
+}
+
 /// Decode MeasuredEV - ExifTool format (from Canon.pm PrintConv)
 /// Simple passthrough that returns the value as a string
 pub fn decode_measured_ev_exiftool(value: i16) -> String {
@@ -2257,10 +2281,10 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
-    // Flash mode (index 4)
+    // Flash mode (index 4) - ExifTool calls this "CanonFlashMode"
     if data.len() > 4 {
         decoded.insert(
-            "FlashMode".to_string(),
+            "CanonFlashMode".to_string(),
             ExifValue::Ascii(decode_flash_mode_exiftool(data[4]).to_string()),
         );
     }
@@ -2365,12 +2389,22 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
-    // Exposure mode (index 20)
+    // Exposure mode (index 20) - ExifTool calls this "CanonExposureMode"
     if data.len() > 20 {
         decoded.insert(
-            "ExposureMode".to_string(),
+            "CanonExposureMode".to_string(),
             ExifValue::Ascii(decode_exposure_mode_exiftool(data[20]).to_string()),
         );
+    }
+
+    // Lens type (index 22) - decode to lens name
+    if data.len() > 22 && data[22] > 0 {
+        if let Some(lens_name) = get_canon_lens_name(data[22]) {
+            decoded.insert(
+                "LensType".to_string(),
+                ExifValue::Ascii(lens_name.to_string()),
+            );
+        }
     }
 
     // Focal units per mm (index 25) - needed for calculating actual focal lengths
@@ -2403,21 +2437,16 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         let apex = data[26] as f64 / 32.0;
         let f_number = 2f64.powf(apex / 2.0);
         let rounded = (f_number * 10.0).round() / 10.0;
-        decoded.insert(
-            "MaxAperture".to_string(),
-            ExifValue::Ascii(format!("{}", rounded)),
-        );
+        decoded.insert("MaxAperture".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Min aperture (index 27) - Convert Canon aperture value to f-number
     if data.len() > 27 && data[27] > 0 {
         let apex = data[27] as f64 / 32.0;
         let f_number = 2f64.powf(apex / 2.0);
-        let rounded = (f_number * 10.0).round() / 10.0;
-        decoded.insert(
-            "MinAperture".to_string(),
-            ExifValue::Ascii(format!("{}", rounded)),
-        );
+        // ExifTool rounds to integer for MinAperture
+        let rounded = f_number.round();
+        decoded.insert("MinAperture".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Camera ISO (index 16)
@@ -2661,10 +2690,10 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
-    // Flash mode (index 4)
+    // Flash mode (index 4) - CanonFlashMode for consistency
     if data.len() > 4 {
         decoded.insert(
-            "FlashMode".to_string(),
+            "CanonFlashMode".to_string(),
             ExifValue::Ascii(decode_flash_mode_exiv2(data[4]).to_string()),
         );
     }
@@ -2766,12 +2795,22 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
-    // Exposure mode (index 20)
+    // Exposure mode (index 20) - CanonExposureMode for consistency
     if data.len() > 20 {
         decoded.insert(
-            "ExposureMode".to_string(),
+            "CanonExposureMode".to_string(),
             ExifValue::Ascii(decode_exposure_mode_exiv2(data[20]).to_string()),
         );
+    }
+
+    // Lens type (index 22) - decode to lens name
+    if data.len() > 22 && data[22] > 0 {
+        if let Some(lens_name) = get_canon_lens_name(data[22]) {
+            decoded.insert(
+                "LensType".to_string(),
+                ExifValue::Ascii(lens_name.to_string()),
+            );
+        }
     }
 
     // Focal units per mm (index 25)
@@ -2804,21 +2843,15 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         let apex = data[26] as f64 / 32.0;
         let f_number = 2f64.powf(apex / 2.0);
         let rounded = (f_number * 10.0).round() / 10.0;
-        decoded.insert(
-            "MaxAperture".to_string(),
-            ExifValue::Ascii(format!("{}", rounded)),
-        );
+        decoded.insert("MaxAperture".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Min aperture (index 27)
     if data.len() > 27 && data[27] > 0 {
         let apex = data[27] as f64 / 32.0;
         let f_number = 2f64.powf(apex / 2.0);
-        let rounded = (f_number * 10.0).round() / 10.0;
-        decoded.insert(
-            "MinAperture".to_string(),
-            ExifValue::Ascii(format!("{}", rounded)),
-        );
+        let rounded = f_number.round();
+        decoded.insert("MinAperture".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Camera ISO (index 16)
@@ -3061,10 +3094,9 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 3 {
         let raw = data[3] as i16; // Treat as signed for negative EV values
         let ev = (raw as f64 / 32.0) + 5.0;
-        decoded.insert(
-            "MeasuredEV".to_string(),
-            ExifValue::Ascii(format!("{:.2}", ev)),
-        );
+        // Round to 2 decimal places
+        let rounded = (ev * 100.0).round() / 100.0;
+        decoded.insert("MeasuredEV".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Target aperture (index 4) - Canon APEX aperture value
@@ -3075,7 +3107,7 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
         let rounded = (f_number * 10.0).round() / 10.0;
         decoded.insert(
             "TargetAperture".to_string(),
-            ExifValue::Ascii(format!("{}", rounded)),
+            ExifValue::Double(vec![rounded]),
         );
     }
 
@@ -3195,10 +3227,9 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     // Formula: val / 8 - 6
     if data.len() > 23 && data[23] != 0 {
         let ev2 = (data[23] as f64 / 8.0) - 6.0;
-        decoded.insert(
-            "MeasuredEV2".to_string(),
-            ExifValue::Ascii(format!("{:.3}", ev2)),
-        );
+        // Round to 3 decimal places
+        let rounded = (ev2 * 1000.0).round() / 1000.0;
+        decoded.insert("MeasuredEV2".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Bulb duration (index 24)
@@ -3349,10 +3380,8 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 3 {
         let raw = data[3] as i16;
         let ev = (raw as f64 / 32.0) + 5.0;
-        decoded.insert(
-            "MeasuredEV".to_string(),
-            ExifValue::Ascii(format!("{:.2}", ev)),
-        );
+        let rounded = (ev * 100.0).round() / 100.0;
+        decoded.insert("MeasuredEV".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Target aperture (index 4)
@@ -3362,7 +3391,7 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
         let rounded = (f_number * 10.0).round() / 10.0;
         decoded.insert(
             "TargetAperture".to_string(),
-            ExifValue::Ascii(format!("{}", rounded)),
+            ExifValue::Double(vec![rounded]),
         );
     }
 
@@ -3474,10 +3503,8 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
     // Measured EV 2 (index 23)
     if data.len() > 23 && data[23] != 0 {
         let ev2 = (data[23] as f64 / 8.0) - 6.0;
-        decoded.insert(
-            "MeasuredEV2".to_string(),
-            ExifValue::Ascii(format!("{:.3}", ev2)),
-        );
+        let rounded = (ev2 * 1000.0).round() / 1000.0;
+        decoded.insert("MeasuredEV2".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Bulb duration (index 24)
@@ -3695,6 +3722,122 @@ pub fn decode_file_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
 // decode_file_info_exiv2 - same as exiftool (BracketMode values are identical)
 // Use decode_file_info_exiftool for both formats
 
+/// Decode Canon ProcessingInfo array sub-fields
+///
+/// This function decodes the CanonProcessingInfo array (tag 0x00A0).
+pub fn decode_processing_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    decode_processing_info_exiftool(data)
+}
+
+/// Decode Canon ProcessingInfo array sub-fields - ExifTool format
+pub fn decode_processing_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // ProcessingInfo structure (indices are 1-based in ExifTool docs):
+    // Index 1: ToneCurve
+    // Index 2: Sharpness
+    // Index 3: SharpnessFrequency
+    // Index 4: SensorRedLevel
+    // Index 5: SensorBlueLevel
+    // Index 6: WhiteBalanceRed
+    // Index 7: WhiteBalanceBlue
+    // Index 8: WhiteBalance
+    // Index 9: ColorTemperature
+    // Index 10: PictureStyle
+    // Index 11: DigitalGain
+    // Index 12: WBShiftAB
+    // Index 13: WBShiftGM
+
+    // ToneCurve (index 1)
+    if data.len() > 1 {
+        decoded.insert(
+            "ToneCurve".to_string(),
+            ExifValue::Ascii(decode_tone_curve_exiftool(data[1]).to_string()),
+        );
+    }
+
+    // Sharpness (index 2) - numeric value
+    if data.len() > 2 {
+        let sharpness = data[2] as i16;
+        decoded.insert("Sharpness".to_string(), ExifValue::SShort(vec![sharpness]));
+    }
+
+    // SharpnessFrequency (index 3)
+    if data.len() > 3 {
+        decoded.insert(
+            "SharpnessFrequency".to_string(),
+            ExifValue::Ascii(decode_sharpness_frequency_exiftool(data[3]).to_string()),
+        );
+    }
+
+    // SensorRedLevel (index 4)
+    if data.len() > 4 {
+        decoded.insert(
+            "SensorRedLevel".to_string(),
+            ExifValue::Short(vec![data[4]]),
+        );
+    }
+
+    // SensorBlueLevel (index 5)
+    if data.len() > 5 {
+        decoded.insert(
+            "SensorBlueLevel".to_string(),
+            ExifValue::Short(vec![data[5]]),
+        );
+    }
+
+    // WhiteBalanceRed (index 6)
+    if data.len() > 6 {
+        decoded.insert(
+            "WhiteBalanceRed".to_string(),
+            ExifValue::Short(vec![data[6]]),
+        );
+    }
+
+    // WhiteBalanceBlue (index 7)
+    if data.len() > 7 {
+        decoded.insert(
+            "WhiteBalanceBlue".to_string(),
+            ExifValue::Short(vec![data[7]]),
+        );
+    }
+
+    // ColorTemperature (index 9)
+    if data.len() > 9 {
+        decoded.insert(
+            "ColorTemperature".to_string(),
+            ExifValue::Short(vec![data[9]]),
+        );
+    }
+
+    // PictureStyle (index 10)
+    if data.len() > 10 {
+        decoded.insert(
+            "PictureStyle".to_string(),
+            ExifValue::Ascii(decode_picture_style_exiftool(data[10]).to_string()),
+        );
+    }
+
+    // DigitalGain (index 11)
+    if data.len() > 11 && data[11] != 0 {
+        decoded.insert("DigitalGain".to_string(), ExifValue::Short(vec![data[11]]));
+    }
+
+    // WBShiftAB (index 12) - signed
+    if data.len() > 12 {
+        let shift = data[12] as i16;
+        decoded.insert("WBShiftAB".to_string(), ExifValue::SShort(vec![shift]));
+    }
+
+    // WBShiftGM (index 13) - signed
+    if data.len() > 13 {
+        let shift = data[13] as i16;
+        decoded.insert("WBShiftGM".to_string(), ExifValue::SShort(vec![shift]));
+    }
+
+    decoded
+}
+
 /// Decode Canon AFInfo2 array sub-fields
 ///
 /// This function decodes the CanonAFInfo2 array which contains AF area information.
@@ -3707,64 +3850,117 @@ pub fn decode_af_info2(data: &[u16]) -> HashMap<String, ExifValue> {
 pub fn decode_af_info2_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
-    // AF area mode (index 0)
-    if !data.is_empty() {
+    // AFInfo2 structure:
+    // Index 0: Byte count/header
+    // Index 1: AFAreaMode
+    // Index 2: NumAFPoints
+    // Index 3: ValidAFPoints
+    // Index 4: AFImageWidth
+    // Index 5: AFImageHeight
+    // Index 6: CanonImageWidth
+    // Index 7: CanonImageHeight
+    // Index 8+: Widths[N], Heights[N], XPositions[N], YPositions[N]
+
+    // AF area mode (index 1, after header)
+    if data.len() > 1 {
         decoded.insert(
             "AFAreaMode".to_string(),
-            ExifValue::Ascii(decode_af_area_mode_exiftool(data[0]).to_string()),
+            ExifValue::Ascii(decode_af_area_mode_exiftool(data[1]).to_string()),
         );
     }
 
-    // Number of AF points (index 1)
-    if data.len() > 1 {
-        let num_af_points = data[1];
+    // Number of AF points (index 2)
+    if data.len() > 2 {
+        let num_af_points = data[2];
         decoded.insert(
             "NumAFPoints".to_string(),
             ExifValue::Short(vec![num_af_points]),
         );
 
-        // AF area widths (index 2 onwards, based on num_af_points)
-        let mut widths = Vec::new();
-        let mut heights = Vec::new();
-        let mut x_positions = Vec::new();
-        let mut y_positions = Vec::new();
-
-        for i in 0..num_af_points as usize {
-            // Widths start at index 2
-            if data.len() > 2 + i {
-                widths.push(data[2 + i]);
-            }
-            // Heights start after widths
-            if data.len() > 2 + num_af_points as usize + i {
-                heights.push(data[2 + num_af_points as usize + i]);
-            }
-            // X positions start after heights
-            if data.len() > 2 + 2 * num_af_points as usize + i {
-                x_positions.push(data[2 + 2 * num_af_points as usize + i]);
-            }
-            // Y positions start after X positions
-            if data.len() > 2 + 3 * num_af_points as usize + i {
-                y_positions.push(data[2 + 3 * num_af_points as usize + i]);
-            }
+        // ValidAFPoints (index 3)
+        if data.len() > 3 {
+            decoded.insert("ValidAFPoints".to_string(), ExifValue::Short(vec![data[3]]));
         }
 
-        if !widths.is_empty() {
-            decoded.insert("AFAreaWidths".to_string(), ExifValue::Short(widths));
+        // AFImageWidth (index 4)
+        if data.len() > 4 {
+            decoded.insert("AFImageWidth".to_string(), ExifValue::Short(vec![data[4]]));
         }
-        if !heights.is_empty() {
-            decoded.insert("AFAreaHeights".to_string(), ExifValue::Short(heights));
+
+        // AFImageHeight (index 5)
+        if data.len() > 5 {
+            decoded.insert("AFImageHeight".to_string(), ExifValue::Short(vec![data[5]]));
         }
-        if !x_positions.is_empty() {
+
+        // CanonImageWidth (index 6)
+        if data.len() > 6 {
             decoded.insert(
-                "AFAreaXPositions".to_string(),
-                ExifValue::Short(x_positions),
+                "CanonImageWidth".to_string(),
+                ExifValue::Short(vec![data[6]]),
             );
         }
-        if !y_positions.is_empty() {
+
+        // CanonImageHeight (index 7)
+        if data.len() > 7 {
             decoded.insert(
-                "AFAreaYPositions".to_string(),
-                ExifValue::Short(y_positions),
+                "CanonImageHeight".to_string(),
+                ExifValue::Short(vec![data[7]]),
             );
+        }
+
+        // AF area arrays start at index 8 (after the header fields)
+        let base = 8usize;
+        let n = num_af_points as usize;
+
+        // Widths (index 3 to 3+N-1)
+        if data.len() >= base + n {
+            let widths: Vec<u16> = data[base..base + n].to_vec();
+            // Format as space-separated string like ExifTool
+            let widths_str = widths
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            decoded.insert("AFAreaWidths".to_string(), ExifValue::Ascii(widths_str));
+        }
+
+        // Heights (index 3+N to 3+2N-1)
+        if data.len() >= base + 2 * n {
+            let heights: Vec<u16> = data[base + n..base + 2 * n].to_vec();
+            let heights_str = heights
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            decoded.insert("AFAreaHeights".to_string(), ExifValue::Ascii(heights_str));
+        }
+
+        // X positions (index 3+2N to 3+3N-1) - signed values
+        if data.len() >= base + 3 * n {
+            let x_positions: Vec<i16> = data[base + 2 * n..base + 3 * n]
+                .iter()
+                .map(|&v| v as i16)
+                .collect();
+            let xpos_str = x_positions
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            decoded.insert("AFAreaXPositions".to_string(), ExifValue::Ascii(xpos_str));
+        }
+
+        // Y positions (index 3+3N to 3+4N-1) - signed values
+        if data.len() >= base + 4 * n {
+            let y_positions: Vec<i16> = data[base + 3 * n..base + 4 * n]
+                .iter()
+                .map(|&v| v as i16)
+                .collect();
+            let ypos_str = y_positions
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            decoded.insert("AFAreaYPositions".to_string(), ExifValue::Ascii(ypos_str));
         }
     }
 
@@ -3775,59 +3971,611 @@ pub fn decode_af_info2_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
 pub fn decode_af_info2_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
-    // AF area mode (index 0) - uses exiv2 format
-    if !data.is_empty() {
+    // AFInfo2 structure:
+    // Index 0: Byte count/header
+    // Index 1: AFAreaMode
+    // Index 2: NumAFPoints
+    // Index 3-7: ValidAFPoints, AFImageWidth/Height, CanonImageWidth/Height
+    // Index 8+: Widths[N], Heights[N], XPositions[N], YPositions[N]
+
+    // AF area mode (index 1) - uses exiv2 format
+    if data.len() > 1 {
         decoded.insert(
             "AFAreaMode".to_string(),
-            ExifValue::Ascii(decode_af_area_mode_exiv2(data[0]).to_string()),
+            ExifValue::Ascii(decode_af_area_mode_exiv2(data[1]).to_string()),
         );
     }
 
-    // Number of AF points (index 1)
-    if data.len() > 1 {
-        let num_af_points = data[1];
+    // Number of AF points (index 2)
+    if data.len() > 2 {
+        let num_af_points = data[2];
         decoded.insert(
             "NumAFPoints".to_string(),
             ExifValue::Short(vec![num_af_points]),
         );
 
-        // AF area widths (index 2 onwards, based on num_af_points)
-        let mut widths = Vec::new();
-        let mut heights = Vec::new();
-        let mut x_positions = Vec::new();
-        let mut y_positions = Vec::new();
+        let base = 8usize;
+        let n = num_af_points as usize;
 
-        for i in 0..num_af_points as usize {
-            if data.len() > 2 + i {
-                widths.push(data[2 + i]);
-            }
-            if data.len() > 2 + num_af_points as usize + i {
-                heights.push(data[2 + num_af_points as usize + i]);
-            }
-            if data.len() > 2 + 2 * num_af_points as usize + i {
-                x_positions.push(data[2 + 2 * num_af_points as usize + i]);
-            }
-            if data.len() > 2 + 3 * num_af_points as usize + i {
-                y_positions.push(data[2 + 3 * num_af_points as usize + i]);
-            }
+        // Widths
+        if data.len() >= base + n {
+            let widths: Vec<u16> = data[base..base + n].to_vec();
+            let widths_str = widths
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            decoded.insert("AFAreaWidths".to_string(), ExifValue::Ascii(widths_str));
         }
 
-        if !widths.is_empty() {
-            decoded.insert("AFAreaWidths".to_string(), ExifValue::Short(widths));
+        // Heights
+        if data.len() >= base + 2 * n {
+            let heights: Vec<u16> = data[base + n..base + 2 * n].to_vec();
+            let heights_str = heights
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            decoded.insert("AFAreaHeights".to_string(), ExifValue::Ascii(heights_str));
         }
-        if !heights.is_empty() {
-            decoded.insert("AFAreaHeights".to_string(), ExifValue::Short(heights));
+
+        // X positions (signed)
+        if data.len() >= base + 3 * n {
+            let x_positions: Vec<i16> = data[base + 2 * n..base + 3 * n]
+                .iter()
+                .map(|&v| v as i16)
+                .collect();
+            let xpos_str = x_positions
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            decoded.insert("AFAreaXPositions".to_string(), ExifValue::Ascii(xpos_str));
         }
-        if !x_positions.is_empty() {
+
+        // Y positions (signed)
+        if data.len() >= base + 4 * n {
+            let y_positions: Vec<i16> = data[base + 3 * n..base + 4 * n]
+                .iter()
+                .map(|&v| v as i16)
+                .collect();
+            let ypos_str = y_positions
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            decoded.insert("AFAreaYPositions".to_string(), ExifValue::Ascii(ypos_str));
+        }
+    }
+
+    decoded
+}
+
+/// Decode Canon ColorData array sub-fields - ExifTool format
+/// ColorData structure is version-dependent. Version 6 is for 50D/5DmkII
+pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    if data.is_empty() {
+        return decoded;
+    }
+
+    // ColorDataVersion (index 0)
+    let version = data[0];
+    let version_str = match version {
+        1 => "1 (G2/S30/S40/S45)",
+        2 => "2 (S70/S60/Pro1/G6)",
+        3 => "3 (G7/G9/S1/S2/S3/S5/A560/A570/A580/A590/A610/A620/A630/A640/A650/A700/A710/A720)",
+        4 => "4 (G10/G11/G12/S90/S95/S100/S110/S120/A495/A1100/A2100/A3100/A3200/A3300/A3400)",
+        5 => "5 (40D)",
+        6 => "6 (50D/5DmkII)",
+        7 => "7 (500D/550D/600D/1100D)",
+        8 => "8 (60D)",
+        9 => "9 (1DmkIV/5DmkIII/6D/7D/70D)",
+        10 => "10 (1DX/1DC/7DmkII)",
+        11 => "11 (5DS/5DSR/5DmkIV/80D/6DmkII/77D/800D/200D)",
+        _ => "Unknown",
+    };
+    decoded.insert(
+        "ColorDataVersion".to_string(),
+        ExifValue::Ascii(version_str.to_string()),
+    );
+
+    // For version 6 (50D/5DmkII), structure is:
+    // Index 0: ColorDataVersion
+    // Index 3-6: WB_RGGBLevelsAsShot (4 values)
+    // Index 7: ColorTempAsShot
+    // Index 8-11: WB_RGGBLevelsAuto (4 values)
+    // Index 12: ColorTempAuto
+    // Index 13-16: WB_RGGBLevelsMeasured (4 values, but may be different)
+    // Index 17: ColorTempMeasured
+
+    // For version 6 (50D/5DmkII), ColorData structure:
+    // The structure starts with WB data at specific offsets
+    // Based on ExifTool Canon.pm ColorData6 offsets:
+    // WB_RGGBLevelsAsShot starts at index 63
+    if version == 6 && data.len() > 120 {
+        // WB_RGGBLevelsAsShot (indices 63-66)
+        let levels_str = format!("{} {} {} {}", data[63], data[64], data[65], data[66]);
+        decoded.insert(
+            "WB_RGGBLevelsAsShot".to_string(),
+            ExifValue::Ascii(levels_str.clone()),
+        );
+        decoded.insert("WB_RGGBLevels".to_string(), ExifValue::Ascii(levels_str));
+
+        // ColorTempAsShot (index 67)
+        decoded.insert(
+            "ColorTempAsShot".to_string(),
+            ExifValue::Short(vec![data[67]]),
+        );
+
+        // WB_RGGBLevelsAuto (indices 68-71)
+        let levels_str = format!("{} {} {} {}", data[68], data[69], data[70], data[71]);
+        decoded.insert(
+            "WB_RGGBLevelsAuto".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempAuto (index 72)
+        decoded.insert(
+            "ColorTempAuto".to_string(),
+            ExifValue::Short(vec![data[72]]),
+        );
+
+        // WB_RGGBLevelsMeasured (indices 73-76)
+        let levels_str = format!("{} {} {} {}", data[73], data[74], data[75], data[76]);
+        decoded.insert(
+            "WB_RGGBLevelsMeasured".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempMeasured (index 77)
+        decoded.insert(
+            "ColorTempMeasured".to_string(),
+            ExifValue::Short(vec![data[77]]),
+        );
+
+        // Preset WB values - shifted by 5 from my original offsets
+        // WB_RGGBLevelsDaylight (indices 83-86)
+        let levels_str = format!("{} {} {} {}", data[83], data[84], data[85], data[86]);
+        decoded.insert(
+            "WB_RGGBLevelsDaylight".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempDaylight (index 87)
+        decoded.insert(
+            "ColorTempDaylight".to_string(),
+            ExifValue::Short(vec![data[87]]),
+        );
+
+        // WB_RGGBLevelsShade (indices 88-91)
+        let levels_str = format!("{} {} {} {}", data[88], data[89], data[90], data[91]);
+        decoded.insert(
+            "WB_RGGBLevelsShade".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempShade (index 92)
+        decoded.insert(
+            "ColorTempShade".to_string(),
+            ExifValue::Short(vec![data[92]]),
+        );
+
+        // WB_RGGBLevelsCloudy (indices 93-96)
+        let levels_str = format!("{} {} {} {}", data[93], data[94], data[95], data[96]);
+        decoded.insert(
+            "WB_RGGBLevelsCloudy".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempCloudy (index 97)
+        decoded.insert(
+            "ColorTempCloudy".to_string(),
+            ExifValue::Short(vec![data[97]]),
+        );
+
+        // WB_RGGBLevelsTungsten (indices 98-101)
+        let levels_str = format!("{} {} {} {}", data[98], data[99], data[100], data[101]);
+        decoded.insert(
+            "WB_RGGBLevelsTungsten".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempTungsten (index 102)
+        decoded.insert(
+            "ColorTempTungsten".to_string(),
+            ExifValue::Short(vec![data[102]]),
+        );
+
+        // WB_RGGBLevelsFluorescent (indices 103-106)
+        let levels_str = format!("{} {} {} {}", data[103], data[104], data[105], data[106]);
+        decoded.insert(
+            "WB_RGGBLevelsFluorescent".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempFluorescent (index 107)
+        decoded.insert(
+            "ColorTempFluorescent".to_string(),
+            ExifValue::Short(vec![data[107]]),
+        );
+
+        // WB_RGGBLevelsKelvin (indices 108-111)
+        let levels_str = format!("{} {} {} {}", data[108], data[109], data[110], data[111]);
+        decoded.insert(
+            "WB_RGGBLevelsKelvin".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempKelvin (index 112)
+        decoded.insert(
+            "ColorTempKelvin".to_string(),
+            ExifValue::Short(vec![data[112]]),
+        );
+
+        // WB_RGGBLevelsFlash (indices 113-116)
+        let levels_str = format!("{} {} {} {}", data[113], data[114], data[115], data[116]);
+        decoded.insert(
+            "WB_RGGBLevelsFlash".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempFlash (index 117)
+        decoded.insert(
+            "ColorTempFlash".to_string(),
+            ExifValue::Short(vec![data[117]]),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon AFMicroAdj array sub-fields
+pub fn decode_af_micro_adj(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    if data.is_empty() {
+        return decoded;
+    }
+
+    // AFMicroAdj structure:
+    // Index 0: Version (e.g., 20)
+    // Index 1: AFMicroAdjMode
+    // Index 2: AFMicroAdjValue (for mode 1)
+    // Index 3-4: Additional adjustment values
+
+    // AFMicroAdjMode (index 1)
+    if data.len() > 1 {
+        let mode = data[1];
+        let mode_str = match mode {
+            0 => "Disable",
+            1 => "Adjust all by same amount",
+            2 => "Adjust by lens",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "AFMicroAdjMode".to_string(),
+            ExifValue::Ascii(mode_str.to_string()),
+        );
+
+        // AFMicroAdjValue (index 2)
+        if data.len() > 2 {
+            let value = data[2] as i16;
             decoded.insert(
-                "AFAreaXPositions".to_string(),
-                ExifValue::Short(x_positions),
+                "AFMicroAdjValue".to_string(),
+                ExifValue::SShort(vec![value]),
+            );
+
+            // AFMicroadjustment - composite string
+            if data.len() > 4 {
+                let adj_str = format!(
+                    "{}; {}; {}; {}; {}",
+                    mode_str,
+                    data[2] as i16,
+                    data[3] as i16,
+                    data[4] as i16,
+                    if data.len() > 5 { data[5] as i16 } else { 0 }
+                );
+                decoded.insert("AFMicroadjustment".to_string(), ExifValue::Ascii(adj_str));
+            }
+        }
+    }
+
+    decoded
+}
+
+/// Decode Canon CameraInfo for 50D - extract PictureStyleInfo
+/// PictureStyleInfo starts at offset 0x2d7 (727) within CameraInfo
+/// Each value is int32s (4 bytes, signed)
+pub fn decode_camera_info_50d(data: &[u8]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // PictureStyleInfo starts at offset 0x2d7 (727)
+    const PS_INFO_OFFSET: usize = 0x2d7;
+
+    // Check if we have enough data
+    if data.len() < PS_INFO_OFFSET + 0xdc {
+        return decoded;
+    }
+
+    // Helper to read int32s at offset (little-endian)
+    let read_i32 = |offset: usize| -> i32 {
+        let base = PS_INFO_OFFSET + offset;
+        if base + 4 <= data.len() {
+            i32::from_le_bytes([data[base], data[base + 1], data[base + 2], data[base + 3]])
+        } else {
+            0
+        }
+    };
+
+    // PSInfo structure offsets (from ExifTool Canon.pm)
+    let fields: &[(usize, &str)] = &[
+        (0x00, "ContrastStandard"),
+        (0x04, "SharpnessStandard"),
+        (0x08, "SaturationStandard"),
+        (0x0c, "ColorToneStandard"),
+        (0x18, "ContrastPortrait"),
+        (0x1c, "SharpnessPortrait"),
+        (0x20, "SaturationPortrait"),
+        (0x24, "ColorTonePortrait"),
+        (0x30, "ContrastLandscape"),
+        (0x34, "SharpnessLandscape"),
+        (0x38, "SaturationLandscape"),
+        (0x3c, "ColorToneLandscape"),
+        (0x48, "ContrastNeutral"),
+        (0x4c, "SharpnessNeutral"),
+        (0x50, "SaturationNeutral"),
+        (0x54, "ColorToneNeutral"),
+        (0x60, "ContrastFaithful"),
+        (0x64, "SharpnessFaithful"),
+        (0x68, "SaturationFaithful"),
+        (0x6c, "ColorToneFaithful"),
+        (0x78, "ContrastMonochrome"),
+        (0x7c, "SharpnessMonochrome"),
+        (0x90, "ContrastUserDef1"),
+        (0x94, "SharpnessUserDef1"),
+        (0x98, "SaturationUserDef1"),
+        (0x9c, "ColorToneUserDef1"),
+        (0xa8, "ContrastUserDef2"),
+        (0xac, "SharpnessUserDef2"),
+        (0xb0, "SaturationUserDef2"),
+        (0xb4, "ColorToneUserDef2"),
+        (0xc0, "ContrastUserDef3"),
+        (0xc4, "SharpnessUserDef3"),
+        (0xc8, "SaturationUserDef3"),
+        (0xcc, "ColorToneUserDef3"),
+    ];
+
+    for &(offset, name) in fields {
+        let value = read_i32(offset);
+        // Skip "n/a" marker values (0xdeadbeef = -559038737)
+        if value != -559038737 {
+            decoded.insert(name.to_string(), ExifValue::SShort(vec![value as i16]));
+        }
+    }
+
+    // FilterEffect and ToningEffect for Monochrome
+    let filter_effect = read_i32(0x88);
+    if filter_effect != -559038737 {
+        let filter_str = match filter_effect {
+            0 => "None",
+            1 => "Yellow",
+            2 => "Orange",
+            3 => "Red",
+            4 => "Green",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FilterEffectMonochrome".to_string(),
+            ExifValue::Ascii(filter_str.to_string()),
+        );
+    }
+
+    let toning_effect = read_i32(0x8c);
+    if toning_effect != -559038737 {
+        let toning_str = match toning_effect {
+            0 => "None",
+            1 => "Sepia",
+            2 => "Blue",
+            3 => "Purple",
+            4 => "Green",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "ToningEffectMonochrome".to_string(),
+            ExifValue::Ascii(toning_str.to_string()),
+        );
+    }
+
+    // UserDef1 FilterEffect and ToningEffect
+    let filter_ud1 = read_i32(0xa0);
+    if filter_ud1 != -559038737 {
+        let filter_str = match filter_ud1 {
+            0 => "None",
+            1 => "Yellow",
+            2 => "Orange",
+            3 => "Red",
+            4 => "Green",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FilterEffectUserDef1".to_string(),
+            ExifValue::Ascii(filter_str.to_string()),
+        );
+    }
+
+    let toning_ud1 = read_i32(0xa4);
+    if toning_ud1 != -559038737 {
+        let toning_str = match toning_ud1 {
+            0 => "None",
+            1 => "Sepia",
+            2 => "Blue",
+            3 => "Purple",
+            4 => "Green",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "ToningEffectUserDef1".to_string(),
+            ExifValue::Ascii(toning_str.to_string()),
+        );
+    }
+
+    // UserDef2 FilterEffect and ToningEffect
+    let filter_ud2 = read_i32(0xb8);
+    if filter_ud2 != -559038737 {
+        let filter_str = match filter_ud2 {
+            0 => "None",
+            1 => "Yellow",
+            2 => "Orange",
+            3 => "Red",
+            4 => "Green",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FilterEffectUserDef2".to_string(),
+            ExifValue::Ascii(filter_str.to_string()),
+        );
+    }
+
+    let toning_ud2 = read_i32(0xbc);
+    if toning_ud2 != -559038737 {
+        let toning_str = match toning_ud2 {
+            0 => "None",
+            1 => "Sepia",
+            2 => "Blue",
+            3 => "Purple",
+            4 => "Green",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "ToningEffectUserDef2".to_string(),
+            ExifValue::Ascii(toning_str.to_string()),
+        );
+    }
+
+    // UserDef3 FilterEffect and ToningEffect
+    let filter_ud3 = read_i32(0xd0);
+    if filter_ud3 != -559038737 {
+        let filter_str = match filter_ud3 {
+            0 => "None",
+            1 => "Yellow",
+            2 => "Orange",
+            3 => "Red",
+            4 => "Green",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FilterEffectUserDef3".to_string(),
+            ExifValue::Ascii(filter_str.to_string()),
+        );
+    }
+
+    let toning_ud3 = read_i32(0xd4);
+    if toning_ud3 != -559038737 {
+        let toning_str = match toning_ud3 {
+            0 => "None",
+            1 => "Sepia",
+            2 => "Blue",
+            3 => "Purple",
+            4 => "Green",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "ToningEffectUserDef3".to_string(),
+            ExifValue::Ascii(toning_str.to_string()),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon ColorInfo array sub-fields (tag 0x4003)
+/// Contains per-style ColorTone, Contrast, Saturation, Sharpness
+pub fn decode_color_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    if data.len() < 40 {
+        return decoded;
+    }
+
+    // ColorInfo structure has style settings at specific offsets
+    // Based on ExifTool Canon.pm ColorInfo structure
+
+    // Per-style settings - each style has 4 parameters at fixed offsets
+    // The structure varies by firmware, but typically:
+    // ColorTone, Contrast, Saturation, Sharpness for each style
+
+    let styles = [
+        "Standard",
+        "Portrait",
+        "Landscape",
+        "Neutral",
+        "Faithful",
+        "Monochrome",
+        "UserDef1",
+        "UserDef2",
+        "UserDef3",
+    ];
+
+    // For 50D, the offsets are approximately:
+    // Standard: 4-7, Portrait: 8-11, Landscape: 12-15, etc.
+    for (i, style) in styles.iter().enumerate() {
+        let base = 4 + i * 4;
+        if data.len() > base + 3 {
+            // Sharpness
+            decoded.insert(
+                format!("Sharpness{}", style),
+                ExifValue::SShort(vec![data[base] as i16]),
+            );
+            // Contrast
+            decoded.insert(
+                format!("Contrast{}", style),
+                ExifValue::SShort(vec![data[base + 1] as i16]),
+            );
+            // Saturation
+            decoded.insert(
+                format!("Saturation{}", style),
+                ExifValue::SShort(vec![data[base + 2] as i16]),
+            );
+            // ColorTone
+            decoded.insert(
+                format!("ColorTone{}", style),
+                ExifValue::SShort(vec![data[base + 3] as i16]),
             );
         }
-        if !y_positions.is_empty() {
+    }
+
+    // FilterEffect and ToningEffect for Monochrome and UserDef styles
+    // These are at higher offsets
+    let mono_styles = ["Monochrome", "UserDef1", "UserDef2", "UserDef3"];
+    for (i, style) in mono_styles.iter().enumerate() {
+        let base = 40 + i * 2;
+        if data.len() > base + 1 {
+            let filter_effect = match data[base] {
+                0 => "None",
+                1 => "Yellow",
+                2 => "Orange",
+                3 => "Red",
+                4 => "Green",
+                _ => "Unknown",
+            };
             decoded.insert(
-                "AFAreaYPositions".to_string(),
-                ExifValue::Short(y_positions),
+                format!("FilterEffect{}", style),
+                ExifValue::Ascii(filter_effect.to_string()),
+            );
+
+            let toning_effect = match data[base + 1] {
+                0 => "None",
+                1 => "Sepia",
+                2 => "Blue",
+                3 => "Purple",
+                4 => "Green",
+                _ => "Unknown",
+            };
+            decoded.insert(
+                format!("ToningEffect{}", style),
+                ExifValue::Ascii(toning_effect.to_string()),
             );
         }
     }
@@ -3870,11 +4618,27 @@ pub fn parse_canon_maker_notes(
         if let Some((tag_id, value)) =
             parse_ifd_entry(data, entry_offset, endian, tiff_data, tiff_offset)
         {
-            // Skip large binary blobs to save memory (camera info, dust removal, color data)
-            if matches!(
-                tag_id,
-                CANON_CAMERA_INFO | CANON_DUST_REMOVAL_DATA | CANON_COLOR_DATA
-            ) {
+            // Skip large binary blobs to save memory (dust removal data)
+            if tag_id == CANON_DUST_REMOVAL_DATA {
+                continue;
+            }
+
+            // Special handling for CameraInfo - extract PictureStyleInfo
+            if tag_id == CANON_CAMERA_INFO {
+                if let ExifValue::Undefined(bytes) | ExifValue::Byte(bytes) = &value {
+                    let decoded = decode_camera_info_50d(bytes);
+                    for (field_name, field_value) in decoded {
+                        tags.insert(
+                            synthetic_tag_id,
+                            MakerNoteTag {
+                                tag_id: synthetic_tag_id,
+                                tag_name: Some(Box::leak(field_name.into_boxed_str())),
+                                value: field_value,
+                            },
+                        );
+                        synthetic_tag_id = synthetic_tag_id.wrapping_add(1);
+                    }
+                }
                 continue;
             }
 
@@ -3886,16 +4650,40 @@ pub fn parse_canon_maker_notes(
                     | CANON_FOCAL_LENGTH
                     | CANON_FILE_INFO
                     | CANON_AF_INFO_2
+                    | CANON_PROCESSING_INFO
+                    | CANON_COLOR_DATA
+                    | CANON_AF_MICRO_ADJ
+                    | CANON_COLOR_INFO
             );
 
             if should_decode {
-                if let ExifValue::Short(ref shorts) = value {
+                // Extract shorts from Short, SShort, or Long values
+                // Some Canon tags use LONG type but contain small values that should be decoded as shorts
+                let shorts_data: Option<Vec<u16>> = match &value {
+                    ExifValue::Short(shorts) => Some(shorts.clone()),
+                    ExifValue::SShort(sshorts) => Some(sshorts.iter().map(|&v| v as u16).collect()),
+                    ExifValue::Long(longs) => {
+                        // Convert longs to u16 (clamping to 16-bit range)
+                        Some(longs.iter().map(|&v| v as u16).collect())
+                    }
+                    ExifValue::SLong(slongs) => {
+                        // Convert signed longs to u16
+                        Some(slongs.iter().map(|&v| v as u16).collect())
+                    }
+                    _ => None,
+                };
+
+                if let Some(shorts) = shorts_data {
                     let decoded = match tag_id {
-                        CANON_CAMERA_SETTINGS => decode_camera_settings(shorts),
-                        CANON_SHOT_INFO => decode_shot_info(shorts),
-                        CANON_FOCAL_LENGTH => decode_focal_length(shorts),
-                        CANON_FILE_INFO => decode_file_info(shorts),
-                        CANON_AF_INFO_2 => decode_af_info2(shorts),
+                        CANON_CAMERA_SETTINGS => decode_camera_settings(&shorts),
+                        CANON_SHOT_INFO => decode_shot_info(&shorts),
+                        CANON_FOCAL_LENGTH => decode_focal_length(&shorts),
+                        CANON_FILE_INFO => decode_file_info(&shorts),
+                        CANON_AF_INFO_2 => decode_af_info2(&shorts),
+                        CANON_PROCESSING_INFO => decode_processing_info(&shorts),
+                        CANON_COLOR_DATA => decode_color_data(&shorts),
+                        CANON_AF_MICRO_ADJ => decode_af_micro_adj(&shorts),
+                        CANON_COLOR_INFO => decode_color_info(&shorts),
                         _ => HashMap::new(),
                     };
 
@@ -3989,11 +4777,11 @@ pub fn parse_canon_maker_notes(
                         value
                     }
                 }
-                // SerialNumber - output as plain number string
+                // SerialNumber - output as 10-digit string with leading zeros
                 CANON_SERIAL_NUMBER => {
                     if let ExifValue::Long(ref longs) = value {
                         if !longs.is_empty() {
-                            ExifValue::Ascii(format!("{}", longs[0]))
+                            ExifValue::Ascii(format!("{:010}", longs[0]))
                         } else {
                             value
                         }

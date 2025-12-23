@@ -35,12 +35,12 @@ fn test_decode_camera_settings() {
         panic!("Quality should be Ascii");
     }
 
-    // Check flash mode
-    assert!(decoded.contains_key("FlashMode"));
-    if let Some(ExifValue::Ascii(flash)) = decoded.get("FlashMode") {
-        assert_eq!(flash, "Flash Not Fired");
+    // Check flash mode (renamed to CanonFlashMode to match ExifTool)
+    assert!(decoded.contains_key("CanonFlashMode"));
+    if let Some(ExifValue::Ascii(flash)) = decoded.get("CanonFlashMode") {
+        assert_eq!(flash, "Off");
     } else {
-        panic!("FlashMode should be Ascii");
+        panic!("CanonFlashMode should be Ascii");
     }
 
     // Check continuous drive (formerly called DriveMode, renamed to match ExifTool)
@@ -67,8 +67,8 @@ fn test_decode_camera_settings() {
     // Check focus range
     assert!(decoded.contains_key("FocusRange"));
 
-    // Check exposure mode
-    assert!(decoded.contains_key("ExposureMode"));
+    // Check exposure mode (renamed to CanonExposureMode to match ExifTool)
+    assert!(decoded.contains_key("CanonExposureMode"));
 
     // Check focal length values
     assert!(decoded.contains_key("MaxFocalLength"));
@@ -245,28 +245,28 @@ fn test_decode_camera_settings_exposure_modes() {
     // Program AE
     settings[20] = 1;
     let decoded = decode_camera_settings(&settings);
-    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("CanonExposureMode") {
         assert_eq!(mode, "Program AE");
     }
 
     // Shutter priority
     settings[20] = 2;
     let decoded = decode_camera_settings(&settings);
-    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("CanonExposureMode") {
         assert_eq!(mode, "Shutter speed priority AE");
     }
 
     // Aperture priority
     settings[20] = 3;
     let decoded = decode_camera_settings(&settings);
-    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("CanonExposureMode") {
         assert_eq!(mode, "Aperture-priority AE");
     }
 
     // Manual
     settings[20] = 4;
     let decoded = decode_camera_settings(&settings);
-    if let Some(ExifValue::Ascii(mode)) = decoded.get("ExposureMode") {
+    if let Some(ExifValue::Ascii(mode)) = decoded.get("CanonExposureMode") {
         assert_eq!(mode, "Manual");
     }
 }
@@ -308,10 +308,17 @@ fn test_decode_shot_info_white_balance_modes() {
 #[test]
 fn test_decode_af_info2() {
     // Sample AFInfo2 array with 3 AF points
+    // Structure: header, AFAreaMode, NumAFPoints, ValidAFPoints, AFImageW/H, CanonImageW/H, then arrays
     let af_info = vec![
-        2, // AF area mode: Single-point AF
-        3, // Number of AF points
-        10, 12, 14, // Widths for 3 points
+        100,  // Index 0: Header/byte count
+        2,    // Index 1: AF area mode: Single-point AF
+        3,    // Index 2: Number of AF points
+        3,    // Index 3: ValidAFPoints
+        4752, // Index 4: AFImageWidth
+        3168, // Index 5: AFImageHeight
+        4752, // Index 6: CanonImageWidth
+        3168, // Index 7: CanonImageHeight
+        10, 12, 14, // Index 8-10: Widths for 3 points
         20, 22, 24, // Heights for 3 points
         100, 110, 120, // X positions for 3 points
         200, 210, 220, // Y positions for 3 points
@@ -335,72 +342,62 @@ fn test_decode_af_info2() {
         panic!("NumAFPoints should be Short");
     }
 
-    // Check AF area widths
+    // Check AF area widths (now Ascii string format)
     assert!(decoded.contains_key("AFAreaWidths"));
-    if let Some(ExifValue::Short(widths)) = decoded.get("AFAreaWidths") {
-        assert_eq!(widths.len(), 3);
-        assert_eq!(widths[0], 10);
-        assert_eq!(widths[1], 12);
-        assert_eq!(widths[2], 14);
+    if let Some(ExifValue::Ascii(widths)) = decoded.get("AFAreaWidths") {
+        assert_eq!(widths, "10 12 14");
     } else {
-        panic!("AFAreaWidths should be Short array");
+        panic!("AFAreaWidths should be Ascii string");
     }
 
-    // Check AF area heights
+    // Check AF area heights (now Ascii string format)
     assert!(decoded.contains_key("AFAreaHeights"));
-    if let Some(ExifValue::Short(heights)) = decoded.get("AFAreaHeights") {
-        assert_eq!(heights.len(), 3);
-        assert_eq!(heights[0], 20);
-        assert_eq!(heights[1], 22);
-        assert_eq!(heights[2], 24);
+    if let Some(ExifValue::Ascii(heights)) = decoded.get("AFAreaHeights") {
+        assert_eq!(heights, "20 22 24");
     } else {
-        panic!("AFAreaHeights should be Short array");
+        panic!("AFAreaHeights should be Ascii string");
     }
 
-    // Check AF area X positions
+    // Check AF area X positions (now Ascii string format)
     assert!(decoded.contains_key("AFAreaXPositions"));
-    if let Some(ExifValue::Short(x_pos)) = decoded.get("AFAreaXPositions") {
-        assert_eq!(x_pos.len(), 3);
-        assert_eq!(x_pos[0], 100);
-        assert_eq!(x_pos[1], 110);
-        assert_eq!(x_pos[2], 120);
+    if let Some(ExifValue::Ascii(x_pos)) = decoded.get("AFAreaXPositions") {
+        assert_eq!(x_pos, "100 110 120");
     } else {
-        panic!("AFAreaXPositions should be Short array");
+        panic!("AFAreaXPositions should be Ascii string");
     }
 
-    // Check AF area Y positions
+    // Check AF area Y positions (now Ascii string format)
     assert!(decoded.contains_key("AFAreaYPositions"));
-    if let Some(ExifValue::Short(y_pos)) = decoded.get("AFAreaYPositions") {
-        assert_eq!(y_pos.len(), 3);
-        assert_eq!(y_pos[0], 200);
-        assert_eq!(y_pos[1], 210);
-        assert_eq!(y_pos[2], 220);
+    if let Some(ExifValue::Ascii(y_pos)) = decoded.get("AFAreaYPositions") {
+        assert_eq!(y_pos, "200 210 220");
     } else {
-        panic!("AFAreaYPositions should be Short array");
+        panic!("AFAreaYPositions should be Ascii string");
     }
 }
 
 #[test]
 fn test_decode_af_info2_different_modes() {
     // Test different AF area modes
-    let mut af_info = vec![0u16; 2];
+    // AFAreaMode is at index 1, index 0 is header
+    let mut af_info = vec![0u16; 3];
+    af_info[0] = 100; // Header value
 
     // Manual focus
-    af_info[0] = 0;
+    af_info[1] = 0;
     let decoded = decode_af_info2(&af_info);
     if let Some(ExifValue::Ascii(mode)) = decoded.get("AFAreaMode") {
         assert_eq!(mode, "Off (Manual Focus)");
     }
 
     // Face Detect AF
-    af_info[0] = 5;
+    af_info[1] = 5;
     let decoded = decode_af_info2(&af_info);
     if let Some(ExifValue::Ascii(mode)) = decoded.get("AFAreaMode") {
         assert_eq!(mode, "Face Detect AF");
     }
 
     // Zone AF
-    af_info[0] = 7;
+    af_info[1] = 7;
     let decoded = decode_af_info2(&af_info);
     if let Some(ExifValue::Ascii(mode)) = decoded.get("AFAreaMode") {
         assert_eq!(mode, "Zone AF");

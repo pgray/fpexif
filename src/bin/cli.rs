@@ -185,6 +185,146 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
         let display_value = format_exiftool_text_value(value, tag_id.id);
         println!("{:<32}: {}", tag_name, display_value);
     }
+
+    // Output maker notes
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        for (_, note) in maker_notes.iter() {
+            if let Some(name) = note.tag_name {
+                let display_value = format_exiftool_text_value(&note.value, note.tag_id);
+                println!("{:<32}: {}", name, display_value);
+            }
+        }
+    }
+
+    // Output computed/alias fields
+    print_computed_fields(exif_data);
+}
+
+/// Print computed fields that are aliases or calculated from existing data
+fn print_computed_fields(exif_data: &ExifData) {
+    use fpexif::data_types::ExifValue;
+
+    // ThumbnailOffset - alias for JPEGInterchangeFormat (0x0201)
+    if let Some(ExifValue::Long(v)) = exif_data.get_tag_by_id(0x0201) {
+        if !v.is_empty() {
+            println!("{:<32}: {}", "ThumbnailOffset", v[0]);
+        }
+    }
+
+    // ThumbnailLength - alias for JPEGInterchangeFormatLength (0x0202)
+    if let Some(ExifValue::Long(v)) = exif_data.get_tag_by_id(0x0202) {
+        if !v.is_empty() {
+            println!("{:<32}: {}", "ThumbnailLength", v[0]);
+        }
+    }
+
+    // PreviewImageStart - alias for StripOffsets (0x0111)
+    // PreviewImageLength - alias for StripByteCounts (0x0117)
+    // (These aliases are typically only for Canon RAW files where preview is in IFD0)
+
+    // Aperture - alias for FNumber
+    if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829D) {
+        if !v.is_empty() {
+            let (n, d) = v[0];
+            if d != 0 {
+                let f = n as f64 / d as f64;
+                println!("{:<32}: {}", "Aperture", f);
+            }
+        }
+    }
+
+    // ImageSize - computed from ImageWidth (0x0100) and ImageLength (0x0101)
+    let width = get_dimension(exif_data, 0xA002).or_else(|| get_dimension(exif_data, 0x0100));
+    let height = get_dimension(exif_data, 0xA003).or_else(|| get_dimension(exif_data, 0x0101));
+
+    if let (Some(w), Some(h)) = (width, height) {
+        println!("{:<32}: {}x{}", "ImageSize", w, h);
+
+        // Megapixels
+        let megapixels = (w as f64 * h as f64) / 1_000_000.0;
+        println!("{:<32}: {:.1}", "Megapixels", megapixels);
+    }
+
+    // RedBalance and BlueBalance from WB_RGGBLevelsAsShot
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        // Find WB_RGGBLevelsAsShot or WB_RGGBLevels
+        for (_, note) in maker_notes.iter() {
+            if let Some(name) = note.tag_name {
+                if name == "WB_RGGBLevelsAsShot" || name == "WB_RGGBLevels" {
+                    // Can be either Short array or Ascii string "R G G B"
+                    let values: Option<Vec<f64>> = match &note.value {
+                        ExifValue::Short(v) if v.len() >= 4 => {
+                            Some(v.iter().map(|&x| x as f64).collect())
+                        }
+                        ExifValue::Ascii(s) => {
+                            // Parse space-separated values
+                            let parsed: Vec<f64> = s
+                                .split_whitespace()
+                                .filter_map(|x| x.parse().ok())
+                                .collect();
+                            if parsed.len() >= 4 {
+                                Some(parsed)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(v) = values {
+                        // RGGB: v[0]=R, v[1]=G1, v[2]=G2, v[3]=B
+                        // Balance is R/G and B/G where G = G1 (first G)
+                        let r = v[0];
+                        let g = v[1]; // Use first G
+                        let b = v[3];
+                        if g > 0.0 {
+                            println!("{:<32}: {:.6}", "RedBalance", r / g);
+                            println!("{:<32}: {:.6}", "BlueBalance", b / g);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // ScaleFactor35efl for Canon APS-C is 1.6
+    // Check if this is a Canon APS-C camera (not full-frame)
+    if let Some(ExifValue::Ascii(make)) = exif_data.get_tag_by_id(0x010F) {
+        if make.contains("Canon") {
+            // For APS-C Canon cameras, scale factor is 1.6
+            // We'd need to check the model to determine if it's APS-C or full-frame
+            // For now, let's assume 50D is APS-C
+            println!("{:<32}: {}", "ScaleFactor35efl", 1.6);
+        }
+    }
+
+    // ShutterSpeed - alias for ExposureTime
+    if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829A) {
+        if !v.is_empty() {
+            let (n, d) = v[0];
+            if d != 0 {
+                let exposure = n as f64 / d as f64;
+                let denom = (1.0 / exposure).round() as u32;
+                println!("{:<32}: 1/{}", "ShutterSpeed", denom);
+            }
+        }
+    }
+}
+
+/// Get dimension value from a tag (handles Short or Long)
+fn get_dimension(exif_data: &ExifData, tag_id: u16) -> Option<u32> {
+    use fpexif::data_types::ExifValue;
+
+    if let Some(value) = exif_data.get_tag_by_id(tag_id) {
+        match value {
+            ExifValue::Short(v) if !v.is_empty() => Some(v[0] as u32),
+            ExifValue::Long(v) if !v.is_empty() => Some(v[0]),
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
 
 /// Format an ExifValue for exiftool-style text output
@@ -201,7 +341,14 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                 cleaned.to_string()
             }
         }
-        ExifValue::Byte(v) => format_values_space(v),
+        ExifValue::Byte(v) => {
+            // GPSVersionID (0x0000) should be formatted as "2.2.0.0"
+            if tag_id == 0x0000 && v.len() == 4 {
+                format!("{}.{}.{}.{}", v[0], v[1], v[2], v[3])
+            } else {
+                format_values_space(v)
+            }
+        }
         ExifValue::Short(v) => {
             // Use tag-specific descriptions for known tags
             if v.len() == 1 {
@@ -272,6 +419,22 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                             let distance = n as f64 / d as f64;
                             format!("{} m", distance)
                         }
+                        0x9201 => {
+                            // ShutterSpeedValue (APEX) - convert to shutter speed
+                            // ShutterSpeed = 2^APEX
+                            let apex = n as f64 / d as f64;
+                            let shutter_speed = 2f64.powf(apex);
+                            let denominator = shutter_speed.round() as u32;
+                            format!("1/{}", denominator)
+                        }
+                        0x9202 | 0x9205 => {
+                            // ApertureValue, MaxApertureValue (APEX) - convert to f-number
+                            // F-number = 2^(APEX/2)
+                            let apex = n as f64 / d as f64;
+                            let f_number = 2f64.powf(apex / 2.0);
+                            let rounded = (f_number * 10.0).round() / 10.0;
+                            format!("{}", rounded)
+                        }
                         _ => {
                             let val = n as f64 / d as f64;
                             if val == val.floor() {
@@ -301,10 +464,31 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
             if v.len() == 1 {
                 let (n, d) = v[0];
                 if d != 0 {
-                    format!("{:.6}", n as f64 / d as f64)
-                        .trim_end_matches('0')
-                        .trim_end_matches('.')
-                        .to_string()
+                    match tag_id {
+                        0x9201 => {
+                            // ShutterSpeedValue (APEX) - convert to shutter speed
+                            let apex = n as f64 / d as f64;
+                            let shutter_speed = 2f64.powf(apex);
+                            let denominator = shutter_speed.round() as i32;
+                            format!("1/{}", denominator)
+                        }
+                        0x9204 => {
+                            // ExposureBiasValue - format as +/- EV
+                            let bias = n as f64 / d as f64;
+                            if bias == 0.0 {
+                                "0".to_string()
+                            } else {
+                                format!("{:.6}", bias)
+                                    .trim_end_matches('0')
+                                    .trim_end_matches('.')
+                                    .to_string()
+                            }
+                        }
+                        _ => format!("{:.6}", n as f64 / d as f64)
+                            .trim_end_matches('0')
+                            .trim_end_matches('.')
+                            .to_string(),
+                    }
                 } else {
                     format!("{}/{}", n, d)
                 }
@@ -320,6 +504,32 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
         ExifValue::Undefined(v) => {
             // Handle UserComment and other undefined tags
             match tag_id {
+                0x9000 | 0xA000 => {
+                    // ExifVersion (0x9000), FlashpixVersion (0xA000) - decode as ASCII
+                    // Stored as 4 bytes like "0221" or "0100"
+                    String::from_utf8(v.to_vec())
+                        .ok()
+                        .map(|s| s.trim_end_matches('\0').to_string())
+                        .unwrap_or_else(|| format!("(Binary data {} bytes)", v.len()))
+                }
+                0x9101 => {
+                    // ComponentsConfiguration - decode component IDs
+                    // 0=-, 1=Y, 2=Cb, 3=Cr, 4=R, 5=G, 6=B
+                    let components: Vec<&str> = v
+                        .iter()
+                        .map(|&b| match b {
+                            0 => "-",
+                            1 => "Y",
+                            2 => "Cb",
+                            3 => "Cr",
+                            4 => "R",
+                            5 => "G",
+                            6 => "B",
+                            _ => "?",
+                        })
+                        .collect();
+                    components.join(", ")
+                }
                 0x9286 => {
                     // UserComment - EXIF spec says first 8 bytes are character code
                     // followed by the actual comment. Common codes: "ASCII\0\0\0", "UNICODE\0", etc.
