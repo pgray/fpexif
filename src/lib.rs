@@ -3,6 +3,7 @@ pub mod data_types;
 pub mod errors;
 pub mod formats;
 pub mod io;
+pub mod macros;
 pub mod makernotes;
 pub mod parser;
 pub mod tags;
