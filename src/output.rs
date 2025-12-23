@@ -950,6 +950,66 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
+    // Add computed fields for exiftool compatibility
+
+    // LensID is a copy of LensType (for Canon)
+    if let Some(lens_type) = output.get("LensType").cloned() {
+        if !output.contains_key("LensID") {
+            output.insert("LensID".to_string(), lens_type);
+        }
+    }
+
+    // Lens - compute from MinFocalLength and MaxFocalLength
+    if !output.contains_key("Lens") {
+        let min_fl = output.get("MinFocalLength").and_then(|v| {
+            if let Value::String(s) = v {
+                s.trim_end_matches(" mm").parse::<f64>().ok()
+            } else {
+                None
+            }
+        });
+        let max_fl = output.get("MaxFocalLength").and_then(|v| {
+            if let Value::String(s) = v {
+                s.trim_end_matches(" mm").parse::<f64>().ok()
+            } else {
+                None
+            }
+        });
+        if let (Some(min), Some(max)) = (min_fl, max_fl) {
+            let lens = format!("{:.1} - {:.1} mm", min, max);
+            output.insert("Lens".to_string(), Value::String(lens));
+        }
+    }
+
+    // ImageSize - compute from ImageWidth and ImageHeight/ImageLength
+    // TIFF uses ImageLength for height, EXIF uses ImageHeight
+    let width = output.get("ImageWidth").and_then(|v| match v {
+        Value::Number(n) => n.as_u64(),
+        _ => None,
+    });
+    let height = output
+        .get("ImageHeight")
+        .or_else(|| output.get("ImageLength"))
+        .and_then(|v| match v {
+            Value::Number(n) => n.as_u64(),
+            _ => None,
+        });
+    if let (Some(w), Some(h)) = (width, height) {
+        if !output.contains_key("ImageSize") {
+            output.insert(
+                "ImageSize".to_string(),
+                Value::String(format!("{}x{}", w, h)),
+            );
+        }
+        if !output.contains_key("Megapixels") {
+            let mp = (w * h) as f64 / 1_000_000.0;
+            let rounded = (mp * 10.0).round() / 10.0;
+            if let Some(num) = serde_json::Number::from_f64(rounded) {
+                output.insert("Megapixels".to_string(), Value::Number(num));
+            }
+        }
+    }
+
     // Wrap in an array like exiftool does
     Value::Array(vec![Value::Object(output)])
 }
