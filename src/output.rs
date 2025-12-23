@@ -17,9 +17,19 @@ fn gcd(a: u32, b: u32) -> u32 {
     }
 }
 
-/// Format a single Short value with tag-specific interpretation
+/// Format EXIF MeteringMode - always use standard EXIF decode
+/// MakerNote MeteringMode will override this for cameras that use different values
 #[cfg(feature = "serde")]
-fn format_short_value(value: u16, tag_id: u16) -> Value {
+fn format_metering_mode(value: u16, _make: Option<&str>) -> String {
+    // Use standard EXIF metering mode description
+    // For cameras like Canon CR2 that use different internal values,
+    // the MakerNote MeteringMode will override this in to_exiftool_json()
+    crate::tags::get_metering_mode_description(value).to_string()
+}
+
+/// Format a single Short value with tag-specific interpretation and optional manufacturer info
+#[cfg(feature = "serde")]
+fn format_short_value_with_make(value: u16, tag_id: u16, make: Option<&str>) -> Value {
     match tag_id {
         0x0106 => Value::String(
             crate::tags::get_photometric_interpretation_description(value).to_string(),
@@ -32,7 +42,7 @@ fn format_short_value(value: u16, tag_id: u16) -> Value {
         0x0128 => Value::String(crate::tags::get_resolution_unit_description(value).to_string()),
         0x0213 => Value::String(crate::tags::get_ycbcr_positioning_description(value).to_string()),
         0x8822 => Value::String(crate::tags::get_exposure_program_description(value).to_string()),
-        0x9207 => Value::String(crate::tags::get_metering_mode_description(value).to_string()),
+        0x9207 => Value::String(format_metering_mode(value, make)),
         0x9208 => Value::String(crate::tags::get_light_source_description(value).to_string()),
         0x9209 => Value::String(crate::tags::get_flash_description(value).to_string()),
         0xA001 => Value::String(crate::tags::get_color_space_description(value).to_string()),
@@ -356,7 +366,30 @@ fn should_format_as_space_separated(tag_id: u16) -> bool {
         | 0x828D // CFARepeatPatternDim
         | 0x0214 // ReferenceBlackWhite
         | 0xC620 // DefaultCropSize (DNG)
+        // Nikon makernote tags
+        | 0x0099 // RawImageCenter
+        | 0x0016 // ImageBoundary
     )
+}
+
+/// Special handling for RetouchHistory (Nikon 0x009E) - return "None" if all zeros
+#[cfg(feature = "serde")]
+fn format_retouch_history(values: &[u16]) -> Option<Value> {
+    if values.iter().all(|&v| v == 0) {
+        Some(Value::String("None".to_string()))
+    } else {
+        // Return decoded values for non-zero entries
+        let decoded: Vec<&str> = values
+            .iter()
+            .filter(|&&v| v != 0)
+            .map(|&v| crate::makernotes::nikon::decode_retouch_history_exiftool(v))
+            .collect();
+        if decoded.is_empty() {
+            Some(Value::String("None".to_string()))
+        } else {
+            Some(Value::String(decoded.join(", ")))
+        }
+    }
 }
 
 /// Tags that should be formatted as space-separated decimals for rational/srational arrays
@@ -367,6 +400,7 @@ fn should_format_rationals_as_space_separated(tag_id: u16) -> bool {
         0x013E // WhitePoint
         | 0x013F // PrimaryChromaticities
         | 0x0211 // YCbCrCoefficients
+        | 0x0214 // ReferenceBlackWhite
         | 0xC621 // ColorMatrix1 (DNG)
         | 0xC622 // ColorMatrix2 (DNG)
         | 0xC627 // AnalogBalance (DNG)
@@ -452,13 +486,10 @@ fn format_gps_timestamp(time: &[(u32, u32)]) -> String {
 
 /// Format CFA pattern bytes as ExifTool-compatible string
 /// Converts [0,1,1,2] to "[Red,Green][Green,Blue]"
+/// EXIF CFAPattern (0xA302) format: 2 bytes horiz repeat, 2 bytes vert repeat, then pattern
+/// TIFF/EP CFAPattern (0x828E) format: just the 4 pattern bytes
 #[cfg(feature = "serde")]
 fn format_cfa_pattern(data: &[u8]) -> Option<String> {
-    // CFA pattern for 2x2 Bayer pattern should have 4 bytes
-    if data.len() < 4 {
-        return None;
-    }
-
     let color_name = |c: u8| -> &'static str {
         match c {
             0 => "Red",
@@ -472,23 +503,96 @@ fn format_cfa_pattern(data: &[u8]) -> Option<String> {
         }
     };
 
-    // Format as [Row1][Row2] for 2x2 pattern
-    Some(format!(
-        "[{},{}][{},{}]",
-        color_name(data[0]),
-        color_name(data[1]),
-        color_name(data[2]),
-        color_name(data[3])
-    ))
+    // EXIF CFAPattern (0xA302) has 4-byte dimension prefix + pattern
+    // Format: [horiz_repeat:u16][vert_repeat:u16][pattern bytes]
+    // For 2x2 pattern: 8 bytes total (e.g., 0x00 0x02 0x00 0x02 + 4 pattern bytes)
+    // Endianness varies by camera - try both BE and LE
+    if data.len() == 8 {
+        // Try big-endian first (0x00 0x02 0x00 0x02)
+        let horiz_be = u16::from_be_bytes([data[0], data[1]]);
+        let vert_be = u16::from_be_bytes([data[2], data[3]]);
+        if horiz_be == 2 && vert_be == 2 {
+            // Pattern is in bytes 4-7
+            return Some(format!(
+                "[{},{}][{},{}]",
+                color_name(data[4]),
+                color_name(data[5]),
+                color_name(data[6]),
+                color_name(data[7])
+            ));
+        }
+        // Try little-endian (0x02 0x00 0x02 0x00)
+        let horiz_le = u16::from_le_bytes([data[0], data[1]]);
+        let vert_le = u16::from_le_bytes([data[2], data[3]]);
+        if horiz_le == 2 && vert_le == 2 {
+            // Pattern is in bytes 4-7
+            return Some(format!(
+                "[{},{}][{},{}]",
+                color_name(data[4]),
+                color_name(data[5]),
+                color_name(data[6]),
+                color_name(data[7])
+            ));
+        }
+    }
+
+    // TIFF/EP CFAPattern (0x828E) or other 4-byte patterns
+    if data.len() >= 4 {
+        return Some(format!(
+            "[{},{}][{},{}]",
+            color_name(data[0]),
+            color_name(data[1]),
+            color_name(data[2]),
+            color_name(data[3])
+        ));
+    }
+
+    None
+}
+
+/// Check if a string is a pure numeric value that can be output as a JSON number
+/// Returns true if the string contains only digits and has no leading zeros
+/// (unless it's just "0")
+#[cfg(feature = "serde")]
+fn is_numeric_string(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    // Check if all characters are digits
+    if !s.chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    // Check for leading zeros (but "0" itself is fine)
+    if s.len() > 1 && s.starts_with('0') {
+        return false;
+    }
+    true
 }
 
 /// Convert an ExifValue to a JSON value in exiftool-compatible format
 #[cfg(feature = "serde")]
 pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
+    format_exif_value_for_json_with_make(value, tag_id, None)
+}
+
+/// Convert an ExifValue to a JSON value in exiftool-compatible format with manufacturer info
+#[cfg(feature = "serde")]
+pub fn format_exif_value_for_json_with_make(
+    value: &ExifValue,
+    tag_id: u16,
+    make: Option<&str>,
+) -> Value {
     match value {
-        // ASCII strings - return as plain string
+        // ASCII strings - return as number if purely numeric, otherwise string
         ExifValue::Ascii(s) => {
             let cleaned = s.trim_end_matches('\0').trim();
+            // ExifTool outputs pure numeric strings (like SerialNumber, SubSecTime)
+            // as JSON numbers, so we do the same
+            if is_numeric_string(cleaned) {
+                if let Ok(n) = cleaned.parse::<u64>() {
+                    return Value::Number(n.into());
+                }
+            }
             Value::String(cleaned.to_string())
         }
 
@@ -503,8 +607,8 @@ pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
             _ => Value::Number(v[0].into()),
         },
 
-        // Single-value Short - use helper function
-        ExifValue::Short(v) if v.len() == 1 => format_short_value(v[0], tag_id),
+        // Single-value Short - use helper function with make for manufacturer-specific decoding
+        ExifValue::Short(v) if v.len() == 1 => format_short_value_with_make(v[0], tag_id, make),
 
         // Single-value other numeric types
         ExifValue::Long(v) if v.len() == 1 => Value::Number(v[0].into()),
@@ -556,6 +660,12 @@ pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
             }
         }
         ExifValue::Short(v) => {
+            // Nikon RetouchHistory (0x009E) - special handling
+            if tag_id == 0x009E {
+                if let Some(formatted) = format_retouch_history(v) {
+                    return formatted;
+                }
+            }
             if should_format_as_space_separated(tag_id) {
                 Value::String(
                     v.iter()
@@ -695,6 +805,13 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         output.insert("SourceFile".to_string(), Value::String(file.to_string()));
     }
 
+    // Extract Make for manufacturer-specific formatting (tag 0x010F)
+    let make: Option<String> = exif_data.get_tag_by_id(0x010F).and_then(|v| match v {
+        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        _ => None,
+    });
+    let make_ref = make.as_deref();
+
     // Convert each tag to a key-value pair
     for (tag_id, value) in exif_data.iter() {
         let tag_name = if let Some(name) = tag_id.name() {
@@ -702,7 +819,7 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         } else {
             format!("Tag{}", tag_id.id)
         };
-        let json_value = format_exif_value_for_json(value, tag_id.id);
+        let json_value = format_exif_value_for_json_with_make(value, tag_id.id, make_ref);
         output.insert(tag_name, json_value);
     }
 
@@ -808,14 +925,25 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     }
 
     // Add maker notes if present
-    // Skip MakerNote tags that would overwrite standard EXIF tags
+    // MakerNote tags can override EXIF tags for certain fields where the MakerNote
+    // value is more accurate (like MeteringMode for Canon cameras)
     if let Some(maker_notes) = exif_data.get_maker_notes() {
+        // Tags where MakerNote should override EXIF (ExifTool behavior)
+        const MAKERNOTE_PRIORITY_TAGS: &[&str] = &["MeteringMode", "WhiteBalance"];
+
         for (tag_id, maker_tag) in maker_notes.iter() {
             let tag_name = maker_tag
                 .tag_name
                 .unwrap_or_else(|| Box::leak(format!("MakerNote{:04X}", tag_id).into_boxed_str()));
-            // Only add if tag doesn't already exist (preserve standard EXIF over MakerNote)
-            if !output.contains_key(tag_name) {
+
+            // Allow MakerNote to override EXIF for priority tags
+            let should_insert = if MAKERNOTE_PRIORITY_TAGS.contains(&tag_name) {
+                true // Always use MakerNote value
+            } else {
+                !output.contains_key(tag_name) // Only add if not already present
+            };
+
+            if should_insert {
                 let json_value = format_exif_value_for_json(&maker_tag.value, *tag_id);
                 output.insert(tag_name.to_string(), json_value);
             }

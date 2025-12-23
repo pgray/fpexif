@@ -1,6 +1,7 @@
 // makernotes/sony.rs - Sony maker notes parsing
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use std::collections::HashMap;
@@ -71,6 +72,37 @@ pub const SONY_DYNAMIC_RANGE_OPTIMIZER_2: u16 = 0xB04F;
 pub const SONY_HIGH_ISO_NOISE_REDUCTION_2: u16 = 0xB050;
 pub const SONY_INTELLIGENT_AUTO: u16 = 0xB052;
 pub const SONY_WHITE_BALANCE_2: u16 = 0xB054;
+// Additional Sony Tags for 50% coverage
+pub const SONY_FLASH_ACTION: u16 = 0x2017;
+pub const SONY_EFCS: u16 = 0x201A;
+pub const SONY_AF_AREA_MODE_SETTING: u16 = 0x201C;
+pub const SONY_FLEXIBLE_SPOT_POSITION: u16 = 0x201D;
+pub const SONY_AF_POINTS_USED: u16 = 0x2020;
+pub const SONY_AF_TRACKING: u16 = 0x2021;
+pub const SONY_FOCAL_PLANE_AF_POINTS_USED: u16 = 0x2022;
+pub const SONY_MULTI_FRAME_NR_EFFECT: u16 = 0x2023;
+pub const SONY_WB_SHIFT_AB_GM_PRECISE: u16 = 0x2026;
+pub const SONY_FOCUS_LOCATION: u16 = 0x2027;
+pub const SONY_VARIABLE_LOW_PASS_FILTER: u16 = 0x2028;
+pub const SONY_RAW_FILE_TYPE: u16 = 0x2029;
+pub const SONY_PRIORITY_SET_IN_AWB: u16 = 0x202B;
+pub const SONY_METERING_MODE_2: u16 = 0x202C;
+pub const SONY_EXPOSURE_STANDARD_ADJUSTMENT: u16 = 0x202D;
+pub const SONY_QUALITY_3: u16 = 0x202E;
+pub const SONY_PIXEL_SHIFT_INFO: u16 = 0x202F;
+pub const SONY_SERIAL_NUMBER: u16 = 0x2031;
+pub const SONY_SHADOWS: u16 = 0x2032;
+pub const SONY_HIGHLIGHTS: u16 = 0x2033;
+pub const SONY_FADE: u16 = 0x2034;
+pub const SONY_SHARPNESS_RANGE: u16 = 0x2035;
+pub const SONY_CLARITY: u16 = 0x2036;
+pub const SONY_FOCUS_FRAME_SIZE: u16 = 0x2037;
+pub const SONY_JPEG_HEIF_SWITCH: u16 = 0x2039;
+pub const SONY_FACE_DETECTION: u16 = 0x0021;
+pub const SONY_SMILE_SHUTTER: u16 = 0x0022;
+pub const SONY_FOCUS_DISTANCE: u16 = 0x0206;
+pub const SONY_NOISE_REDUCTION_2: u16 = 0x200C;
+pub const SONY_WB_RG_BG_LEVELS: u16 = 0x2024;
 
 /// Get the name of a Sony MakerNote tag
 pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -112,6 +144,53 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         SONY_RELEASE_MODE => Some("ReleaseMode"),
         SONY_ANTI_BLUR => Some("AntiBlur"),
         SONY_INTELLIGENT_AUTO => Some("IntelligentAuto"),
+        SONY_WHITE_BALANCE_2 => Some("WhiteBalance2"),
+        SONY_FLASH_ACTION => Some("FlashAction"),
+        SONY_EFCS => Some("ElectronicFrontCurtainShutter"),
+        SONY_AF_AREA_MODE_SETTING => Some("AFAreaModeSetting"),
+        SONY_FLEXIBLE_SPOT_POSITION => Some("FlexibleSpotPosition"),
+        SONY_AF_POINTS_USED => Some("AFPointsUsed"),
+        SONY_AF_TRACKING => Some("AFTracking"),
+        SONY_FOCAL_PLANE_AF_POINTS_USED => Some("FocalPlaneAFPointsUsed"),
+        SONY_MULTI_FRAME_NR_EFFECT => Some("MultiFrameNREffect"),
+        SONY_WB_SHIFT_AB_GM_PRECISE => Some("WBShiftABGMPrecise"),
+        SONY_FOCUS_LOCATION => Some("FocusLocation"),
+        SONY_VARIABLE_LOW_PASS_FILTER => Some("VariableLowPassFilter"),
+        SONY_RAW_FILE_TYPE => Some("RAWFileType"),
+        SONY_PRIORITY_SET_IN_AWB => Some("PrioritySetInAWB"),
+        SONY_METERING_MODE_2 => Some("MeteringMode2"),
+        SONY_EXPOSURE_STANDARD_ADJUSTMENT => Some("ExposureStandardAdjustment"),
+        SONY_QUALITY_3 => Some("Quality3"),
+        SONY_PIXEL_SHIFT_INFO => Some("PixelShiftInfo"),
+        SONY_SERIAL_NUMBER => Some("SerialNumber"),
+        SONY_SHADOWS => Some("Shadows"),
+        SONY_HIGHLIGHTS => Some("Highlights"),
+        SONY_FADE => Some("Fade"),
+        SONY_SHARPNESS_RANGE => Some("SharpnessRange"),
+        SONY_CLARITY => Some("Clarity"),
+        SONY_FOCUS_FRAME_SIZE => Some("FocusFrameSize"),
+        SONY_JPEG_HEIF_SWITCH => Some("JPEGHEIFSwitch"),
+        SONY_WHITE_BALANCE_FINE_TUNE => Some("WhiteBalanceFineTune"),
+        SONY_SOFT_SKIN_EFFECT => Some("SoftSkinEffect"),
+        SONY_LATERAL_CHROMATIC_ABERRATION => Some("LateralChromaticAberration"),
+        SONY_WB_SHIFT_AB => Some("WBShiftAB"),
+        SONY_WB_SHIFT_GM => Some("WBShiftGM"),
+        SONY_AUTO_PORTRAIT_FRAMED => Some("AutoPortraitFramed"),
+        SONY_COLOR_COMPENSATION_FILTER => Some("ColorCompensationFilter"),
+        SONY_ZONE_MATCHING => Some("ZoneMatching"),
+        SONY_COLOR_MODE => Some("ColorMode"),
+        SONY_FILE_FORMAT => Some("FileFormat"),
+        SONY_AF_ILLUMINATOR => Some("AFIlluminator"),
+        SONY_FOCUS_MODE_2 => Some("FocusMode2"),
+        SONY_DYNAMIC_RANGE_OPTIMIZER_2 => Some("DynamicRangeOptimizer2"),
+        SONY_HIGH_ISO_NOISE_REDUCTION_2 => Some("HighISONoiseReduction2"),
+        SONY_LONG_EXPOSURE_NOISE_REDUCTION_2 => Some("LongExposureNoiseReduction2"),
+        SONY_SEQUENCE_NUMBER => Some("SequenceNumber"),
+        SONY_FACE_DETECTION => Some("FaceDetection"),
+        SONY_SMILE_SHUTTER => Some("SmileShutter"),
+        SONY_FOCUS_DISTANCE => Some("FocusDistance"),
+        SONY_NOISE_REDUCTION_2 => Some("NoiseReduction2"),
+        SONY_WB_RG_BG_LEVELS => Some("WBRGBGLevels"),
         _ => None,
     }
 }
@@ -422,9 +501,10 @@ pub fn decode_creative_style_exiftool(value: u16) -> &'static str {
 }
 // decode_creative_style_exiv2 - exiv2 uses string-based lookup (StringTagDetails)
 
-/// Decode ExposureMode value (tag 0xB041) - ExifTool format
-pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ExposureMode (tag 0xB041): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    exposure_mode,
+    exiftool: {
         0 => "Auto",
         1 => "Portrait",
         2 => "Landscape",
@@ -446,14 +526,8 @@ pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
         18 => "Background Defocus",
         19 => "Soft Skin",
         20 => "Portrait (with Smile Shutter)",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ExposureMode value (tag 0xB041) - exiv2 format
-/// Note: exiv2 has completely different value mappings
-pub fn decode_exposure_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Program AE",
         1 => "Portrait",
         2 => "Beach",
@@ -477,13 +551,13 @@ pub fn decode_exposure_mode_exiv2(value: u16) -> &'static str {
         39 => "Continuous Priority AE",
         40 => "Sweep Panorama",
         0xffff => "n/a",
-        _ => "Unknown",
     }
 }
 
-/// Decode AFMode value (tag 0xB043) - ExifTool format
-pub fn decode_af_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// AFMode (tag 0xB043): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    af_mode,
+    exiftool: {
         0 => "Default",
         1 => "Multi",
         2 => "Center",
@@ -499,13 +573,8 @@ pub fn decode_af_mode_exiftool(value: u16) -> &'static str {
         12 => "Flexible Spot (M)",
         13 => "Flexible Spot (L)",
         14 => "Eye AF",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AFMode value (tag 0xB043) - exiv2 format (Set1)
-pub fn decode_af_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Default",
         1 => "Multi",
         2 => "Center",
@@ -515,14 +584,13 @@ pub fn decode_af_mode_exiv2(value: u16) -> &'static str {
         14 => "Tracking",
         15 => "Face Detected",
         0xffff => "n/a",
-        _ => "Unknown",
     }
 }
 
-/// Decode DynamicRangeOptimizer value (tag 0xB025) - ExifTool format
-/// Note: This tag can be either SHORT or LONG depending on camera model
-pub fn decode_dynamic_range_optimizer_exiftool(value: u16) -> &'static str {
-    match value {
+// DynamicRangeOptimizer (tag 0xB025): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    dynamic_range_optimizer,
+    exiftool: {
         0 => "Off",
         1 => "Standard",
         2 => "Advanced Auto",
@@ -537,14 +605,8 @@ pub fn decode_dynamic_range_optimizer_exiftool(value: u16) -> &'static str {
         11 => "Lv3",
         12 => "Lv4",
         13 => "Lv5",
-        _ => "Unknown",
-    }
-}
-
-/// Decode DynamicRangeOptimizer value (tag 0xB025) - exiv2 format
-/// Note: exiv2 uses different indices for Advanced levels (8-11 vs 4-7)
-pub fn decode_dynamic_range_optimizer_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "Standard",
         2 => "Advanced Auto",
@@ -559,58 +621,35 @@ pub fn decode_dynamic_range_optimizer_exiv2(value: u16) -> &'static str {
         18 => "Lv3",
         19 => "Lv4",
         20 => "Lv5",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusMode value (tag 0x201B) - ExifTool format
-/// Note: This tag can be BYTE or SHORT depending on camera model
-pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusMode (tag 0x201B): Sony.pm / sonymn_int.cpp sonyFocusMode2
+define_tag_decoder! {
+    focus_mode,
+    both: {
         0 => "Manual",
         2 => "AF-S",
         3 => "AF-C",
         4 => "AF-A",
         6 => "DMF",
         7 => "AF-D",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusMode value (tag 0x201B) - exiv2 format (sonyFocusMode2)
-/// Note: exiv2 has gaps in the sequence (no 1, 5)
-pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
-    match value {
-        0 => "Manual",
-        2 => "AF-S",
-        3 => "AF-C",
-        4 => "AF-A",
-        6 => "DMF",
-        7 => "AF-D",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ImageStabilization value (tag 0xB026) - ExifTool format
-/// Note: This tag can be either SHORT or LONG depending on camera model
-pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
-    match value {
+// ImageStabilization (tag 0xB026): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    image_stabilization,
+    exiftool: {
         0 => "Off",
         1 => "On",
         2 => "On (2)",
         3 => "On (Shooting)",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ImageStabilization value (tag 0xB026) - exiv2 format
-/// Note: exiv2 only has Off, On, n/a
-pub fn decode_image_stabilization_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "On",
         0xffff => "n/a",
-        _ => "Unknown",
     }
 }
 
@@ -763,9 +802,10 @@ pub fn decode_teleconverter_exiftool(value: u32) -> &'static str {
 }
 // decode_teleconverter_exiv2 - same as exiftool, no separate function needed
 
-/// Decode PictureEffect value (tag 0x200E) - ExifTool format
-pub fn decode_picture_effect_exiftool(value: u16) -> &'static str {
-    match value {
+// PictureEffect (tag 0x200E): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    picture_effect,
+    exiftool: {
         0 => "Off",
         1 => "Toy Camera",
         2 => "Pop Color",
@@ -801,14 +841,8 @@ pub fn decode_picture_effect_exiftool(value: u16) -> &'static str {
         96 => "Illustration (low)",
         97 => "Illustration",
         98 => "Illustration (high)",
-        _ => "Unknown",
-    }
-}
-
-/// Decode PictureEffect value (tag 0x200E) - exiv2 format
-/// Note: exiv2 uses offset values for Miniature modes (48-54 vs 36-42)
-pub fn decode_picture_effect_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "Toy Camera",
         2 => "Pop Color",
@@ -845,7 +879,6 @@ pub fn decode_picture_effect_exiv2(value: u16) -> &'static str {
         112 => "Illustration (low)",
         113 => "Illustration",
         114 => "Illustration (high)",
-        _ => "Unknown",
     }
 }
 
@@ -1026,6 +1059,198 @@ pub fn format_lens_spec(bytes: &[u8]) -> String {
             max_ap_short as f32 / 10.0,
             max_ap_long as f32 / 10.0
         )
+    }
+}
+
+/// Decode FlashAction value (tag 0x2017) - exiv2 format
+pub fn decode_flash_action_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Did not fire",
+        1 => "Flash fired",
+        2 => "External flash fired",
+        3 => "Wireless controlled flash fired",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFTracking value (tag 0x2021) - exiv2 format
+pub fn decode_af_tracking_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Face tracking",
+        2 => "Lock on AF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MultiFrameNREffect value (tag 0x2023) - exiv2 format
+pub fn decode_multi_frame_nr_effect_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode RAWFileType value (tag 0x2029) - exiv2 format
+pub fn decode_raw_file_type_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Compressed RAW",
+        1 => "Uncompressed RAW",
+        2 => "Lossless Compressed RAW",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode PrioritySetInAWB value (tag 0x202B) - exiv2 format
+pub fn decode_priority_set_in_awb_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Ambience",
+        2 => "White",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MeteringMode2 value (tag 0x202C) - exiv2 format
+pub fn decode_metering_mode2_exiv2(value: u16) -> &'static str {
+    match value {
+        0x100 => "Multi-segment",
+        0x200 => "Center-weighted average",
+        0x301 => "Spot (Standard)",
+        0x302 => "Spot (Large)",
+        0x400 => "Average",
+        0x500 => "Highlight",
+        _ => "Unknown",
+    }
+}
+
+/// Decode JPEGHEIFSwitch value (tag 0x2039) - exiv2 format
+pub fn decode_jpeg_heif_switch_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "JPEG",
+        1 => "HEIF",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FocusMode3 value (tag 0xB04E) - exiv2 format
+pub fn decode_focus_mode3_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        2 => "AF-S",
+        3 => "AF-C",
+        5 => "Semi-manual",
+        6 => "DMF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SoftSkinEffect value (tag 0x200F) - exiv2 format
+pub fn decode_soft_skin_effect_exiv2(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Low",
+        2 => "Mid",
+        3 => "High",
+        0xffffffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AutoPortraitFramed value (tag 0x2016) - exiv2 format
+pub fn decode_auto_portrait_framed_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "No",
+        1 => "Yes",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFIlluminator value (tag 0xB044) - exiv2 format
+pub fn decode_af_illuminator_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Auto",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Macro value (tag 0xB040) - exiv2 format
+pub fn decode_macro_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        2 => "Close Focus",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode DynamicRangeOptimizer2 value (tag 0xB04F) - exiv2 format
+pub fn decode_dynamic_range_optimizer2_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Standard",
+        2 => "Plus",
+        _ => "Unknown",
+    }
+}
+
+/// Decode HighISONoiseReduction2 value (tag 0xB050) - exiv2 format
+pub fn decode_high_iso_noise_reduction2_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "High",
+        2 => "Low",
+        3 => "Off",
+        0xffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode LateralChromaticAberration value (tag 0x2012) - exiv2 format
+pub fn decode_lateral_chromatic_aberration_exiv2(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        2 => "Auto",
+        0xffffffff => "n/a",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFAreaModeSetting value (tag 0x201C) - exiv2 format Set1
+pub fn decode_af_area_mode_setting_set1_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Wide",
+        4 => "Local",
+        8 => "Zone",
+        9 => "Spot",
+        _ => "Unknown",
+    }
+}
+
+/// Decode WhiteBalance2 value (tag 0xB054) - exiv2 format
+pub fn decode_white_balance2_exiv2(value: u16) -> &'static str {
+    match value {
+        0 => "Auto",
+        4 => "Manual",
+        5 => "Daylight",
+        6 => "Cloudy",
+        7 => "Cool White Fluorescent",
+        8 => "Day White Fluorescent",
+        9 => "Daylight Fluorescent",
+        10 => "Incandescent2",
+        11 => "Warm White Fluorescent",
+        14 => "Incandescent",
+        15 => "Flash",
+        17 => "Underwater 1 (Blue Water)",
+        18 => "Underwater 2 (Green Water)",
+        19 => "Underwater Auto",
+        _ => "Unknown",
     }
 }
 

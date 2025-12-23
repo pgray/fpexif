@@ -2,9 +2,12 @@
 
 pub mod canon;
 pub mod fuji;
+pub mod kodak;
+pub mod minolta;
 pub mod nikon;
 pub mod olympus;
 pub mod panasonic;
+pub mod pentax;
 pub mod sony;
 
 use crate::data_types::{Endianness, ExifValue};
@@ -66,6 +69,12 @@ pub fn parse_maker_notes_with_tiff_data(
         olympus::parse_olympus_maker_notes(data, endian)
     } else if make_str.contains("panasonic") {
         panasonic::parse_panasonic_maker_notes(data, endian)
+    } else if make_str.contains("pentax") || make_str.contains("ricoh") {
+        pentax::parse_pentax_maker_notes(data, endian)
+    } else if make_str.contains("minolta") || make_str.contains("konica") {
+        minolta::parse_minolta_maker_notes(data, endian)
+    } else if make_str.contains("kodak") || make_str.contains("eastman") {
+        kodak::parse_kodak_maker_notes(data, endian)
     } else {
         // Unknown maker, return empty HashMap
         Ok(HashMap::new())

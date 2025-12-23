@@ -85,6 +85,417 @@ pub const CANON_MULTI_EXP: u16 = 0x4021;
 pub const CANON_FILTER_INFO: u16 = 0x4024;
 pub const CANON_HDR_INFO: u16 = 0x4025;
 pub const CANON_AF_CONFIG: u16 = 0x4028;
+pub const CANON_RAW_BURST_MODE_ROLL: u16 = 0x4029;
+pub const CANON_LOG_INFO: u16 = 0x4040;
+
+// CameraSettings sub-array tags (indices in tag 0x0001)
+pub const CS_MACRO_MODE: u16 = 0x0001;
+pub const CS_SELF_TIMER: u16 = 0x0002;
+pub const CS_QUALITY: u16 = 0x0003;
+pub const CS_FLASH_MODE: u16 = 0x0004;
+pub const CS_CONTINUOUS_DRIVE: u16 = 0x0005;
+pub const CS_FOCUS_MODE: u16 = 0x0007;
+pub const CS_RECORD_MODE: u16 = 0x0009;
+pub const CS_IMAGE_SIZE: u16 = 0x000A;
+pub const CS_EASY_MODE: u16 = 0x000B;
+pub const CS_DIGITAL_ZOOM: u16 = 0x000C;
+pub const CS_CONTRAST: u16 = 0x000D;
+pub const CS_SATURATION: u16 = 0x000E;
+pub const CS_SHARPNESS: u16 = 0x000F;
+pub const CS_ISO_SPEED: u16 = 0x0010;
+pub const CS_METERING_MODE: u16 = 0x0011;
+pub const CS_FOCUS_TYPE: u16 = 0x0012;
+pub const CS_AF_POINT: u16 = 0x0013;
+pub const CS_EXPOSURE_PROGRAM: u16 = 0x0014;
+pub const CS_LENS_TYPE: u16 = 0x0016;
+pub const CS_MAX_FOCAL_LENGTH: u16 = 0x0017;
+pub const CS_MIN_FOCAL_LENGTH: u16 = 0x0018;
+pub const CS_FOCAL_UNITS: u16 = 0x0019;
+pub const CS_MAX_APERTURE: u16 = 0x001A;
+pub const CS_MIN_APERTURE: u16 = 0x001B;
+pub const CS_FLASH_ACTIVITY: u16 = 0x001C;
+pub const CS_FLASH_BITS: u16 = 0x001D;
+pub const CS_FOCUS_CONTINUOUS: u16 = 0x0020;
+pub const CS_AE_SETTING: u16 = 0x0021;
+pub const CS_IMAGE_STABILIZATION: u16 = 0x0022;
+pub const CS_DISPLAY_APERTURE: u16 = 0x0023;
+pub const CS_ZOOM_SOURCE_WIDTH: u16 = 0x0024;
+pub const CS_ZOOM_TARGET_WIDTH: u16 = 0x0025;
+pub const CS_SPOT_METERING_MODE: u16 = 0x0027;
+pub const CS_PHOTO_EFFECT: u16 = 0x0028;
+pub const CS_MANUAL_FLASH_OUTPUT: u16 = 0x0029;
+pub const CS_COLOR_TONE: u16 = 0x002A;
+pub const CS_SRAW_QUALITY: u16 = 0x002E;
+pub const CS_FOCUS_BRACKETING: u16 = 0x0032; // Index 50
+pub const CS_CLARITY: u16 = 0x0033; // Index 51
+pub const CS_HDR_PQ: u16 = 0x0034; // Index 52
+
+// ShotInfo sub-array tags (indices in tag 0x0004)
+pub const SI_AUTO_ISO: u16 = 0x0001;
+pub const SI_BASE_ISO: u16 = 0x0002;
+pub const SI_MEASURED_EV: u16 = 0x0003;
+pub const SI_TARGET_APERTURE: u16 = 0x0004;
+pub const SI_TARGET_EXPOSURE_TIME: u16 = 0x0005;
+pub const SI_EXPOSURE_COMPENSATION: u16 = 0x0006;
+pub const SI_WHITE_BALANCE: u16 = 0x0007;
+pub const SI_SLOW_SHUTTER: u16 = 0x0008;
+pub const SI_SEQUENCE_NUMBER: u16 = 0x0009;
+pub const SI_OPTICAL_ZOOM_CODE: u16 = 0x000A;
+pub const SI_CAMERA_TEMPERATURE: u16 = 0x000C;
+pub const SI_FLASH_GUIDE_NUMBER: u16 = 0x000D;
+pub const SI_AF_POINTS_IN_FOCUS: u16 = 0x000E;
+pub const SI_FLASH_EXPOSURE_COMP: u16 = 0x000F;
+pub const SI_AUTO_EXPOSURE_BRACKETING: u16 = 0x0010;
+pub const SI_AEB_BRACKET_VALUE: u16 = 0x0011;
+pub const SI_CONTROL_MODE: u16 = 0x0012;
+pub const SI_FOCUS_DISTANCE_UPPER: u16 = 0x0013;
+pub const SI_FOCUS_DISTANCE_LOWER: u16 = 0x0014;
+pub const SI_FNUMBER: u16 = 0x0015; // Index 21
+pub const SI_EXPOSURE_TIME: u16 = 0x0016; // Index 22
+pub const SI_MEASURED_EV2: u16 = 0x0017; // Index 23
+pub const SI_BULB_DURATION: u16 = 0x0018; // Index 24
+pub const SI_CAMERA_TYPE: u16 = 0x001A; // Index 26
+pub const SI_AUTO_ROTATE: u16 = 0x001B; // Index 27
+pub const SI_ND_FILTER: u16 = 0x001C; // Index 28
+pub const SI_SELF_TIMER_2: u16 = 0x001D; // Index 29
+pub const SI_FLASH_OUTPUT: u16 = 0x0021; // Index 33
+
+// FocalLength sub-array tags (indices in tag 0x0002)
+pub const FL_FOCAL_TYPE: u16 = 0x0000;
+pub const FL_FOCAL_LENGTH: u16 = 0x0001;
+pub const FL_FOCAL_PLANE_X_SIZE: u16 = 0x0002;
+pub const FL_FOCAL_PLANE_Y_SIZE: u16 = 0x0003;
+
+// ProcessingInfo sub-array tags (indices in tag 0x00A0)
+pub const PR_TONE_CURVE: u16 = 0x0001;
+pub const PR_SHARPNESS: u16 = 0x0002;
+pub const PR_SHARPNESS_FREQUENCY: u16 = 0x0003;
+pub const PR_SENSOR_RED_LEVEL: u16 = 0x0004;
+pub const PR_SENSOR_BLUE_LEVEL: u16 = 0x0005;
+pub const PR_WHITE_BALANCE_RED: u16 = 0x0006;
+pub const PR_WHITE_BALANCE_BLUE: u16 = 0x0007;
+pub const PR_WHITE_BALANCE: u16 = 0x0008;
+pub const PR_COLOR_TEMPERATURE: u16 = 0x0009;
+pub const PR_PICTURE_STYLE: u16 = 0x000A;
+pub const PR_DIGITAL_GAIN: u16 = 0x000B;
+pub const PR_WB_SHIFT_AB: u16 = 0x000C;
+pub const PR_WB_SHIFT_GM: u16 = 0x000D;
+
+// FileInfo sub-array tags (indices in tag 0x0093)
+pub const FI_FILE_NUMBER: u16 = 0x0001;
+pub const FI_BRACKET_MODE: u16 = 0x0003;
+pub const FI_BRACKET_VALUE: u16 = 0x0004;
+pub const FI_BRACKET_SHOT_NUMBER: u16 = 0x0005;
+pub const FI_RAW_JPG_QUALITY: u16 = 0x0006;
+pub const FI_RAW_JPG_SIZE: u16 = 0x0007;
+pub const FI_NOISE_REDUCTION: u16 = 0x0008;
+pub const FI_WB_BRACKET_MODE: u16 = 0x0009;
+pub const FI_WB_BRACKET_VALUE_AB: u16 = 0x000C;
+pub const FI_WB_BRACKET_VALUE_GM: u16 = 0x000D;
+pub const FI_FILTER_EFFECT: u16 = 0x000E;
+pub const FI_TONING_EFFECT: u16 = 0x000F;
+pub const FI_MACRO_MAGNIFICATION: u16 = 0x0010;
+pub const FI_LIVE_VIEW_SHOOTING: u16 = 0x0013;
+pub const FI_FOCUS_DISTANCE_UPPER_2: u16 = 0x0014;
+pub const FI_FOCUS_DISTANCE_LOWER_2: u16 = 0x0015;
+pub const FI_FLASH_EXPOSURE_LOCK: u16 = 0x0019;
+
+// LightingOpt sub-array tags (indices in tag 0x4018)
+pub const LO_PERIPHERAL_LIGHTING: u16 = 0x0000;
+pub const LO_PERIPHERAL_LIGHTING_VALUE: u16 = 0x0001;
+pub const LO_AUTO_LIGHTING_OPTIMIZER: u16 = 0x0002;
+pub const LO_HIGH_ISO_NOISE_REDUCTION: u16 = 0x0003;
+pub const LO_HIGHLIGHT_TONE_PRIORITY: u16 = 0x0004;
+pub const LO_LONG_EXPOSURE_NOISE_REDUCTION: u16 = 0x0005;
+
+// AFConfig sub-array tags (indices in tag 0x4028)
+pub const AFC_AF_CONFIG_TOOL: u16 = 0x0000;
+pub const AFC_AF_TRACK_SENSITIVITY: u16 = 0x0001;
+pub const AFC_AF_ACCEL_TRACK: u16 = 0x0002;
+pub const AFC_AF_POINT_SWITCHING: u16 = 0x0003;
+pub const AFC_AI_SERVO_FIRST_IMAGE: u16 = 0x0004;
+pub const AFC_AI_SERVO_SECOND_IMAGE: u16 = 0x0005;
+pub const AFC_USABLE_AF_POINTS: u16 = 0x0006;
+
+// VignettingCorr sub-array tags (indices in tag 0x4015)
+pub const VC_PERIPHERAL_ILLUMINATION_CORR: u16 = 0x0000;
+pub const VC_DISTORTION_CORRECTION: u16 = 0x0001;
+pub const VC_CHROMATIC_ABERRATION_CORR: u16 = 0x0002;
+pub const VC_PERIPHERAL_ILLUMINATION_CORR_2: u16 = 0x0003;
+pub const VC_DIFFRACTION_CORRECTION: u16 = 0x0004;
+
+// LensInfo sub-array tags (indices in tag 0x4019)
+pub const LI_LENS_SERIAL_NUMBER: u16 = 0x0000;
+
+// MultiExp sub-array tags (indices in tag 0x4021)
+pub const ME_MULTI_EXPOSURE_MODE: u16 = 0x0000;
+pub const ME_MULTI_EXPOSURE_SHOTS: u16 = 0x0001;
+pub const ME_MULTI_EXPOSURE_CONTROL: u16 = 0x0002;
+
+// HDRInfo sub-array tags (indices in tag 0x4025)
+pub const HDR_MODE: u16 = 0x0000;
+pub const HDR_STRENGTH: u16 = 0x0001;
+pub const HDR_EFFECT: u16 = 0x0002;
+
+// Additional CameraSettings tags
+pub const CS_FLASH_DETAILS: u16 = 0x001E;
+pub const CS_FOCUS_MODE_2: u16 = 0x0032;
+pub const CS_MANUAL_AF_POINT_SEL: u16 = 0x0034;
+pub const CS_AF_AREA_MODE: u16 = 0x0033;
+
+// AspectInfo sub-array tags (indices in tag 0x009A)
+pub const AI_ASPECT_RATIO: u16 = 0x0000;
+pub const AI_CROPPED_IMAGE_WIDTH: u16 = 0x0001;
+pub const AI_CROPPED_IMAGE_HEIGHT: u16 = 0x0002;
+pub const AI_CROPPED_IMAGE_LEFT: u16 = 0x0003;
+pub const AI_CROPPED_IMAGE_TOP: u16 = 0x0004;
+
+// CustomFunctions tags
+pub const CF_SET_BUTTON_FUNCTION: u16 = 0x0101;
+pub const CF_LONG_EXPOSURE_NOISE_REDUCTION: u16 = 0x0102;
+pub const CF_FLASH_SYNC_SPEED: u16 = 0x0103;
+pub const CF_SHUTTER_AE_LOCK_BUTTON: u16 = 0x0104;
+pub const CF_MIRROR_LOCKUP: u16 = 0x0105;
+pub const CF_TV_AV_SETTING: u16 = 0x0106;
+pub const CF_AF_ASSIST_BEAM_FIRING: u16 = 0x0107;
+pub const CF_SAFETY_SHIFT: u16 = 0x0108;
+pub const CF_LCD_DISPLAY_AT_POWER_ON: u16 = 0x0109;
+pub const CF_AEB_SEQUENCE: u16 = 0x0110;
+pub const CF_SHUTTER_CURTAIN_SYNC: u16 = 0x0111;
+
+// MovieInfo sub-array tags (indices in tag 0x0011)
+pub const MI_MOVIE_FRAME_WIDTH: u16 = 0x0000;
+pub const MI_MOVIE_FRAME_HEIGHT: u16 = 0x0001;
+pub const MI_MOVIE_FRAME_RATE: u16 = 0x0002;
+pub const MI_MOVIE_FRAME_COUNT: u16 = 0x0003;
+pub const MI_MOVIE_AUDIO_DURATION: u16 = 0x0004;
+
+// AFInfo2 sub-array tags (indices in tag 0x0026)
+pub const AF2_NUM_AF_POINTS: u16 = 0x0000;
+pub const AF2_VALID_AF_POINTS: u16 = 0x0001;
+pub const AF2_IMG_WIDTH: u16 = 0x0002;
+pub const AF2_IMG_HEIGHT: u16 = 0x0003;
+pub const AF2_AF_IMG_WIDTH: u16 = 0x0004;
+pub const AF2_AF_IMG_HEIGHT: u16 = 0x0005;
+pub const AF2_AF_AREA_WIDTHS: u16 = 0x0006;
+pub const AF2_AF_AREA_HEIGHTS: u16 = 0x0007;
+pub const AF2_AF_AREA_X_POSITIONS: u16 = 0x0008;
+pub const AF2_AF_AREA_Y_POSITIONS: u16 = 0x0009;
+pub const AF2_AF_POINTS_IN_FOCUS: u16 = 0x000A;
+pub const AF2_AF_POINTS_SELECTED: u16 = 0x000B;
+pub const AF2_PRIMARY_AF_POINT: u16 = 0x000C;
+
+// ColorBalance sub-array tags (indices in tag 0x00A9)
+pub const CB_WB_RGGB_LEVELS_AS_SHOT: u16 = 0x0000;
+pub const CB_COLOR_TEMP_AS_SHOT: u16 = 0x0001;
+pub const CB_WB_RGGB_LEVELS_AUTO: u16 = 0x0002;
+pub const CB_COLOR_TEMP_AUTO: u16 = 0x0003;
+pub const CB_WB_RGGB_LEVELS_MEASURED: u16 = 0x0004;
+pub const CB_COLOR_TEMP_MEASURED: u16 = 0x0005;
+pub const CB_WB_RGGB_LEVELS_DAYLIGHT: u16 = 0x0006;
+pub const CB_COLOR_TEMP_DAYLIGHT: u16 = 0x0007;
+pub const CB_WB_RGGB_LEVELS_SHADE: u16 = 0x0008;
+pub const CB_COLOR_TEMP_SHADE: u16 = 0x0009;
+pub const CB_WB_RGGB_LEVELS_CLOUDY: u16 = 0x000A;
+pub const CB_COLOR_TEMP_CLOUDY: u16 = 0x000B;
+pub const CB_WB_RGGB_LEVELS_TUNGSTEN: u16 = 0x000C;
+pub const CB_COLOR_TEMP_TUNGSTEN: u16 = 0x000D;
+pub const CB_WB_RGGB_LEVELS_FLUORESCENT: u16 = 0x000E;
+pub const CB_COLOR_TEMP_FLUORESCENT: u16 = 0x000F;
+pub const CB_WB_RGGB_LEVELS_KELVIN: u16 = 0x0010;
+pub const CB_COLOR_TEMP_KELVIN: u16 = 0x0011;
+pub const CB_WB_RGGB_LEVELS_FLASH: u16 = 0x0012;
+pub const CB_COLOR_TEMP_FLASH: u16 = 0x0013;
+
+// SensorInfo sub-array tags (indices in tag 0x00E0)
+pub const SE_SENSOR_WIDTH: u16 = 0x0001;
+pub const SE_SENSOR_HEIGHT: u16 = 0x0002;
+pub const SE_SENSOR_LEFT_BORDER: u16 = 0x0005;
+pub const SE_SENSOR_TOP_BORDER: u16 = 0x0006;
+pub const SE_SENSOR_RIGHT_BORDER: u16 = 0x0007;
+pub const SE_SENSOR_BOTTOM_BORDER: u16 = 0x0008;
+pub const SE_BLACK_MASK_LEFT_BORDER: u16 = 0x0009;
+pub const SE_BLACK_MASK_TOP_BORDER: u16 = 0x000A;
+pub const SE_BLACK_MASK_RIGHT_BORDER: u16 = 0x000B;
+pub const SE_BLACK_MASK_BOTTOM_BORDER: u16 = 0x000C;
+
+// FilterInfo sub-array tags (indices in tag 0x4024)
+pub const FLT_MINIATURE_FILTER_ORIENTATION: u16 = 0x0000;
+pub const FLT_MINIATURE_FILTER_POSITION: u16 = 0x0001;
+pub const FLT_MINIATURE_FILTER_PARAMETER: u16 = 0x0002;
+pub const FLT_FISHEYE_EFFECT: u16 = 0x0003;
+pub const FLT_TOY_CAMERA_EFFECT: u16 = 0x0004;
+pub const FLT_SOFT_FOCUS_EFFECT: u16 = 0x0005;
+
+// AmbianceInfo sub-array tags (indices in tag 0x4020)
+pub const AM_AMBIANCE_SELECTION: u16 = 0x0000;
+pub const AM_AMBIANCE_EFFECT: u16 = 0x0001;
+
+// PictureStyleUserDef sub-array tags (indices in tag 0x4008)
+pub const PS_USER_DEF_1: u16 = 0x0000;
+pub const PS_USER_DEF_2: u16 = 0x0001;
+pub const PS_USER_DEF_3: u16 = 0x0002;
+
+// AFMicroAdj sub-array tags (indices in tag 0x4013)
+pub const AFMA_AF_MICRO_ADJ_MODE: u16 = 0x0000;
+pub const AFMA_AF_MICRO_ADJ_VALUE: u16 = 0x0001;
+
+// Additional main IFD tags
+pub const CANON_FACE_INFO_1: u16 = 0x0030;
+pub const CANON_FACE_INFO_2: u16 = 0x0031;
+pub const CANON_ORIGINAL_FILENAME: u16 = 0x003A;
+pub const CANON_EMBEDDED_IMAGE_QUALITY: u16 = 0x0071;
+pub const CANON_MV_INFO: u16 = 0x4007;
+pub const CANON_CANON_FLASHINFO: u16 = 0x00C4;
+pub const CANON_INTERNAL_SERIAL_NUMBER: u16 = 0x0096;
+
+// Additional CropInfo tags (indices in tag 0x0098)
+pub const CR_CROP_LEFT_MARGIN: u16 = 0x0000;
+pub const CR_CROP_RIGHT_MARGIN: u16 = 0x0001;
+pub const CR_CROP_TOP_MARGIN: u16 = 0x0002;
+pub const CR_CROP_BOTTOM_MARGIN: u16 = 0x0003;
+
+// Panorama sub-array tags (indices in tag 0x0005)
+pub const PA_PANORAMA_FRAME_NUMBER: u16 = 0x0000;
+pub const PA_PANORAMA_DIRECTION: u16 = 0x0001;
+
+// FaceDetect sub-array tags (indices in tag 0x0024)
+pub const FD_NUM_FACES_DETECTED: u16 = 0x0000;
+pub const FD_FACE_DETECT_FRAME_SIZE: u16 = 0x0001;
+pub const FD_FACE_1_POSITION: u16 = 0x0002;
+pub const FD_FACE_2_POSITION: u16 = 0x0003;
+pub const FD_FACE_3_POSITION: u16 = 0x0004;
+pub const FD_FACE_4_POSITION: u16 = 0x0005;
+pub const FD_FACE_5_POSITION: u16 = 0x0006;
+
+// PreviewImageInfo sub-array tags (indices in tag 0x00B6)
+pub const PI_PREVIEW_QUALITY: u16 = 0x0000;
+pub const PI_PREVIEW_IMAGE_LENGTH: u16 = 0x0001;
+pub const PI_PREVIEW_IMAGE_WIDTH: u16 = 0x0002;
+pub const PI_PREVIEW_IMAGE_HEIGHT: u16 = 0x0003;
+pub const PI_PREVIEW_IMAGE_START: u16 = 0x0004;
+pub const PI_FOCAL_PLANE_X_RESOLUTION: u16 = 0x0005;
+pub const PI_FOCAL_PLANE_Y_RESOLUTION: u16 = 0x0006;
+
+// ModifiedInfo sub-array tags (indices in tag 0x00B1)
+pub const MD_MODIFIED_TONE_CURVE: u16 = 0x0000;
+pub const MD_MODIFIED_SHARPNESS: u16 = 0x0001;
+pub const MD_MODIFIED_SHARPNESS_FREQ: u16 = 0x0002;
+pub const MD_MODIFIED_SENSOR_RED_LEVEL: u16 = 0x0003;
+pub const MD_MODIFIED_SENSOR_BLUE_LEVEL: u16 = 0x0004;
+pub const MD_MODIFIED_WHITE_BALANCE_RED: u16 = 0x0005;
+pub const MD_MODIFIED_WHITE_BALANCE_BLUE: u16 = 0x0006;
+pub const MD_MODIFIED_WHITE_BALANCE: u16 = 0x0007;
+pub const MD_MODIFIED_COLOR_TEMP: u16 = 0x0008;
+pub const MD_MODIFIED_PICTURE_STYLE: u16 = 0x0009;
+pub const MD_MODIFIED_DIGITAL_GAIN: u16 = 0x000A;
+
+// VignettingCorr2 sub-array tags (indices in tag 0x4016)
+pub const VC2_PERIPHERAL_LIGHTING_SETTING: u16 = 0x0000;
+pub const VC2_CHROMATIC_ABERRATION_SETTING: u16 = 0x0001;
+pub const VC2_DISTORTION_SETTING: u16 = 0x0002;
+
+// FlashInfo sub-array tags (indices in tag 0x0003)
+pub const FLS_FLASH_GUIDE_NUMBER: u16 = 0x0000;
+pub const FLS_FLASH_THRESHOLD: u16 = 0x0001;
+
+// TimeInfo sub-array tags (indices in tag 0x0035)
+pub const TI_TIME_ZONE: u16 = 0x0000;
+pub const TI_TIME_ZONE_CITY: u16 = 0x0001;
+pub const TI_DAYLIGHT_SAVINGS: u16 = 0x0002;
+
+// ContrastInfo sub-array tags (indices in tag 0x0027)
+pub const CI_INCREMENTAL_COLOR_TEMP: u16 = 0x0004;
+pub const CI_INCREMENTAL_TINT: u16 = 0x0005;
+
+// Additional FileInfo tags
+pub const FI_SHUTTER_MODE: u16 = 0x0016;
+pub const FI_RAW_BURST_IMAGE_COUNT: u16 = 0x0017;
+pub const FI_RAW_BURST_SHOT_NUM: u16 = 0x0018;
+pub const FI_HDR: u16 = 0x001E;
+
+// Additional LightingOpt tags
+pub const LO_DIGITAL_LENS_OPTIMIZER: u16 = 0x0006;
+pub const LO_DLO_DATA: u16 = 0x0007;
+pub const LO_DLO_SETTING_APPLIED: u16 = 0x0009;
+
+// Extended ColorData indices (tag 0x4001)
+pub const CD_COLOR_DATA_VERSION: u16 = 0x0000;
+pub const CD_WB_RGGB_LEVELS_AS_SHOT: u16 = 0x0003;
+pub const CD_COLOR_TEMP_AS_SHOT: u16 = 0x0007;
+pub const CD_WB_RGGB_LEVELS_AUTO: u16 = 0x0008;
+pub const CD_COLOR_TEMP_AUTO: u16 = 0x000C;
+pub const CD_WB_RGGB_LEVELS_MEASURED: u16 = 0x000D;
+pub const CD_COLOR_TEMP_MEASURED: u16 = 0x0011;
+pub const CD_WB_RGGB_BLACK_LEVELS: u16 = 0x0012;
+pub const CD_LINEAR_RESPONSE_LIMIT: u16 = 0x0016;
+pub const CD_CAMERA_COLOR_CALIBRATION_01: u16 = 0x0017;
+pub const CD_CAMERA_COLOR_CALIBRATION_02: u16 = 0x0018;
+pub const CD_CAMERA_COLOR_CALIBRATION_03: u16 = 0x0019;
+pub const CD_CAMERA_COLOR_CALIBRATION_04: u16 = 0x001A;
+pub const CD_CAMERA_COLOR_CALIBRATION_05: u16 = 0x001B;
+pub const CD_CAMERA_COLOR_CALIBRATION_06: u16 = 0x001C;
+pub const CD_CAMERA_COLOR_CALIBRATION_07: u16 = 0x001D;
+pub const CD_CAMERA_COLOR_CALIBRATION_08: u16 = 0x001E;
+pub const CD_CAMERA_COLOR_CALIBRATION_09: u16 = 0x001F;
+pub const CD_CAMERA_COLOR_CALIBRATION_10: u16 = 0x0020;
+pub const CD_CAMERA_COLOR_CALIBRATION_11: u16 = 0x0021;
+pub const CD_CAMERA_COLOR_CALIBRATION_12: u16 = 0x0022;
+pub const CD_CAMERA_COLOR_CALIBRATION_13: u16 = 0x0023;
+pub const CD_CAMERA_COLOR_CALIBRATION_14: u16 = 0x0024;
+pub const CD_CAMERA_COLOR_CALIBRATION_15: u16 = 0x0025;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_01: u16 = 0x0026;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_02: u16 = 0x0027;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_03: u16 = 0x0028;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_04: u16 = 0x0029;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_05: u16 = 0x002A;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_06: u16 = 0x002B;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_07: u16 = 0x002C;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_08: u16 = 0x002D;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_09: u16 = 0x002E;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_10: u16 = 0x002F;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_11: u16 = 0x0030;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_12: u16 = 0x0031;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_13: u16 = 0x0032;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_14: u16 = 0x0033;
+pub const CD_REDUCED_RESOLUTION_CALIBRATION_15: u16 = 0x0034;
+pub const CD_AVERAGE_BLACK_LEVEL: u16 = 0x0035;
+
+// Additional AFInfo2 tags
+pub const AF2_AF_STATUS_ARRAY: u16 = 0x000D;
+
+// Extended CameraSettings tags
+pub const CS_ND_FILTER: u16 = 0x0015;
+pub const CS_FOCUS_RANGE: u16 = 0x0033;
+
+// Extended ShotInfo tags
+pub const SI_AF_AREA_WIDTH: u16 = 0x0019;
+pub const SI_AF_AREA_HEIGHT: u16 = 0x001A;
+pub const SI_AF_AREA_X_POSITIONS: u16 = 0x001B;
+pub const SI_AF_AREA_Y_POSITIONS: u16 = 0x001C;
+
+// Additional main tags
+pub const CANON_MEASURED_EV_2: u16 = 0x00A6;
+pub const CANON_FLASH_INFO_2: u16 = 0x0018;
+pub const CANON_MEASURED_RGGB: u16 = 0x00AB;
+pub const CANON_WB_PACKET: u16 = 0x00AD;
+pub const CANON_HIGHLIGHT_SHADOW_ADJUST: u16 = 0x00AC;
+pub const CANON_SENSOR_CALIBRATION: u16 = 0x00E5;
+pub const CANON_ROLLING_SHUTTER_INFO: u16 = 0x00E6;
+pub const CANON_CCDT_INFO: u16 = 0x00E2;
+pub const CANON_VRD_STAMP_INFO: u16 = 0x00D1;
+pub const CANON_DIGITAL_INFO: u16 = 0x00E4;
+pub const CANON_LENS_SERIAL_INFO: u16 = 0x00E8;
+pub const CANON_CANON_VRD_RECIPE: u16 = 0x00DF;
+pub const CANON_MK_NOTES_VERSION: u16 = 0x0001;
+pub const CANON_ISO_SPEED_RATING: u16 = 0x000A;
+pub const CANON_LONG_EXP_NR_ON: u16 = 0x00E7;
+pub const CANON_USER_COMMENT: u16 = 0x00F7;
+pub const CANON_WB_INFO_2: u16 = 0x002A;
+pub const CANON_AF_POINTS_IN_FOCUS: u16 = 0x002C;
+pub const CANON_MY_COLOR_MODE: u16 = 0x002D;
+pub const CANON_FACE_DETECT_INFO: u16 = 0x002E;
+pub const CANON_THUMBNAIL_IMAGE: u16 = 0x0032;
 
 /// Get Canon lens name from lens type ID
 /// Based on ExifTool's canonLensTypes database
@@ -644,6 +1055,7 @@ define_tag_decoder! {
         4 => "Continuous, Low",
         5 => "Continuous, High",
         6 => "Silent Single Shooting",
+        8 => "Continuous, High+",
         9 => "Single-frame Shooting, Silent",
         10 => "Continuous Shooting, Silent",
     },
@@ -655,6 +1067,7 @@ define_tag_decoder! {
         4 => "Continuous, low",
         5 => "Continuous, high",
         6 => "Silent Single",
+        8 => "Continuous, high+",
         9 => "Single, Silent",
         10 => "Continuous, Silent",
     }
@@ -667,12 +1080,16 @@ define_tag_decoder! {
         0 => "One-shot AF",
         1 => "AI Servo AF",
         2 => "AI Focus AF",
-        3 => "Manual Focus",
+        3 => "Manual Focus (3)",
         4 => "Single",
         5 => "Continuous",
-        6 => "Manual Focus",
+        6 => "Manual Focus (6)",
         16 => "Pan Focus",
-        256 => "Manual",
+        256 => "One-shot AF (Live View)",
+        257 => "AI Servo AF (Live View)",
+        258 => "AI Focus AF (Live View)",
+        512 => "Movie Snap Focus",
+        519 => "Movie Servo AF",
     },
     exiv2: {
         0 => "One shot AF",
@@ -905,27 +1322,15 @@ pub fn decode_control_mode_exiftool(value: u16) -> &'static str {
 
 // ControlMode exiv2 - same as exiftool
 
-/// Decode CameraType - ExifTool format (from Canon.pm PrintConv, ShotInfo index 26)
-pub fn decode_camera_type_exiftool(value: u16) -> &'static str {
-    match value {
+// CameraType: Canon.pm PrintConv / canonmn_int.cpp cameraType
+define_tag_decoder! {
+    camera_type,
+    both: {
         0 => "n/a",
         248 => "EOS High-end",
         250 => "Compact",
         252 => "EOS Mid-range",
         255 => "DV Camera",
-        _ => "Unknown",
-    }
-}
-
-/// Decode CameraType - exiv2 format (from canonmn_int.cpp cameraType)
-pub fn decode_camera_type_exiv2(value: u16) -> &'static str {
-    match value {
-        0 => "n/a",
-        248 => "EOS High-end",
-        250 => "Compact",
-        252 => "EOS Mid-range",
-        255 => "DV Camera",
-        _ => "Unknown",
     }
 }
 
@@ -969,9 +1374,10 @@ pub fn decode_bracket_mode_exiftool(value: u16) -> &'static str {
 
 // BracketMode exiv2 - same as exiftool, no separate function needed
 
-/// Decode AFAreaMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// AFAreaMode: Canon.pm PrintConv / canonmn_int.cpp canonAFAreaMode
+define_tag_decoder! {
+    af_area_mode,
+    exiftool: {
         0 => "Off (Manual Focus)",
         1 => "AF Point Expansion (surround)",
         2 => "Single-point AF",
@@ -985,20 +1391,13 @@ pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
         11 => "Flexizone Multi",
         13 => "Flexizone Single",
         14 => "Large Zone AF",
-        // Compact camera modes
         0x0060 => "Face AiAF",
         0x1001 => "Single-point AF (Compact)",
         0x1002 => "Tracking AF (Compact)",
         0x1003 => "Face + Tracking (Compact)",
         0xFFFF => "n/a",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AFAreaMode - exiv2 format (from canonmn_int.cpp canonAFAreaMode)
-/// Differs: 4="Multi-point AF" vs "Auto", 11/12 Flexizone naming, no compact modes
-pub fn decode_af_area_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off (Manual Focus)",
         1 => "AF Point Expansion (surround)",
         2 => "Single-point AF",
@@ -1013,7 +1412,6 @@ pub fn decode_af_area_mode_exiv2(value: u16) -> &'static str {
         12 => "Flexizone Multi (9 point)",
         13 => "Flexizone Single",
         14 => "Large Zone AF",
-        _ => "Unknown",
     }
 }
 
@@ -1029,20 +1427,15 @@ pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
 
 // DateStampMode exiv2 - same as exiftool, no separate function needed
 
-/// Decode DigitalZoom - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_digital_zoom_exiftool(value: u16) -> &'static str {
-    match value {
+// DigitalZoom: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    digital_zoom,
+    both: {
         0 => "None",
         1 => "2x",
         2 => "4x",
         3 => "Other",
-        _ => "Unknown",
     }
-}
-
-/// Decode DigitalZoom - exiv2 format (same as exiftool)
-pub fn decode_digital_zoom_exiv2(value: u16) -> &'static str {
-    decode_digital_zoom_exiftool(value)
 }
 
 /// Decode Contrast - ExifTool format (from Canon.pm using printParameter)
@@ -1219,9 +1612,10 @@ pub fn decode_canon_image_size_exiv2(value: u16) -> &'static str {
     }
 }
 
-/// Decode EasyMode - ExifTool format
-pub fn decode_easy_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// EasyMode: Canon.pm (same for exiv2)
+define_tag_decoder! {
+    easy_mode,
+    both: {
         0 => "Full auto",
         1 => "Manual",
         2 => "Landscape",
@@ -1297,18 +1691,13 @@ pub fn decode_easy_mode_exiftool(value: u16) -> &'static str {
         263 => "Night Scene",
         264 => "Surface",
         265 => "Low Light 2",
-        _ => "Unknown",
     }
 }
 
-/// Decode EasyMode - exiv2 format (same as ExifTool)
-pub fn decode_easy_mode_exiv2(value: u16) -> &'static str {
-    decode_easy_mode_exiftool(value)
-}
-
-/// Decode AFPoint - ExifTool format
-pub fn decode_af_point_exiftool(value: u16) -> &'static str {
-    match value {
+// AFPoint: Canon.pm PrintConv / canonmn_int.cpp
+define_tag_decoder! {
+    af_point,
+    exiftool: {
         0x2005 => "Manual AF point selection",
         0x3000 => "None (MF)",
         0x3001 => "Auto AF point selection",
@@ -1317,13 +1706,8 @@ pub fn decode_af_point_exiftool(value: u16) -> &'static str {
         0x3004 => "Left",
         0x4001 => "Auto AF point selection",
         0x4006 => "Face Detect",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AFPoint - exiv2 format
-pub fn decode_af_point_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0x2005 => "Manual AF point selection",
         0x3000 => "None (MF)",
         0x3001 => "Auto-selected",
@@ -1332,7 +1716,6 @@ pub fn decode_af_point_exiv2(value: u16) -> &'static str {
         0x3004 => "Left",
         0x4001 => "Auto AF point selection",
         0x4006 => "Face Detect",
-        _ => "Unknown",
     }
 }
 
@@ -1407,14 +1790,21 @@ pub fn decode_photo_effect_exiv2(value: i16) -> &'static str {
 }
 
 /// Decode ColorTone - ExifTool format (uses printParameter like Contrast/Saturation)
+/// printParameter: 0 => "Normal", positive => "+N", negative => "-N"
 pub fn decode_color_tone_exiftool(value: u16) -> String {
     if value == 0x7fff {
         return "n/a".to_string();
     }
-    if value > 0 {
-        format!("+{}", value)
+    if value == 0 {
+        "Normal".to_string()
     } else {
-        value.to_string()
+        // Treat as signed value for display
+        let signed = value as i16;
+        if signed > 0 {
+            format!("+{}", signed)
+        } else {
+            signed.to_string()
+        }
     }
 }
 
@@ -1444,37 +1834,28 @@ pub fn decode_sraw_quality_exiv2(value: i16) -> &'static str {
     decode_sraw_quality_exiftool(value)
 }
 
-/// Decode FocusBracketing - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_focus_bracketing_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusBracketing: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    focus_bracketing,
+    both: {
         0 => "Disable",
         1 => "Enable",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusBracketing - exiv2 format (same as ExifTool)
-pub fn decode_focus_bracketing_exiv2(value: u16) -> &'static str {
-    decode_focus_bracketing_exiftool(value)
-}
-
-/// Decode DaylightSavings - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_daylight_savings_exiftool(value: u16) -> &'static str {
-    match value {
+// DaylightSavings: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    daylight_savings,
+    both: {
         0 => "Off",
         60 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode DaylightSavings - exiv2 format (same as ExifTool)
-pub fn decode_daylight_savings_exiv2(value: u16) -> &'static str {
-    decode_daylight_savings_exiftool(value)
-}
-
-/// Decode PictureStyle - ExifTool format (from Canon.pm pictureStyles)
-pub fn decode_picture_style_exiftool(value: u16) -> &'static str {
-    match value {
+// PictureStyle: Canon.pm pictureStyles (same for exiv2)
+define_tag_decoder! {
+    picture_style,
+    both: {
         0x00 => "None",
         0x01 => "Standard",
         0x02 => "Portrait",
@@ -1499,13 +1880,7 @@ pub fn decode_picture_style_exiftool(value: u16) -> &'static str {
         0x88 => "Fine Detail",
         0xff => "n/a",
         0xffff => "n/a",
-        _ => "Unknown",
     }
-}
-
-/// Decode PictureStyle - exiv2 format (same as ExifTool)
-pub fn decode_picture_style_exiv2(value: u16) -> &'static str {
-    decode_picture_style_exiftool(value)
 }
 
 /// Decode MeasuredEV - ExifTool format (from Canon.pm PrintConv)
@@ -1519,185 +1894,116 @@ pub fn decode_measured_ev_exiv2(value: i16) -> String {
     decode_measured_ev_exiftool(value)
 }
 
-/// Decode SuperMacro - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:1601
-pub fn decode_super_macro_exiftool(value: u16) -> &'static str {
-    match value {
+// SuperMacro: Canon.pm / canonmn_int.cpp canonSuperMacro
+define_tag_decoder! {
+    super_macro,
+    both: {
         0 => "Off",
         1 => "On (1)",
         2 => "On (2)",
-        _ => "Unknown",
     }
 }
 
-/// Decode SuperMacro - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonSuperMacro
-pub fn decode_super_macro_exiv2(value: u16) -> &'static str {
-    decode_super_macro_exiftool(value)
-}
-
-/// Decode AutoLightingOptimizer - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:4020
-pub fn decode_auto_lighting_optimizer_exiftool(value: u16) -> &'static str {
-    match value {
+// AutoLightingOptimizer: Canon.pm / canonmn_int.cpp canonAutoLightingOptimizer
+define_tag_decoder! {
+    auto_lighting_optimizer,
+    both: {
         0 => "Standard",
         1 => "Low",
         2 => "Strong",
         3 => "Off",
-        _ => "Unknown",
     }
 }
 
-/// Decode AutoLightingOptimizer - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonAutoLightingOptimizer
-pub fn decode_auto_lighting_optimizer_exiv2(value: u16) -> &'static str {
-    decode_auto_lighting_optimizer_exiftool(value)
-}
-
-/// Decode LongExposureNoiseReduction - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:8980
-pub fn decode_long_exposure_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// LongExposureNoiseReduction: Canon.pm / canonmn_int.cpp canonLongExposureNoiseReduction
+define_tag_decoder! {
+    long_exposure_noise_reduction,
+    both: {
         0 => "Off",
         1 => "Auto",
         2 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode LongExposureNoiseReduction - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonLongExposureNoiseReduction
-pub fn decode_long_exposure_noise_reduction_exiv2(value: u16) -> &'static str {
-    decode_long_exposure_noise_reduction_exiftool(value)
-}
-
-/// Decode HighISONoiseReduction - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:4012
-pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// HighISONoiseReduction: Canon.pm / canonmn_int.cpp canonHighISONoiseReduction
+define_tag_decoder! {
+    high_iso_noise_reduction,
+    both: {
         0 => "Standard",
         1 => "Low",
         2 => "Strong",
         3 => "Off",
-        _ => "Unknown",
     }
 }
 
-/// Decode HighISONoiseReduction - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonHighISONoiseReduction
-pub fn decode_high_iso_noise_reduction_exiv2(value: u16) -> &'static str {
-    decode_high_iso_noise_reduction_exiftool(value)
-}
-
-/// Decode DigitalLensOptimizer - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9000
-pub fn decode_digital_lens_optimizer_exiftool(value: u16) -> &'static str {
-    match value {
+// DigitalLensOptimizer: Canon.pm / canonmn_int.cpp canonDigitalLensOptimizer
+define_tag_decoder! {
+    digital_lens_optimizer,
+    both: {
         0 => "Off",
         1 => "Standard",
         2 => "High",
-        _ => "Unknown",
     }
 }
 
-/// Decode DigitalLensOptimizer - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonDigitalLensOptimizer
-pub fn decode_digital_lens_optimizer_exiv2(value: u16) -> &'static str {
-    decode_digital_lens_optimizer_exiftool(value)
-}
-
-/// Decode ColorSpace - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm (ColorData)
-pub fn decode_color_space_exiftool(value: u16) -> &'static str {
-    match value {
+// ColorSpace: Canon.pm / canonmn_int.cpp canonColorSpace
+define_tag_decoder! {
+    color_space,
+    exiftool: {
         1 => "sRGB",
         2 => "Adobe RGB",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ColorSpace - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonColorSpace
-pub fn decode_color_space_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "sRGB",
         2 => "Adobe RGB",
         65535 => "n/a",
-        _ => "Unknown",
     }
 }
 
-/// Decode HDR - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9120
-pub fn decode_hdr_exiftool(value: u16) -> &'static str {
-    match value {
+// HDR: Canon.pm / canonmn_int.cpp canonHdr
+define_tag_decoder! {
+    hdr,
+    exiftool: {
         0 => "Off",
         1 => "Auto",
         2 => "On",
-        _ => "Unknown",
-    }
-}
-
-/// Decode HDR - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonHdr
-pub fn decode_hdr_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "On",
         2 => "On (RAW)",
-        _ => "Unknown",
     }
 }
 
-/// Decode HDREffect - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9128
-pub fn decode_hdr_effect_exiftool(value: u16) -> &'static str {
-    match value {
+// HDREffect: Canon.pm / canonmn_int.cpp canonHdrEffect
+define_tag_decoder! {
+    hdr_effect,
+    both: {
         0 => "Natural",
         1 => "Art (standard)",
         2 => "Art (vivid)",
         3 => "Art (bold)",
         4 => "Art (embossed)",
-        _ => "Unknown",
     }
 }
 
-/// Decode HDREffect - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonHdrEffect
-pub fn decode_hdr_effect_exiv2(value: u16) -> &'static str {
-    decode_hdr_effect_exiftool(value)
-}
-
-/// Decode CameraOrientation - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:3403
-pub fn decode_camera_orientation_exiftool(value: u16) -> &'static str {
-    match value {
+// CameraOrientation: Canon.pm
+define_tag_decoder! {
+    camera_orientation,
+    both: {
         0 => "Horizontal (normal)",
         1 => "Rotate 90 CW",
         2 => "Rotate 270 CW",
-        _ => "Unknown",
     }
 }
 
-/// Decode CameraOrientation - exiv2 format
-pub fn decode_camera_orientation_exiv2(value: u16) -> &'static str {
-    decode_camera_orientation_exiftool(value)
-}
-
-/// Decode DualPixelRaw - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9008 (uses %offOn)
-pub fn decode_dual_pixel_raw_exiftool(value: u16) -> &'static str {
-    match value {
+// DualPixelRaw: Canon.pm / canonmn_int.cpp canonDualPixelRaw
+define_tag_decoder! {
+    dual_pixel_raw,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
-}
-
-/// Decode DualPixelRaw - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonDualPixelRaw
-pub fn decode_dual_pixel_raw_exiv2(value: u16) -> &'static str {
-    decode_dual_pixel_raw_exiftool(value)
 }
 
 /// Decode SerialNumberFormat - ExifTool format
@@ -1716,45 +2022,31 @@ pub fn decode_serial_number_format_exiv2(value: u32) -> &'static str {
     decode_serial_number_format_exiftool(value)
 }
 
-/// Decode MultiExposure - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9061
-pub fn decode_multi_exposure_exiftool(value: u16) -> &'static str {
-    match value {
+// MultiExposure: Canon.pm / canonmn_int.cpp canonMultiExposure
+define_tag_decoder! {
+    multi_exposure,
+    both: {
         0 => "Off",
         1 => "On",
         2 => "On (RAW)",
-        _ => "Unknown",
     }
 }
 
-/// Decode MultiExposure - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonMultiExposure
-pub fn decode_multi_exposure_exiv2(value: u16) -> &'static str {
-    decode_multi_exposure_exiftool(value)
-}
-
-/// Decode MultiExposureControl - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9069
-pub fn decode_multi_exposure_control_exiftool(value: u16) -> &'static str {
-    match value {
+// MultiExposureControl: Canon.pm / canonmn_int.cpp canonMultiExposureControl
+define_tag_decoder! {
+    multi_exposure_control,
+    both: {
         0 => "Additive",
         1 => "Average",
         2 => "Bright (comparative)",
         3 => "Dark (comparative)",
-        _ => "Unknown",
     }
 }
 
-/// Decode MultiExposureControl - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonMultiExposureControl
-pub fn decode_multi_exposure_control_exiv2(value: u16) -> &'static str {
-    decode_multi_exposure_control_exiftool(value)
-}
-
-/// Decode AmbienceSelection - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9039
-pub fn decode_ambience_selection_exiftool(value: u16) -> &'static str {
-    match value {
+// AmbienceSelection: Canon.pm / canonmn_int.cpp canonAmbienceSelection
+define_tag_decoder! {
+    ambience_selection,
+    both: {
         0 => "Standard",
         1 => "Vivid",
         2 => "Warm",
@@ -1764,14 +2056,7 @@ pub fn decode_ambience_selection_exiftool(value: u16) -> &'static str {
         6 => "Brighter",
         7 => "Darker",
         8 => "Monochrome",
-        _ => "Unknown",
     }
-}
-
-/// Decode AmbienceSelection - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonAmbienceSelection
-pub fn decode_ambience_selection_exiv2(value: u16) -> &'static str {
-    decode_ambience_selection_exiftool(value)
 }
 
 /// Parse a single IFD entry and return the tag value
@@ -2306,6 +2591,43 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
+    // Focus bracketing (index 50) - EOS R models
+    if data.len() > 50 {
+        let focus_bracketing = match data[50] {
+            0 => "Disable",
+            1 => "Enable",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FocusBracketing".to_string(),
+            ExifValue::Ascii(focus_bracketing.to_string()),
+        );
+    }
+
+    // Clarity (index 51) - EOS R models
+    if data.len() > 51 && data[51] != 0x7fff {
+        let value = data[51] as i16;
+        let clarity = if value == 0 {
+            "0".to_string()
+        } else if value > 0 {
+            format!("+{}", value)
+        } else {
+            format!("{}", value)
+        };
+        decoded.insert("Clarity".to_string(), ExifValue::Ascii(clarity));
+    }
+
+    // HDR-PQ (index 52)
+    if data.len() > 52 {
+        let hdr_pq = match data[52] as i16 {
+            -1 => "n/a",
+            0 => "Off",
+            1 => "On",
+            _ => "Unknown",
+        };
+        decoded.insert("HDR-PQ".to_string(), ExifValue::Ascii(hdr_pq.to_string()));
+    }
+
     decoded
 }
 
@@ -2664,6 +2986,38 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
+    // Focus bracketing (index 50) - EOS R models
+    if data.len() > 50 {
+        decoded.insert(
+            "FocusBracketing".to_string(),
+            ExifValue::Ascii(decode_focus_bracketing_exiv2(data[50]).to_string()),
+        );
+    }
+
+    // Clarity (index 51) - EOS R models
+    if data.len() > 51 && data[51] != 0x7fff {
+        let value = data[51] as i16;
+        let clarity = if value == 0 {
+            "0".to_string()
+        } else if value > 0 {
+            format!("+{}", value)
+        } else {
+            format!("{}", value)
+        };
+        decoded.insert("Clarity".to_string(), ExifValue::Ascii(clarity));
+    }
+
+    // HDR-PQ (index 52)
+    if data.len() > 52 {
+        let hdr_pq = match data[52] as i16 {
+            -1 => "n/a",
+            0 => "Off",
+            1 => "On",
+            _ => "Unknown",
+        };
+        decoded.insert("HDR-PQ".to_string(), ExifValue::Ascii(hdr_pq.to_string()));
+    }
+
     decoded
 }
 
@@ -2932,6 +3286,38 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // FNumber (index 21) - Canon APEX aperture value
+    // f-number = exp(CanonEv(value)*log(2)/2)
+    if data.len() > 21 && data[21] != 0 {
+        let raw = data[21] as i16;
+        let f_number = (canon_ev(raw) * 2f64.ln() / 2.0).exp();
+        let rounded = (f_number * 100.0).round() / 100.0;
+        decoded.insert(
+            "FNumber".to_string(),
+            ExifValue::Ascii(format!("{:.2}", rounded)),
+        );
+    }
+
+    // ExposureTime (index 22) - Canon APEX time value
+    // exposure time = exp(-CanonEv(value)*log(2))
+    if data.len() > 22 && data[22] != 0 {
+        let raw = data[22] as i16;
+        let time = (-canon_ev(raw) * 2f64.ln()).exp();
+        // Format as fraction if less than 1 second
+        let formatted = if time < 1.0 && time > 0.0 {
+            let denominator = (1.0 / time).round() as u32;
+            format!("1/{}", denominator)
+        } else {
+            format!("{:.1}", time)
+        };
+        decoded.insert("ExposureTime".to_string(), ExifValue::Ascii(formatted));
+    }
+
+    // FlashOutput (index 33) - PowerShot models only
+    if data.len() > 33 && data[33] != 0 {
+        decoded.insert("FlashOutput".to_string(), ExifValue::Short(vec![data[33]]));
+    }
+
     decoded
 }
 
@@ -3172,6 +3558,35 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
             "SubjectDistance".to_string(),
             ExifValue::Short(vec![data[19]]),
         );
+    }
+
+    // FNumber (index 21) - Canon APEX aperture value
+    if data.len() > 21 && data[21] != 0 {
+        let raw = data[21] as i16;
+        let f_number = (canon_ev(raw) * 2f64.ln() / 2.0).exp();
+        let rounded = (f_number * 100.0).round() / 100.0;
+        decoded.insert(
+            "FNumber".to_string(),
+            ExifValue::Ascii(format!("{:.2}", rounded)),
+        );
+    }
+
+    // ExposureTime (index 22) - Canon APEX time value
+    if data.len() > 22 && data[22] != 0 {
+        let raw = data[22] as i16;
+        let time = (-canon_ev(raw) * 2f64.ln()).exp();
+        let formatted = if time < 1.0 && time > 0.0 {
+            let denominator = (1.0 / time).round() as u32;
+            format!("1/{}", denominator)
+        } else {
+            format!("{:.1}", time)
+        };
+        decoded.insert("ExposureTime".to_string(), ExifValue::Ascii(formatted));
+    }
+
+    // FlashOutput (index 33) - PowerShot models only
+    if data.len() > 33 && data[33] != 0 {
+        decoded.insert("FlashOutput".to_string(), ExifValue::Short(vec![data[33]]));
     }
 
     decoded
@@ -3567,6 +3982,18 @@ pub fn parse_canon_maker_notes(
                             let dir = v / 10000;
                             let file = v % 10000;
                             ExifValue::Ascii(format!("{}-{:04}", dir, file))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // SerialNumber - output as plain number string
+                CANON_SERIAL_NUMBER => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            ExifValue::Ascii(format!("{}", longs[0]))
                         } else {
                             value
                         }
