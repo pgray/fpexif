@@ -1308,27 +1308,15 @@ pub fn decode_control_mode_exiftool(value: u16) -> &'static str {
 
 // ControlMode exiv2 - same as exiftool
 
-/// Decode CameraType - ExifTool format (from Canon.pm PrintConv, ShotInfo index 26)
-pub fn decode_camera_type_exiftool(value: u16) -> &'static str {
-    match value {
+// CameraType: Canon.pm PrintConv / canonmn_int.cpp cameraType
+define_tag_decoder! {
+    camera_type,
+    both: {
         0 => "n/a",
         248 => "EOS High-end",
         250 => "Compact",
         252 => "EOS Mid-range",
         255 => "DV Camera",
-        _ => "Unknown",
-    }
-}
-
-/// Decode CameraType - exiv2 format (from canonmn_int.cpp cameraType)
-pub fn decode_camera_type_exiv2(value: u16) -> &'static str {
-    match value {
-        0 => "n/a",
-        248 => "EOS High-end",
-        250 => "Compact",
-        252 => "EOS Mid-range",
-        255 => "DV Camera",
-        _ => "Unknown",
     }
 }
 
@@ -1372,9 +1360,10 @@ pub fn decode_bracket_mode_exiftool(value: u16) -> &'static str {
 
 // BracketMode exiv2 - same as exiftool, no separate function needed
 
-/// Decode AFAreaMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// AFAreaMode: Canon.pm PrintConv / canonmn_int.cpp canonAFAreaMode
+define_tag_decoder! {
+    af_area_mode,
+    exiftool: {
         0 => "Off (Manual Focus)",
         1 => "AF Point Expansion (surround)",
         2 => "Single-point AF",
@@ -1388,20 +1377,13 @@ pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
         11 => "Flexizone Multi",
         13 => "Flexizone Single",
         14 => "Large Zone AF",
-        // Compact camera modes
         0x0060 => "Face AiAF",
         0x1001 => "Single-point AF (Compact)",
         0x1002 => "Tracking AF (Compact)",
         0x1003 => "Face + Tracking (Compact)",
         0xFFFF => "n/a",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AFAreaMode - exiv2 format (from canonmn_int.cpp canonAFAreaMode)
-/// Differs: 4="Multi-point AF" vs "Auto", 11/12 Flexizone naming, no compact modes
-pub fn decode_af_area_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off (Manual Focus)",
         1 => "AF Point Expansion (surround)",
         2 => "Single-point AF",
@@ -1416,7 +1398,6 @@ pub fn decode_af_area_mode_exiv2(value: u16) -> &'static str {
         12 => "Flexizone Multi (9 point)",
         13 => "Flexizone Single",
         14 => "Large Zone AF",
-        _ => "Unknown",
     }
 }
 
@@ -1432,20 +1413,15 @@ pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
 
 // DateStampMode exiv2 - same as exiftool, no separate function needed
 
-/// Decode DigitalZoom - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_digital_zoom_exiftool(value: u16) -> &'static str {
-    match value {
+// DigitalZoom: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    digital_zoom,
+    both: {
         0 => "None",
         1 => "2x",
         2 => "4x",
         3 => "Other",
-        _ => "Unknown",
     }
-}
-
-/// Decode DigitalZoom - exiv2 format (same as exiftool)
-pub fn decode_digital_zoom_exiv2(value: u16) -> &'static str {
-    decode_digital_zoom_exiftool(value)
 }
 
 /// Decode Contrast - ExifTool format (from Canon.pm using printParameter)
@@ -1622,9 +1598,10 @@ pub fn decode_canon_image_size_exiv2(value: u16) -> &'static str {
     }
 }
 
-/// Decode EasyMode - ExifTool format
-pub fn decode_easy_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// EasyMode: Canon.pm (same for exiv2)
+define_tag_decoder! {
+    easy_mode,
+    both: {
         0 => "Full auto",
         1 => "Manual",
         2 => "Landscape",
@@ -1700,18 +1677,13 @@ pub fn decode_easy_mode_exiftool(value: u16) -> &'static str {
         263 => "Night Scene",
         264 => "Surface",
         265 => "Low Light 2",
-        _ => "Unknown",
     }
 }
 
-/// Decode EasyMode - exiv2 format (same as ExifTool)
-pub fn decode_easy_mode_exiv2(value: u16) -> &'static str {
-    decode_easy_mode_exiftool(value)
-}
-
-/// Decode AFPoint - ExifTool format
-pub fn decode_af_point_exiftool(value: u16) -> &'static str {
-    match value {
+// AFPoint: Canon.pm PrintConv / canonmn_int.cpp
+define_tag_decoder! {
+    af_point,
+    exiftool: {
         0x2005 => "Manual AF point selection",
         0x3000 => "None (MF)",
         0x3001 => "Auto AF point selection",
@@ -1720,13 +1692,8 @@ pub fn decode_af_point_exiftool(value: u16) -> &'static str {
         0x3004 => "Left",
         0x4001 => "Auto AF point selection",
         0x4006 => "Face Detect",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AFPoint - exiv2 format
-pub fn decode_af_point_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0x2005 => "Manual AF point selection",
         0x3000 => "None (MF)",
         0x3001 => "Auto-selected",
@@ -1735,7 +1702,6 @@ pub fn decode_af_point_exiv2(value: u16) -> &'static str {
         0x3004 => "Left",
         0x4001 => "Auto AF point selection",
         0x4006 => "Face Detect",
-        _ => "Unknown",
     }
 }
 
@@ -1854,37 +1820,28 @@ pub fn decode_sraw_quality_exiv2(value: i16) -> &'static str {
     decode_sraw_quality_exiftool(value)
 }
 
-/// Decode FocusBracketing - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_focus_bracketing_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusBracketing: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    focus_bracketing,
+    both: {
         0 => "Disable",
         1 => "Enable",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusBracketing - exiv2 format (same as ExifTool)
-pub fn decode_focus_bracketing_exiv2(value: u16) -> &'static str {
-    decode_focus_bracketing_exiftool(value)
-}
-
-/// Decode DaylightSavings - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_daylight_savings_exiftool(value: u16) -> &'static str {
-    match value {
+// DaylightSavings: Canon.pm PrintConv (same for exiv2)
+define_tag_decoder! {
+    daylight_savings,
+    both: {
         0 => "Off",
         60 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode DaylightSavings - exiv2 format (same as ExifTool)
-pub fn decode_daylight_savings_exiv2(value: u16) -> &'static str {
-    decode_daylight_savings_exiftool(value)
-}
-
-/// Decode PictureStyle - ExifTool format (from Canon.pm pictureStyles)
-pub fn decode_picture_style_exiftool(value: u16) -> &'static str {
-    match value {
+// PictureStyle: Canon.pm pictureStyles (same for exiv2)
+define_tag_decoder! {
+    picture_style,
+    both: {
         0x00 => "None",
         0x01 => "Standard",
         0x02 => "Portrait",
@@ -1909,13 +1866,7 @@ pub fn decode_picture_style_exiftool(value: u16) -> &'static str {
         0x88 => "Fine Detail",
         0xff => "n/a",
         0xffff => "n/a",
-        _ => "Unknown",
     }
-}
-
-/// Decode PictureStyle - exiv2 format (same as ExifTool)
-pub fn decode_picture_style_exiv2(value: u16) -> &'static str {
-    decode_picture_style_exiftool(value)
 }
 
 /// Decode MeasuredEV - ExifTool format (from Canon.pm PrintConv)
@@ -1929,185 +1880,116 @@ pub fn decode_measured_ev_exiv2(value: i16) -> String {
     decode_measured_ev_exiftool(value)
 }
 
-/// Decode SuperMacro - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:1601
-pub fn decode_super_macro_exiftool(value: u16) -> &'static str {
-    match value {
+// SuperMacro: Canon.pm / canonmn_int.cpp canonSuperMacro
+define_tag_decoder! {
+    super_macro,
+    both: {
         0 => "Off",
         1 => "On (1)",
         2 => "On (2)",
-        _ => "Unknown",
     }
 }
 
-/// Decode SuperMacro - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonSuperMacro
-pub fn decode_super_macro_exiv2(value: u16) -> &'static str {
-    decode_super_macro_exiftool(value)
-}
-
-/// Decode AutoLightingOptimizer - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:4020
-pub fn decode_auto_lighting_optimizer_exiftool(value: u16) -> &'static str {
-    match value {
+// AutoLightingOptimizer: Canon.pm / canonmn_int.cpp canonAutoLightingOptimizer
+define_tag_decoder! {
+    auto_lighting_optimizer,
+    both: {
         0 => "Standard",
         1 => "Low",
         2 => "Strong",
         3 => "Off",
-        _ => "Unknown",
     }
 }
 
-/// Decode AutoLightingOptimizer - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonAutoLightingOptimizer
-pub fn decode_auto_lighting_optimizer_exiv2(value: u16) -> &'static str {
-    decode_auto_lighting_optimizer_exiftool(value)
-}
-
-/// Decode LongExposureNoiseReduction - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:8980
-pub fn decode_long_exposure_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// LongExposureNoiseReduction: Canon.pm / canonmn_int.cpp canonLongExposureNoiseReduction
+define_tag_decoder! {
+    long_exposure_noise_reduction,
+    both: {
         0 => "Off",
         1 => "Auto",
         2 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode LongExposureNoiseReduction - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonLongExposureNoiseReduction
-pub fn decode_long_exposure_noise_reduction_exiv2(value: u16) -> &'static str {
-    decode_long_exposure_noise_reduction_exiftool(value)
-}
-
-/// Decode HighISONoiseReduction - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:4012
-pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// HighISONoiseReduction: Canon.pm / canonmn_int.cpp canonHighISONoiseReduction
+define_tag_decoder! {
+    high_iso_noise_reduction,
+    both: {
         0 => "Standard",
         1 => "Low",
         2 => "Strong",
         3 => "Off",
-        _ => "Unknown",
     }
 }
 
-/// Decode HighISONoiseReduction - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonHighISONoiseReduction
-pub fn decode_high_iso_noise_reduction_exiv2(value: u16) -> &'static str {
-    decode_high_iso_noise_reduction_exiftool(value)
-}
-
-/// Decode DigitalLensOptimizer - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9000
-pub fn decode_digital_lens_optimizer_exiftool(value: u16) -> &'static str {
-    match value {
+// DigitalLensOptimizer: Canon.pm / canonmn_int.cpp canonDigitalLensOptimizer
+define_tag_decoder! {
+    digital_lens_optimizer,
+    both: {
         0 => "Off",
         1 => "Standard",
         2 => "High",
-        _ => "Unknown",
     }
 }
 
-/// Decode DigitalLensOptimizer - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonDigitalLensOptimizer
-pub fn decode_digital_lens_optimizer_exiv2(value: u16) -> &'static str {
-    decode_digital_lens_optimizer_exiftool(value)
-}
-
-/// Decode ColorSpace - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm (ColorData)
-pub fn decode_color_space_exiftool(value: u16) -> &'static str {
-    match value {
+// ColorSpace: Canon.pm / canonmn_int.cpp canonColorSpace
+define_tag_decoder! {
+    color_space,
+    exiftool: {
         1 => "sRGB",
         2 => "Adobe RGB",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ColorSpace - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonColorSpace
-pub fn decode_color_space_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "sRGB",
         2 => "Adobe RGB",
         65535 => "n/a",
-        _ => "Unknown",
     }
 }
 
-/// Decode HDR - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9120
-pub fn decode_hdr_exiftool(value: u16) -> &'static str {
-    match value {
+// HDR: Canon.pm / canonmn_int.cpp canonHdr
+define_tag_decoder! {
+    hdr,
+    exiftool: {
         0 => "Off",
         1 => "Auto",
         2 => "On",
-        _ => "Unknown",
-    }
-}
-
-/// Decode HDR - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonHdr
-pub fn decode_hdr_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "On",
         2 => "On (RAW)",
-        _ => "Unknown",
     }
 }
 
-/// Decode HDREffect - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9128
-pub fn decode_hdr_effect_exiftool(value: u16) -> &'static str {
-    match value {
+// HDREffect: Canon.pm / canonmn_int.cpp canonHdrEffect
+define_tag_decoder! {
+    hdr_effect,
+    both: {
         0 => "Natural",
         1 => "Art (standard)",
         2 => "Art (vivid)",
         3 => "Art (bold)",
         4 => "Art (embossed)",
-        _ => "Unknown",
     }
 }
 
-/// Decode HDREffect - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonHdrEffect
-pub fn decode_hdr_effect_exiv2(value: u16) -> &'static str {
-    decode_hdr_effect_exiftool(value)
-}
-
-/// Decode CameraOrientation - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:3403
-pub fn decode_camera_orientation_exiftool(value: u16) -> &'static str {
-    match value {
+// CameraOrientation: Canon.pm
+define_tag_decoder! {
+    camera_orientation,
+    both: {
         0 => "Horizontal (normal)",
         1 => "Rotate 90 CW",
         2 => "Rotate 270 CW",
-        _ => "Unknown",
     }
 }
 
-/// Decode CameraOrientation - exiv2 format
-pub fn decode_camera_orientation_exiv2(value: u16) -> &'static str {
-    decode_camera_orientation_exiftool(value)
-}
-
-/// Decode DualPixelRaw - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9008 (uses %offOn)
-pub fn decode_dual_pixel_raw_exiftool(value: u16) -> &'static str {
-    match value {
+// DualPixelRaw: Canon.pm / canonmn_int.cpp canonDualPixelRaw
+define_tag_decoder! {
+    dual_pixel_raw,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
-}
-
-/// Decode DualPixelRaw - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonDualPixelRaw
-pub fn decode_dual_pixel_raw_exiv2(value: u16) -> &'static str {
-    decode_dual_pixel_raw_exiftool(value)
 }
 
 /// Decode SerialNumberFormat - ExifTool format
@@ -2126,45 +2008,31 @@ pub fn decode_serial_number_format_exiv2(value: u32) -> &'static str {
     decode_serial_number_format_exiftool(value)
 }
 
-/// Decode MultiExposure - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9061
-pub fn decode_multi_exposure_exiftool(value: u16) -> &'static str {
-    match value {
+// MultiExposure: Canon.pm / canonmn_int.cpp canonMultiExposure
+define_tag_decoder! {
+    multi_exposure,
+    both: {
         0 => "Off",
         1 => "On",
         2 => "On (RAW)",
-        _ => "Unknown",
     }
 }
 
-/// Decode MultiExposure - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonMultiExposure
-pub fn decode_multi_exposure_exiv2(value: u16) -> &'static str {
-    decode_multi_exposure_exiftool(value)
-}
-
-/// Decode MultiExposureControl - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9069
-pub fn decode_multi_exposure_control_exiftool(value: u16) -> &'static str {
-    match value {
+// MultiExposureControl: Canon.pm / canonmn_int.cpp canonMultiExposureControl
+define_tag_decoder! {
+    multi_exposure_control,
+    both: {
         0 => "Additive",
         1 => "Average",
         2 => "Bright (comparative)",
         3 => "Dark (comparative)",
-        _ => "Unknown",
     }
 }
 
-/// Decode MultiExposureControl - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonMultiExposureControl
-pub fn decode_multi_exposure_control_exiv2(value: u16) -> &'static str {
-    decode_multi_exposure_control_exiftool(value)
-}
-
-/// Decode AmbienceSelection - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:9039
-pub fn decode_ambience_selection_exiftool(value: u16) -> &'static str {
-    match value {
+// AmbienceSelection: Canon.pm / canonmn_int.cpp canonAmbienceSelection
+define_tag_decoder! {
+    ambience_selection,
+    both: {
         0 => "Standard",
         1 => "Vivid",
         2 => "Warm",
@@ -2174,14 +2042,7 @@ pub fn decode_ambience_selection_exiftool(value: u16) -> &'static str {
         6 => "Brighter",
         7 => "Darker",
         8 => "Monochrome",
-        _ => "Unknown",
     }
-}
-
-/// Decode AmbienceSelection - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonAmbienceSelection
-pub fn decode_ambience_selection_exiv2(value: u16) -> &'static str {
-    decode_ambience_selection_exiftool(value)
 }
 
 /// Parse a single IFD entry and return the tag value

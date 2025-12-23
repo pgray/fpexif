@@ -1,6 +1,7 @@
 // makernotes/olympus.rs - Olympus maker notes parsing
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use std::collections::HashMap;
@@ -447,29 +448,23 @@ pub fn decode_macro_mode_exiftool(value: u16) -> &'static str {
 }
 // decode_macro_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode FocusMode value (CS 0x0301) - ExifTool format
-pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusMode (CS 0x0301): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    focus_mode,
+    exiftool: {
         0 => "Single AF",
         1 => "Sequential shooting AF",
         2 => "Continuous AF",
         3 => "Multi AF",
         4 => "Face Detect",
         10 => "MF",
-        _ => "Unknown",
-    }
-}
-
-/// Decode FocusMode value (CS 0x0301) - exiv2 format
-/// Note: exiv2 doesn't have value 4 (Face Detect)
-pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Single AF",
         1 => "Sequential shooting AF",
         2 => "Continuous AF",
         3 => "Multi AF",
         10 => "MF",
-        _ => "Unknown",
     }
 }
 
@@ -730,9 +725,10 @@ pub fn decode_shading_compensation_exiftool(value: u16) -> &'static str {
 }
 // decode_shading_compensation_exiv2 - same as exiftool, no separate function needed
 
-/// Decode PictureMode value (CS 0x0520) - ExifTool format
-pub fn decode_picture_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// PictureMode (CS 0x0520): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    picture_mode,
+    exiftool: {
         1 => "Vivid",
         2 => "Natural",
         3 => "Muted",
@@ -751,14 +747,8 @@ pub fn decode_picture_mode_exiftool(value: u16) -> &'static str {
         18 => "Monochrome Profile 4",
         256 => "Monotone",
         512 => "Sepia",
-        _ => "Unknown",
-    }
-}
-
-/// Decode PictureMode value (CS 0x0520) - exiv2 format
-/// Note: exiv2 doesn't have values 8, 17, 18
-pub fn decode_picture_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "Vivid",
         2 => "Natural",
         3 => "Muted",
@@ -774,37 +764,31 @@ pub fn decode_picture_mode_exiv2(value: u16) -> &'static str {
         14 => "Monochrome Profile 3",
         256 => "Monotone",
         512 => "Sepia",
-        _ => "Unknown",
     }
 }
 
-/// Decode ImageQuality value (CS 0x0603) - ExifTool format
-pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
-    match value {
+// ImageQuality (CS 0x0603): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    image_quality,
+    exiftool: {
         1 => "SQ",
         2 => "HQ",
         3 => "SHQ",
         4 => "RAW",
         5 => "SQ (5)",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ImageQuality value (CS 0x0603) - exiv2 format
-/// Note: exiv2 doesn't have value 5
-pub fn decode_image_quality_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "SQ",
         2 => "HQ",
         3 => "SHQ",
         4 => "RAW",
-        _ => "Unknown",
     }
 }
 
-/// Decode JpegQuality value (Main 0x0201) - ExifTool format
-pub fn decode_jpeg_quality_exiftool(value: u16) -> &'static str {
-    match value {
+// JpegQuality (Main 0x0201): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    jpeg_quality,
+    exiftool: {
         1 => "SQ",
         2 => "HQ",
         3 => "SHQ",
@@ -812,18 +796,12 @@ pub fn decode_jpeg_quality_exiftool(value: u16) -> &'static str {
         5 => "Medium-Fine",
         6 => "Small-Fine",
         33 => "Uncompressed",
-        _ => "Unknown",
-    }
-}
-
-/// Decode JpegQuality value (Main 0x0201) - exiv2 format
-pub fn decode_jpeg_quality_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "Standard Quality (SQ)",
         2 => "High Quality (HQ)",
         3 => "Super High Quality (SHQ)",
         6 => "Raw",
-        _ => "Unknown",
     }
 }
 
@@ -838,9 +816,10 @@ pub fn decode_ae_lock_exiftool(value: u16) -> &'static str {
 }
 // decode_ae_lock_exiv2 - same as exiftool, no separate function needed
 
-/// Decode FlashRemoteControl value (CS 0x0403) - ExifTool format
-pub fn decode_flash_remote_control_exiftool(value: u16) -> &'static str {
-    match value {
+// FlashRemoteControl (CS 0x0403): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    flash_remote_control,
+    both: {
         0x0 => "Off",
         0x1 => "Channel 1, Low",
         0x2 => "Channel 2, Low",
@@ -854,51 +833,36 @@ pub fn decode_flash_remote_control_exiftool(value: u16) -> &'static str {
         0x12 => "Channel 2, High",
         0x13 => "Channel 3, High",
         0x14 => "Channel 4, High",
-        _ => "Unknown",
     }
 }
 
-/// Decode FlashRemoteControl value (CS 0x0403) - exiv2 format
-pub fn decode_flash_remote_control_exiv2(value: u16) -> &'static str {
-    decode_flash_remote_control_exiftool(value) // Same values
-}
-
-/// Decode FlashControlMode value (CS 0x0404) - ExifTool format
-pub fn decode_flash_control_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FlashControlMode (CS 0x0404): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    flash_control_mode,
+    both: {
         0 => "Off",
         3 => "TTL",
         4 => "Auto",
         5 => "Manual",
-        _ => "Unknown",
     }
 }
 
-/// Decode FlashControlMode value (CS 0x0404) - exiv2 format
-pub fn decode_flash_control_mode_exiv2(value: u16) -> &'static str {
-    decode_flash_control_mode_exiftool(value) // Same values
-}
-
-/// Decode ModifiedSaturation value (CS 0x0504) - ExifTool format
-pub fn decode_modified_saturation_exiftool(value: u16) -> &'static str {
-    match value {
+// ModifiedSaturation (CS 0x0504): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    modified_saturation,
+    both: {
         0 => "Off",
         1 => "CM1 (Red Enhance)",
         2 => "CM2 (Green Enhance)",
         3 => "CM3 (Blue Enhance)",
         4 => "CM4 (Skin Tones)",
-        _ => "Unknown",
     }
 }
 
-/// Decode ModifiedSaturation value (CS 0x0504) - exiv2 format
-pub fn decode_modified_saturation_exiv2(value: u16) -> &'static str {
-    decode_modified_saturation_exiftool(value) // Same values
-}
-
-/// Decode ArtFilter value (CS 0x0529) - ExifTool format
-pub fn decode_art_filter_exiftool(value: u16) -> &'static str {
-    match value {
+// ArtFilter (CS 0x0529): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    art_filter,
+    both: {
         0 => "Off",
         1 => "Soft Focus",
         2 => "Pop Art",
@@ -937,50 +901,35 @@ pub fn decode_art_filter_exiftool(value: u16) -> &'static str {
         39 => "Partial Color",
         40 => "Partial Color II",
         41 => "Partial Color III",
-        _ => "Unknown",
     }
 }
 
-/// Decode ArtFilter value (CS 0x0529) - exiv2 format
-pub fn decode_art_filter_exiv2(value: u16) -> &'static str {
-    decode_art_filter_exiftool(value) // Same values
-}
-
-/// Decode ImageStabilization value (CS 0x0604) - ExifTool format
-pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
-    match value {
+// ImageStabilization (CS 0x0604): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    image_stabilization,
+    both: {
         0 => "Off",
         1 => "On, Mode 1",
         2 => "On, Mode 2",
         3 => "On, Mode 3",
         4 => "On, Mode 4",
-        _ => "Unknown",
     }
 }
 
-/// Decode ImageStabilization value (CS 0x0604) - exiv2 format
-pub fn decode_image_stabilization_exiv2(value: u16) -> &'static str {
-    decode_image_stabilization_exiftool(value) // Same values
-}
-
-/// Decode MultipleExposureMode value (IP 0x101C) - ExifTool format
-pub fn decode_multiple_exposure_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// MultipleExposureMode (IP 0x101C): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    multiple_exposure_mode,
+    both: {
         0 => "Off",
         2 => "On (2 frames)",
         3 => "On (3 frames)",
-        _ => "Unknown",
     }
 }
 
-/// Decode MultipleExposureMode value (IP 0x101C) - exiv2 format
-pub fn decode_multiple_exposure_mode_exiv2(value: u16) -> &'static str {
-    decode_multiple_exposure_mode_exiftool(value) // Same values
-}
-
-/// Decode AspectRatio value (IP 0x1112) - ExifTool format
-pub fn decode_aspect_ratio_exiftool(value: u16) -> &'static str {
-    match value {
+// AspectRatio (IP 0x1112): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    aspect_ratio,
+    both: {
         1 => "4:3",
         2 => "3:2",
         3 => "16:9",
@@ -990,27 +939,16 @@ pub fn decode_aspect_ratio_exiftool(value: u16) -> &'static str {
         7 => "6:5",
         8 => "7:5",
         9 => "3:4",
-        _ => "Unknown",
     }
 }
 
-/// Decode AspectRatio value (IP 0x1112) - exiv2 format
-pub fn decode_aspect_ratio_exiv2(value: u16) -> &'static str {
-    decode_aspect_ratio_exiftool(value) // Same values
-}
-
-/// Decode ExternalFlashBounce value (FI 0x1203) - ExifTool format
-pub fn decode_external_flash_bounce_exiftool(value: u16) -> &'static str {
-    match value {
+// ExternalFlashBounce (FI 0x1203): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    external_flash_bounce,
+    both: {
         0 => "Bounce or Off",
         1 => "Direct",
-        _ => "Unknown",
     }
-}
-
-/// Decode ExternalFlashBounce value (FI 0x1203) - exiv2 format
-pub fn decode_external_flash_bounce_exiv2(value: u16) -> &'static str {
-    decode_external_flash_bounce_exiftool(value) // Same values
 }
 
 // =============================================================================

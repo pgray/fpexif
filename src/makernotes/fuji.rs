@@ -1,6 +1,7 @@
 // makernotes/fuji.rs - Fujifilm maker notes parsing
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -152,10 +153,10 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
-/// Decode FilmMode value (tag 0x1401) - ExifTool format
-/// Values based on ExifTool FujiFilm.pm reference
-pub fn decode_film_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FilmMode (tag 0x1401): FujiFilm.pm / fujimn_int.cpp fujiFilmMode[]
+define_tag_decoder! {
+    film_mode,
+    exiftool: {
         0x000 => "F0/Standard (Provia)",
         0x100 => "F1/Studio Portrait",
         0x110 => "F1a/Studio Portrait Enhanced Saturation",
@@ -168,25 +169,17 @@ pub fn decode_film_mode_exiftool(value: u16) -> &'static str {
         0x501 => "Pro Neg. Hi",
         0x600 => "Classic Chrome",
         0x700 => "Eterna",
+        0x701 => "Eterna Bleach Bypass",
         0x800 => "Classic Negative",
-        0x900 => "Bleach Bypass",
-        0xa00 => "Nostalgic Neg",
-        0xb00 => "Reala ACE",
-        // Acros variants (in Saturation tag 0x1003, but sometimes reported here)
         0x801 => "Acros",
         0x802 => "Acros+Ye Filter",
         0x803 => "Acros+R Filter",
         0x804 => "Acros+G Filter",
-        // Eterna variants
-        0x701 => "Eterna Bleach Bypass",
-        _ => "Unknown",
-    }
-}
-
-/// Decode FilmMode value (tag 0x1401) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiFilmMode[]
-pub fn decode_film_mode_exiv2(value: u16) -> &'static str {
-    match value {
+        0x900 => "Bleach Bypass",
+        0xa00 => "Nostalgic Neg",
+        0xb00 => "Reala ACE",
+    },
+    exiv2: {
         0 => "PROVIA (F0/Standard)",
         256 => "F1/Studio Portrait",
         272 => "F1a/Studio Portrait Enhanced Saturation",
@@ -203,7 +196,6 @@ pub fn decode_film_mode_exiv2(value: u16) -> &'static str {
         2304 => "ETERNA Bleach Bypass",
         2560 => "Nostalgic Neg.",
         2816 => "REALA ACE",
-        _ => "Unknown",
     }
 }
 
@@ -218,9 +210,10 @@ pub fn decode_dynamic_range_exiftool(value: u16) -> &'static str {
 }
 // decode_dynamic_range_exiv2 - same as exiftool, no separate function needed
 
-/// Decode WhiteBalance value (tag 0x1002) - ExifTool format
-pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
-    match value {
+// WhiteBalance (tag 0x1002): FujiFilm.pm / fujimn_int.cpp fujiWhiteBalance[]
+define_tag_decoder! {
+    white_balance,
+    exiftool: {
         0 => "Auto",
         1 => "Auto (White Priority)",
         2 => "Auto (Ambience Priority)",
@@ -240,14 +233,8 @@ pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
         3843 => "Custom4",
         3844 => "Custom5",
         6144 => "Kelvin",
-        _ => "Unknown",
-    }
-}
-
-/// Decode WhiteBalance value (tag 0x1002) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiWhiteBalance[]
-pub fn decode_white_balance_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Auto",
         1 => "Auto White Priority",
         2 => "Auto Ambience Priority",
@@ -265,13 +252,13 @@ pub fn decode_white_balance_exiv2(value: u16) -> &'static str {
         3843 => "Custom 4",
         3844 => "Custom 5",
         4080 => "Kelvin",
-        _ => "Unknown",
     }
 }
 
-/// Decode Sharpness value (tag 0x1001) - ExifTool format
-pub fn decode_sharpness_exiftool(value: u16) -> &'static str {
-    match value {
+// Sharpness (tag 0x1001): FujiFilm.pm / fujimn_int.cpp fujiSharpness[]
+define_tag_decoder! {
+    sharpness,
+    exiftool: {
         0x00 => "-4 (softest)",
         0x01 => "-3 (very soft)",
         0x02 => "-2 (soft)",
@@ -283,14 +270,8 @@ pub fn decode_sharpness_exiftool(value: u16) -> &'static str {
         0x84 => "+1 (medium hard)",
         0x8000 => "Film Simulation",
         0xffff => "n/a",
-        _ => "Unknown",
-    }
-}
-
-/// Decode Sharpness value (tag 0x1001) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiSharpness[]
-pub fn decode_sharpness_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "-4 (softest)",
         1 => "-3 (very soft)",
         2 => "-2 (soft)",
@@ -300,7 +281,6 @@ pub fn decode_sharpness_exiv2(value: u16) -> &'static str {
         6 => "+4 (hardest)",
         130 => "-1 (medium soft)",
         132 => "+1 (medium hard)",
-        _ => "Unknown",
     }
 }
 
@@ -317,9 +297,10 @@ pub fn decode_contrast_exiftool(value: u16) -> &'static str {
     }
 }
 
-/// Decode Saturation value (tag 0x1003) - ExifTool format
-pub fn decode_saturation_exiftool(value: u16) -> &'static str {
-    match value {
+// Saturation (tag 0x1003): FujiFilm.pm / fujimn_int.cpp fujiColor[]
+define_tag_decoder! {
+    saturation,
+    exiftool: {
         0x0 => "0 (normal)",
         0x80 => "+1 (medium high)",
         0x100 => "+2 (high)",
@@ -332,14 +313,8 @@ pub fn decode_saturation_exiftool(value: u16) -> &'static str {
         0x304 => "Acros+G Filter",
         0x8000 => "Film Simulation",
         0xffff => "n/a",
-        _ => "Unknown",
-    }
-}
-
-/// Decode Saturation value (tag 0x1003) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiColor[]
-pub fn decode_saturation_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "0 (normal)",
         128 => "+1 (medium high)",
         192 => "+3 (very high)",
@@ -360,7 +335,6 @@ pub fn decode_saturation_exiv2(value: u16) -> &'static str {
         1282 => "ACROS + Ye Filter",
         1283 => "ACROS + G Filter",
         32768 => "Film Simulation",
-        _ => "Unknown",
     }
 }
 
@@ -387,27 +361,21 @@ pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
 }
 // decode_focus_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode AFMode value (tag 0x1022) - ExifTool format
-pub fn decode_af_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// AFMode (tag 0x1022): FujiFilm.pm / fujimn_int.cpp fujiFocusArea[]
+define_tag_decoder! {
+    af_mode,
+    exiftool: {
         0 => "No",
         1 => "Single Point",
         256 => "Zone",
         512 => "Wide/Tracking",
         768 => "Wide/Tracking (PriorityFace)",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AFMode value (tag 0x1022) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiFocusArea[]
-pub fn decode_af_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Wide",
         1 => "Single Point",
         256 => "Zone",
         512 => "Tracking",
-        _ => "Unknown",
     }
 }
 
@@ -422,82 +390,58 @@ pub fn decode_slow_sync_exiftool(value: u16) -> &'static str {
 }
 // decode_slow_sync_exiv2 - same as exiftool, no separate function needed
 
-/// Decode AutoBracketing value (tag 0x1100) - ExifTool format
-pub fn decode_auto_bracketing_exiftool(value: u16) -> &'static str {
-    match value {
+// AutoBracketing (tag 0x1100): FujiFilm.pm / fujimn_int.cpp fujiContinuous[]
+define_tag_decoder! {
+    auto_bracketing,
+    exiftool: {
         0 => "Off",
         1 => "On",
         2 => "Pre-shot",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AutoBracketing value (tag 0x1100) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiContinuous[]
-pub fn decode_auto_bracketing_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "On",
         2 => "Pre-shot/No flash & flash",
         6 => "Pixel Shift",
-        _ => "Unknown",
     }
 }
 
-/// Decode BlurWarning value (tag 0x1300) - ExifTool format
-pub fn decode_blur_warning_exiftool(value: u16) -> &'static str {
-    match value {
+// BlurWarning (tag 0x1300): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    blur_warning,
+    exiftool: {
         0 => "None",
         1 => "Blur Warning",
-        _ => "Unknown",
-    }
-}
-
-/// Decode BlurWarning value (tag 0x1300) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiOffOn[]
-pub fn decode_blur_warning_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusWarning value (tag 0x1301) - ExifTool format
-pub fn decode_focus_warning_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusWarning (tag 0x1301): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    focus_warning,
+    exiftool: {
         0 => "Good",
         1 => "Out of focus",
-        _ => "Unknown",
-    }
-}
-
-/// Decode FocusWarning value (tag 0x1301) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiOffOn[]
-pub fn decode_focus_warning_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode ExposureWarning value (tag 0x1302) - ExifTool format
-pub fn decode_exposure_warning_exiftool(value: u16) -> &'static str {
-    match value {
+// ExposureWarning (tag 0x1302): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    exposure_warning,
+    exiftool: {
         0 => "Good",
         1 => "Bad exposure",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ExposureWarning value (tag 0x1302) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiOffOn[]
-pub fn decode_exposure_warning_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
 

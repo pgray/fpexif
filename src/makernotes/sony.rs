@@ -1,6 +1,7 @@
 // makernotes/sony.rs - Sony maker notes parsing
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use std::collections::HashMap;
@@ -500,9 +501,10 @@ pub fn decode_creative_style_exiftool(value: u16) -> &'static str {
 }
 // decode_creative_style_exiv2 - exiv2 uses string-based lookup (StringTagDetails)
 
-/// Decode ExposureMode value (tag 0xB041) - ExifTool format
-pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ExposureMode (tag 0xB041): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    exposure_mode,
+    exiftool: {
         0 => "Auto",
         1 => "Portrait",
         2 => "Landscape",
@@ -524,14 +526,8 @@ pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
         18 => "Background Defocus",
         19 => "Soft Skin",
         20 => "Portrait (with Smile Shutter)",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ExposureMode value (tag 0xB041) - exiv2 format
-/// Note: exiv2 has completely different value mappings
-pub fn decode_exposure_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Program AE",
         1 => "Portrait",
         2 => "Beach",
@@ -555,13 +551,13 @@ pub fn decode_exposure_mode_exiv2(value: u16) -> &'static str {
         39 => "Continuous Priority AE",
         40 => "Sweep Panorama",
         0xffff => "n/a",
-        _ => "Unknown",
     }
 }
 
-/// Decode AFMode value (tag 0xB043) - ExifTool format
-pub fn decode_af_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// AFMode (tag 0xB043): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    af_mode,
+    exiftool: {
         0 => "Default",
         1 => "Multi",
         2 => "Center",
@@ -577,13 +573,8 @@ pub fn decode_af_mode_exiftool(value: u16) -> &'static str {
         12 => "Flexible Spot (M)",
         13 => "Flexible Spot (L)",
         14 => "Eye AF",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AFMode value (tag 0xB043) - exiv2 format (Set1)
-pub fn decode_af_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Default",
         1 => "Multi",
         2 => "Center",
@@ -593,14 +584,13 @@ pub fn decode_af_mode_exiv2(value: u16) -> &'static str {
         14 => "Tracking",
         15 => "Face Detected",
         0xffff => "n/a",
-        _ => "Unknown",
     }
 }
 
-/// Decode DynamicRangeOptimizer value (tag 0xB025) - ExifTool format
-/// Note: This tag can be either SHORT or LONG depending on camera model
-pub fn decode_dynamic_range_optimizer_exiftool(value: u16) -> &'static str {
-    match value {
+// DynamicRangeOptimizer (tag 0xB025): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    dynamic_range_optimizer,
+    exiftool: {
         0 => "Off",
         1 => "Standard",
         2 => "Advanced Auto",
@@ -615,14 +605,8 @@ pub fn decode_dynamic_range_optimizer_exiftool(value: u16) -> &'static str {
         11 => "Lv3",
         12 => "Lv4",
         13 => "Lv5",
-        _ => "Unknown",
-    }
-}
-
-/// Decode DynamicRangeOptimizer value (tag 0xB025) - exiv2 format
-/// Note: exiv2 uses different indices for Advanced levels (8-11 vs 4-7)
-pub fn decode_dynamic_range_optimizer_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "Standard",
         2 => "Advanced Auto",
@@ -637,58 +621,35 @@ pub fn decode_dynamic_range_optimizer_exiv2(value: u16) -> &'static str {
         18 => "Lv3",
         19 => "Lv4",
         20 => "Lv5",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusMode value (tag 0x201B) - ExifTool format
-/// Note: This tag can be BYTE or SHORT depending on camera model
-pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusMode (tag 0x201B): Sony.pm / sonymn_int.cpp sonyFocusMode2
+define_tag_decoder! {
+    focus_mode,
+    both: {
         0 => "Manual",
         2 => "AF-S",
         3 => "AF-C",
         4 => "AF-A",
         6 => "DMF",
         7 => "AF-D",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusMode value (tag 0x201B) - exiv2 format (sonyFocusMode2)
-/// Note: exiv2 has gaps in the sequence (no 1, 5)
-pub fn decode_focus_mode_exiv2(value: u16) -> &'static str {
-    match value {
-        0 => "Manual",
-        2 => "AF-S",
-        3 => "AF-C",
-        4 => "AF-A",
-        6 => "DMF",
-        7 => "AF-D",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ImageStabilization value (tag 0xB026) - ExifTool format
-/// Note: This tag can be either SHORT or LONG depending on camera model
-pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
-    match value {
+// ImageStabilization (tag 0xB026): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    image_stabilization,
+    exiftool: {
         0 => "Off",
         1 => "On",
         2 => "On (2)",
         3 => "On (Shooting)",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ImageStabilization value (tag 0xB026) - exiv2 format
-/// Note: exiv2 only has Off, On, n/a
-pub fn decode_image_stabilization_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "On",
         0xffff => "n/a",
-        _ => "Unknown",
     }
 }
 
@@ -841,9 +802,10 @@ pub fn decode_teleconverter_exiftool(value: u32) -> &'static str {
 }
 // decode_teleconverter_exiv2 - same as exiftool, no separate function needed
 
-/// Decode PictureEffect value (tag 0x200E) - ExifTool format
-pub fn decode_picture_effect_exiftool(value: u16) -> &'static str {
-    match value {
+// PictureEffect (tag 0x200E): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    picture_effect,
+    exiftool: {
         0 => "Off",
         1 => "Toy Camera",
         2 => "Pop Color",
@@ -879,14 +841,8 @@ pub fn decode_picture_effect_exiftool(value: u16) -> &'static str {
         96 => "Illustration (low)",
         97 => "Illustration",
         98 => "Illustration (high)",
-        _ => "Unknown",
-    }
-}
-
-/// Decode PictureEffect value (tag 0x200E) - exiv2 format
-/// Note: exiv2 uses offset values for Miniature modes (48-54 vs 36-42)
-pub fn decode_picture_effect_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "Toy Camera",
         2 => "Pop Color",
@@ -923,7 +879,6 @@ pub fn decode_picture_effect_exiv2(value: u16) -> &'static str {
         112 => "Illustration (low)",
         113 => "Illustration",
         114 => "Illustration (high)",
-        _ => "Unknown",
     }
 }
 

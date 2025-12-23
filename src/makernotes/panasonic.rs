@@ -1,6 +1,7 @@
 // makernotes/panasonic.rs - Panasonic/Lumix maker notes parsing
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
@@ -126,9 +127,10 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
-/// Decode ImageQuality value (tag 0x0001) - ExifTool format
-pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
-    match value {
+// ImageQuality (tag 0x0001): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    image_quality,
+    exiftool: {
         1 => "TIFF",
         2 => "High",
         3 => "Standard",
@@ -137,13 +139,8 @@ pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
         9 => "Motion Picture",
         11 => "Full HD Movie",
         12 => "4K Movie",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ImageQuality value (tag 0x0001) - exiv2 format
-pub fn decode_image_quality_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "TIFF",
         2 => "High",
         3 => "Normal",
@@ -152,13 +149,13 @@ pub fn decode_image_quality_exiv2(value: u16) -> &'static str {
         9 => "Motion Picture",
         11 => "Full HD Movie",
         12 => "4k Movie",
-        _ => "Unknown",
     }
 }
 
-/// Decode WhiteBalance value (tag 0x0003) - ExifTool format
-pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
-    match value {
+// WhiteBalance (tag 0x0003): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    white_balance,
+    exiftool: {
         1 => "Auto",
         2 => "Daylight",
         3 => "Cloudy",
@@ -168,13 +165,8 @@ pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
         10 => "Black & White",
         11 => "Shade",
         12 => "Kelvin",
-        _ => "Unknown",
-    }
-}
-
-/// Decode WhiteBalance value (tag 0x0003) - exiv2 format
-pub fn decode_white_balance_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "Auto",
         2 => "Daylight",
         3 => "Cloudy",
@@ -185,7 +177,6 @@ pub fn decode_white_balance_exiv2(value: u16) -> &'static str {
         11 => "Manual",
         12 => "Shade",
         13 => "Kelvin",
-        _ => "Unknown",
     }
 }
 
@@ -222,9 +213,10 @@ pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
 }
 // decode_af_area_mode_exiv2 - exiv2 uses different two-byte parsing, complex
 
-/// Decode ImageStabilization value (tag 0x001A) - ExifTool format
-pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
-    match value {
+// ImageStabilization (tag 0x001A): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    image_stabilization,
+    exiftool: {
         2 => "On, Optical",
         3 => "Off",
         4 => "On, Mode 2",
@@ -235,41 +227,30 @@ pub fn decode_image_stabilization_exiftool(value: u16) -> &'static str {
         10 => "Dual IS Panning",
         11 => "Dual2 IS",
         12 => "Dual2 IS Panning",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ImageStabilization value (tag 0x001A) - exiv2 format
-pub fn decode_image_stabilization_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         2 => "On, Mode 1",
         3 => "Off",
         4 => "On, Mode 2",
         5 => "Panning",
         6 => "On, Mode 3",
-        _ => "Unknown",
     }
 }
 
-/// Decode MacroMode value (tag 0x001C) - ExifTool format
-pub fn decode_macro_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// MacroMode (tag 0x001C): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    macro_mode,
+    exiftool: {
         1 => "On",
         2 => "Off",
         257 => "Tele-macro",
         513 => "Macro Zoom",
-        _ => "Unknown",
-    }
-}
-
-/// Decode MacroMode value (tag 0x001C) - exiv2 format
-pub fn decode_macro_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "On",
         2 => "Off",
         257 => "Tele-macro",
         513 => "Macro-zoom",
-        _ => "Unknown",
     }
 }
 
@@ -305,9 +286,10 @@ pub fn decode_shooting_mode_exiftool(value: u16) -> &'static str {
 }
 // decode_shooting_mode_exiv2 - exiv2 has 90+ values, same base values match
 
-/// Decode PhotoStyle value (tag 0x0089) - ExifTool format
-pub fn decode_photo_style_exiftool(value: u16) -> &'static str {
-    match value {
+// PhotoStyle (tag 0x0089): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    photo_style,
+    exiftool: {
         0 => "Auto",
         1 => "Standard or Custom",
         2 => "Vivid",
@@ -322,13 +304,8 @@ pub fn decode_photo_style_exiftool(value: u16) -> &'static str {
         15 => "L.Monochrome D",
         17 => "V-Log",
         18 => "Cinelike D2",
-        _ => "Unknown",
-    }
-}
-
-/// Decode PhotoStyle value (tag 0x0089) - exiv2 format
-pub fn decode_photo_style_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "NoAuto",
         1 => "Standard or Custom",
         2 => "Vivid",
@@ -336,7 +313,6 @@ pub fn decode_photo_style_exiv2(value: u16) -> &'static str {
         4 => "Monochrome",
         5 => "Scenery",
         6 => "Portrait",
-        _ => "Unknown",
     }
 }
 
@@ -352,9 +328,10 @@ pub fn decode_shutter_type_exiftool(value: u16) -> &'static str {
 }
 // decode_shutter_type_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ContrastMode value (tag 0x002C) - ExifTool format
-pub fn decode_contrast_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ContrastMode (tag 0x002C): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    contrast_mode,
+    exiftool: {
         0 => "Normal",
         1 => "Low",
         2 => "High",
@@ -364,13 +341,8 @@ pub fn decode_contrast_mode_exiftool(value: u16) -> &'static str {
         256 => "Low",
         272 => "Standard",
         288 => "High",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ContrastMode value (tag 0x002C) - exiv2 format
-pub fn decode_contrast_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Normal",
         1 => "Low",
         2 => "High",
@@ -379,13 +351,13 @@ pub fn decode_contrast_mode_exiv2(value: u16) -> &'static str {
         256 => "Low",
         272 => "Standard",
         288 => "High",
-        _ => "Unknown",
     }
 }
 
-/// Decode BurstMode value (tag 0x002A) - ExifTool format
-pub fn decode_burst_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// BurstMode (tag 0x002A): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    burst_mode,
+    exiftool: {
         0 => "Off",
         1 => "On",
         2 => "Auto Exposure Bracketing",
@@ -394,17 +366,11 @@ pub fn decode_burst_mode_exiftool(value: u16) -> &'static str {
         8 => "White Balance Bracketing",
         17 => "On (with flash)",
         18 => "Aperture Bracketing",
-        _ => "Unknown",
-    }
-}
-
-/// Decode BurstMode value (tag 0x002A) - exiv2 format
-pub fn decode_burst_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "Low/High quality",
         2 => "Infinite",
-        _ => "Unknown",
     }
 }
 

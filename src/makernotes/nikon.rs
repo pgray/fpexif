@@ -1,6 +1,7 @@
 // makernotes/nikon.rs - Nikon maker notes parsing
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
@@ -722,9 +723,10 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
     }
 }
 
-/// Decode Active D-Lighting value (tag 0x0022) - ExifTool format
-pub fn decode_active_d_lighting_exiftool(value: u16) -> &'static str {
-    match value {
+// Active D-Lighting (tag 0x0022): Nikon.pm / nikonmn_int.cpp nikonActiveDLighting[]
+define_tag_decoder! {
+    active_d_lighting,
+    exiftool: {
         0 => "Off",
         1 => "Low",
         3 => "Normal",
@@ -733,38 +735,24 @@ pub fn decode_active_d_lighting_exiftool(value: u16) -> &'static str {
         8 => "Extra High 1",
         9 => "Extra High 2",
         65535 => "Auto",
-        _ => "Unknown",
-    }
-}
-
-/// Decode Active D-Lighting value (tag 0x0022) - exiv2 format
-/// Values based on exiv2 nikonmn_int.cpp nikonActiveDLighting[]
-pub fn decode_active_d_lighting_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "Low",
         3 => "Normal",
         5 => "High",
         7 => "Extra High",
         65535 => "Auto",
-        _ => "Unknown",
     }
 }
 
-/// Decode JPG Compression value - ExifTool format
-/// From Nikon.pm PrintConv for tag 0x0044 in WorldTime
-pub fn decode_jpg_compression_exiftool(value: u16) -> &'static str {
-    match value {
+// JPG Compression: Nikon.pm
+define_tag_decoder! {
+    jpg_compression,
+    both: {
         1 => "Size Priority",
         3 => "Optimal Quality",
-        _ => "Unknown",
     }
-}
-
-/// Decode JPG Compression value - exiv2 format
-/// exiv2 does not define this tag, using ExifTool values
-pub fn decode_jpg_compression_exiv2(value: u16) -> &'static str {
-    decode_jpg_compression_exiftool(value)
 }
 
 /// Decode VR Type value - ExifTool format
@@ -824,23 +812,17 @@ pub fn decode_image_stabilization_exiv2(value: &str) -> &'static str {
     decode_image_stabilization_exiftool(value)
 }
 
-/// Decode Color Space value (tag 0x001E) - ExifTool format
-pub fn decode_color_space_exiftool(value: u16) -> &'static str {
-    match value {
+// ColorSpace (tag 0x001E): Nikon.pm / nikonmn_int.cpp nikonColorSpace[]
+define_tag_decoder! {
+    color_space,
+    exiftool: {
         1 => "sRGB",
         2 => "Adobe RGB",
         4 => "BT.2100",
-        _ => "Unknown",
-    }
-}
-
-/// Decode Color Space value (tag 0x001E) - exiv2 format
-/// Values based on exiv2 nikonmn_int.cpp nikonColorSpace[]
-pub fn decode_color_space_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "sRGB",
         2 => "Adobe RGB",
-        _ => "Unknown",
     }
 }
 
@@ -856,9 +838,10 @@ pub fn decode_vignette_control_exiftool(value: u16) -> &'static str {
 }
 // decode_vignette_control_exiv2 - same as exiftool, no separate function needed
 
-/// Decode High ISO Noise Reduction value (tag 0x00B1) - ExifTool format
-pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// HighISONoiseReduction (tag 0x00B1): Nikon.pm / nikonmn_int.cpp nikonHighISONoiseReduction[]
+define_tag_decoder! {
+    high_iso_noise_reduction,
+    exiftool: {
         0 => "Off",
         1 => "Minimal",
         2 => "Low",
@@ -866,21 +849,13 @@ pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
         4 => "Normal",
         5 => "Medium High",
         6 => "High",
-        _ => "Unknown",
-    }
-}
-
-/// Decode High ISO Noise Reduction value (tag 0x00B1) - exiv2 format
-/// Values based on exiv2 nikonmn_int.cpp nikonHighISONoiseReduction[]
-/// Note: exiv2 skips values 3 and 5 that ExifTool has
-pub fn decode_high_iso_noise_reduction_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Off",
         1 => "Minimal",
         2 => "Low",
         4 => "Normal",
         6 => "High",
-        _ => "Unknown",
     }
 }
 
@@ -897,25 +872,21 @@ pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
 }
 // decode_date_stamp_mode_exiv2 - not defined in exiv2
 
-/// Decode NEF Compression value (tag 0x0093) - ExifTool format
-pub fn decode_nef_compression_exiftool(value: u16) -> &'static str {
-    match value {
+// NEFCompression (tag 0x0093): Nikon.pm
+define_tag_decoder! {
+    nef_compression,
+    both: {
         1 => "Lossy (type 1)",
         2 => "Uncompressed",
         3 => "Lossless",
         4 => "Lossy (type 2)",
-        _ => "Unknown",
     }
 }
 
-/// Decode NEF Compression value (tag 0x0093) - exiv2 format
-pub fn decode_nef_compression_exiv2(value: u16) -> &'static str {
-    decode_nef_compression_exiftool(value)
-}
-
-/// Decode Retouch History value (tag 0x009E) - ExifTool format
-pub fn decode_retouch_history_exiftool(value: u16) -> &'static str {
-    match value {
+// RetouchHistory (tag 0x009E): Nikon.pm
+define_tag_decoder! {
+    retouch_history,
+    both: {
         0 => "None",
         3 => "B & W",
         4 => "Sepia",
@@ -928,13 +899,7 @@ pub fn decode_retouch_history_exiftool(value: u16) -> &'static str {
         11 => "Warm Tone",
         12 => "Color Custom",
         13 => "Image Overlay",
-        _ => "Unknown",
     }
-}
-
-/// Decode Retouch History - exiv2 format (same values)
-pub fn decode_retouch_history_exiv2(value: u16) -> &'static str {
-    decode_retouch_history_exiftool(value)
 }
 
 /// Decode packed rational value (4 bytes: a, b, c, _)
