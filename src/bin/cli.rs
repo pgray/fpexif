@@ -185,6 +185,16 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
         let display_value = format_exiftool_text_value(value, tag_id.id);
         println!("{:<32}: {}", tag_name, display_value);
     }
+
+    // Output maker notes
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        for (_, note) in maker_notes.iter() {
+            if let Some(name) = note.tag_name {
+                let display_value = format_exiftool_text_value(&note.value, note.tag_id);
+                println!("{:<32}: {}", name, display_value);
+            }
+        }
+    }
 }
 
 /// Format an ExifValue for exiftool-style text output
@@ -201,7 +211,14 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                 cleaned.to_string()
             }
         }
-        ExifValue::Byte(v) => format_values_space(v),
+        ExifValue::Byte(v) => {
+            // GPSVersionID (0x0000) should be formatted as "2.2.0.0"
+            if tag_id == 0x0000 && v.len() == 4 {
+                format!("{}.{}.{}.{}", v[0], v[1], v[2], v[3])
+            } else {
+                format_values_space(v)
+            }
+        }
         ExifValue::Short(v) => {
             // Use tag-specific descriptions for known tags
             if v.len() == 1 {
@@ -272,6 +289,22 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                             let distance = n as f64 / d as f64;
                             format!("{} m", distance)
                         }
+                        0x9201 => {
+                            // ShutterSpeedValue (APEX) - convert to shutter speed
+                            // ShutterSpeed = 2^APEX
+                            let apex = n as f64 / d as f64;
+                            let shutter_speed = 2f64.powf(apex);
+                            let denominator = shutter_speed.round() as u32;
+                            format!("1/{}", denominator)
+                        }
+                        0x9202 | 0x9205 => {
+                            // ApertureValue, MaxApertureValue (APEX) - convert to f-number
+                            // F-number = 2^(APEX/2)
+                            let apex = n as f64 / d as f64;
+                            let f_number = 2f64.powf(apex / 2.0);
+                            let rounded = (f_number * 10.0).round() / 10.0;
+                            format!("{}", rounded)
+                        }
                         _ => {
                             let val = n as f64 / d as f64;
                             if val == val.floor() {
@@ -301,10 +334,31 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
             if v.len() == 1 {
                 let (n, d) = v[0];
                 if d != 0 {
-                    format!("{:.6}", n as f64 / d as f64)
-                        .trim_end_matches('0')
-                        .trim_end_matches('.')
-                        .to_string()
+                    match tag_id {
+                        0x9201 => {
+                            // ShutterSpeedValue (APEX) - convert to shutter speed
+                            let apex = n as f64 / d as f64;
+                            let shutter_speed = 2f64.powf(apex);
+                            let denominator = shutter_speed.round() as i32;
+                            format!("1/{}", denominator)
+                        }
+                        0x9204 => {
+                            // ExposureBiasValue - format as +/- EV
+                            let bias = n as f64 / d as f64;
+                            if bias == 0.0 {
+                                "0".to_string()
+                            } else {
+                                format!("{:.6}", bias)
+                                    .trim_end_matches('0')
+                                    .trim_end_matches('.')
+                                    .to_string()
+                            }
+                        }
+                        _ => format!("{:.6}", n as f64 / d as f64)
+                            .trim_end_matches('0')
+                            .trim_end_matches('.')
+                            .to_string(),
+                    }
                 } else {
                     format!("{}/{}", n, d)
                 }
@@ -320,6 +374,32 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
         ExifValue::Undefined(v) => {
             // Handle UserComment and other undefined tags
             match tag_id {
+                0x9000 | 0xA000 => {
+                    // ExifVersion (0x9000), FlashpixVersion (0xA000) - decode as ASCII
+                    // Stored as 4 bytes like "0221" or "0100"
+                    String::from_utf8(v.to_vec())
+                        .ok()
+                        .map(|s| s.trim_end_matches('\0').to_string())
+                        .unwrap_or_else(|| format!("(Binary data {} bytes)", v.len()))
+                }
+                0x9101 => {
+                    // ComponentsConfiguration - decode component IDs
+                    // 0=-, 1=Y, 2=Cb, 3=Cr, 4=R, 5=G, 6=B
+                    let components: Vec<&str> = v
+                        .iter()
+                        .map(|&b| match b {
+                            0 => "-",
+                            1 => "Y",
+                            2 => "Cb",
+                            3 => "Cr",
+                            4 => "R",
+                            5 => "G",
+                            6 => "B",
+                            _ => "?",
+                        })
+                        .collect();
+                    components.join(", ")
+                }
                 0x9286 => {
                     // UserComment - EXIF spec says first 8 bytes are character code
                     // followed by the actual comment. Common codes: "ASCII\0\0\0", "UNICODE\0", etc.

@@ -4020,6 +4020,186 @@ pub fn decode_af_info2_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
     decoded
 }
 
+/// Decode Canon ColorData array sub-fields - ExifTool format
+/// ColorData structure is version-dependent. Version 6 is for 50D/5DmkII
+pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    if data.is_empty() {
+        return decoded;
+    }
+
+    // ColorDataVersion (index 0)
+    let version = data[0];
+    let version_str = match version {
+        1 => "1 (G2/S30/S40/S45)",
+        2 => "2 (S70/S60/Pro1/G6)",
+        3 => "3 (G7/G9/S1/S2/S3/S5/A560/A570/A580/A590/A610/A620/A630/A640/A650/A700/A710/A720)",
+        4 => "4 (G10/G11/G12/S90/S95/S100/S110/S120/A495/A1100/A2100/A3100/A3200/A3300/A3400)",
+        5 => "5 (40D)",
+        6 => "6 (50D/5DmkII)",
+        7 => "7 (500D/550D/600D/1100D)",
+        8 => "8 (60D)",
+        9 => "9 (1DmkIV/5DmkIII/6D/7D/70D)",
+        10 => "10 (1DX/1DC/7DmkII)",
+        11 => "11 (5DS/5DSR/5DmkIV/80D/6DmkII/77D/800D/200D)",
+        _ => "Unknown",
+    };
+    decoded.insert(
+        "ColorDataVersion".to_string(),
+        ExifValue::Ascii(version_str.to_string()),
+    );
+
+    // For version 6 (50D/5DmkII), structure is:
+    // Index 0: ColorDataVersion
+    // Index 3-6: WB_RGGBLevelsAsShot (4 values)
+    // Index 7: ColorTempAsShot
+    // Index 8-11: WB_RGGBLevelsAuto (4 values)
+    // Index 12: ColorTempAuto
+    // Index 13-16: WB_RGGBLevelsMeasured (4 values, but may be different)
+    // Index 17: ColorTempMeasured
+
+    // For version 6 (50D/5DmkII), ColorData structure:
+    // The structure starts with WB data at specific offsets
+    // Based on ExifTool Canon.pm ColorData6 offsets:
+    // WB_RGGBLevelsAsShot starts at index 63
+    if version == 6 && data.len() > 120 {
+        // WB_RGGBLevelsAsShot (indices 63-66)
+        let levels_str = format!("{} {} {} {}", data[63], data[64], data[65], data[66]);
+        decoded.insert(
+            "WB_RGGBLevelsAsShot".to_string(),
+            ExifValue::Ascii(levels_str.clone()),
+        );
+        decoded.insert("WB_RGGBLevels".to_string(), ExifValue::Ascii(levels_str));
+
+        // ColorTempAsShot (index 67)
+        decoded.insert(
+            "ColorTempAsShot".to_string(),
+            ExifValue::Short(vec![data[67]]),
+        );
+
+        // WB_RGGBLevelsAuto (indices 68-71)
+        let levels_str = format!("{} {} {} {}", data[68], data[69], data[70], data[71]);
+        decoded.insert(
+            "WB_RGGBLevelsAuto".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempAuto (index 72)
+        decoded.insert(
+            "ColorTempAuto".to_string(),
+            ExifValue::Short(vec![data[72]]),
+        );
+
+        // WB_RGGBLevelsMeasured (indices 73-76)
+        let levels_str = format!("{} {} {} {}", data[73], data[74], data[75], data[76]);
+        decoded.insert(
+            "WB_RGGBLevelsMeasured".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempMeasured (index 77)
+        decoded.insert(
+            "ColorTempMeasured".to_string(),
+            ExifValue::Short(vec![data[77]]),
+        );
+
+        // Preset WB values - shifted by 5 from my original offsets
+        // WB_RGGBLevelsDaylight (indices 83-86)
+        let levels_str = format!("{} {} {} {}", data[83], data[84], data[85], data[86]);
+        decoded.insert(
+            "WB_RGGBLevelsDaylight".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempDaylight (index 87)
+        decoded.insert(
+            "ColorTempDaylight".to_string(),
+            ExifValue::Short(vec![data[87]]),
+        );
+
+        // WB_RGGBLevelsShade (indices 88-91)
+        let levels_str = format!("{} {} {} {}", data[88], data[89], data[90], data[91]);
+        decoded.insert(
+            "WB_RGGBLevelsShade".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempShade (index 92)
+        decoded.insert(
+            "ColorTempShade".to_string(),
+            ExifValue::Short(vec![data[92]]),
+        );
+
+        // WB_RGGBLevelsCloudy (indices 93-96)
+        let levels_str = format!("{} {} {} {}", data[93], data[94], data[95], data[96]);
+        decoded.insert(
+            "WB_RGGBLevelsCloudy".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempCloudy (index 97)
+        decoded.insert(
+            "ColorTempCloudy".to_string(),
+            ExifValue::Short(vec![data[97]]),
+        );
+
+        // WB_RGGBLevelsTungsten (indices 98-101)
+        let levels_str = format!("{} {} {} {}", data[98], data[99], data[100], data[101]);
+        decoded.insert(
+            "WB_RGGBLevelsTungsten".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempTungsten (index 102)
+        decoded.insert(
+            "ColorTempTungsten".to_string(),
+            ExifValue::Short(vec![data[102]]),
+        );
+
+        // WB_RGGBLevelsFluorescent (indices 103-106)
+        let levels_str = format!("{} {} {} {}", data[103], data[104], data[105], data[106]);
+        decoded.insert(
+            "WB_RGGBLevelsFluorescent".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempFluorescent (index 107)
+        decoded.insert(
+            "ColorTempFluorescent".to_string(),
+            ExifValue::Short(vec![data[107]]),
+        );
+
+        // WB_RGGBLevelsKelvin (indices 108-111)
+        let levels_str = format!("{} {} {} {}", data[108], data[109], data[110], data[111]);
+        decoded.insert(
+            "WB_RGGBLevelsKelvin".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempKelvin (index 112)
+        decoded.insert(
+            "ColorTempKelvin".to_string(),
+            ExifValue::Short(vec![data[112]]),
+        );
+
+        // WB_RGGBLevelsFlash (indices 113-116)
+        let levels_str = format!("{} {} {} {}", data[113], data[114], data[115], data[116]);
+        decoded.insert(
+            "WB_RGGBLevelsFlash".to_string(),
+            ExifValue::Ascii(levels_str),
+        );
+
+        // ColorTempFlash (index 117)
+        decoded.insert(
+            "ColorTempFlash".to_string(),
+            ExifValue::Short(vec![data[117]]),
+        );
+    }
+
+    decoded
+}
+
 /// Parse Canon maker notes
 ///
 /// Canon maker notes use TIFF-relative offsets, so we need access to the full
@@ -4055,11 +4235,8 @@ pub fn parse_canon_maker_notes(
         if let Some((tag_id, value)) =
             parse_ifd_entry(data, entry_offset, endian, tiff_data, tiff_offset)
         {
-            // Skip large binary blobs to save memory (camera info, dust removal, color data)
-            if matches!(
-                tag_id,
-                CANON_CAMERA_INFO | CANON_DUST_REMOVAL_DATA | CANON_COLOR_DATA
-            ) {
+            // Skip large binary blobs to save memory (camera info, dust removal)
+            if matches!(tag_id, CANON_CAMERA_INFO | CANON_DUST_REMOVAL_DATA) {
                 continue;
             }
 
@@ -4072,6 +4249,7 @@ pub fn parse_canon_maker_notes(
                     | CANON_FILE_INFO
                     | CANON_AF_INFO_2
                     | CANON_PROCESSING_INFO
+                    | CANON_COLOR_DATA
             );
 
             if should_decode {
@@ -4083,6 +4261,7 @@ pub fn parse_canon_maker_notes(
                         CANON_FILE_INFO => decode_file_info(shorts),
                         CANON_AF_INFO_2 => decode_af_info2(shorts),
                         CANON_PROCESSING_INFO => decode_processing_info(shorts),
+                        CANON_COLOR_DATA => decode_color_data(shorts),
                         _ => HashMap::new(),
                     };
 
