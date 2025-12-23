@@ -1980,10 +1980,12 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
-    // Drive mode (index 5)
+    // Continuous drive (index 5)
+    // Note: ExifTool calls this "ContinuousDrive", not "DriveMode"
+    // The composite "DriveMode" tag is computed elsewhere
     if data.len() > 5 {
         decoded.insert(
-            "DriveMode".to_string(),
+            "ContinuousDrive".to_string(),
             ExifValue::Ascii(decode_drive_mode_exiftool(data[5]).to_string()),
         );
     }
@@ -2345,10 +2347,11 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
-    // Drive mode (index 5)
+    // Continuous drive (index 5)
+    // Note: This is "ContinuousDrive", not "DriveMode"
     if data.len() > 5 {
         decoded.insert(
-            "DriveMode".to_string(),
+            "ContinuousDrive".to_string(),
             ExifValue::Ascii(decode_drive_mode_exiv2(data[5]).to_string()),
         );
     }

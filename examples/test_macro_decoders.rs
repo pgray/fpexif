@@ -62,10 +62,22 @@ fn main() {
 
     // Test ImageStabilization (both format)
     println!("ImageStabilization:");
-    println!("  Value 0 ExifTool: {}", decode_image_stabilization_exiftool(0));
-    println!("  Value 0 exiv2:    {}", decode_image_stabilization_exiv2(0));
-    println!("  Value 1 ExifTool: {}", decode_image_stabilization_exiftool(1));
-    println!("  Value 1 exiv2:    {}", decode_image_stabilization_exiv2(1));
+    println!(
+        "  Value 0 ExifTool: {}",
+        decode_image_stabilization_exiftool(0)
+    );
+    println!(
+        "  Value 0 exiv2:    {}",
+        decode_image_stabilization_exiv2(0)
+    );
+    println!(
+        "  Value 1 ExifTool: {}",
+        decode_image_stabilization_exiftool(1)
+    );
+    println!(
+        "  Value 1 exiv2:    {}",
+        decode_image_stabilization_exiv2(1)
+    );
     println!();
 
     // Test FocalType (both format)
