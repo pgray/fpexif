@@ -126,6 +126,9 @@ pub const CS_PHOTO_EFFECT: u16 = 0x0028;
 pub const CS_MANUAL_FLASH_OUTPUT: u16 = 0x0029;
 pub const CS_COLOR_TONE: u16 = 0x002A;
 pub const CS_SRAW_QUALITY: u16 = 0x002E;
+pub const CS_FOCUS_BRACKETING: u16 = 0x0032; // Index 50
+pub const CS_CLARITY: u16 = 0x0033; // Index 51
+pub const CS_HDR_PQ: u16 = 0x0034; // Index 52
 
 // ShotInfo sub-array tags (indices in tag 0x0004)
 pub const SI_AUTO_ISO: u16 = 0x0001;
@@ -147,9 +150,15 @@ pub const SI_AEB_BRACKET_VALUE: u16 = 0x0011;
 pub const SI_CONTROL_MODE: u16 = 0x0012;
 pub const SI_FOCUS_DISTANCE_UPPER: u16 = 0x0013;
 pub const SI_FOCUS_DISTANCE_LOWER: u16 = 0x0014;
-pub const SI_FMICRO_ADJ: u16 = 0x0015;
-pub const SI_BULB_DURATION: u16 = 0x0018;
-pub const SI_SELF_TIMER_2: u16 = 0x001D;
+pub const SI_FNUMBER: u16 = 0x0015; // Index 21
+pub const SI_EXPOSURE_TIME: u16 = 0x0016; // Index 22
+pub const SI_MEASURED_EV2: u16 = 0x0017; // Index 23
+pub const SI_BULB_DURATION: u16 = 0x0018; // Index 24
+pub const SI_CAMERA_TYPE: u16 = 0x001A; // Index 26
+pub const SI_AUTO_ROTATE: u16 = 0x001B; // Index 27
+pub const SI_ND_FILTER: u16 = 0x001C; // Index 28
+pub const SI_SELF_TIMER_2: u16 = 0x001D; // Index 29
+pub const SI_FLASH_OUTPUT: u16 = 0x0021; // Index 33
 
 // FocalLength sub-array tags (indices in tag 0x0002)
 pub const FL_FOCAL_TYPE: u16 = 0x0000;
@@ -464,7 +473,6 @@ pub const SI_AF_AREA_WIDTH: u16 = 0x0019;
 pub const SI_AF_AREA_HEIGHT: u16 = 0x001A;
 pub const SI_AF_AREA_X_POSITIONS: u16 = 0x001B;
 pub const SI_AF_AREA_Y_POSITIONS: u16 = 0x001C;
-pub const SI_AUTO_ROTATE: u16 = 0x001E;
 
 // Additional main tags
 pub const CANON_MEASURED_EV_2: u16 = 0x00A6;
@@ -1047,6 +1055,7 @@ define_tag_decoder! {
         4 => "Continuous, Low",
         5 => "Continuous, High",
         6 => "Silent Single Shooting",
+        8 => "Continuous, High+",
         9 => "Single-frame Shooting, Silent",
         10 => "Continuous Shooting, Silent",
     },
@@ -1058,6 +1067,7 @@ define_tag_decoder! {
         4 => "Continuous, low",
         5 => "Continuous, high",
         6 => "Silent Single",
+        8 => "Continuous, high+",
         9 => "Single, Silent",
         10 => "Continuous, Silent",
     }
@@ -1070,12 +1080,16 @@ define_tag_decoder! {
         0 => "One-shot AF",
         1 => "AI Servo AF",
         2 => "AI Focus AF",
-        3 => "Manual Focus",
+        3 => "Manual Focus (3)",
         4 => "Single",
         5 => "Continuous",
-        6 => "Manual Focus",
+        6 => "Manual Focus (6)",
         16 => "Pan Focus",
-        256 => "Manual",
+        256 => "One-shot AF (Live View)",
+        257 => "AI Servo AF (Live View)",
+        258 => "AI Focus AF (Live View)",
+        512 => "Movie Snap Focus",
+        519 => "Movie Servo AF",
     },
     exiv2: {
         0 => "One shot AF",
@@ -2577,6 +2591,43 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
+    // Focus bracketing (index 50) - EOS R models
+    if data.len() > 50 {
+        let focus_bracketing = match data[50] {
+            0 => "Disable",
+            1 => "Enable",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "FocusBracketing".to_string(),
+            ExifValue::Ascii(focus_bracketing.to_string()),
+        );
+    }
+
+    // Clarity (index 51) - EOS R models
+    if data.len() > 51 && data[51] != 0x7fff {
+        let value = data[51] as i16;
+        let clarity = if value == 0 {
+            "0".to_string()
+        } else if value > 0 {
+            format!("+{}", value)
+        } else {
+            format!("{}", value)
+        };
+        decoded.insert("Clarity".to_string(), ExifValue::Ascii(clarity));
+    }
+
+    // HDR-PQ (index 52)
+    if data.len() > 52 {
+        let hdr_pq = match data[52] as i16 {
+            -1 => "n/a",
+            0 => "Off",
+            1 => "On",
+            _ => "Unknown",
+        };
+        decoded.insert("HDR-PQ".to_string(), ExifValue::Ascii(hdr_pq.to_string()));
+    }
+
     decoded
 }
 
@@ -2935,6 +2986,38 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
+    // Focus bracketing (index 50) - EOS R models
+    if data.len() > 50 {
+        decoded.insert(
+            "FocusBracketing".to_string(),
+            ExifValue::Ascii(decode_focus_bracketing_exiv2(data[50]).to_string()),
+        );
+    }
+
+    // Clarity (index 51) - EOS R models
+    if data.len() > 51 && data[51] != 0x7fff {
+        let value = data[51] as i16;
+        let clarity = if value == 0 {
+            "0".to_string()
+        } else if value > 0 {
+            format!("+{}", value)
+        } else {
+            format!("{}", value)
+        };
+        decoded.insert("Clarity".to_string(), ExifValue::Ascii(clarity));
+    }
+
+    // HDR-PQ (index 52)
+    if data.len() > 52 {
+        let hdr_pq = match data[52] as i16 {
+            -1 => "n/a",
+            0 => "Off",
+            1 => "On",
+            _ => "Unknown",
+        };
+        decoded.insert("HDR-PQ".to_string(), ExifValue::Ascii(hdr_pq.to_string()));
+    }
+
     decoded
 }
 
@@ -3203,6 +3286,38 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // FNumber (index 21) - Canon APEX aperture value
+    // f-number = exp(CanonEv(value)*log(2)/2)
+    if data.len() > 21 && data[21] != 0 {
+        let raw = data[21] as i16;
+        let f_number = (canon_ev(raw) * 2f64.ln() / 2.0).exp();
+        let rounded = (f_number * 100.0).round() / 100.0;
+        decoded.insert(
+            "FNumber".to_string(),
+            ExifValue::Ascii(format!("{:.2}", rounded)),
+        );
+    }
+
+    // ExposureTime (index 22) - Canon APEX time value
+    // exposure time = exp(-CanonEv(value)*log(2))
+    if data.len() > 22 && data[22] != 0 {
+        let raw = data[22] as i16;
+        let time = (-canon_ev(raw) * 2f64.ln()).exp();
+        // Format as fraction if less than 1 second
+        let formatted = if time < 1.0 && time > 0.0 {
+            let denominator = (1.0 / time).round() as u32;
+            format!("1/{}", denominator)
+        } else {
+            format!("{:.1}", time)
+        };
+        decoded.insert("ExposureTime".to_string(), ExifValue::Ascii(formatted));
+    }
+
+    // FlashOutput (index 33) - PowerShot models only
+    if data.len() > 33 && data[33] != 0 {
+        decoded.insert("FlashOutput".to_string(), ExifValue::Short(vec![data[33]]));
+    }
+
     decoded
 }
 
@@ -3443,6 +3558,35 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
             "SubjectDistance".to_string(),
             ExifValue::Short(vec![data[19]]),
         );
+    }
+
+    // FNumber (index 21) - Canon APEX aperture value
+    if data.len() > 21 && data[21] != 0 {
+        let raw = data[21] as i16;
+        let f_number = (canon_ev(raw) * 2f64.ln() / 2.0).exp();
+        let rounded = (f_number * 100.0).round() / 100.0;
+        decoded.insert(
+            "FNumber".to_string(),
+            ExifValue::Ascii(format!("{:.2}", rounded)),
+        );
+    }
+
+    // ExposureTime (index 22) - Canon APEX time value
+    if data.len() > 22 && data[22] != 0 {
+        let raw = data[22] as i16;
+        let time = (-canon_ev(raw) * 2f64.ln()).exp();
+        let formatted = if time < 1.0 && time > 0.0 {
+            let denominator = (1.0 / time).round() as u32;
+            format!("1/{}", denominator)
+        } else {
+            format!("{:.1}", time)
+        };
+        decoded.insert("ExposureTime".to_string(), ExifValue::Ascii(formatted));
+    }
+
+    // FlashOutput (index 33) - PowerShot models only
+    if data.len() > 33 && data[33] != 0 {
+        decoded.insert("FlashOutput".to_string(), ExifValue::Short(vec![data[33]]));
     }
 
     decoded
