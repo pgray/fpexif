@@ -680,18 +680,27 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
 fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
     match tag_id {
         NIKON_QUALITY => decode_quality_exiftool(value).to_string(),
-        NIKON_WHITE_BALANCE => match value.trim() {
-            "AUTO" | "AUTO1" | "AUTO2" => "Auto",
-            "SUNNY" | "DIRECT SUNLIGHT" => "Daylight",
-            "SHADE" => "Shade",
-            "CLOUDY" => "Cloudy",
-            "TUNGSTEN" | "INCANDESCENT" => "Tungsten",
-            "FLUORESCENT" => "Fluorescent",
-            "FLASH" => "Flash",
-            "PRESET" => "Preset",
-            _ => value.trim(),
+        NIKON_WHITE_BALANCE => {
+            let trimmed = value.trim();
+            match trimmed {
+                "AUTO" => "Auto".to_string(),
+                "AUTO1" => "Auto1".to_string(),
+                "AUTO2" => "Auto2".to_string(),
+                "SUNNY" => "Sunny".to_string(),
+                "DIRECT SUNLIGHT" => "Direct Sunlight".to_string(),
+                "SHADE" => "Shade".to_string(),
+                "CLOUDY" => "Cloudy".to_string(),
+                "TUNGSTEN" | "INCANDESCENT" => "Incandescent".to_string(),
+                "FLUORESCENT" => "Fluorescent".to_string(),
+                "FLASH" => "Flash".to_string(),
+                "PRESET" => "Preset".to_string(),
+                _ if trimmed.starts_with("PRESET") => {
+                    // Handle PRESET0, PRESET1, etc. -> Preset0, Preset1, etc.
+                    format!("Preset{}", &trimmed[6..])
+                }
+                _ => trimmed.to_string(),
+            }
         }
-        .to_string(),
         NIKON_FOCUS_MODE => decode_focus_mode_exiftool(value).to_string(),
         NIKON_FLASH_SETTING => decode_flash_setting_exiftool(value).to_string(),
         NIKON_SHARPNESS => decode_sharpening_exiftool(value).to_string(),
@@ -926,6 +935,40 @@ pub fn decode_retouch_history_exiftool(value: u16) -> &'static str {
 /// Decode Retouch History - exiv2 format (same values)
 pub fn decode_retouch_history_exiv2(value: u16) -> &'static str {
     decode_retouch_history_exiftool(value)
+}
+
+/// Decode packed rational value (4 bytes: a, b, c, _)
+/// For signed values: result = a * (b / c) where a, b, c are signed chars
+/// Used for ProgramShift, ExposureDifference, FlashExposureComp
+pub fn decode_packed_rational_signed(data: &[u8]) -> Option<f64> {
+    if data.len() < 4 {
+        return None;
+    }
+    let a = data[0] as i8 as f64;
+    let b = data[1] as i8 as f64;
+    let c = data[2] as i8 as f64;
+    if c == 0.0 {
+        Some(0.0)
+    } else {
+        Some(a * (b / c))
+    }
+}
+
+/// Decode packed rational value (4 bytes: a, b, c, _)
+/// For unsigned values: result = a * (b / c) where a, b, c are unsigned chars
+/// Used for LensFStops
+pub fn decode_packed_rational_unsigned(data: &[u8]) -> Option<f64> {
+    if data.len() < 4 {
+        return None;
+    }
+    let a = data[0] as f64;
+    let b = data[1] as f64;
+    let c = data[2] as f64;
+    if c == 0.0 {
+        Some(0.0)
+    } else {
+        Some(a * (b / c))
+    }
 }
 
 /// Decode Flash Mode value (tag 0x0087) - ExifTool format
@@ -1975,8 +2018,35 @@ pub fn parse_nikon_maker_notes(
                     }
                 }
                 7 => {
-                    // UNDEFINED - keep as binary
-                    ExifValue::Undefined(value_bytes)
+                    // UNDEFINED - handle packed rational values specially
+                    match tag_id {
+                        // Signed packed rationals (a * b/c where a,b,c are signed)
+                        NIKON_PROGRAM_SHIFT
+                        | NIKON_EXPOSURE_DIFFERENCE
+                        | NIKON_FLASH_EXPOSURE_COMP
+                        | NIKON_FLASH_EXPOSURE_BRACKET_VALUE
+                        | NIKON_EXPOSURE_BRACKET_VALUE => {
+                            if let Some(val) = decode_packed_rational_signed(&value_bytes) {
+                                // Store as SRational for proper JSON number output
+                                // Convert to rational with denominator 100 for precision
+                                let int_val = (val * 100.0).round() as i32;
+                                ExifValue::SRational(vec![(int_val, 100)])
+                            } else {
+                                ExifValue::Undefined(value_bytes)
+                            }
+                        }
+                        // Unsigned packed rationals (a * b/c where a,b,c are unsigned)
+                        NIKON_LENS_F_STOPS => {
+                            if let Some(val) = decode_packed_rational_unsigned(&value_bytes) {
+                                // Store as Rational for proper JSON number output
+                                let int_val = (val * 100.0).round() as u32;
+                                ExifValue::Rational(vec![(int_val, 100)])
+                            } else {
+                                ExifValue::Undefined(value_bytes)
+                            }
+                        }
+                        _ => ExifValue::Undefined(value_bytes),
+                    }
                 }
                 _ => {
                     // Unsupported type

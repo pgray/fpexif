@@ -620,6 +620,20 @@ pub fn decode_text_stamp_exiftool(value: u16) -> &'static str {
 }
 // decode_text_stamp_exiv2 - same as exiftool
 
+/// Decode CameraOrientation value (tag 0x008F) - ExifTool format
+pub fn decode_camera_orientation_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Rotate CW",
+        2 => "Rotate 180",
+        3 => "Rotate CCW",
+        4 => "Tilt Upwards",
+        5 => "Tilt Downwards",
+        _ => "Unknown",
+    }
+}
+// decode_camera_orientation_exiv2 - same as exiftool
+
 /// Parse Panasonic maker notes
 pub fn parse_panasonic_maker_notes(
     data: &[u8],
@@ -701,19 +715,39 @@ pub fn parse_panasonic_maker_notes(
             let value = match tag_type {
                 1 => {
                     // BYTE
-                    if count <= 4 {
-                        let bytes = match endian {
-                            Endianness::Little => value_offset.to_le_bytes(),
-                            Endianness::Big => value_offset.to_be_bytes(),
-                        };
-                        ExifValue::Byte(bytes[..count as usize].to_vec())
+                    let bytes = if count <= 4 {
+                        match endian {
+                            Endianness::Little => {
+                                value_offset.to_le_bytes()[..count as usize].to_vec()
+                            }
+                            Endianness::Big => {
+                                value_offset.to_be_bytes()[..count as usize].to_vec()
+                            }
+                        }
                     } else {
                         let offset = value_offset as usize;
                         if offset + count as usize <= data.len() {
-                            ExifValue::Byte(data[offset..offset + count as usize].to_vec())
+                            data[offset..offset + count as usize].to_vec()
                         } else {
                             continue;
                         }
+                    };
+
+                    // Try to decode specific tags
+                    if count == 1 && !bytes.is_empty() {
+                        let decoded = match tag_id {
+                            PANA_CAMERA_ORIENTATION => {
+                                Some(decode_camera_orientation_exiftool(bytes[0]).to_string())
+                            }
+                            _ => None,
+                        };
+                        if let Some(s) = decoded {
+                            ExifValue::Ascii(s)
+                        } else {
+                            ExifValue::Byte(bytes)
+                        }
+                    } else {
+                        ExifValue::Byte(bytes)
                     }
                 }
                 2 => {

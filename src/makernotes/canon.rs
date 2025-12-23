@@ -1810,14 +1810,21 @@ pub fn decode_photo_effect_exiv2(value: i16) -> &'static str {
 }
 
 /// Decode ColorTone - ExifTool format (uses printParameter like Contrast/Saturation)
+/// printParameter: 0 => "Normal", positive => "+N", negative => "-N"
 pub fn decode_color_tone_exiftool(value: u16) -> String {
     if value == 0x7fff {
         return "n/a".to_string();
     }
-    if value > 0 {
-        format!("+{}", value)
+    if value == 0 {
+        "Normal".to_string()
     } else {
-        value.to_string()
+        // Treat as signed value for display
+        let signed = value as i16;
+        if signed > 0 {
+            format!("+{}", signed)
+        } else {
+            signed.to_string()
+        }
     }
 }
 
@@ -3970,6 +3977,18 @@ pub fn parse_canon_maker_notes(
                             let dir = v / 10000;
                             let file = v % 10000;
                             ExifValue::Ascii(format!("{}-{:04}", dir, file))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // SerialNumber - output as plain number string
+                CANON_SERIAL_NUMBER => {
+                    if let ExifValue::Long(ref longs) = value {
+                        if !longs.is_empty() {
+                            ExifValue::Ascii(format!("{}", longs[0]))
                         } else {
                             value
                         }

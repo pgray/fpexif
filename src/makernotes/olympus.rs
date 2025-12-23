@@ -419,6 +419,22 @@ pub fn decode_metering_mode_exiftool(value: u16) -> &'static str {
 }
 // decode_metering_mode_exiv2 - same as exiftool, no separate function needed
 
+/// Decode EXIF MeteringMode (tag 0x9207) with Olympus-specific names
+/// Olympus uses "ESP" instead of "Multi-segment" for pattern metering
+pub fn decode_exif_metering_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Unknown",
+        1 => "Average",
+        2 => "Center-weighted average",
+        3 => "Spot",
+        4 => "Multi-spot",
+        5 => "ESP", // Olympus-specific: EXIF standard is "Multi-segment"
+        6 => "Partial",
+        255 => "Other",
+        _ => "Unknown",
+    }
+}
+
 /// Decode MacroMode value (CS 0x0300 and Main 0x0202) - ExifTool format
 /// Note: exiv2 uses identical values - no separate version needed
 pub fn decode_macro_mode_exiftool(value: u16) -> &'static str {
