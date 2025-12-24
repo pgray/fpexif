@@ -1996,7 +1996,7 @@ pub fn decode_vibration_reduction_exiv2(value: u8) -> &'static str {
 pub fn decode_flash_type_exiftool(value: &str) -> String {
     let val = value.trim().to_uppercase();
     let result = match val.as_str() {
-        "" => "None",
+        "" => "",
         "NEW" => "New",
         "NORMAL" => "Built-in",
         "EXTERNAL" | "STROBE" => "External",
@@ -2420,6 +2420,9 @@ pub fn parse_nikon_maker_notes(
                     } else if tag_id == NIKON_CROP_HI_SPEED && !values.is_empty() {
                         // CropHiSpeed is a 7-element array, decode the first value
                         ExifValue::Ascii(decode_crop_hi_speed_exiftool(values[0]).to_string())
+                    } else if tag_id == NIKON_EXPOSURE_TUNING && !values.is_empty() {
+                        // ExposureTuning is a 7-element array, output only the first value
+                        ExifValue::Short(vec![values[0]])
                     } else {
                         ExifValue::Short(values)
                     }

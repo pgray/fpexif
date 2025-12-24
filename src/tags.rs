@@ -1152,7 +1152,7 @@ pub fn get_metering_mode_description(value: u16) -> &'static str {
 /// Human-readable descriptions for various EXIF light source values (exiftool-compatible)
 pub fn get_light_source_description(value: u16) -> &'static str {
     match value {
-        0 => "Unknown",
+        0 => "",
         1 => "Daylight",
         2 => "Fluorescent",
         3 => "Tungsten (Incandescent)",
