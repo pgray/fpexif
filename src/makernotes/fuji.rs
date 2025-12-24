@@ -26,6 +26,7 @@ pub const FUJI_AF_MODE: u16 = 0x1022;
 pub const FUJI_FOCUS_PIXEL: u16 = 0x1023;
 pub const FUJI_SLOW_SYNC: u16 = 0x1030;
 pub const FUJI_PICTURE_MODE: u16 = 0x1031;
+pub const FUJI_EXPOSURE_COUNT: u16 = 0x1032;
 pub const FUJI_EXR_AUTO: u16 = 0x1033;
 pub const FUJI_EXR_MODE: u16 = 0x1034;
 pub const FUJI_AUTO_BRACKETING: u16 = 0x1100;
@@ -56,6 +57,8 @@ pub const FUJI_HIGH_ISO_NOISE_REDUCTION: u16 = 0x100E;
 pub const FUJI_CLARITY: u16 = 0x100F;
 pub const FUJI_SHADOW_TONE: u16 = 0x1040;
 pub const FUJI_HIGHLIGHT_TONE: u16 = 0x1041;
+pub const FUJI_DIGITAL_ZOOM: u16 = 0x1044;
+pub const FUJI_LENS_MODULATION_OPTIMIZER: u16 = 0x1045;
 pub const FUJI_COLOR_CHROME_EFFECT: u16 = 0x1048;
 pub const FUJI_GRAIN_EFFECT_SIZE: u16 = 0x104C;
 pub const FUJI_CROP_MODE: u16 = 0x104D;
@@ -64,6 +67,7 @@ pub const FUJI_SHUTTER_TYPE: u16 = 0x1050;
 pub const FUJI_PANORAMA_DIRECTION: u16 = 0x1154;
 pub const FUJI_ADVANCED_FILTER: u16 = 0x1201;
 pub const FUJI_FINE_PIX_COLOR: u16 = 0x1210;
+pub const FUJI_IMAGE_STABILIZATION: u16 = 0x1422;
 pub const FUJI_SCENE_RECOGNITION: u16 = 0x1425;
 pub const FUJI_IMAGE_GENERATION: u16 = 0x1436;
 pub const FUJI_GRAIN_EFFECT_ROUGHNESS: u16 = 0x104B;
@@ -90,10 +94,12 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_CONTRAST => Some("Contrast"),
         FUJI_COLOR_TEMPERATURE => Some("ColorTemperature"),
         FUJI_CONTRAST_DETECTION_AF => Some("ContrastDetectionAF"),
-        FUJI_NOISE_REDUCTION => Some("NoiseReduction"),
-        FUJI_HIGH_ISO_NOISE_REDUCTION => Some("HighIsoNoiseReduction"),
+        // Note: 0x100B is skipped when value is 256 (handled in parser)
+        FUJI_NOISE_REDUCTION => Some("NoiseReduction_Old"),
+        // 0x100E is the preferred NoiseReduction tag for newer cameras
+        FUJI_HIGH_ISO_NOISE_REDUCTION => Some("NoiseReduction"),
         FUJI_CLARITY => Some("Clarity"),
-        FUJI_FLASH_MODE => Some("FlashMode"),
+        FUJI_FLASH_MODE => Some("FujiFlashMode"),
         FUJI_FLASH_EXPOSURE_COMP => Some("FlashExposureComp"),
         FUJI_MACRO => Some("Macro"),
         FUJI_FOCUS_MODE => Some("FocusMode"),
@@ -101,10 +107,13 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_FOCUS_PIXEL => Some("FocusPixel"),
         FUJI_SLOW_SYNC => Some("SlowSync"),
         FUJI_PICTURE_MODE => Some("PictureMode"),
+        FUJI_EXPOSURE_COUNT => Some("ExposureCount"),
         FUJI_EXR_AUTO => Some("EXRAuto"),
         FUJI_EXR_MODE => Some("EXRMode"),
         FUJI_SHADOW_TONE => Some("ShadowTone"),
         FUJI_HIGHLIGHT_TONE => Some("HighlightTone"),
+        FUJI_DIGITAL_ZOOM => Some("DigitalZoom"),
+        FUJI_LENS_MODULATION_OPTIMIZER => Some("LensModulationOptimizer"),
         FUJI_COLOR_CHROME_EFFECT => Some("ColorChromeEffect"),
         FUJI_GRAIN_EFFECT_SIZE => Some("GrainEffectSize"),
         FUJI_CROP_MODE => Some("CropMode"),
@@ -134,6 +143,7 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_MAX_FOCAL_LENGTH => Some("MaxFocalLength"),
         FUJI_MAX_APERTURE_AT_MIN_FOCAL => Some("MaxApertureAtMinFocal"),
         FUJI_MAX_APERTURE_AT_MAX_FOCAL => Some("MaxApertureAtMaxFocal"),
+        FUJI_IMAGE_STABILIZATION => Some("ImageStabilization"),
         FUJI_SCENE_RECOGNITION => Some("SceneRecognition"),
         FUJI_IMAGE_GENERATION => Some("ImageGeneration"),
         FUJI_FILE_SOURCE => Some("FileSource"),
@@ -390,6 +400,48 @@ pub fn decode_slow_sync_exiftool(value: u16) -> &'static str {
 }
 // decode_slow_sync_exiv2 - same as exiftool, no separate function needed
 
+// FlashMode (tag 0x1010): FujiFilm.pm fujiFlashMode[] / fujimn_int.cpp
+define_tag_decoder! {
+    flash_mode,
+    exiftool: {
+        0 => "Auto",
+        1 => "On",
+        2 => "Off",
+        3 => "Red-eye reduction",
+        4 => "External",
+        16 => "Commander",
+        0x8000 => "Not Attached",
+        0x8120 => "TTL",
+        0x8320 => "TTL Auto - Did not fire",
+        0x9840 => "Manual",
+        0x9860 => "Flash Commander",
+        0x9880 => "Multi-flash",
+        0xa920 => "1st Curtain (front)",
+        0xaa20 => "TTL Slow - 1st Curtain (front)",
+        0xab20 => "TTL Auto - 1st Curtain (front)",
+        0xad20 => "TTL - Red-eye Flash - 1st Curtain (front)",
+        0xae20 => "TTL Slow - Red-eye Flash - 1st Curtain (front)",
+        0xaf20 => "TTL Auto - Red-eye Flash - 1st Curtain (front)",
+        0xc920 => "2nd Curtain (rear)",
+        0xca20 => "TTL Slow - 2nd Curtain (rear)",
+        0xcb20 => "TTL Auto - 2nd Curtain (rear)",
+        0xcd20 => "TTL - Red-eye Flash - 2nd Curtain (rear)",
+        0xce20 => "TTL Slow - Red-eye Flash - 2nd Curtain (rear)",
+        0xcf20 => "TTL Auto - Red-eye Flash - 2nd Curtain (rear)",
+        0xe920 => "High Speed Sync (HSS)",
+    },
+    exiv2: {
+        0x0000 => "Auto",
+        0x0001 => "On",
+        0x0002 => "Off",
+        0x0003 => "Red-eye reduction",
+        0x0004 => "External",
+        0x0010 => "Commander",
+        0x8000 => "No flash",
+        0x8120 => "TTL",
+    }
+}
+
 // AutoBracketing (tag 0x1100): FujiFilm.pm / fujimn_int.cpp fujiContinuous[]
 define_tag_decoder! {
     auto_bracketing,
@@ -557,16 +609,29 @@ pub fn decode_exr_mode_exiftool(value: u16) -> &'static str {
 /// Converts hex-encoded body number and date to readable format
 /// e.g., "FFDT21804365     59333030373413110124F03021264A" ->
 ///       "FFDT21804365     Y30074 2013:11:01 24F03021264A"
+/// e.g., "FC  B2595279     5933313935341412173EA330218443" ->
+///       "FC  B2595279     Y31954 2014:12:17 3EA330218443"
 pub fn decode_internal_serial_number(raw: &str) -> String {
     let trimmed = raw.trim_end_matches('\0').trim_end();
 
     // Try to decode the hex portion
-    // Pattern: prefix + hex(starting with 59 = 'Y') + yymmdd + suffix(12 chars)
-    // The hex portion typically starts after spaces and begins with "59" (ASCII 'Y')
+    // Pattern: prefix (with trailing spaces) + hex(starting with 59 = 'Y') + yymmdd + suffix(12 chars)
+    // The hex portion starts AFTER the trailing spaces in the prefix
 
-    // Find where hex portion starts - look for "59" which is 'Y' in ASCII
-    if let Some(hex_start) = trimmed.find("59") {
-        // Check that this looks like a hex sequence
+    // Find the last occurrence of multiple consecutive spaces, then look for "59" after that
+    // This avoids matching "59" that appears within the prefix (e.g., "B2595279")
+    let mut search_start = 0;
+    if let Some(space_pos) = trimmed.rfind("  ") {
+        // Find the end of the space sequence
+        search_start = space_pos;
+        while search_start < trimmed.len() && trimmed.as_bytes().get(search_start) == Some(&b' ') {
+            search_start += 1;
+        }
+    }
+
+    // Look for "59" (hex for 'Y') starting from after the spaces
+    if let Some(relative_pos) = trimmed[search_start..].find("59") {
+        let hex_start = search_start + relative_pos;
         let prefix = &trimmed[..hex_start];
         let rest = &trimmed[hex_start..];
 
@@ -704,6 +769,12 @@ pub fn decode_shutter_type_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode ShutterType value (tag 0x1050) - ExifTool format
+/// Same as exiv2
+pub fn decode_shutter_type_exiftool(value: u16) -> &'static str {
+    decode_shutter_type_exiv2(value)
+}
+
 /// Decode CropMode value (tag 0x104D) - exiv2 format
 pub fn decode_crop_mode_exiv2(value: u16) -> &'static str {
     match value {
@@ -775,6 +846,85 @@ pub fn decode_image_generation_exiv2(value: u16) -> &'static str {
     match value {
         0 => "Original Image",
         1 => "Re-developed from RAW",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageGeneration value (tag 0x1436) - ExifTool format
+/// Same as exiv2
+pub fn decode_image_generation_exiftool(value: u16) -> &'static str {
+    decode_image_generation_exiv2(value)
+}
+
+/// Decode ShadowTone/HighlightTone value (tags 0x1040/0x1041) - ExifTool format
+/// ExifTool uses "(normal)" suffix for value 0, and named adjustments for others
+pub fn decode_shadow_highlight_tone_exiftool(value: i32) -> &'static str {
+    match value {
+        -64 => "+4 (hardest)",
+        -48 => "+3 (very hard)",
+        -32 => "+2 (hard)",
+        -16 => "+1 (medium hard)",
+        0 => "0 (normal)",
+        16 => "-1 (medium soft)",
+        32 => "-2 (soft)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode LensModulationOptimizer value (tag 0x1045) - ExifTool format
+pub fn decode_lens_modulation_optimizer_exiftool(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ImageStabilization (tag 0x1422) - 3 values: type, mode, param
+/// ExifTool format: "Type; Mode; Param"
+pub fn decode_image_stabilization_exiftool(values: &[u32]) -> String {
+    if values.len() < 3 {
+        return values
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+    }
+
+    let is_type = match values[0] {
+        0 => "None",
+        1 => "Optical",
+        2 => "Sensor-shift",
+        3 => "OIS/IBIS Combined",
+        _ => "Unknown",
+    };
+
+    let is_mode = match values[1] {
+        0 => "Off",
+        1 => "On (mode 1, continuous)",
+        2 => "On (mode 2, shooting only)",
+        3 => "On (mode 3, panning)",
+        _ => "Unknown",
+    };
+
+    format!("{}; {}; {}", is_type, is_mode, values[2])
+}
+
+/// Decode NoiseReduction value (tag 0x100B or 0x100E) - ExifTool format with full range
+/// For value 0 (which comes from newer cameras), shows "0 (normal)"
+pub fn decode_noise_reduction_full_exiftool(value: u16) -> &'static str {
+    match value {
+        0x000 => "0 (normal)",
+        0x040 => "Low",
+        0x080 => "Normal",
+        0x100 => "+2 (strong)",
+        0x180 => "+1 (medium strong)",
+        0x1c0 => "+3 (very strong)",
+        0x1e0 => "+4 (strongest)",
+        0x200 => "-2 (weak)",
+        0x280 => "-1 (medium weak)",
+        0x2c0 => "-3 (very weak)",
+        0x2e0 => "-4 (weakest)",
         _ => "Unknown",
     }
 }
@@ -879,8 +1029,8 @@ pub fn parse_fuji_maker_notes(
                         continue;
                     }
                 }
-                3 => {
-                    // SHORT
+                3 | 8 => {
+                    // SHORT (3) or SSHORT (8)
                     let mut values = Vec::new();
                     if count == 1 {
                         // Value is in the offset field - lower 16 bits (little-endian)
@@ -940,8 +1090,27 @@ pub fn parse_fuji_maker_notes(
                             }
                             FUJI_EXR_AUTO => Some(decode_exr_auto_exiftool(v).to_string()),
                             FUJI_EXR_MODE => Some(decode_exr_mode_exiftool(v).to_string()),
+                            FUJI_FLASH_MODE => Some(decode_flash_mode_exiftool(v).to_string()),
+                            FUJI_SHUTTER_TYPE => Some(decode_shutter_type_exiftool(v).to_string()),
+                            FUJI_IMAGE_GENERATION => {
+                                Some(decode_image_generation_exiftool(v).to_string())
+                            }
+                            FUJI_NOISE_REDUCTION => {
+                                // Tag 0x100B - older style (skip handled below for value 0x100)
+                                Some(decode_noise_reduction_exiftool(v).to_string())
+                            }
+                            FUJI_HIGH_ISO_NOISE_REDUCTION => {
+                                // Tag 0x100E - newer cameras use this, value 0 = "0 (normal)"
+                                Some(decode_noise_reduction_full_exiftool(v).to_string())
+                            }
                             _ => None,
                         };
+
+                        // Check for special skip condition (NoiseReduction 0x100B with value 256)
+                        if tag_id == FUJI_NOISE_REDUCTION && values.len() == 1 && values[0] == 0x100
+                        {
+                            continue; // Skip this tag entirely, 0x100E will be used
+                        }
 
                         if let Some(s) = decoded {
                             ExifValue::Ascii(s)
@@ -952,14 +1121,51 @@ pub fn parse_fuji_maker_notes(
                         // Special formatting for FocusPixel: "X Y" space-separated
                         let formatted = format!("{} {}", values[0], values[1]);
                         ExifValue::Ascii(formatted)
+                    } else if tag_id == FUJI_IMAGE_STABILIZATION && values.len() >= 3 {
+                        // ImageStabilization: format as "Type; Mode; Param"
+                        // Convert shorts to u32 for the decode function
+                        let long_vals: Vec<u32> = values.iter().map(|&v| v as u32).collect();
+                        ExifValue::Ascii(decode_image_stabilization_exiftool(&long_vals))
                     } else {
                         ExifValue::Short(values)
                     }
                 }
-                4 => {
-                    // LONG
-                    if count == 1 {
-                        ExifValue::Long(vec![value_offset])
+                4 | 9 => {
+                    // LONG (4) or SLONG (9)
+                    let raw_value = if count == 1 {
+                        value_offset
+                    } else {
+                        let offset = value_offset as usize;
+                        if offset + 4 <= data.len() {
+                            let mut cursor = Cursor::new(&data[offset..]);
+                            cursor.read_u32::<LittleEndian>().unwrap_or(0)
+                        } else {
+                            continue;
+                        }
+                    };
+
+                    // Decode specific LONG tags
+                    let decoded = match tag_id {
+                        FUJI_SHADOW_TONE | FUJI_HIGHLIGHT_TONE => {
+                            // These are signed values
+                            let signed_val = raw_value as i32;
+                            Some(decode_shadow_highlight_tone_exiftool(signed_val).to_string())
+                        }
+                        FUJI_LENS_MODULATION_OPTIMIZER => {
+                            Some(decode_lens_modulation_optimizer_exiftool(raw_value).to_string())
+                        }
+                        FUJI_DIGITAL_ZOOM => {
+                            // DigitalZoom = value / 8
+                            let zoom = raw_value as f64 / 8.0;
+                            Some(format!("{}", zoom))
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(s) = decoded {
+                        ExifValue::Ascii(s)
+                    } else if count == 1 {
+                        ExifValue::Long(vec![raw_value])
                     } else {
                         let offset = value_offset as usize;
                         if offset + (count as usize * 4) <= data.len() {
@@ -972,7 +1178,26 @@ pub fn parse_fuji_maker_notes(
                                     break;
                                 }
                             }
-                            ExifValue::Long(values)
+
+                            // Check for multi-value LONG/SLONG tags that need special formatting
+                            if tag_id == FUJI_WHITE_BALANCE_FINE_TUNE && values.len() == 2 {
+                                // WhiteBalanceFineTune: "Red +X, Blue +Y" format (stored as SLONG)
+                                let red = values[0] as i32;
+                                let blue = values[1] as i32;
+                                let red_str = if red >= 0 {
+                                    format!("+{}", red)
+                                } else {
+                                    format!("{}", red)
+                                };
+                                let blue_str = if blue >= 0 {
+                                    format!("+{}", blue)
+                                } else {
+                                    format!("{}", blue)
+                                };
+                                ExifValue::Ascii(format!("Red {}, Blue {}", red_str, blue_str))
+                            } else {
+                                ExifValue::Long(values)
+                            }
                         } else {
                             continue;
                         }
