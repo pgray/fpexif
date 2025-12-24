@@ -1304,6 +1304,506 @@ fn nikon_decrypt(serial: u32, count: u32, data: &mut [u8], start: usize) {
     }
 }
 
+/// Decode ISOExpansion value to string
+fn decode_iso_expansion_exiftool(value: u16) -> &'static str {
+    match value {
+        0x000 => "Off",
+        0x101 => "Hi 0.3",
+        0x102 => "Hi 0.5",
+        0x103 => "Hi 0.7",
+        0x104 => "Hi 1.0",
+        0x105 => "Hi 1.3",
+        0x106 => "Hi 1.5",
+        0x107 => "Hi 1.7",
+        0x108 => "Hi 2.0",
+        0x109 => "Hi 2.3",
+        0x10a => "Hi 2.5",
+        0x10b => "Hi 2.7",
+        0x10c => "Hi 3.0",
+        0x10d => "Hi 3.3",
+        0x10e => "Hi 3.5",
+        0x201 => "Lo 0.3",
+        0x202 => "Lo 0.5",
+        0x203 => "Lo 0.7",
+        0x204 => "Lo 1.0",
+        _ => "Unknown",
+    }
+}
+
+/// Parse ISOInfo tag data (tag 0x0025)
+/// BigEndian byte order (forced)
+fn parse_iso_info(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 14 {
+        return tags;
+    }
+
+    // Offset 0x00: ISO (int8u)
+    let iso_raw = data[0];
+    if iso_raw != 0 {
+        let iso = (100.0 * ((iso_raw as f64 / 12.0 - 5.0) * 2.0_f64.ln()).exp()).round() as u32;
+        tags.push(("ISO".to_string(), iso.to_string()));
+    }
+
+    // Offset 0x04: ISOExpansion (int16u, BigEndian)
+    let iso_expansion = u16::from_be_bytes([data[4], data[5]]);
+    if iso_expansion != 0 {
+        tags.push((
+            "ISOExpansion".to_string(),
+            decode_iso_expansion_exiftool(iso_expansion).to_string(),
+        ));
+    }
+
+    // Offset 0x06: ISO2 (int8u)
+    let iso2_raw = data[6];
+    if iso2_raw != 0 {
+        let iso2 = (100.0 * ((iso2_raw as f64 / 12.0 - 5.0) * 2.0_f64.ln()).exp()).round() as u32;
+        tags.push(("ISO2".to_string(), iso2.to_string()));
+    }
+
+    // Offset 0x0A: ISOExpansion2 (int16u, BigEndian)
+    let iso_expansion2 = u16::from_be_bytes([data[10], data[11]]);
+    if iso_expansion2 != 0 {
+        tags.push((
+            "ISOExpansion2".to_string(),
+            decode_iso_expansion_exiftool(iso_expansion2).to_string(),
+        ));
+    }
+
+    tags
+}
+
+/// Parse VRInfo tag data (tag 0x001F)
+fn parse_vr_info(data: &[u8], _endian: Endianness) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 8 {
+        return tags;
+    }
+
+    // Offset 0x00: VRInfoVersion (undef[4])
+    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    tags.push(("VRInfoVersion".to_string(), version));
+
+    // Offset 0x04: VibrationReduction (int8u)
+    let vr = data[4];
+    let vr_str = match vr {
+        0 => "n/a",
+        1 => "On",
+        2 => "Off",
+        _ => "Unknown",
+    };
+    if vr != 0 {
+        tags.push(("VibrationReduction".to_string(), vr_str.to_string()));
+    }
+
+    // Offset 0x06: VRMode (int8u)
+    let vr_mode = data[6];
+    let vr_mode_str = match vr_mode {
+        0 => "Normal",
+        1 => "On (1)",
+        2 => "Active",
+        3 => "Sport",
+        _ => "Unknown",
+    };
+    tags.push(("VRMode".to_string(), vr_mode_str.to_string()));
+
+    tags
+}
+
+/// Parse PictureControlData tag data (tag 0x0023)
+/// Version-dependent structure
+fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 4 {
+        return tags;
+    }
+
+    // Offset 0x00: Version (undef[4])
+    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    tags.push(("PictureControlVersion".to_string(), version.clone()));
+
+    // Version 0100 structure (D300)
+    if version == "0100" && data.len() >= 58 {
+        // Offset 0x04: PictureControlName (string[20])
+        let name_bytes = &data[4..24];
+        let name = String::from_utf8_lossy(name_bytes)
+            .trim_end_matches('\0')
+            .to_string();
+        if !name.is_empty() {
+            // Format string: capitalize first letter of each word
+            let formatted_name = name
+                .to_lowercase()
+                .split_whitespace()
+                .map(|word| {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            tags.push(("PictureControlName".to_string(), formatted_name));
+        }
+
+        // Offset 0x18: PictureControlBase (string[20])
+        let base_bytes = &data[24..44];
+        let base = String::from_utf8_lossy(base_bytes)
+            .trim_end_matches('\0')
+            .to_string();
+        if !base.is_empty() {
+            let formatted_base = base
+                .to_lowercase()
+                .split_whitespace()
+                .map(|word| {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            tags.push(("PictureControlBase".to_string(), formatted_base));
+        }
+
+        // Offset 0x30: PictureControlAdjust (int8u)
+        if data.len() > 0x30 {
+            let adjust = data[0x30];
+            let adjust_str = match adjust {
+                0 => "Default",
+                1 => "Quick Adjust",
+                2 => "Full Control",
+                _ => "Unknown",
+            };
+            tags.push(("PictureControlAdjust".to_string(), adjust_str.to_string()));
+        }
+
+        // Offset 0x31: PictureControlQuickAdjust (int8u)
+        if data.len() > 0x31 {
+            let quick = data[0x31];
+            if quick != 0xff {
+                let value = quick.wrapping_sub(128) as i8;
+                if value == 0 {
+                    tags.push((
+                        "PictureControlQuickAdjust".to_string(),
+                        "Normal".to_string(),
+                    ));
+                } else {
+                    tags.push(("PictureControlQuickAdjust".to_string(), value.to_string()));
+                }
+            }
+        }
+
+        // Offset 0x32: Sharpness (int8u)
+        if data.len() > 0x32 {
+            let sharp = data[0x32];
+            let value = sharp.wrapping_sub(128) as i8;
+            if value == 0 {
+                tags.push(("Sharpness".to_string(), "Normal".to_string()));
+            } else {
+                tags.push(("Sharpness".to_string(), value.to_string()));
+            }
+        }
+
+        // Offset 0x33: Contrast (int8u)
+        if data.len() > 0x33 {
+            let contrast = data[0x33];
+            let value = contrast.wrapping_sub(128) as i8;
+            if value == 0 {
+                tags.push(("Contrast".to_string(), "Normal".to_string()));
+            } else {
+                tags.push(("Contrast".to_string(), value.to_string()));
+            }
+        }
+
+        // Offset 0x34: Brightness (int8u)
+        if data.len() > 0x34 {
+            let bright = data[0x34];
+            let value = bright.wrapping_sub(128) as i8;
+            if value == 0 {
+                tags.push(("Brightness".to_string(), "Normal".to_string()));
+            } else {
+                tags.push(("Brightness".to_string(), value.to_string()));
+            }
+        }
+
+        // Offset 0x35: Saturation (int8u)
+        if data.len() > 0x35 {
+            let sat = data[0x35];
+            if sat != 0xff {
+                let value = sat.wrapping_sub(128) as i8;
+                if value == 0 {
+                    tags.push(("Saturation".to_string(), "Normal".to_string()));
+                } else {
+                    tags.push(("Saturation".to_string(), value.to_string()));
+                }
+            }
+        }
+
+        // Offset 0x36: HueAdjustment (int8u)
+        if data.len() > 0x36 {
+            let hue = data[0x36];
+            if hue != 0xff {
+                let value = hue.wrapping_sub(128) as i8;
+                if value == 0 {
+                    tags.push(("HueAdjustment".to_string(), "None".to_string()));
+                } else {
+                    tags.push(("HueAdjustment".to_string(), value.to_string()));
+                }
+            } else {
+                tags.push(("HueAdjustment".to_string(), "n/a".to_string()));
+            }
+        }
+
+        // Offset 0x37: FilterEffect (int8u) - for Monochrome only
+        if data.len() > 0x37 {
+            let filter = data[0x37];
+            let filter_str = match filter {
+                0x80 => "Off",
+                0x81 => "Yellow",
+                0x82 => "Orange",
+                0x83 => "Red",
+                0x84 => "Green",
+                0xff => "n/a",
+                _ => "Unknown",
+            };
+            tags.push(("FilterEffect".to_string(), filter_str.to_string()));
+        }
+
+        // Offset 0x38: ToningEffect (int8u) - for Monochrome only
+        if data.len() > 0x38 {
+            let toning = data[0x38];
+            let toning_str = match toning {
+                0x80 => "B&W",
+                0x81 => "Sepia",
+                0x82 => "Cyanotype",
+                0x83 => "Red",
+                0x84 => "Yellow",
+                0x85 => "Green",
+                0x86 => "Blue-green",
+                0x87 => "Blue",
+                0x88 => "Purple-blue",
+                0x89 => "Red-purple",
+                0xff => "n/a",
+                _ => "Unknown",
+            };
+            tags.push(("ToningEffect".to_string(), toning_str.to_string()));
+        }
+
+        // Offset 0x39: ToningSaturation (int8u)
+        if data.len() > 0x39 {
+            let toning_sat = data[0x39];
+            if toning_sat != 0xff {
+                let value = toning_sat.wrapping_sub(128) as i8;
+                tags.push(("ToningSaturation".to_string(), value.to_string()));
+            } else {
+                tags.push(("ToningSaturation".to_string(), "n/a".to_string()));
+            }
+        }
+    }
+
+    tags
+}
+
+/// Parse FlashInfo tag data (tag 0x00A8)
+/// Version-dependent structure
+fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 4 {
+        return tags;
+    }
+
+    // Offset 0x00: FlashInfoVersion (string[4])
+    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    tags.push(("FlashInfoVersion".to_string(), version.clone()));
+
+    // FlashInfo0102 structure (D300 uses this)
+    if version == "0102" && data.len() >= 25 {
+        // Offset 0x04: FlashSource (int8u)
+        let source = data[4];
+        let source_str = match source {
+            0 => "None",
+            1 => "External",
+            2 => "Internal",
+            _ => "Unknown",
+        };
+        tags.push(("FlashSource".to_string(), source_str.to_string()));
+
+        // Offset 0x06-0x07: ExternalFlashFirmware (int8u[2])
+        if data[6] == 0 && data[7] == 0 {
+            tags.push(("ExternalFlashFirmware".to_string(), "n/a".to_string()));
+        } else {
+            tags.push((
+                "ExternalFlashFirmware".to_string(),
+                format!("{}.{:02}", data[6], data[7]),
+            ));
+        }
+
+        // Offset 0x08: ExternalFlashFlags (int8u)
+        let flags = data[8];
+        if flags == 0 {
+            tags.push(("ExternalFlashFlags".to_string(), "(none)".to_string()));
+        } else {
+            let mut flag_strs = Vec::new();
+            if flags & 0x01 != 0 {
+                flag_strs.push("Fired");
+            }
+            if flags & 0x04 != 0 {
+                flag_strs.push("Bounce");
+            }
+            if flags & 0x10 != 0 {
+                flag_strs.push("Wide Adapter");
+            }
+            if flags & 0x20 != 0 {
+                flag_strs.push("Dome Diffuser");
+            }
+            tags.push(("ExternalFlashFlags".to_string(), flag_strs.join(", ")));
+        }
+
+        // Offset 0x09.2: FlashCommanderMode (bits)
+        let commander_mode = data[9] & 0x7F;
+        let commander_str = match commander_mode {
+            0 => "Off",
+            1 => "TTL",
+            2 => "Auto Aperture",
+            3 => "Manual",
+            4 => "Repeating Flash",
+            _ => "Unknown",
+        };
+        tags.push(("FlashCommanderMode".to_string(), commander_str.to_string()));
+
+        // Offset 0x0F.1: FlashControlMode
+        if data.len() > 0x0F {
+            let control_mode = data[0x0F] & 0x7F;
+            let control_str = match control_mode {
+                0 => "Off",
+                1 => "iTTL-BL",
+                2 => "iTTL",
+                3 => "Auto Aperture",
+                4 => "Automatic",
+                5 => "GN (distance priority)",
+                6 => "Manual",
+                7 => "Repeating Flash",
+                _ => "Unknown",
+            };
+            tags.push(("FlashControlMode".to_string(), control_str.to_string()));
+        }
+
+        // Offset 0x11: FlashCompensation (int8s)
+        if data.len() > 0x11 {
+            let comp = data[0x11] as i8;
+            let ev = comp as f64 / 6.0;
+            tags.push((
+                "FlashCompensation".to_string(),
+                format!("{:.1}", ev).trim_end_matches(".0").to_string(),
+            ));
+        }
+
+        // Offset 0x12: FlashGNDistance (int8u)
+        if data.len() > 0x12 {
+            let gn = data[0x12];
+            tags.push(("FlashGNDistance".to_string(), gn.to_string()));
+        }
+
+        // Offset 0x13.1: FlashGroupAControlMode
+        if data.len() > 0x13 {
+            let group_a = data[0x13] & 0x7F;
+            let group_a_str = match group_a {
+                0 => "Off",
+                1 => "iTTL-BL",
+                2 => "iTTL",
+                3 => "Auto Aperture",
+                4 => "Automatic",
+                5 => "GN (distance priority)",
+                6 => "Manual",
+                7 => "Repeating Flash",
+                _ => "Unknown",
+            };
+            tags.push((
+                "FlashGroupAControlMode".to_string(),
+                group_a_str.to_string(),
+            ));
+        }
+
+        // Offset 0x14.1: FlashGroupBControlMode
+        if data.len() > 0x14 {
+            let group_b = data[0x14] & 0x7F;
+            let group_b_str = match group_b {
+                0 => "Off",
+                1 => "iTTL-BL",
+                2 => "iTTL",
+                3 => "Auto Aperture",
+                4 => "Automatic",
+                5 => "GN (distance priority)",
+                6 => "Manual",
+                7 => "Repeating Flash",
+                _ => "Unknown",
+            };
+            tags.push((
+                "FlashGroupBControlMode".to_string(),
+                group_b_str.to_string(),
+            ));
+        }
+
+        // Offset 0x15.1: FlashGroupCControlMode
+        if data.len() > 0x15 {
+            let group_c = data[0x15] & 0x7F;
+            let group_c_str = match group_c {
+                0 => "Off",
+                1 => "iTTL-BL",
+                2 => "iTTL",
+                3 => "Auto Aperture",
+                4 => "Automatic",
+                5 => "GN (distance priority)",
+                6 => "Manual",
+                7 => "Repeating Flash",
+                _ => "Unknown",
+            };
+            tags.push((
+                "FlashGroupCControlMode".to_string(),
+                group_c_str.to_string(),
+            ));
+        }
+
+        // Offset 0x16: FlashGroupACompensation (int8s)
+        if data.len() > 0x16 {
+            let comp = data[0x16] as i8;
+            let ev = comp as f64 / 6.0;
+            tags.push((
+                "FlashGroupACompensation".to_string(),
+                format!("{:.1}", ev).trim_end_matches(".0").to_string(),
+            ));
+        }
+
+        // Offset 0x17: FlashGroupBCompensation (int8s)
+        if data.len() > 0x17 {
+            let comp = data[0x17] as i8;
+            let ev = comp as f64 / 6.0;
+            tags.push((
+                "FlashGroupBCompensation".to_string(),
+                format!("{:.1}", ev).trim_end_matches(".0").to_string(),
+            ));
+        }
+
+        // Offset 0x18: FlashGroupCCompensation (int8s)
+        if data.len() > 0x18 {
+            let comp = data[0x18] as i8;
+            let ev = comp as f64 / 6.0;
+            tags.push((
+                "FlashGroupCCompensation".to_string(),
+                format!("{:.1}", ev).trim_end_matches(".0").to_string(),
+            ));
+        }
+    }
+
+    tags
+}
+
 /// Get ShutterCount offset for a given ShotInfo version and data size
 /// Returns (offset, is_little_endian) or None if not supported
 fn get_shot_info_shutter_offset(version: &str, data_len: usize) -> Option<(usize, bool)> {
@@ -2024,9 +2524,70 @@ pub fn parse_nikon_maker_notes(
                 MakerNoteTag {
                     tag_id,
                     tag_name: get_nikon_tag_name(tag_id),
-                    value,
+                    value: value.clone(),
                 },
             );
+
+            // Parse sub-structures and insert extracted fields as separate tags
+            match tag_id {
+                NIKON_ISO_INFO => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_iso_info(bytes) {
+                            tags.insert(
+                                0x9000 + tags.len() as u16, // Pseudo tag ID
+                                MakerNoteTag {
+                                    tag_id: 0x9000 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                NIKON_VR_INFO => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_vr_info(bytes, maker_endian) {
+                            tags.insert(
+                                0x9100 + tags.len() as u16, // Pseudo tag ID
+                                MakerNoteTag {
+                                    tag_id: 0x9100 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                NIKON_PICTURE_CONTROL_DATA => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_picture_control(bytes) {
+                            tags.insert(
+                                0x9200 + tags.len() as u16, // Pseudo tag ID
+                                MakerNoteTag {
+                                    tag_id: 0x9200 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                NIKON_FLASH_INFO => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_flash_info(bytes) {
+                            tags.insert(
+                                0x9300 + tags.len() as u16, // Pseudo tag ID
+                                MakerNoteTag {
+                                    tag_id: 0x9300 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
