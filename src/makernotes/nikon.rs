@@ -2522,6 +2522,12 @@ pub fn parse_nikon_maker_notes(
                 }
             };
 
+            // Skip tags that are better represented by their parsed sub-structure values
+            // These tags contain raw/binary data that's decoded from ISOInfo structure
+            if matches!(tag_id, NIKON_ISO_SETTING | NIKON_ISO_SETTING_2) {
+                continue;
+            }
+
             tags.insert(
                 tag_id,
                 MakerNoteTag {
