@@ -666,6 +666,22 @@ pub fn format_exif_value_for_json_with_make(
                     return formatted;
                 }
             }
+            // Fuji WhiteBalanceFineTune (0x100A) - format as "Red +X, Blue +Y"
+            if tag_id == 0x100A && v.len() == 2 {
+                let red = v[0] as i16;
+                let blue = v[1] as i16;
+                let red_str = if red >= 0 {
+                    format!("+{}", red)
+                } else {
+                    format!("{}", red)
+                };
+                let blue_str = if blue >= 0 {
+                    format!("+{}", blue)
+                } else {
+                    format!("{}", blue)
+                };
+                return Value::String(format!("Red {}, Blue {}", red_str, blue_str));
+            }
             if should_format_as_space_separated(tag_id) {
                 Value::String(
                     v.iter()
@@ -678,6 +694,24 @@ pub fn format_exif_value_for_json_with_make(
             }
         }
         ExifValue::Long(v) => {
+            // Fuji ImageStabilization (0x1422) - format as "Type; Mode; Param"
+            if tag_id == 0x1422 && v.len() >= 3 {
+                let is_type = match v[0] {
+                    0 => "None",
+                    1 => "Optical",
+                    2 => "Sensor-shift",
+                    3 => "OIS/IBIS Combined",
+                    _ => "Unknown",
+                };
+                let is_mode = match v[1] {
+                    0 => "Off",
+                    1 => "On (mode 1, continuous)",
+                    2 => "On (mode 2, shooting only)",
+                    3 => "On (mode 3, panning)",
+                    _ => "Unknown",
+                };
+                return Value::String(format!("{}; {}; {}", is_type, is_mode, v[2]));
+            }
             if should_format_as_space_separated(tag_id) {
                 Value::String(
                     v.iter()
@@ -691,6 +725,22 @@ pub fn format_exif_value_for_json_with_make(
         }
         ExifValue::SByte(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
         ExifValue::SShort(v) => {
+            // Fuji WhiteBalanceFineTune (0x100A) - format as "Red +X, Blue +Y"
+            if tag_id == 0x100A && v.len() == 2 {
+                let red = v[0];
+                let blue = v[1];
+                let red_str = if red >= 0 {
+                    format!("+{}", red)
+                } else {
+                    format!("{}", red)
+                };
+                let blue_str = if blue >= 0 {
+                    format!("+{}", blue)
+                } else {
+                    format!("{}", blue)
+                };
+                return Value::String(format!("Red {}, Blue {}", red_str, blue_str));
+            }
             if should_format_as_space_separated(tag_id) {
                 Value::String(
                     v.iter()
@@ -1006,6 +1056,26 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             let rounded = (mp * 10.0).round() / 10.0;
             if let Some(num) = serde_json::Number::from_f64(rounded) {
                 output.insert("Megapixels".to_string(), Value::Number(num));
+            }
+        }
+    }
+
+    // Add RAF-specific metadata if present (for Fujifilm RAF files)
+    if let Some(raf_metadata) = exif_data.get_raf_metadata() {
+        for (key, value) in &raf_metadata.tags {
+            // Try to parse as number for fields that should be numeric
+            if key == "RawImageWidth"
+                || key == "RawImageHeight"
+                || key == "RawImageFullWidth"
+                || key == "RawImageFullHeight"
+            {
+                if let Ok(n) = value.parse::<i64>() {
+                    output.insert(key.clone(), Value::Number(n.into()));
+                } else {
+                    output.insert(key.clone(), Value::String(value.clone()));
+                }
+            } else {
+                output.insert(key.clone(), Value::String(value.clone()));
             }
         }
     }

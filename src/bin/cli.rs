@@ -180,6 +180,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Print all EXIF data in exiftool text format: `Tag Name                        : Value`
 fn print_exif_data_exiftool(exif_data: &ExifData) {
+    // Output RAF-specific metadata first (for Fujifilm RAF files)
+    if let Some(raf_metadata) = exif_data.get_raf_metadata() {
+        // Output in a consistent order
+        let ordered_keys = [
+            "RAFVersion",
+            "RAFCompression",
+            "RawImageFullSize",
+            "RawImageCropTopLeft",
+            "RawImageCroppedSize",
+            "FujiLayout",
+            "XTransLayout",
+            "RawExposureBias",
+            "RawImageWidth",
+            "RawImageHeight",
+            "RawImageFullWidth",
+            "RawImageFullHeight",
+            "BlackLevel",
+            "WB_GRBLevels",
+            "WB_GRBLevelsAuto",
+            "WB_GRBLevelsStandard",
+            "GeometricDistortionParams",
+            "ChromaticAberrationParams",
+            "VignettingParams",
+        ];
+        for key in ordered_keys {
+            if let Some(value) = raf_metadata.tags.get(key) {
+                println!("{:<32}: {}", key, value);
+            }
+        }
+    }
+
     for (tag_id, value) in exif_data.iter() {
         let tag_name = tag_id.name().unwrap_or("Unknown");
         let display_value = format_exiftool_text_value(value, tag_id.id);
@@ -393,11 +424,47 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                     0x8830 => tags::get_sensitivity_type_description(v[0]).to_string(),
                     _ => format_values_space(v),
                 }
+            } else if v.len() == 2 && tag_id == 0x100A {
+                // Fuji WhiteBalanceFineTune - format as "Red +X, Blue +Y"
+                let red = v[0] as i16;
+                let blue = v[1] as i16;
+                let red_str = if red >= 0 {
+                    format!("+{}", red)
+                } else {
+                    format!("{}", red)
+                };
+                let blue_str = if blue >= 0 {
+                    format!("+{}", blue)
+                } else {
+                    format!("{}", blue)
+                };
+                format!("Red {}, Blue {}", red_str, blue_str)
             } else {
                 format_values_space(v)
             }
         }
-        ExifValue::Long(v) => format_values_space(v),
+        ExifValue::Long(v) => {
+            // Fuji ImageStabilization (0x1422) - format as "Type; Mode; Param"
+            if tag_id == 0x1422 && v.len() >= 3 {
+                let is_type = match v[0] {
+                    0 => "None",
+                    1 => "Optical",
+                    2 => "Sensor-shift",
+                    3 => "OIS/IBIS Combined",
+                    _ => "Unknown",
+                };
+                let is_mode = match v[1] {
+                    0 => "Off",
+                    1 => "On (mode 1, continuous)",
+                    2 => "On (mode 2, shooting only)",
+                    3 => "On (mode 3, panning)",
+                    _ => "Unknown",
+                };
+                format!("{}; {}; {}", is_type, is_mode, v[2])
+            } else {
+                format_values_space(v)
+            }
+        }
         ExifValue::Rational(v) => {
             if v.len() == 1 {
                 let (n, d) = v[0];

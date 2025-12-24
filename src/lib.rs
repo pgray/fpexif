@@ -78,9 +78,11 @@ pub struct ExifData {
     // Internal storage for tag data
     tags: std::collections::HashMap<tags::ExifTagId, data_types::ExifValue>,
     // Track the original endianness of the data
-    endian: data_types::Endianness,
+    pub endian: data_types::Endianness,
     // Parsed maker notes
     maker_notes: Option<std::collections::HashMap<u16, makernotes::MakerNoteTag>>,
+    // RAF-specific metadata (for Fujifilm RAF files)
+    pub raf_metadata: Option<formats::RafMetadata>,
 }
 
 impl ExifData {
@@ -90,7 +92,18 @@ impl ExifData {
             tags: std::collections::HashMap::new(),
             endian: data_types::Endianness::Little,
             maker_notes: None,
+            raf_metadata: None,
         }
+    }
+
+    /// Set RAF-specific metadata
+    pub fn set_raf_metadata(&mut self, metadata: formats::RafMetadata) {
+        self.raf_metadata = Some(metadata);
+    }
+
+    /// Get RAF-specific metadata
+    pub fn get_raf_metadata(&self) -> Option<&formats::RafMetadata> {
+        self.raf_metadata.as_ref()
     }
 
     /// Get a tag value by its numeric ID

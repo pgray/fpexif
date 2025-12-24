@@ -58,12 +58,20 @@ where
 }
 
 /// Parse EXIF data from a reader with configuration
-pub fn parse_exif_with_config<R>(reader: R, config: ParseConfig) -> ExifResult<crate::ExifData>
+pub fn parse_exif_with_config<R>(mut reader: R, config: ParseConfig) -> ExifResult<crate::ExifData>
 where
     R: Read + Seek,
 {
     // Initialize an empty EXIF data container
     let mut exif_data = crate::ExifData::new();
+
+    // First, check for RAF-specific metadata (for Fujifilm RAF files)
+    if let Ok(Some(raf_metadata)) = formats::extract_raf_metadata_if_raf(&mut reader) {
+        exif_data.set_raf_metadata(raf_metadata);
+    }
+
+    // Reset reader position for EXIF extraction
+    reader.seek(std::io::SeekFrom::Start(0))?;
 
     // Extract EXIF APP1 segment using format-specific handlers
     let app1_data = formats::extract_exif_segment(reader)?;
