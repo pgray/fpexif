@@ -195,6 +195,13 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
             "RawImageHeight",
             "RawImageFullWidth",
             "RawImageFullHeight",
+            "BlackLevel",
+            "WB_GRBLevels",
+            "WB_GRBLevelsAuto",
+            "WB_GRBLevelsStandard",
+            "GeometricDistortionParams",
+            "ChromaticAberrationParams",
+            "VignettingParams",
         ];
         for key in ordered_keys {
             if let Some(value) = raf_metadata.tags.get(key) {

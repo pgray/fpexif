@@ -281,7 +281,237 @@ pub fn extract_raf_metadata<R: Read + Seek>(mut reader: R) -> ExifResult<RafMeta
         }
     }
 
+    // Parse FujiIFD for WB levels and other parameters
+    let fuji_ifd_offset =
+        u32::from_be_bytes([header[0x64], header[0x65], header[0x66], header[0x67]]) as u64;
+    let fuji_ifd_len =
+        u32::from_be_bytes([header[0x68], header[0x69], header[0x6a], header[0x6b]]) as usize;
+
+    if fuji_ifd_offset > 0 && fuji_ifd_len > 0 {
+        reader.seek(SeekFrom::Start(fuji_ifd_offset))?;
+        let mut ifd_data = vec![0u8; fuji_ifd_len.min(64 * 1024)];
+        let bytes_read = reader.read(&mut ifd_data)?;
+        ifd_data.truncate(bytes_read);
+
+        if let Some(fuji_tags) = parse_fuji_ifd(&ifd_data) {
+            for (k, v) in fuji_tags.tags {
+                metadata.insert(&k, v);
+            }
+        }
+    }
+
     Ok(metadata)
+}
+
+/// Parse FujiIFD TIFF structure to extract WB levels and other parameters
+fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
+    if data.len() < 8 {
+        return None;
+    }
+
+    // Check TIFF header (II or MM)
+    let little_endian = match (&data[0], &data[1]) {
+        (b'I', b'I') => true,
+        (b'M', b'M') => false,
+        _ => return None,
+    };
+
+    let read_u16 = |d: &[u8]| -> u16 {
+        if little_endian {
+            u16::from_le_bytes([d[0], d[1]])
+        } else {
+            u16::from_be_bytes([d[0], d[1]])
+        }
+    };
+
+    let read_u32 = |d: &[u8]| -> u32 {
+        if little_endian {
+            u32::from_le_bytes([d[0], d[1], d[2], d[3]])
+        } else {
+            u32::from_be_bytes([d[0], d[1], d[2], d[3]])
+        }
+    };
+
+    let read_i32 = |d: &[u8]| -> i32 {
+        if little_endian {
+            i32::from_le_bytes([d[0], d[1], d[2], d[3]])
+        } else {
+            i32::from_be_bytes([d[0], d[1], d[2], d[3]])
+        }
+    };
+
+    // Get IFD0 offset
+    let ifd0_offset = read_u32(&data[4..8]) as usize;
+    if ifd0_offset + 2 > data.len() {
+        return None;
+    }
+
+    let mut metadata = RafMetadata::new();
+
+    // Parse IFD0
+    let num_entries = read_u16(&data[ifd0_offset..]) as usize;
+    if num_entries == 0 || ifd0_offset + 2 + num_entries * 12 > data.len() {
+        return None;
+    }
+
+    for i in 0..num_entries {
+        let entry_offset = ifd0_offset + 2 + i * 12;
+        let tag = read_u16(&data[entry_offset..]);
+        let dtype = read_u16(&data[entry_offset + 2..]);
+        let _count = read_u32(&data[entry_offset + 4..]) as usize;
+        let value_offset = read_u32(&data[entry_offset + 8..]) as usize;
+
+        // Look for SubIFD pointer (0xf000)
+        if tag == 0xf000 && dtype == 13 {
+            // Parse SubIFD
+            if value_offset + 2 <= data.len() {
+                let sub_entries = read_u16(&data[value_offset..]) as usize;
+                if value_offset + 2 + sub_entries * 12 <= data.len() {
+                    for j in 0..sub_entries {
+                        let se_offset = value_offset + 2 + j * 12;
+                        let stag = read_u16(&data[se_offset..]);
+                        let sdtype = read_u16(&data[se_offset + 2..]);
+                        let scount = read_u32(&data[se_offset + 4..]) as usize;
+                        let svalue_offset = read_u32(&data[se_offset + 8..]) as usize;
+
+                        match stag {
+                            0xf00a => {
+                                // BlackLevel (LONG array)
+                                if sdtype == 4 && svalue_offset + scount * 4 <= data.len() {
+                                    let vals: Vec<String> = (0..scount)
+                                        .map(|k| {
+                                            read_u32(&data[svalue_offset + k * 4..]).to_string()
+                                        })
+                                        .collect();
+                                    metadata.insert("BlackLevel", vals.join(" "));
+                                }
+                            }
+                            0xf00c => {
+                                // WB_GRBLevelsStandard (LONG array)
+                                if sdtype == 4 && svalue_offset + scount * 4 <= data.len() {
+                                    let vals: Vec<String> = (0..scount)
+                                        .map(|k| {
+                                            read_u32(&data[svalue_offset + k * 4..]).to_string()
+                                        })
+                                        .collect();
+                                    metadata.insert("WB_GRBLevelsStandard", vals.join(" "));
+                                }
+                            }
+                            0xf00d => {
+                                // WB_GRBLevelsAuto (LONG array)
+                                if sdtype == 4 {
+                                    let vals: Vec<String> = if scount * 4 <= 4 {
+                                        // Value in offset field
+                                        let offset_bytes = if little_endian {
+                                            (svalue_offset as u32).to_le_bytes()
+                                        } else {
+                                            (svalue_offset as u32).to_be_bytes()
+                                        };
+                                        (0..scount.min(1))
+                                            .map(|_| read_u32(&offset_bytes).to_string())
+                                            .collect()
+                                    } else if svalue_offset + scount * 4 <= data.len() {
+                                        (0..scount)
+                                            .map(|k| {
+                                                read_u32(&data[svalue_offset + k * 4..]).to_string()
+                                            })
+                                            .collect()
+                                    } else {
+                                        continue;
+                                    };
+                                    metadata.insert("WB_GRBLevelsAuto", vals.join(" "));
+                                }
+                            }
+                            0xf00e => {
+                                // WB_GRBLevels (LONG array)
+                                if sdtype == 4 {
+                                    let vals: Vec<String> = if scount * 4 <= 4 {
+                                        let offset_bytes = if little_endian {
+                                            (svalue_offset as u32).to_le_bytes()
+                                        } else {
+                                            (svalue_offset as u32).to_be_bytes()
+                                        };
+                                        (0..scount.min(1))
+                                            .map(|_| read_u32(&offset_bytes).to_string())
+                                            .collect()
+                                    } else if svalue_offset + scount * 4 <= data.len() {
+                                        (0..scount)
+                                            .map(|k| {
+                                                read_u32(&data[svalue_offset + k * 4..]).to_string()
+                                            })
+                                            .collect()
+                                    } else {
+                                        continue;
+                                    };
+                                    metadata.insert("WB_GRBLevels", vals.join(" "));
+                                }
+                            }
+                            0xf00b => {
+                                // GeometricDistortionParams (SRATIONAL array)
+                                if sdtype == 10 && svalue_offset + scount * 8 <= data.len() {
+                                    let vals: Vec<String> = (0..scount)
+                                        .map(|k| {
+                                            let offset = svalue_offset + k * 8;
+                                            let num = read_i32(&data[offset..]);
+                                            let den = read_i32(&data[offset + 4..]);
+                                            if den != 0 {
+                                                let val = num as f64 / den as f64;
+                                                format!("{}", val)
+                                            } else {
+                                                "0".to_string()
+                                            }
+                                        })
+                                        .collect();
+                                    metadata.insert("GeometricDistortionParams", vals.join(" "));
+                                }
+                            }
+                            0xf00f => {
+                                // ChromaticAberrationParams (SRATIONAL array)
+                                if sdtype == 10 && svalue_offset + scount * 8 <= data.len() {
+                                    let vals: Vec<String> = (0..scount)
+                                        .map(|k| {
+                                            let offset = svalue_offset + k * 8;
+                                            let num = read_i32(&data[offset..]);
+                                            let den = read_i32(&data[offset + 4..]);
+                                            if den != 0 {
+                                                let val = num as f64 / den as f64;
+                                                format!("{}", val)
+                                            } else {
+                                                "0".to_string()
+                                            }
+                                        })
+                                        .collect();
+                                    metadata.insert("ChromaticAberrationParams", vals.join(" "));
+                                }
+                            }
+                            0xf010 => {
+                                // VignettingParams (SRATIONAL array)
+                                if sdtype == 10 && svalue_offset + scount * 8 <= data.len() {
+                                    let vals: Vec<String> = (0..scount)
+                                        .map(|k| {
+                                            let offset = svalue_offset + k * 8;
+                                            let num = read_i32(&data[offset..]);
+                                            let den = read_i32(&data[offset + 4..]);
+                                            if den != 0 {
+                                                let val = num as f64 / den as f64;
+                                                format!("{}", val)
+                                            } else {
+                                                "0".to_string()
+                                            }
+                                        })
+                                        .collect();
+                                    metadata.insert("VignettingParams", vals.join(" "));
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Some(metadata)
 }
 
 /// Extract EXIF APP1 segment from a Fujifilm RAF file
