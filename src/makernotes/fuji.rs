@@ -79,6 +79,8 @@ pub const FUJI_OUTPUT_IMAGE_SIZE: u16 = 0x1304;
 pub const FUJI_CONTINUOUS_DRIVE: u16 = 0x1103;
 pub const FUJI_VIDEO_MODE: u16 = 0x1303;
 pub const FUJI_LENS_MOUNT_TYPE: u16 = 0x1600;
+pub const FUJI_RATING: u16 = 0x1431;
+pub const FUJI_RAW_EXPOSURE_BIAS: u16 = 0x9650;
 pub const FUJI_RATINGS_INFO: u16 = 0xB211;
 pub const FUJI_GE_IMAGE_SIZE: u16 = 0xB212;
 
@@ -157,6 +159,8 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_RAW_IMAGE_CROPPED_SIZE => Some("RawImageCroppedSize"),
         FUJI_RAW_IMAGE_ASPECT_RATIO => Some("RawImageAspectRatio"),
         FUJI_LENS_MOUNT_TYPE => Some("LensMountType"),
+        FUJI_RATING => Some("Rating"),
+        FUJI_RAW_EXPOSURE_BIAS => Some("RawExposureBias"),
         FUJI_RATINGS_INFO => Some("RatingsInfo"),
         FUJI_GE_IMAGE_SIZE => Some("GEImageSize"),
         _ => None,
@@ -1201,6 +1205,66 @@ pub fn parse_fuji_maker_notes(
                         } else {
                             continue;
                         }
+                    }
+                }
+                5 => {
+                    // RATIONAL (unsigned)
+                    let offset = value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let mut cursor = Cursor::new(&data[offset..]);
+                        let num = cursor.read_u32::<LittleEndian>().unwrap_or(0);
+                        let den = cursor.read_u32::<LittleEndian>().unwrap_or(1);
+                        if den != 0 {
+                            let val = num as f64 / den as f64;
+                            // Format as integer if it's a whole number
+                            if val == val.floor() {
+                                ExifValue::Ascii(format!("{}", val as i64))
+                            } else {
+                                ExifValue::Ascii(format!("{}", val))
+                            }
+                        } else {
+                            ExifValue::Rational(vec![(num, den)])
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+                7 => {
+                    // UNDEFINED - for Version tag (0x0000)
+                    let offset = value_offset as usize;
+                    if count <= 4 {
+                        // Value is in the offset field (little-endian bytes)
+                        let bytes = value_offset.to_le_bytes();
+                        let s = String::from_utf8_lossy(&bytes[..count as usize]).to_string();
+                        ExifValue::Ascii(s.trim_end_matches('\0').to_string())
+                    } else if offset + count as usize <= data.len() {
+                        let bytes = &data[offset..offset + count as usize];
+                        let s = String::from_utf8_lossy(bytes).to_string();
+                        ExifValue::Ascii(s.trim_end_matches('\0').to_string())
+                    } else {
+                        continue;
+                    }
+                }
+                10 => {
+                    // SRATIONAL (signed rational)
+                    let offset = value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let mut cursor = Cursor::new(&data[offset..]);
+                        let num = cursor.read_i32::<LittleEndian>().unwrap_or(0);
+                        let den = cursor.read_i32::<LittleEndian>().unwrap_or(1);
+                        if den != 0 {
+                            let val = num as f64 / den as f64;
+                            // Format as integer if it's a whole number
+                            if val == val.floor() {
+                                ExifValue::Ascii(format!("{}", val as i64))
+                            } else {
+                                ExifValue::Ascii(format!("{:.1}", val))
+                            }
+                        } else {
+                            ExifValue::SRational(vec![(num, den)])
+                        }
+                    } else {
+                        continue;
                     }
                 }
                 _ => {
