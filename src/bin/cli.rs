@@ -180,6 +180,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Print all EXIF data in exiftool text format: `Tag Name                        : Value`
 fn print_exif_data_exiftool(exif_data: &ExifData) {
+    // Output RAF-specific metadata first (for Fujifilm RAF files)
+    if let Some(raf_metadata) = exif_data.get_raf_metadata() {
+        // Output in a consistent order
+        let ordered_keys = [
+            "RAFVersion",
+            "RAFCompression",
+            "RawImageFullSize",
+            "RawImageCroppedSize",
+            "FujiLayout",
+            "XTransLayout",
+            "RawExposureBias",
+            "RawImageWidth",
+            "RawImageHeight",
+            "RawImageFullWidth",
+            "RawImageFullHeight",
+        ];
+        for key in ordered_keys {
+            if let Some(value) = raf_metadata.tags.get(key) {
+                println!("{:<32}: {}", key, value);
+            }
+        }
+    }
+
     for (tag_id, value) in exif_data.iter() {
         let tag_name = tag_id.name().unwrap_or("Unknown");
         let display_value = format_exiftool_text_value(value, tag_id.id);

@@ -15,8 +15,30 @@ pub mod tiff;
 pub mod webp;
 pub mod x3f;
 
+// Re-export RAF metadata type
+pub use raf::RafMetadata;
+
 use crate::errors::ExifResult;
 use std::io::{Read, Seek};
+
+/// Check if a reader contains a RAF file and extract RAF-specific metadata if so
+pub fn extract_raf_metadata_if_raf<R: Read + Seek>(
+    mut reader: R,
+) -> ExifResult<Option<RafMetadata>> {
+    // Read first 16 bytes to check signature
+    let mut signature = [0u8; 16];
+    reader.read_exact(&mut signature)?;
+
+    // Reset to beginning
+    reader.seek(std::io::SeekFrom::Start(0))?;
+
+    // Check for RAF signature
+    if signature.starts_with(b"FUJIFILMCCD-RAW") {
+        Ok(Some(raf::extract_raf_metadata(reader)?))
+    } else {
+        Ok(None)
+    }
+}
 
 /// Extract EXIF APP1 segment data from any supported image format
 /// Returns the raw APP1 data starting with "Exif\0\0" marker

@@ -1060,6 +1060,26 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
+    // Add RAF-specific metadata if present (for Fujifilm RAF files)
+    if let Some(raf_metadata) = exif_data.get_raf_metadata() {
+        for (key, value) in &raf_metadata.tags {
+            // Try to parse as number for fields that should be numeric
+            if key == "RawImageWidth"
+                || key == "RawImageHeight"
+                || key == "RawImageFullWidth"
+                || key == "RawImageFullHeight"
+            {
+                if let Ok(n) = value.parse::<i64>() {
+                    output.insert(key.clone(), Value::Number(n.into()));
+                } else {
+                    output.insert(key.clone(), Value::String(value.clone()));
+                }
+            } else {
+                output.insert(key.clone(), Value::String(value.clone()));
+            }
+        }
+    }
+
     // Wrap in an array like exiftool does
     Value::Array(vec![Value::Object(output)])
 }
