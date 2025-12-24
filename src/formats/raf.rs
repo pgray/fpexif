@@ -118,6 +118,14 @@ fn parse_raf_directory(buffer: &[u8]) -> RafMetadata {
                     metadata.insert("RawImageFullHeight", format!("{}", height));
                 }
             }
+            0x110 => {
+                // RawImageCropTopLeft (2 x int16u, top margin then left margin)
+                if len >= 4 {
+                    let top = u16::from_be_bytes([value_data[0], value_data[1]]);
+                    let left = u16::from_be_bytes([value_data[2], value_data[3]]);
+                    metadata.insert("RawImageCropTopLeft", format!("{} {}", top, left));
+                }
+            }
             0x111 => {
                 // RawImageCroppedSize (2 x int16u, height then width)
                 if len >= 4 {

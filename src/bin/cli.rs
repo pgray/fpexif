@@ -187,6 +187,7 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
             "RAFVersion",
             "RAFCompression",
             "RawImageFullSize",
+            "RawImageCropTopLeft",
             "RawImageCroppedSize",
             "FujiLayout",
             "XTransLayout",
