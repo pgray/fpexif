@@ -968,6 +968,37 @@ fn canon_ev(val: i16) -> f64 {
     sign * (val_int as f64 + frac) / 0x20 as f64
 }
 
+/// Format EV compensation as a fraction like ExifTool's PrintFraction
+/// Examples: 0 -> "0", 1.0 -> "+1", -1.0 -> "-1", 0.333 -> "+1/3", 0.5 -> "+1/2"
+fn format_ev_fraction(val: f64) -> String {
+    if val == 0.0 {
+        return "0".to_string();
+    }
+
+    // Avoid floating point errors
+    let val = val * 1.00001;
+
+    // Check if it's a whole number
+    if ((val.round() / val) - 1.0).abs() < 0.001 {
+        return format!("{:+}", val.round() as i32);
+    }
+
+    // Check if it's n/2
+    let times2 = val * 2.0;
+    if ((times2.round() / times2) - 1.0).abs() < 0.001 {
+        return format!("{:+}/2", times2.round() as i32);
+    }
+
+    // Check if it's n/3
+    let times3 = val * 3.0;
+    if ((times3.round() / times3) - 1.0).abs() < 0.001 {
+        return format!("{:+}/3", times3.round() as i32);
+    }
+
+    // Fall back to decimal format
+    format!("{:+.3}", val)
+}
+
 // =============================================================================
 // Dual-format decode functions (ExifTool and exiv2)
 // Only _exiv2 versions created where values actually differ from ExifTool
@@ -1042,16 +1073,16 @@ define_tag_decoder! {
 define_tag_decoder! {
     drive_mode,
     exiftool: {
-        0 => "Single-frame Shooting",
-        1 => "Continuous Shooting",
+        0 => "Single",
+        1 => "Continuous",
         2 => "Movie",
         3 => "Continuous, Speed Priority",
         4 => "Continuous, Low",
         5 => "Continuous, High",
-        6 => "Silent Single Shooting",
+        6 => "Silent Single",
         8 => "Continuous, High+",
-        9 => "Single-frame Shooting, Silent",
-        10 => "Continuous Shooting, Silent",
+        9 => "Single, Silent",
+        10 => "Continuous, Silent",
     },
     exiv2: {
         0 => "Single / timer",
@@ -3219,17 +3250,9 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
         // Canon stores exposure compensation using CanonEv encoding
         let raw = data[6] as i16;
         let ev_comp = canon_ev(raw);
-        // Format: "0" for zero, otherwise "+x.x" or "-x.x"
-        let formatted = if ev_comp == 0.0 {
-            "0".to_string()
-        } else if ev_comp > 0.0 {
-            format!("+{:.1}", ev_comp)
-        } else {
-            format!("{:.1}", ev_comp)
-        };
         decoded.insert(
             "ExposureCompensation".to_string(),
-            ExifValue::Ascii(formatted),
+            ExifValue::Ascii(format_ev_fraction(ev_comp)),
         );
     }
 
@@ -3243,18 +3266,12 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // Flash exposure compensation (index 15)
     if data.len() > 15 {
-        // Canon stores flash exposure compensation using CanonEv encoding
         let raw = data[15] as i16;
         let flash_comp = canon_ev(raw);
-        // Format: "0" for zero, otherwise "+x.x" or "-x.x"
-        let formatted = if flash_comp == 0.0 {
-            "0".to_string()
-        } else if flash_comp > 0.0 {
-            format!("+{:.1}", flash_comp)
-        } else {
-            format!("{:.1}", flash_comp)
-        };
-        decoded.insert("FlashExposureComp".to_string(), ExifValue::Ascii(formatted));
+        decoded.insert(
+            "FlashExposureComp".to_string(),
+            ExifValue::Ascii(format_ev_fraction(flash_comp)),
+        );
     }
 
     // Subject distance (index 19)
@@ -3492,16 +3509,9 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 6 {
         let raw = data[6] as i16;
         let ev_comp = canon_ev(raw);
-        let formatted = if ev_comp == 0.0 {
-            "0".to_string()
-        } else if ev_comp > 0.0 {
-            format!("+{:.1}", ev_comp)
-        } else {
-            format!("{:.1}", ev_comp)
-        };
         decoded.insert(
             "ExposureCompensation".to_string(),
-            ExifValue::Ascii(formatted),
+            ExifValue::Ascii(format_ev_fraction(ev_comp)),
         );
     }
 
@@ -3517,14 +3527,10 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 15 {
         let raw = data[15] as i16;
         let flash_comp = canon_ev(raw);
-        let formatted = if flash_comp == 0.0 {
-            "0".to_string()
-        } else if flash_comp > 0.0 {
-            format!("+{:.1}", flash_comp)
-        } else {
-            format!("{:.1}", flash_comp)
-        };
-        decoded.insert("FlashExposureComp".to_string(), ExifValue::Ascii(formatted));
+        decoded.insert(
+            "FlashExposureComp".to_string(),
+            ExifValue::Ascii(format_ev_fraction(flash_comp)),
+        );
     }
 
     // Subject distance (index 19)
@@ -4009,19 +4015,34 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
     }
 
     // ColorDataVersion (index 0)
+    // Note: Version interpretation depends on ColorData table (camera model)
+    // Using ColorData2 mappings (most common for DSLR cameras)
     let version = data[0];
     let version_str = match version {
-        1 => "1 (G2/S30/S40/S45)",
-        2 => "2 (S70/S60/Pro1/G6)",
-        3 => "3 (G7/G9/S1/S2/S3/S5/A560/A570/A580/A590/A610/A620/A630/A640/A650/A700/A710/A720)",
-        4 => "4 (G10/G11/G12/S90/S95/S100/S110/S120/A495/A1100/A2100/A3100/A3200/A3300/A3400)",
-        5 => "5 (40D)",
+        1 => "1 (1DmkIIN/5D/30D/400D)",
+        2 => "2 (1DmkIII)",
+        3 => "3 (40D)",
+        4 => "4 (1DSmkIII)",
+        5 => "5 (450D/1000D)",
         6 => "6 (50D/5DmkII)",
-        7 => "7 (500D/550D/600D/1100D)",
-        8 => "8 (60D)",
-        9 => "9 (1DmkIV/5DmkIII/6D/7D/70D)",
-        10 => "10 (1DX/1DC/7DmkII)",
-        11 => "11 (5DS/5DSR/5DmkIV/80D/6DmkII/77D/800D/200D)",
+        7 => "7 (500D/550D/7D/1DmkIV)",
+        9 => "9 (60D/1100D)",
+        10 => "10 (1DX/5DmkIII/6D/70D/100D/650D/700D/M/M2)",
+        11 => "11 (7DmkII/750D/760D/8000D)",
+        12 => "12 (1DXmkII/5DS/5DSR)",
+        13 => "13 (80D/5DmkIV)",
+        14 => "14 (1300D/2000D/4000D)",
+        15 => "15 (6DmkII/77D/200D/800D,9000D)",
+        16 => "16 (M50)",
+        17 => "17 (R)",
+        18 => "18 (RP/250D)",
+        19 => "19 (90D/850D/M6mkII/M200)",
+        32 => "32 (1DXmkIII)",
+        33 => "33 (R5/R6)",
+        34 => "34 (R3)",
+        48 => "48 (R7/R10/R50/R6mkII)",
+        64 => "64 (R1/R5mkII)",
+        65 => "65 (R50V)",
         _ => "Unknown",
     };
     decoded.insert(

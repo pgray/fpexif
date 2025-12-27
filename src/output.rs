@@ -1068,7 +1068,12 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             }
         });
         if let (Some(min), Some(max)) = (min_fl, max_fl) {
-            let lens = format!("{:.1} - {:.1} mm", min, max);
+            // If min and max are the same (prime lens), just show one value
+            let lens = if (min - max).abs() < 0.01 {
+                format!("{:.1} mm", min)
+            } else {
+                format!("{:.1} - {:.1} mm", min, max)
+            };
             output.insert("Lens".to_string(), Value::String(lens));
         }
     }
