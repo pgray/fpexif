@@ -987,25 +987,18 @@ define_tag_decoder! {
     }
 }
 
-// Note: Quality decoder uses i16 so it can handle -1, keeping manual implementation
-/// Decode Quality - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_quality_exiftool(value: u16) -> &'static str {
-    match value {
+// Quality: Canon.pm PrintConv / canonmn_int.cpp canonCsQuality
+define_tag_decoder! {
+    quality,
+    exiftool: {
         1 => "Economy",
         2 => "Normal",
         3 => "Fine",
         4 => "RAW",
         5 => "Superfine",
         130 => "Normal Movie",
-        _ => "Unknown",
-    }
-}
-
-/// Decode Quality - exiv2 format (from canonmn_int.cpp canonCsQuality)
-/// Differs: exiv2 has additional values (n/a, unknown, CRAW, Movie (2))
-pub fn decode_quality_exiv2(value: u16) -> &'static str {
-    match value as i16 {
-        -1 => "n/a",
+    },
+    exiv2: {
         0 => "unknown",
         1 => "Economy",
         2 => "Normal",
@@ -1015,7 +1008,7 @@ pub fn decode_quality_exiv2(value: u16) -> &'static str {
         7 => "CRAW",
         130 => "Normal Movie",
         131 => "Movie (2)",
-        _ => "Unknown",
+        0xFFFF => "n/a",
     }
 }
 
@@ -1293,10 +1286,10 @@ define_tag_decoder! {
     }
 }
 
-/// Decode AFPointsInFocus - ExifTool format (from Canon.pm PrintConv)
-/// Used by D30, D60 and some PowerShot/Ixus models
-pub fn decode_af_points_in_focus_exiftool(value: u16) -> &'static str {
-    match value {
+// AFPointsInFocus: Canon.pm (D30, D60, some PowerShot/Ixus)
+define_tag_decoder! {
+    af_points_in_focus,
+    both: {
         0x3000 => "None (MF)",
         0x3001 => "Right",
         0x3002 => "Center",
@@ -1305,23 +1298,18 @@ pub fn decode_af_points_in_focus_exiftool(value: u16) -> &'static str {
         0x3005 => "Left+Right",
         0x3006 => "Left+Center",
         0x3007 => "All",
-        _ => "Unknown",
     }
 }
 
-// AFPointsInFocus exiv2 - same as exiftool for basic values
-
-/// Decode ControlMode - ExifTool format (from Canon.pm PrintConv, ShotInfo index 18)
-pub fn decode_control_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ControlMode: Canon.pm ShotInfo index 18
+define_tag_decoder! {
+    control_mode,
+    both: {
         0 => "n/a",
         1 => "Camera Local Control",
         3 => "Computer Remote Control",
-        _ => "Unknown",
     }
 }
-
-// ControlMode exiv2 - same as exiftool
 
 // CameraType: Canon.pm PrintConv / canonmn_int.cpp cameraType
 define_tag_decoder! {
@@ -1335,45 +1323,41 @@ define_tag_decoder! {
     }
 }
 
-/// Decode NDFilter - ExifTool format (from Canon.pm PrintConv, ShotInfo index 28)
-pub fn decode_nd_filter_exiftool(value: u16) -> &'static str {
-    match value as i16 {
+// NDFilter: Canon.pm ShotInfo index 28
+define_tag_decoder! {
+    nd_filter,
+    type: i16,
+    both: {
         -1 => "n/a",
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
 
-// NDFilter exiv2 - same as exiftool
-
-/// Decode AutoRotate - ExifTool format (from Canon.pm PrintConv, ShotInfo index 27)
-pub fn decode_auto_rotate_exiftool(value: u16) -> &'static str {
-    match value as i16 {
+// AutoRotate: Canon.pm ShotInfo index 27
+define_tag_decoder! {
+    auto_rotate,
+    type: i16,
+    both: {
         -1 => "n/a",
         0 => "None",
         1 => "Rotate 90 CW",
         2 => "Rotate 180",
         3 => "Rotate 270 CW",
-        _ => "Unknown",
     }
 }
 
-// AutoRotate exiv2 - same as exiftool
-
-/// Decode BracketMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_bracket_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// BracketMode: Canon.pm PrintConv
+define_tag_decoder! {
+    bracket_mode,
+    both: {
         0 => "Off",
         1 => "AEB",
         2 => "FEB",
         3 => "ISO",
         4 => "WB",
-        _ => "Unknown",
     }
 }
-
-// BracketMode exiv2 - same as exiftool, no separate function needed
 
 // AFAreaMode: Canon.pm PrintConv / canonmn_int.cpp canonAFAreaMode
 define_tag_decoder! {
@@ -1416,17 +1400,15 @@ define_tag_decoder! {
     }
 }
 
-/// Decode DateStampMode - ExifTool format (from Canon.pm PrintConv)
-pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// DateStampMode: Canon.pm PrintConv
+define_tag_decoder! {
+    date_stamp_mode,
+    both: {
         0 => "Off",
         1 => "Date",
         2 => "Date & Time",
-        _ => "Unknown",
     }
 }
-
-// DateStampMode exiv2 - same as exiftool, no separate function needed
 
 // DigitalZoom: Canon.pm PrintConv (same for exiv2)
 define_tag_decoder! {
@@ -1458,13 +1440,13 @@ pub fn decode_contrast_exiftool(value: u16) -> String {
     }
 }
 
-/// Decode Contrast - exiv2 format (from canonmn_int.cpp canonCsLnh)
-pub fn decode_contrast_exiv2(value: u16) -> &'static str {
-    match value {
+// Contrast exiv2: canonmn_int.cpp canonCsLnh
+define_tag_decoder! {
+    contrast_lnh,
+    both: {
         0xffff => "Low",
         0x0000 => "Normal",
         0x0001 => "High",
-        _ => "Unknown",
     }
 }
 
@@ -1487,13 +1469,13 @@ pub fn decode_saturation_exiftool(value: u16) -> String {
     }
 }
 
-/// Decode Saturation - exiv2 format
-pub fn decode_saturation_exiv2(value: u16) -> &'static str {
-    match value {
+// Saturation exiv2: canonmn_int.cpp canonCsLnh
+define_tag_decoder! {
+    saturation_lnh,
+    both: {
         0xffff => "Low",
         0x0000 => "Normal",
         0x0001 => "High",
-        _ => "Unknown",
     }
 }
 
@@ -1509,19 +1491,21 @@ pub fn decode_sharpness_exiftool(value: u16) -> String {
     }
 }
 
-/// Decode Sharpness - exiv2 format
-pub fn decode_sharpness_exiv2(value: u16) -> &'static str {
-    match value {
+// Sharpness exiv2: canonmn_int.cpp canonCsLnh
+define_tag_decoder! {
+    sharpness_lnh,
+    both: {
         0xffff => "Low",
         0x0000 => "Normal",
         0x0001 => "High",
-        _ => "Unknown",
     }
 }
 
-/// Decode RecordMode - ExifTool format
-pub fn decode_record_mode_exiftool(value: i16) -> &'static str {
-    match value {
+// RecordMode: Canon.pm PrintConv / canonmn_int.cpp
+define_tag_decoder! {
+    record_mode,
+    type: i16,
+    exiftool: {
         -1 => "n/a",
         1 => "JPEG",
         2 => "CRW+THM",
@@ -1537,13 +1521,8 @@ pub fn decode_record_mode_exiftool(value: i16) -> &'static str {
         13 => "CR3+JPEG",
         14 => "HIF",
         15 => "CR3+HIF",
-        _ => "Unknown",
-    }
-}
-
-/// Decode RecordMode - exiv2 format
-pub fn decode_record_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         1 => "JPEG",
         2 => "CRW+THM",
         3 => "AVI+THM",
@@ -1558,13 +1537,14 @@ pub fn decode_record_mode_exiv2(value: u16) -> &'static str {
         13 => "CR3+JPEG",
         14 => "HIF",
         15 => "CR3+HIF",
-        _ => "Unknown",
     }
 }
 
-/// Decode CanonImageSize - ExifTool format
-pub fn decode_canon_image_size_exiftool(value: i16) -> &'static str {
-    match value {
+// CanonImageSize: Canon.pm PrintConv / canonmn_int.cpp
+define_tag_decoder! {
+    canon_image_size,
+    type: i16,
+    exiftool: {
         -1 => "n/a",
         0 => "Large",
         1 => "Medium",
@@ -1584,13 +1564,8 @@ pub fn decode_canon_image_size_exiftool(value: i16) -> &'static str {
         137 => "1280x720 Movie",
         142 => "1920x1080 Movie",
         143 => "4096x2160 Movie",
-        _ => "Unknown",
-    }
-}
-
-/// Decode CanonImageSize - exiv2 format (same as ExifTool)
-pub fn decode_canon_image_size_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Large",
         1 => "Medium",
         2 => "Small",
@@ -1609,7 +1584,6 @@ pub fn decode_canon_image_size_exiv2(value: u16) -> &'static str {
         137 => "1280x720 Movie",
         142 => "1920x1080 Movie",
         143 => "4096x2160 Movie",
-        _ => "Unknown",
     }
 }
 
@@ -1720,58 +1694,48 @@ define_tag_decoder! {
     }
 }
 
-/// Decode FocusContinuous - ExifTool format
-pub fn decode_focus_continuous_exiftool(value: i16) -> &'static str {
-    match value {
+// FocusContinuous: Canon.pm PrintConv
+define_tag_decoder! {
+    focus_continuous,
+    type: i16,
+    both: {
         -1 => "n/a",
         0 => "Single",
         1 => "Continuous",
         8 => "Manual",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusContinuous - exiv2 format (same as ExifTool)
-pub fn decode_focus_continuous_exiv2(value: i16) -> &'static str {
-    decode_focus_continuous_exiftool(value)
-}
-
-/// Decode AESetting - ExifTool format
-pub fn decode_ae_setting_exiftool(value: i16) -> &'static str {
-    match value {
+// AESetting: Canon.pm PrintConv
+define_tag_decoder! {
+    ae_setting,
+    type: i16,
+    both: {
         -1 => "n/a",
         0 => "Normal AE",
         1 => "Exposure Compensation",
         2 => "AE Lock",
         3 => "AE Lock + Exposure Comp.",
         4 => "No AE",
-        _ => "Unknown",
     }
 }
 
-/// Decode AESetting - exiv2 format (same as ExifTool)
-pub fn decode_ae_setting_exiv2(value: i16) -> &'static str {
-    decode_ae_setting_exiftool(value)
-}
-
-/// Decode SpotMeteringMode - ExifTool format
-pub fn decode_spot_metering_mode_exiftool(value: i16) -> &'static str {
-    match value {
+// SpotMeteringMode: Canon.pm PrintConv
+define_tag_decoder! {
+    spot_metering_mode,
+    type: i16,
+    both: {
         -1 => "n/a",
         0 => "Center",
         1 => "AF Point",
-        _ => "Unknown",
     }
 }
 
-/// Decode SpotMeteringMode - exiv2 format (same as ExifTool)
-pub fn decode_spot_metering_mode_exiv2(value: i16) -> &'static str {
-    decode_spot_metering_mode_exiftool(value)
-}
-
-/// Decode PhotoEffect - ExifTool format
-pub fn decode_photo_effect_exiftool(value: i16) -> &'static str {
-    match value {
+// PhotoEffect: Canon.pm PrintConv
+define_tag_decoder! {
+    photo_effect,
+    type: i16,
+    both: {
         -1 => "n/a",
         0 => "Off",
         1 => "Vivid",
@@ -1781,13 +1745,7 @@ pub fn decode_photo_effect_exiftool(value: i16) -> &'static str {
         5 => "B&W",
         6 => "Custom",
         100 => "My Color Data",
-        _ => "Unknown",
     }
-}
-
-/// Decode PhotoEffect - exiv2 format (same as ExifTool)
-pub fn decode_photo_effect_exiv2(value: i16) -> &'static str {
-    decode_photo_effect_exiftool(value)
 }
 
 /// Decode ColorTone - ExifTool format (uses printParameter like Contrast/Saturation)
@@ -1809,30 +1767,26 @@ pub fn decode_color_tone_exiftool(value: u16) -> String {
     }
 }
 
-/// Decode ColorTone - exiv2 format
-pub fn decode_color_tone_exiv2(value: u16) -> &'static str {
-    match value {
+// ColorTone exiv2: canonmn_int.cpp canonCsLnh
+define_tag_decoder! {
+    color_tone_lnh,
+    both: {
         0xffff => "Low",
         0x0000 => "Normal",
         0x0001 => "High",
-        _ => "Unknown",
     }
 }
 
-/// Decode SRAWQuality - ExifTool format
-pub fn decode_sraw_quality_exiftool(value: i16) -> &'static str {
-    match value {
+// SRAWQuality: Canon.pm PrintConv
+define_tag_decoder! {
+    sraw_quality,
+    type: i16,
+    both: {
         -1 => "n/a",
         0 => "n/a",
         1 => "sRAW1 (mRAW)",
         2 => "sRAW2 (sRAW)",
-        _ => "Unknown",
     }
-}
-
-/// Decode SRAWQuality - exiv2 format (same as ExifTool)
-pub fn decode_sraw_quality_exiv2(value: i16) -> &'static str {
-    decode_sraw_quality_exiftool(value)
 }
 
 // FocusBracketing: Canon.pm PrintConv (same for exiv2)
@@ -2030,20 +1984,14 @@ define_tag_decoder! {
     }
 }
 
-/// Decode SerialNumberFormat - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Canon.pm:1593
-pub fn decode_serial_number_format_exiftool(value: u32) -> &'static str {
-    match value {
+// SerialNumberFormat: Canon.pm / canonmn_int.cpp canonSerialNumberFormat
+define_tag_decoder! {
+    serial_number_format,
+    type: u32,
+    both: {
         0x90000000 => "Format 1",
         0xa0000000 => "Format 2",
-        _ => "Unknown",
     }
-}
-
-/// Decode SerialNumberFormat - exiv2 format
-/// Source: exiv2/src/canonmn_int.cpp canonSerialNumberFormat
-pub fn decode_serial_number_format_exiv2(value: u32) -> &'static str {
-    decode_serial_number_format_exiftool(value)
 }
 
 // MultiExposure: Canon.pm / canonmn_int.cpp canonMultiExposure
@@ -2719,7 +2667,7 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     if data.len() > 9 {
         decoded.insert(
             "RecordMode".to_string(),
-            ExifValue::Ascii(decode_record_mode_exiv2(data[9]).to_string()),
+            ExifValue::Ascii(decode_record_mode_exiv2(data[9] as i16).to_string()),
         );
     }
 
@@ -2727,7 +2675,7 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     if data.len() > 10 {
         decoded.insert(
             "CanonImageSize".to_string(),
-            ExifValue::Ascii(decode_canon_image_size_exiv2(data[10]).to_string()),
+            ExifValue::Ascii(decode_canon_image_size_exiv2(data[10] as i16).to_string()),
         );
     }
 
@@ -2751,7 +2699,7 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     if data.len() > 13 {
         decoded.insert(
             "Contrast".to_string(),
-            ExifValue::Ascii(decode_contrast_exiv2(data[13]).to_string()),
+            ExifValue::Ascii(decode_contrast_lnh_exiv2(data[13]).to_string()),
         );
     }
 
@@ -2759,7 +2707,7 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     if data.len() > 14 {
         decoded.insert(
             "Saturation".to_string(),
-            ExifValue::Ascii(decode_saturation_exiv2(data[14]).to_string()),
+            ExifValue::Ascii(decode_saturation_lnh_exiv2(data[14]).to_string()),
         );
     }
 
@@ -2767,7 +2715,7 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     if data.len() > 15 {
         decoded.insert(
             "Sharpness".to_string(),
-            ExifValue::Ascii(decode_sharpness_exiv2(data[15]).to_string()),
+            ExifValue::Ascii(decode_sharpness_lnh_exiv2(data[15]).to_string()),
         );
     }
 
@@ -3006,7 +2954,7 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     if data.len() > 42 && data[42] != 0x7fff {
         decoded.insert(
             "ColorTone".to_string(),
-            ExifValue::Ascii(decode_color_tone_exiv2(data[42]).to_string()),
+            ExifValue::Ascii(decode_color_tone_lnh_exiv2(data[42]).to_string()),
         );
     }
 
@@ -3254,7 +3202,7 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 27 && data[27] as i16 >= 0 {
         decoded.insert(
             "AutoRotate".to_string(),
-            ExifValue::Ascii(decode_auto_rotate_exiftool(data[27]).to_string()),
+            ExifValue::Ascii(decode_auto_rotate_exiftool(data[27] as i16).to_string()),
         );
     }
 
@@ -3262,7 +3210,7 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 28 {
         decoded.insert(
             "NDFilter".to_string(),
-            ExifValue::Ascii(decode_nd_filter_exiftool(data[28]).to_string()),
+            ExifValue::Ascii(decode_nd_filter_exiftool(data[28] as i16).to_string()),
         );
     }
 
@@ -3528,7 +3476,7 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 27 && data[27] as i16 >= 0 {
         decoded.insert(
             "AutoRotate".to_string(),
-            ExifValue::Ascii(decode_auto_rotate_exiftool(data[27]).to_string()),
+            ExifValue::Ascii(decode_auto_rotate_exiftool(data[27] as i16).to_string()),
         );
     }
 
@@ -3536,7 +3484,7 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
     if data.len() > 28 {
         decoded.insert(
             "NDFilter".to_string(),
-            ExifValue::Ascii(decode_nd_filter_exiftool(data[28]).to_string()),
+            ExifValue::Ascii(decode_nd_filter_exiftool(data[28] as i16).to_string()),
         );
     }
 
