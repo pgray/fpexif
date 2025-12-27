@@ -46,7 +46,8 @@ fn test_decode_camera_settings() {
     // Check continuous drive (formerly called DriveMode, renamed to match ExifTool)
     assert!(decoded.contains_key("ContinuousDrive"));
     if let Some(ExifValue::Ascii(drive)) = decoded.get("ContinuousDrive") {
-        assert_eq!(drive, "Continuous Shooting");
+        // ExifTool uses "Continuous" not "Continuous Shooting"
+        assert_eq!(drive, "Continuous");
     } else {
         panic!("ContinuousDrive should be Ascii");
     }
