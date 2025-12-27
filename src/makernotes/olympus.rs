@@ -391,62 +391,56 @@ fn get_focus_info_tag_name(tag_id: u16) -> Option<&'static str> {
 // Decode Functions - ExifTool and exiv2 compatible value decoders
 // =============================================================================
 
-/// Decode ExposureMode value (CS 0x0200) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_exposure_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ExposureMode (CS 0x0200): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    exposure_mode,
+    both: {
         1 => "Manual",
         2 => "Program",
         3 => "Aperture-priority AE",
         4 => "Shutter speed priority AE",
         5 => "Program-shift",
-        _ => "Unknown",
     }
 }
-// decode_exposure_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode MeteringMode value (CS 0x0202) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_metering_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// MeteringMode (CS 0x0202): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    metering_mode,
+    both: {
         2 => "Center-weighted average",
         3 => "Spot",
         5 => "ESP",
         261 => "Pattern+AF",
         515 => "Spot+Highlight control",
         1027 => "Spot+Shadow control",
-        _ => "Unknown",
     }
 }
-// decode_metering_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode EXIF MeteringMode (tag 0x9207) with Olympus-specific names
-/// Olympus uses "ESP" instead of "Multi-segment" for pattern metering
-pub fn decode_exif_metering_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ExifMeteringMode (tag 0x9207) with Olympus-specific names
+// Olympus uses "ESP" instead of "Multi-segment" for pattern metering
+define_tag_decoder! {
+    exif_metering_mode,
+    both: {
         0 => "Unknown",
         1 => "Average",
         2 => "Center-weighted average",
         3 => "Spot",
         4 => "Multi-spot",
-        5 => "ESP", // Olympus-specific: EXIF standard is "Multi-segment"
+        5 => "ESP",
         6 => "Partial",
         255 => "Other",
-        _ => "Unknown",
     }
 }
 
-/// Decode MacroMode value (CS 0x0300 and Main 0x0202) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_macro_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// MacroMode (CS 0x0300 and Main 0x0202): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    macro_mode,
+    both: {
         0 => "Off",
         1 => "On",
         2 => "Super Macro",
-        _ => "Unknown",
     }
 }
-// decode_macro_mode_exiv2 - same as exiftool, no separate function needed
 
 // FocusMode (CS 0x0301): Olympus.pm / olympusmn_int.cpp
 define_tag_decoder! {
@@ -468,27 +462,23 @@ define_tag_decoder! {
     }
 }
 
-/// Decode FocusProcess value (CS 0x0302) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_focus_process_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusProcess (CS 0x0302): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    focus_process,
+    both: {
         0 => "AF Not Used",
         1 => "AF Used",
-        _ => "Unknown",
     }
 }
-// decode_focus_process_exiv2 - same as exiftool, no separate function needed
 
-/// Decode AFSearch value (CS 0x0303) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_af_search_exiftool(value: u16) -> &'static str {
-    match value {
+// AFSearch (CS 0x0303): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    af_search,
+    both: {
         0 => "Not Ready",
         1 => "Ready",
-        _ => "Unknown",
     }
 }
-// decode_af_search_exiv2 - same as exiftool, no separate function needed
 
 /// Decode FlashMode value (CS 0x0400) - ExifTool format (bitmask)
 /// Note: exiv2 uses identical values - no separate version needed
@@ -514,10 +504,10 @@ pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
 }
 // decode_flash_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode WhiteBalance value (CS 0x0500) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
-    match value {
+// WhiteBalance (CS 0x0500): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    white_balance,
+    both: {
         0 => "Auto",
         1 => "Auto (Keep Warm Color Off)",
         16 => "7500K (Fine Weather with Shade)",
@@ -541,22 +531,18 @@ pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
         513 => "Custom WB 2",
         514 => "Custom WB 3",
         515 => "Custom WB 4",
-        _ => "Unknown",
     }
 }
-// decode_white_balance_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ColorSpace value (CS 0x0507) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_color_space_exiftool(value: u16) -> &'static str {
-    match value {
+// ColorSpace (CS 0x0507): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    color_space,
+    both: {
         0 => "sRGB",
         1 => "Adobe RGB",
         2 => "Pro Photo RGB",
-        _ => "Unknown",
     }
 }
-// decode_color_space_exiv2 - same as exiftool, no separate function needed
 
 /// Decode SceneMode value (CS 0x0509) - ExifTool format
 pub fn decode_scene_mode_exiftool(value: u16) -> &'static str {
@@ -703,27 +689,23 @@ pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
 }
 // decode_noise_reduction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode DistortionCorrection value (CS 0x050B) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_distortion_correction_exiftool(value: u16) -> &'static str {
-    match value {
+// DistortionCorrection (CS 0x050B): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    distortion_correction,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
-// decode_distortion_correction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ShadingCompensation value (CS 0x050C) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_shading_compensation_exiftool(value: u16) -> &'static str {
-    match value {
+// ShadingCompensation (CS 0x050C): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    shading_compensation,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
-// decode_shading_compensation_exiv2 - same as exiftool, no separate function needed
 
 // PictureMode (CS 0x0520): Olympus.pm / olympusmn_int.cpp
 define_tag_decoder! {
@@ -805,16 +787,14 @@ define_tag_decoder! {
     }
 }
 
-/// Decode AELock value (CS 0x0201) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_ae_lock_exiftool(value: u16) -> &'static str {
-    match value {
+// AELock (CS 0x0201): Olympus.pm / olympusmn_int.cpp
+define_tag_decoder! {
+    ae_lock,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
-// decode_ae_lock_exiv2 - same as exiftool, no separate function needed
 
 // FlashRemoteControl (CS 0x0403): Olympus.pm / olympusmn_int.cpp
 define_tag_decoder! {
