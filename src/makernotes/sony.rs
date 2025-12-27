@@ -653,10 +653,10 @@ define_tag_decoder! {
     }
 }
 
-/// Decode ImageQuality value (tag 0x0102) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
-    match value {
+// ImageQuality (tag 0x0102): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    image_quality,
+    both: {
         0 => "RAW",
         1 => "Super Fine",
         2 => "Fine",
@@ -667,15 +667,13 @@ pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
         7 => "Compressed RAW",
         8 => "Compressed RAW + JPEG",
         9 => "Light",
-        _ => "Unknown",
     }
 }
-// decode_image_quality_exiv2 - same as exiftool, no separate function needed
 
-/// Decode WhiteBalance value (tag 0x0115) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
-    match value {
+// WhiteBalance (tag 0x0115): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    white_balance,
+    both: {
         0x00 => "Auto",
         0x01 => "Color Temperature/Color Filter",
         0x10 => "Daylight",
@@ -686,45 +684,40 @@ pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
         0x60 => "Fluorescent",
         0x70 => "Custom",
         0x80 => "Underwater",
-        _ => "Unknown",
     }
 }
-// decode_white_balance_exiv2 - same as exiftool, no separate function needed
 
-/// Decode LongExposureNoiseReduction value (tag 0x2008) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_long_exposure_noise_reduction_exiftool(value: u32) -> &'static str {
-    match value {
+// LongExposureNoiseReduction (tag 0x2008): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    long_exposure_noise_reduction,
+    type: u32,
+    both: {
         0 => "Off",
         1 => "On (unused)",
         0x10001 => "On (dark subtracted)",
         0xffff0000 => "Off (65535)",
         0xffff0001 => "On (65535)",
         0xffffffff => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_long_exposure_noise_reduction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode HighISONoiseReduction value (tag 0x2009) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// HighISONoiseReduction (tag 0x2009): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    high_iso_noise_reduction,
+    both: {
         0 => "Off",
         1 => "Low",
         2 => "Normal",
         3 => "High",
         256 => "Auto",
         65535 => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_high_iso_noise_reduction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode SceneMode value (tag 0xB023) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_scene_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// SceneMode (tag 0xB023): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    scene_mode,
+    both: {
         0 => "Standard",
         1 => "Portrait",
         2 => "Text",
@@ -750,16 +743,14 @@ pub fn decode_scene_mode_exiftool(value: u16) -> &'static str {
         28 => "Pet",
         33 => "HDR",
         0xffff => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_scene_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode Contrast/Saturation/Sharpness adjustment values - ExifTool format
-/// (tags 0x2004/0x2005/0x2006)
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_adjustment_exiftool(value: i32) -> &'static str {
-    match value {
+// Adjustment values (tags 0x2004/0x2005/0x2006): Contrast/Saturation/Sharpness
+define_tag_decoder! {
+    adjustment,
+    type: i32,
+    both: {
         -3 => "-3",
         -2 => "-2",
         -1 => "-1",
@@ -767,10 +758,8 @@ pub fn decode_adjustment_exiftool(value: i32) -> &'static str {
         1 => "+1",
         2 => "+2",
         3 => "+3",
-        _ => "Unknown",
     }
 }
-// decode_adjustment_exiv2 - same as exiftool, no separate function needed
 
 /// Decode ColorTemperature value (tag 0xB021) - ExifTool format
 /// Returns None if value should be displayed as-is (actual temperature)
@@ -783,11 +772,11 @@ pub fn decode_color_temperature_exiftool(value: u32) -> Option<&'static str> {
 }
 // decode_color_temperature_exiv2 - same as exiftool, no separate function needed
 
-/// Decode Teleconverter value (tag 0x0105) - ExifTool format
-/// Based on ExifTool's minoltaTeleconverters
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_teleconverter_exiftool(value: u32) -> &'static str {
-    match value {
+// Teleconverter (tag 0x0105): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    teleconverter,
+    type: u32,
+    both: {
         0x00 => "None",
         0x04 => "Minolta/Sony AF 1.4x APO (D) (0x04)",
         0x05 => "Minolta/Sony AF 2x APO (D) (0x05)",
@@ -797,10 +786,8 @@ pub fn decode_teleconverter_exiftool(value: u32) -> &'static str {
         0x88 => "Minolta/Sony AF 1.4x APO (D)",
         0x90 => "Minolta AF 1.4x APO II",
         0xa0 => "Minolta AF 1.4x APO",
-        _ => "Unknown",
     }
 }
-// decode_teleconverter_exiv2 - same as exiftool, no separate function needed
 
 // PictureEffect (tag 0x200E): Sony.pm / sonymn_int.cpp
 define_tag_decoder! {
@@ -882,44 +869,40 @@ define_tag_decoder! {
     }
 }
 
-/// Decode VignettingCorrection value (tag 0x2011) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_vignetting_correction_exiftool(value: u32) -> &'static str {
-    match value {
+// VignettingCorrection (tag 0x2011): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    vignetting_correction,
+    type: u32,
+    both: {
         0 => "Off",
         2 => "Auto",
         0xffffffff => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_vignetting_correction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode DistortionCorrection value (tag 0x2013) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_distortion_correction_exiftool(value: u32) -> &'static str {
-    match value {
+// DistortionCorrection (tag 0x2013): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    distortion_correction,
+    type: u32,
+    both: {
         0 => "Off",
         2 => "Auto",
         0xffffffff => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_distortion_correction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ReleaseMode value (tag 0xB049) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_release_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ReleaseMode (tag 0xB049): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    release_mode,
+    both: {
         0 => "Normal",
         2 => "Continuous",
         5 => "Exposure Bracketing",
         6 => "White Balance Bracketing",
         8 => "DRO Bracketing",
         65535 => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_release_mode_exiv2 - same as exiftool, no separate function needed
 
 /// Decode MultiFrameNoiseReduction value (tag 0x200B) - ExifTool format
 pub fn decode_multi_frame_noise_reduction_exiftool(value: u32) -> &'static str {
@@ -942,23 +925,20 @@ pub fn decode_multi_frame_noise_reduction_exiv2(value: u32) -> &'static str {
     }
 }
 
-/// Decode IntelligentAuto value (tag 0xB052) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_intelligent_auto_exiftool(value: u16) -> &'static str {
-    match value {
+// IntelligentAuto (tag 0xB052): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    intelligent_auto,
+    both: {
         0 => "Off",
         1 => "On",
         2 => "Advanced",
-        _ => "Unknown",
     }
 }
-// decode_intelligent_auto_exiv2 - same as exiftool, no separate function needed
 
-/// Decode HDR value (tag 0x200A) - ExifTool format
-/// Returns the first element of the HDR pair (level)
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_hdr_exiftool(value: u16) -> &'static str {
-    match value {
+// HDR (tag 0x200A): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    hdr,
+    both: {
         0x0 => "Off",
         0x01 => "Auto",
         0x10 => "1.0 EV",
@@ -972,10 +952,8 @@ pub fn decode_hdr_exiftool(value: u16) -> &'static str {
         0x18 => "5.0 EV",
         0x19 => "5.5 EV",
         0x1a => "6.0 EV",
-        _ => "Unknown",
     }
 }
-// decode_hdr_exiv2 - same as exiftool, no separate function needed
 
 /// Decode Quality value (tag 0x0102 and 0xB047) - ExifTool format
 /// Note: This overlaps with decode_image_quality but with more values
