@@ -755,39 +755,23 @@ define_tag_decoder! {
     }
 }
 
-/// Decode VR Type value - ExifTool format
-/// From Nikon.pm VRInfo subdirectory, offset 8
-pub fn decode_vr_type_exiftool(value: u8) -> &'static str {
-    match value {
+// VRType: Nikon.pm VRInfo subdirectory
+define_tag_decoder! {
+    vr_type,
+    type: u8,
+    both: {
         2 => "In-body",
         3 => "In-body + Lens",
-        _ => "Unknown",
     }
 }
 
-/// Decode VR Type value - exiv2 format
-/// exiv2 does not define VRType, using ExifTool values
-pub fn decode_vr_type_exiv2(value: u8) -> &'static str {
-    decode_vr_type_exiftool(value)
-}
-
-/// Decode Daylight Savings value - ExifTool format
-/// From Nikon.pm WorldTime subdirectory, offset 2
-pub fn decode_daylight_savings_exiftool(value: u8) -> &'static str {
-    match value {
+// DaylightSavings: Nikon.pm WorldTime / nikonmn_int.cpp nikonYesNo[]
+define_tag_decoder! {
+    daylight_savings,
+    type: u8,
+    both: {
         0 => "No",
         1 => "Yes",
-        _ => "Unknown",
-    }
-}
-
-/// Decode Daylight Savings value - exiv2 format
-/// Values based on exiv2 nikonmn_int.cpp nikonYesNo[]
-pub fn decode_daylight_savings_exiv2(value: u8) -> &'static str {
-    match value {
-        0 => "No",
-        1 => "Yes",
-        _ => "Unknown",
     }
 }
 
@@ -826,17 +810,16 @@ define_tag_decoder! {
     }
 }
 
-/// Decode Vignette Control value (tag 0x002A) - ExifTool format
-pub fn decode_vignette_control_exiftool(value: u16) -> &'static str {
-    match value {
+// VignetteControl (tag 0x002A): Nikon.pm / nikonmn_int.cpp
+define_tag_decoder! {
+    vignette_control,
+    both: {
         0 => "Off",
         1 => "Low",
         3 => "Normal",
         5 => "High",
-        _ => "Unknown",
     }
 }
-// decode_vignette_control_exiv2 - same as exiftool, no separate function needed
 
 // HighISONoiseReduction (tag 0x00B1): Nikon.pm / nikonmn_int.cpp nikonHighISONoiseReduction[]
 define_tag_decoder! {
@@ -859,18 +842,16 @@ define_tag_decoder! {
     }
 }
 
-/// Decode Date Stamp Mode value (tag 0x009D) - ExifTool format
-/// Note: This tag is not defined in exiv2
-pub fn decode_date_stamp_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// DateStampMode (tag 0x009D): Nikon.pm
+define_tag_decoder! {
+    date_stamp_mode,
+    both: {
         0 => "Off",
         1 => "Date & Time",
         2 => "Date",
         3 => "Date Counter",
-        _ => "Unknown",
     }
 }
-// decode_date_stamp_mode_exiv2 - not defined in exiv2
 
 // NEFCompression (tag 0x0093): Nikon.pm
 define_tag_decoder! {
@@ -936,9 +917,11 @@ pub fn decode_packed_rational_unsigned(data: &[u8]) -> Option<f64> {
     }
 }
 
-/// Decode Flash Mode value (tag 0x0087) - ExifTool format
-pub fn decode_flash_mode_exiftool(value: u8) -> &'static str {
-    match value {
+// FlashMode (tag 0x0087): Nikon.pm
+define_tag_decoder! {
+    flash_mode,
+    type: u8,
+    both: {
         0 => "Did Not Fire",
         1 => "Fired, Manual",
         3 => "Not Ready",
@@ -946,7 +929,6 @@ pub fn decode_flash_mode_exiftool(value: u8) -> &'static str {
         8 => "Fired, Commander Mode",
         9 => "Fired, TTL Mode",
         18 => "LED Light",
-        _ => "Unknown",
     }
 }
 
@@ -1018,23 +1000,18 @@ fn decode_shooting_mode_bits(value: u16, _is_exiv2: bool) -> String {
     }
 }
 
-/// Decode Auto Bracket Release value (tag 0x008A) - ExifTool format
-pub fn decode_auto_bracket_release_exiftool(value: u16) -> &'static str {
-    match value {
+// AutoBracketRelease (tag 0x008A): Nikon.pm / nikonmn_int.cpp
+define_tag_decoder! {
+    auto_bracket_release,
+    exiftool: {
         0 => "None",
         1 => "Auto Release",
         2 => "Manual Release",
-        _ => "Unknown",
-    }
-}
-
-/// Decode Auto Bracket Release value (tag 0x008A) - exiv2 format
-pub fn decode_auto_bracket_release_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "None",
         1 => "Auto release",
         2 => "Manual release",
-        _ => "Unknown",
     }
 }
 
@@ -1166,77 +1143,53 @@ pub fn decode_iso_selection_exiv2(value: &str) -> String {
     decode_iso_selection_exiftool(value)
 }
 
-/// Decode VRMode value - ExifTool format
-/// From Nikon.pm vRModeZ9 hash
-pub fn decode_vr_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// VRMode: Nikon.pm vRModeZ9 / nikonmn_int.cpp VRInfo
+define_tag_decoder! {
+    vr_mode,
+    exiftool: {
         0 => "Off",
         1 => "Normal",
         2 => "Sport",
-        3 => "Active", // observed in some models
-        _ => "Unknown",
-    }
-}
-
-/// Decode VRMode value - exiv2 format
-/// From nikonmn_int.cpp VRInfo PrintConv
-pub fn decode_vr_mode_exiv2(value: u16) -> &'static str {
-    match value {
+        3 => "Active",
+    },
+    exiv2: {
         0 => "Off",
         1 => "Normal",
         2 => "Sport",
-        _ => "Unknown",
     }
 }
 
-/// Decode AutoDistortionControl value - ExifTool format
-/// From Nikon.pm - various tags reference this
-pub fn decode_auto_distortion_control_exiftool(value: u16) -> &'static str {
-    match value {
-        0 | 2 => "Off",
-        1 => "On",
-        _ => "Unknown",
-    }
-}
-
-/// Decode AutoDistortionControl value - exiv2 format
-pub fn decode_auto_distortion_control_exiv2(value: u16) -> &'static str {
-    decode_auto_distortion_control_exiftool(value)
-}
-
-/// Decode HDR mode value - ExifTool format
-/// From Nikon.pm multipleExposureModeZ9 hash
-pub fn decode_hdr_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// AutoDistortionControl: Nikon.pm
+define_tag_decoder! {
+    auto_distortion_control,
+    both: {
         0 => "Off",
         1 => "On",
-        2 => "On (series)", // Multiple exposure series
-        _ => "Unknown",
+        2 => "Off",
     }
 }
 
-/// Decode HDR mode value - exiv2 format
-pub fn decode_hdr_mode_exiv2(value: u16) -> &'static str {
-    decode_hdr_mode_exiftool(value)
+// HDRMode: Nikon.pm multipleExposureModeZ9
+define_tag_decoder! {
+    hdr_mode,
+    both: {
+        0 => "Off",
+        1 => "On",
+        2 => "On (series)",
+    }
 }
 
-/// Decode HDR level value - ExifTool format
-/// From Nikon.pm hdrLevelZ8 hash
-pub fn decode_hdr_level_exiftool(value: u16) -> &'static str {
-    match value {
+// HDRLevel: Nikon.pm hdrLevelZ8
+define_tag_decoder! {
+    hdr_level,
+    both: {
         0 => "Auto",
         1 => "Extra Low",
         2 => "Low",
         3 => "Normal",
         4 => "High",
         5 => "Extra High",
-        _ => "Unknown",
     }
-}
-
-/// Decode HDR level value - exiv2 format
-pub fn decode_hdr_level_exiv2(value: u16) -> &'static str {
-    decode_hdr_level_exiftool(value)
 }
 
 /// Nikon decryption lookup tables (from ExifTool)
@@ -1912,42 +1865,29 @@ pub fn parse_shot_info_shutter_count(serial: u32, shutter_count: u32, data: &[u8
     Some(count)
 }
 
-/// Decode Image Authentication value (tag 0x0020) - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Nikon.pm
-pub fn decode_image_authentication_exiftool(value: u8) -> &'static str {
-    match value {
+// ImageAuthentication (tag 0x0020): Nikon.pm / nikonmn_int.cpp nikonOffOn[]
+define_tag_decoder! {
+    image_authentication,
+    type: u8,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode Image Authentication value (tag 0x0020) - exiv2 format
-/// Values based on exiv2 nikonmn_int.cpp nikonOffOn[]
-pub fn decode_image_authentication_exiv2(value: u8) -> &'static str {
-    decode_image_authentication_exiftool(value)
-}
-
-/// Decode Silent Photography value (tag 0x00BF) - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Nikon.pm
-pub fn decode_silent_photography_exiftool(value: u16) -> &'static str {
-    match value {
+// SilentPhotography (tag 0x00BF): Nikon.pm
+define_tag_decoder! {
+    silent_photography,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode Silent Photography value (tag 0x00BF) - exiv2 format
-/// exiv2 does not define this tag, using ExifTool values
-pub fn decode_silent_photography_exiv2(value: u16) -> &'static str {
-    decode_silent_photography_exiftool(value)
-}
-
-/// Decode Crop Hi Speed value (tag 0x001B) - ExifTool format
-/// Source: exiftool/lib/Image/ExifTool/Nikon.pm cropHiSpeed hash
-pub fn decode_crop_hi_speed_exiftool(value: u16) -> &'static str {
-    match value {
+// CropHiSpeed (tag 0x001A): Nikon.pm cropHiSpeed hash
+define_tag_decoder! {
+    crop_hi_speed,
+    both: {
         0 => "Off",
         1 => "1.3x Crop",
         2 => "DX Crop",
@@ -1964,31 +1904,18 @@ pub fn decode_crop_hi_speed_exiftool(value: u16) -> &'static str {
         15 => "1.5x Movie Crop",
         17 => "FX 1:1 Crop",
         18 => "DX 1:1 Crop",
-        _ => "Unknown",
     }
 }
 
-/// Decode Crop Hi Speed value (tag 0x001B) - exiv2 format
-/// exiv2 does not define this tag, using ExifTool values
-pub fn decode_crop_hi_speed_exiv2(value: u16) -> &'static str {
-    decode_crop_hi_speed_exiftool(value)
-}
-
-/// Decode Vibration Reduction value - ExifTool format
-/// From Nikon.pm VRInfo subdirectory, offset 4
-pub fn decode_vibration_reduction_exiftool(value: u8) -> &'static str {
-    match value {
+// VibrationReduction: Nikon.pm VRInfo subdirectory
+define_tag_decoder! {
+    vibration_reduction,
+    type: u8,
+    both: {
         0 => "n/a",
         1 => "On",
         2 => "Off",
-        _ => "Unknown",
     }
-}
-
-/// Decode Vibration Reduction value - exiv2 format
-/// exiv2 does not have VibrationReduction tag, using ExifTool values
-pub fn decode_vibration_reduction_exiv2(value: u8) -> &'static str {
-    decode_vibration_reduction_exiftool(value)
 }
 
 /// Decode Flash Type ASCII value (tag 0x0009) - ExifTool format
