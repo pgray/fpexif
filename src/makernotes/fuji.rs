@@ -213,16 +213,14 @@ define_tag_decoder! {
     }
 }
 
-/// Decode DynamicRange value (tag 0x1400)
-/// Identical between ExifTool and exiv2
-pub fn decode_dynamic_range_exiftool(value: u16) -> &'static str {
-    match value {
+// DynamicRange (tag 0x1400): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    dynamic_range,
+    both: {
         1 => "Standard",
         3 => "Wide",
-        _ => "Unknown",
     }
 }
-// decode_dynamic_range_exiv2 - same as exiftool, no separate function needed
 
 // WhiteBalance (tag 0x1002): FujiFilm.pm / fujimn_int.cpp fujiWhiteBalance[]
 define_tag_decoder! {
@@ -298,16 +296,16 @@ define_tag_decoder! {
     }
 }
 
-/// Decode Contrast value (tag 0x1004) - ExifTool format
-pub fn decode_contrast_exiftool(value: u16) -> &'static str {
-    match value {
+// Contrast (tag 0x1004): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    contrast,
+    both: {
         0x0 => "Normal",
         0x080 => "Medium High",
         0x100 => "High",
         0x180 => "Medium Low",
         0x200 => "Low",
         0x8000 => "Film Simulation",
-        _ => "Unknown",
     }
 }
 
@@ -352,28 +350,24 @@ define_tag_decoder! {
     }
 }
 
-/// Decode Macro value (tag 0x1020)
-/// Identical between ExifTool and exiv2 (uses fujiOffOn[])
-pub fn decode_macro_exiftool(value: u16) -> &'static str {
-    match value {
+// Macro (tag 0x1020): FujiFilm.pm / fujimn_int.cpp (fujiOffOn[])
+define_tag_decoder! {
+    fuji_macro,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
-// decode_macro_exiv2 - same as exiftool, no separate function needed
 
-/// Decode FocusMode value (tag 0x1021)
-/// Identical between ExifTool and exiv2
-pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusMode (tag 0x1021): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    focus_mode,
+    both: {
         0 => "Auto",
         1 => "Manual",
         65535 => "Movie",
-        _ => "Unknown",
     }
 }
-// decode_focus_mode_exiv2 - same as exiftool, no separate function needed
 
 // AFMode (tag 0x1022): FujiFilm.pm / fujimn_int.cpp fujiFocusArea[]
 define_tag_decoder! {
@@ -393,16 +387,14 @@ define_tag_decoder! {
     }
 }
 
-/// Decode SlowSync value (tag 0x1030)
-/// Identical between ExifTool and exiv2 (uses fujiOffOn[])
-pub fn decode_slow_sync_exiftool(value: u16) -> &'static str {
-    match value {
+// SlowSync (tag 0x1030): FujiFilm.pm / fujimn_int.cpp (fujiOffOn[])
+define_tag_decoder! {
+    slow_sync,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
-// decode_slow_sync_exiv2 - same as exiftool, no separate function needed
 
 // FlashMode (tag 0x1010): FujiFilm.pm fujiFlashMode[] / fujimn_int.cpp
 define_tag_decoder! {
@@ -501,9 +493,10 @@ define_tag_decoder! {
     }
 }
 
-/// Decode PictureMode value (tag 0x1031) - ExifTool format
-pub fn decode_picture_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// PictureMode (tag 0x1031): FujiFilm.pm / fujimn_int.cpp fujiPictureMode[]
+define_tag_decoder! {
+    picture_mode,
+    exiftool: {
         0 => "Auto",
         1 => "Portrait",
         2 => "Landscape",
@@ -522,14 +515,8 @@ pub fn decode_picture_mode_exiftool(value: u16) -> &'static str {
         256 => "Aperture-priority AE",
         512 => "Shutter speed priority AE",
         768 => "Manual",
-        _ => "Unknown",
-    }
-}
-
-/// Decode PictureMode value (tag 0x1031) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiPictureMode[]
-pub fn decode_picture_mode_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Auto",
         1 => "Portrait",
         2 => "Landscape",
@@ -563,49 +550,42 @@ pub fn decode_picture_mode_exiv2(value: u16) -> &'static str {
         256 => "Aperture-priority AE",
         512 => "Shutter speed priority AE",
         768 => "Manual",
-        _ => "Unknown",
     }
 }
 
-/// Decode DynamicRangeSetting value (tag 0x1402) - ExifTool format
-pub fn decode_dynamic_range_setting_exiftool(value: u16) -> &'static str {
-    match value {
+// DynamicRangeSetting (tag 0x1402): FujiFilm.pm / fujimn_int.cpp fujiDynamicRangeSetting[]
+define_tag_decoder! {
+    dynamic_range_setting,
+    exiftool: {
         0 => "Auto",
         1 => "Manual",
-        _ => "Unknown",
-    }
-}
-
-/// Decode DynamicRangeSetting value (tag 0x1402) - exiv2 format
-/// Values based on exiv2 fujimn_int.cpp fujiDynamicRangeSetting[]
-pub fn decode_dynamic_range_setting_exiv2(value: u16) -> &'static str {
-    match value {
+    },
+    exiv2: {
         0 => "Auto",
         1 => "Manual",
         256 => "Standard (100%)",
         512 => "Wide mode 1 (230%)",
         513 => "Wide mode 2 (400%)",
         32768 => "Film simulation mode",
-        _ => "Unknown",
     }
 }
 
-/// Decode EXRAuto value (tag 0x1033) - ExifTool format
-pub fn decode_exr_auto_exiftool(value: u16) -> &'static str {
-    match value {
+// EXRAuto (tag 0x1033): FujiFilm.pm
+define_tag_decoder! {
+    exr_auto,
+    both: {
         0 => "Auto",
         1 => "Manual",
-        _ => "Unknown",
     }
 }
 
-/// Decode EXRMode value (tag 0x1034) - ExifTool format
-pub fn decode_exr_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// EXRMode (tag 0x1034): FujiFilm.pm
+define_tag_decoder! {
+    exr_mode,
+    both: {
         0x100 => "HR (High Resolution)",
         0x200 => "SN (Signal to Noise priority)",
         0x300 => "DR (Dynamic Range priority)",
-        _ => "Unknown",
     }
 }
 
@@ -688,19 +668,31 @@ pub fn decode_internal_serial_number(raw: &str) -> String {
     trimmed.to_string()
 }
 
-/// Decode NoiseReduction value (tag 0x100B) - ExifTool/exiv2 format
-pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// NoiseReduction (tag 0x100B): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    noise_reduction,
+    both: {
         64 => "Low",
         128 => "Normal",
         256 => "n/a",
-        _ => "Unknown",
     }
 }
 
-/// Decode HighIsoNoiseReduction value (tag 0x100E) - exiv2 format
-pub fn decode_high_iso_noise_reduction_exiv2(value: u16) -> &'static str {
-    match value {
+// HighIsoNoiseReduction (tag 0x100E): fujimn_int.cpp fujiNoiseReduction[]
+define_tag_decoder! {
+    high_iso_noise_reduction,
+    exiftool: {
+        0x000 => "0 (normal)",
+        0x100 => "+2 (strong)",
+        0x180 => "+1 (medium strong)",
+        0x1c0 => "+3 (very strong)",
+        0x1e0 => "+4 (strongest)",
+        0x200 => "-2 (weak)",
+        0x280 => "-1 (medium weak)",
+        0x2c0 => "-3 (very weak)",
+        0x2e0 => "-4 (weakest)",
+    },
+    exiv2: {
         0 => "0 (normal)",
         256 => "+2 (strong)",
         384 => "+1 (medium strong)",
@@ -710,13 +702,14 @@ pub fn decode_high_iso_noise_reduction_exiv2(value: u16) -> &'static str {
         640 => "-1 (medium weak)",
         704 => "-3 (very weak)",
         736 => "-4 (weakest)",
-        _ => "Unknown",
     }
 }
 
-/// Decode Clarity value (tag 0x100F) - exiv2 format
-pub fn decode_clarity_exiv2(value: i16) -> &'static str {
-    match value {
+// Clarity (tag 0x100F): fujimn_int.cpp
+define_tag_decoder! {
+    clarity,
+    type: i16,
+    both: {
         -5000 => "-5",
         -4000 => "-4",
         -3000 => "-3",
@@ -728,13 +721,14 @@ pub fn decode_clarity_exiv2(value: i16) -> &'static str {
         3000 => "+3",
         4000 => "+4",
         5000 => "+5",
-        _ => "Unknown",
     }
 }
 
-/// Decode ShadowTone/HighlightTone value (tags 0x1040/0x1041) - exiv2 format
-pub fn decode_shadow_highlight_tone_exiv2(value: i16) -> &'static str {
-    match value {
+// ShadowTone/HighlightTone (tags 0x1040/0x1041): fujimn_int.cpp
+define_tag_decoder! {
+    shadow_highlight_tone,
+    type: i16,
+    both: {
         -64 => "+4",
         -56 => "+3.5",
         -48 => "+3",
@@ -748,62 +742,57 @@ pub fn decode_shadow_highlight_tone_exiv2(value: i16) -> &'static str {
         16 => "-1",
         24 => "-1.5",
         32 => "-2",
-        _ => "Unknown",
     }
 }
 
-/// Decode ColorChromeEffect/GrainEffectSize/ColorChromeFXBlue value - exiv2 format
-pub fn decode_off_weak_strong_exiv2(value: u16) -> &'static str {
-    match value {
+// ColorChromeEffect/GrainEffectSize/ColorChromeFXBlue - fujimn_int.cpp
+define_tag_decoder! {
+    off_weak_strong,
+    both: {
         0 => "Off",
         32 => "Weak",
         64 => "Strong",
-        _ => "Unknown",
     }
 }
 
-/// Decode ShutterType value (tag 0x1050) - exiv2 format
-pub fn decode_shutter_type_exiv2(value: u16) -> &'static str {
-    match value {
+// ShutterType (tag 0x1050): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    shutter_type,
+    both: {
         0 => "Mechanical",
         1 => "Electronic",
         2 => "Electronic (long shutter speed)",
         3 => "Electronic Front Curtain",
-        _ => "Unknown",
     }
 }
 
-/// Decode ShutterType value (tag 0x1050) - ExifTool format
-/// Same as exiv2
-pub fn decode_shutter_type_exiftool(value: u16) -> &'static str {
-    decode_shutter_type_exiv2(value)
-}
-
-/// Decode CropMode value (tag 0x104D) - exiv2 format
-pub fn decode_crop_mode_exiv2(value: u16) -> &'static str {
-    match value {
+// CropMode (tag 0x104D): fujimn_int.cpp
+define_tag_decoder! {
+    crop_mode,
+    both: {
         0 => "None",
         1 => "Full frame",
         2 => "Sports Finder Mode",
         4 => "Electronic Shutter 1.25x Crop",
-        _ => "Unknown",
     }
 }
 
-/// Decode PanoramaDirection value (tag 0x1154) - exiv2 format
-pub fn decode_panorama_direction_exiv2(value: u16) -> &'static str {
-    match value {
+// PanoramaDirection (tag 0x1154): fujimn_int.cpp
+define_tag_decoder! {
+    panorama_direction,
+    both: {
         1 => "Right",
         2 => "Up",
         3 => "Left",
         4 => "Down",
-        _ => "Unknown",
     }
 }
 
-/// Decode AdvancedFilter value (tag 0x1201) - exiv2 format
-pub fn decode_advanced_filter_exiv2(value: u32) -> &'static str {
-    match value {
+// AdvancedFilter (tag 0x1201): fujimn_int.cpp
+define_tag_decoder! {
+    advanced_filter,
+    type: u32,
+    both: {
         0x10000 => "Pop Color",
         0x20000 => "Hi Key",
         0x30000 => "Toy Camera",
@@ -817,23 +806,23 @@ pub fn decode_advanced_filter_exiv2(value: u32) -> &'static str {
         0x60006 => "Partial Color Purple",
         0x70000 => "Soft Focus",
         0x90000 => "Low Key",
-        _ => "Unknown",
     }
 }
 
-/// Decode FinePixColor value (tag 0x1210) - exiv2 format
-pub fn decode_fine_pix_color_exiv2(value: u16) -> &'static str {
-    match value {
+// FinePixColor (tag 0x1210): fujimn_int.cpp
+define_tag_decoder! {
+    fine_pix_color,
+    both: {
         0 => "Standard",
         16 => "Chrome",
         48 => "Black & white",
-        _ => "Unknown",
     }
 }
 
-/// Decode SceneRecognition value (tag 0x1425) - exiv2 format
-pub fn decode_scene_recognition_exiv2(value: u16) -> &'static str {
-    match value {
+// SceneRecognition (tag 0x1425): fujimn_int.cpp
+define_tag_decoder! {
+    scene_recognition,
+    both: {
         0x000 => "Unrecognized",
         0x100 => "Portrait Image",
         0x103 => "Night Portrait",
@@ -841,29 +830,23 @@ pub fn decode_scene_recognition_exiv2(value: u16) -> &'static str {
         0x200 => "Landscape Image",
         0x300 => "Night Scene",
         0x400 => "Macro",
-        _ => "Unknown",
     }
 }
 
-/// Decode ImageGeneration value (tag 0x1436) - exiv2 format
-pub fn decode_image_generation_exiv2(value: u16) -> &'static str {
-    match value {
+// ImageGeneration (tag 0x1436): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    image_generation,
+    both: {
         0 => "Original Image",
         1 => "Re-developed from RAW",
-        _ => "Unknown",
     }
 }
 
-/// Decode ImageGeneration value (tag 0x1436) - ExifTool format
-/// Same as exiv2
-pub fn decode_image_generation_exiftool(value: u16) -> &'static str {
-    decode_image_generation_exiv2(value)
-}
-
-/// Decode ShadowTone/HighlightTone value (tags 0x1040/0x1041) - ExifTool format
-/// ExifTool uses "(normal)" suffix for value 0, and named adjustments for others
-pub fn decode_shadow_highlight_tone_exiftool(value: i32) -> &'static str {
-    match value {
+// ShadowTone/HighlightTone ExifTool (tags 0x1040/0x1041): FujiFilm.pm
+define_tag_decoder! {
+    shadow_highlight_tone_ext,
+    type: i32,
+    both: {
         -64 => "+4 (hardest)",
         -48 => "+3 (very hard)",
         -32 => "+2 (hard)",
@@ -871,16 +854,16 @@ pub fn decode_shadow_highlight_tone_exiftool(value: i32) -> &'static str {
         0 => "0 (normal)",
         16 => "-1 (medium soft)",
         32 => "-2 (soft)",
-        _ => "Unknown",
     }
 }
 
-/// Decode LensModulationOptimizer value (tag 0x1045) - ExifTool format
-pub fn decode_lens_modulation_optimizer_exiftool(value: u32) -> &'static str {
-    match value {
+// LensModulationOptimizer (tag 0x1045): FujiFilm.pm
+define_tag_decoder! {
+    lens_modulation_optimizer,
+    type: u32,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
 
@@ -914,10 +897,10 @@ pub fn decode_image_stabilization_exiftool(values: &[u32]) -> String {
     format!("{}; {}; {}", is_type, is_mode, values[2])
 }
 
-/// Decode NoiseReduction value (tag 0x100B or 0x100E) - ExifTool format with full range
-/// For value 0 (which comes from newer cameras), shows "0 (normal)"
-pub fn decode_noise_reduction_full_exiftool(value: u16) -> &'static str {
-    match value {
+// NoiseReduction full range (tag 0x100B or 0x100E): FujiFilm.pm
+define_tag_decoder! {
+    noise_reduction_full,
+    both: {
         0x000 => "0 (normal)",
         0x040 => "Low",
         0x080 => "Normal",
@@ -929,7 +912,6 @@ pub fn decode_noise_reduction_full_exiftool(value: u16) -> &'static str {
         0x280 => "-1 (medium weak)",
         0x2c0 => "-3 (very weak)",
         0x2e0 => "-4 (weakest)",
-        _ => "Unknown",
     }
 }
 
@@ -1074,7 +1056,7 @@ pub fn parse_fuji_maker_notes(
                             FUJI_SHARPNESS => Some(decode_sharpness_exiftool(v).to_string()),
                             FUJI_SATURATION => Some(decode_saturation_exiftool(v).to_string()),
                             FUJI_CONTRAST => Some(decode_contrast_exiftool(v).to_string()),
-                            FUJI_MACRO => Some(decode_macro_exiftool(v).to_string()),
+                            FUJI_MACRO => Some(decode_fuji_macro_exiftool(v).to_string()),
                             FUJI_FOCUS_MODE => Some(decode_focus_mode_exiftool(v).to_string()),
                             FUJI_AF_MODE => Some(decode_af_mode_exiftool(v).to_string()),
                             FUJI_SLOW_SYNC => Some(decode_slow_sync_exiftool(v).to_string()),
@@ -1153,7 +1135,7 @@ pub fn parse_fuji_maker_notes(
                         FUJI_SHADOW_TONE | FUJI_HIGHLIGHT_TONE => {
                             // These are signed values
                             let signed_val = raw_value as i32;
-                            Some(decode_shadow_highlight_tone_exiftool(signed_val).to_string())
+                            Some(decode_shadow_highlight_tone_ext_exiftool(signed_val).to_string())
                         }
                         FUJI_LENS_MODULATION_OPTIMIZER => {
                             Some(decode_lens_modulation_optimizer_exiftool(raw_value).to_string())
