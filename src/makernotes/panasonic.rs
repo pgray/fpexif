@@ -180,10 +180,10 @@ define_tag_decoder! {
     }
 }
 
-/// Decode FocusMode value (tag 0x0007)
-/// Identical between ExifTool and exiv2
-pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// FocusMode (tag 0x0007)
+define_tag_decoder! {
+    panasonic_focus_mode,
+    both: {
         1 => "Auto",
         2 => "Manual",
         4 => "Auto, Focus button",
@@ -191,15 +191,13 @@ pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
         6 => "AF-S",
         7 => "AF-C",
         8 => "AF-F",
-        _ => "Unknown",
     }
 }
-// decode_focus_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode AFAreaMode value (tag 0x000F) - ExifTool format
-/// Note: exiv2 parses this as two bytes, but ExifTool uses single values
-pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// AFAreaMode (tag 0x000F)
+define_tag_decoder! {
+    panasonic_af_area_mode,
+    both: {
         0 => "Face Detect",
         1 => "Spot Mode",
         2 => "Multi-area",
@@ -208,10 +206,17 @@ pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
         16 => "23-area",
         17 => "49-area",
         18 => "Custom Multi",
-        _ => "Unknown",
     }
 }
-// decode_af_area_mode_exiv2 - exiv2 uses different two-byte parsing, complex
+
+// Legacy aliases
+pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
+    decode_panasonic_focus_mode_exiftool(value)
+}
+
+pub fn decode_af_area_mode_exiftool(value: u16) -> &'static str {
+    decode_panasonic_af_area_mode_exiftool(value)
+}
 
 // ImageStabilization (tag 0x001A): Panasonic.pm / panasonicmn_int.cpp
 define_tag_decoder! {
@@ -254,9 +259,10 @@ define_tag_decoder! {
     }
 }
 
-/// Decode ShootingMode value (tag 0x001F) - ExifTool format
-pub fn decode_shooting_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ShootingMode (tag 0x001F): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    shooting_mode,
+    both: {
         1 => "Normal",
         2 => "Portrait",
         3 => "Scenery",
@@ -281,10 +287,8 @@ pub fn decode_shooting_mode_exiftool(value: u16) -> &'static str {
         27 => "High Sensitivity",
         29 => "Underwater",
         33 => "Pet",
-        _ => "Unknown",
     }
 }
-// decode_shooting_mode_exiv2 - exiv2 has 90+ values, same base values match
 
 // PhotoStyle (tag 0x0089): Panasonic.pm / panasonicmn_int.cpp
 define_tag_decoder! {
@@ -316,17 +320,15 @@ define_tag_decoder! {
     }
 }
 
-/// Decode ShutterType value (tag 0x009A) - ExifTool format
-/// Identical between ExifTool and exiv2
-pub fn decode_shutter_type_exiftool(value: u16) -> &'static str {
-    match value {
+// ShutterType (tag 0x009A): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    shutter_type,
+    both: {
         0 => "Mechanical",
         1 => "Electronic",
         2 => "Hybrid",
-        _ => "Unknown",
     }
 }
-// decode_shutter_type_exiv2 - same as exiftool, no separate function needed
 
 // ContrastMode (tag 0x002C): Panasonic.pm / panasonicmn_int.cpp
 define_tag_decoder! {
@@ -374,78 +376,69 @@ define_tag_decoder! {
     }
 }
 
-/// Decode IntelligentResolution value (tag 0x0070)
-/// Identical between ExifTool and exiv2
-pub fn decode_intelligent_resolution_exiftool(value: u16) -> &'static str {
-    match value {
+// IntelligentResolution (tag 0x0070): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    intelligent_resolution,
+    both: {
         0 => "Off",
         1 => "Low",
         2 => "Standard",
         3 => "High",
         4 => "Extended",
-        _ => "Unknown",
     }
 }
-// decode_intelligent_resolution_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ClearRetouch value (tag 0x0077)
-/// Identical between ExifTool and exiv2
-pub fn decode_clear_retouch_exiftool(value: u16) -> &'static str {
-    match value {
+// ClearRetouch (tag 0x0077): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    clear_retouch,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
-// decode_clear_retouch_exiv2 - same as exiftool, no separate function needed
 
-/// Decode TouchAE value (tag 0x00AE)
-/// Identical between ExifTool and exiv2
-pub fn decode_touch_ae_exiftool(value: u16) -> &'static str {
-    match value {
+// TouchAE (tag 0x00AE): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    touch_ae,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
-// decode_touch_ae_exiv2 - same as exiftool, no separate function needed
 
-/// Decode FlashCurtain value (tag 0x00AB)
-/// Identical between ExifTool and exiv2
-pub fn decode_flash_curtain_exiftool(value: u16) -> &'static str {
-    match value {
+// FlashCurtain (tag 0x00AB): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    flash_curtain,
+    both: {
         0 => "n/a",
         1 => "1st",
         2 => "2nd",
-        _ => "Unknown",
     }
 }
-// decode_flash_curtain_exiv2 - same as exiftool, no separate function needed
 
-/// Decode HDRShot value (tag 0x0093) - ExifTool format
-pub fn decode_hdr_shot_exiftool(value: u16) -> &'static str {
-    match value {
+// HDRShot (tag 0x0093): Panasonic.pm (exiv2 uses different tag)
+define_tag_decoder! {
+    hdr_shot,
+    both: {
         0 => "No",
         1 => "Yes",
-        _ => "Unknown",
     }
 }
-// decode_hdr_shot_exiv2 - exiv2 uses different tag (0x009E) with EV values
 
-/// Decode Audio value (tag 0x0020) - ExifTool format
-pub fn decode_audio_exiftool(value: u16) -> &'static str {
-    match value {
+// Audio (tag 0x0020): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    audio,
+    both: {
         1 => "Yes",
         2 => "No",
         3 => "Stereo",
-        _ => "Unknown",
     }
 }
-// decode_audio_exiv2 - same as exiftool
 
-/// Decode ColorEffect value (tag 0x0028) - ExifTool format
-pub fn decode_color_effect_exiftool(value: u16) -> &'static str {
-    match value {
+// ColorEffect (tag 0x0028): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    color_effect,
+    both: {
         1 => "Off",
         2 => "Warm",
         3 => "Cool",
@@ -453,14 +446,13 @@ pub fn decode_color_effect_exiftool(value: u16) -> &'static str {
         5 => "Sepia",
         6 => "Happy",
         8 => "Vivid",
-        _ => "Unknown",
     }
 }
-// decode_color_effect_exiv2 - same as exiftool
 
-/// Decode NoiseReduction value (tag 0x002D) - ExifTool format
-pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// NoiseReduction (tag 0x002D): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    noise_reduction,
+    both: {
         0 => "Standard",
         1 => "Low (-1)",
         2 => "High (+1)",
@@ -473,14 +465,13 @@ pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
         65533 => "-3",
         65534 => "-2",
         65535 => "-1",
-        _ => "Unknown",
     }
 }
-// decode_noise_reduction_exiv2 - same as exiftool
 
-/// Decode SelfTimer value (tag 0x002E) - ExifTool format
-pub fn decode_self_timer_exiftool(value: u16) -> &'static str {
-    match value {
+// SelfTimer (tag 0x002E): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    self_timer,
+    both: {
         0 => "Off (0)",
         1 => "Off",
         2 => "10 s",
@@ -489,71 +480,65 @@ pub fn decode_self_timer_exiftool(value: u16) -> &'static str {
         258 => "2 s after shutter pressed",
         266 => "10 s after shutter pressed",
         778 => "3 photos after 10 s",
-        _ => "Unknown",
     }
 }
-// decode_self_timer_exiv2 - same as exiftool
 
-/// Decode Rotation value (tag 0x0030) - ExifTool format
-pub fn decode_rotation_exiftool(value: u16) -> &'static str {
-    match value {
+// Rotation (tag 0x0030): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    rotation,
+    both: {
         1 => "Horizontal (normal)",
         3 => "Rotate 180",
         6 => "Rotate 90 CW",
         8 => "Rotate 270 CW",
-        _ => "Unknown",
     }
 }
-// decode_rotation_exiv2 - same as exiftool
 
-/// Decode AFAssistLamp value (tag 0x0031) - ExifTool format
-pub fn decode_af_assist_lamp_exiftool(value: u16) -> &'static str {
-    match value {
+// AFAssistLamp (tag 0x0031): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    af_assist_lamp,
+    both: {
         1 => "Fired",
         2 => "Enabled but Not Used",
         3 => "Disabled but Required",
         4 => "Disabled and Not Required",
-        _ => "Unknown",
     }
 }
-// decode_af_assist_lamp_exiv2 - same as exiftool
 
-/// Decode ColorMode value (tag 0x0032) - ExifTool format
-pub fn decode_color_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ColorMode (tag 0x0032): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    color_mode,
+    both: {
         0 => "Normal",
         1 => "Natural",
         2 => "Vivid",
-        _ => "Unknown",
     }
 }
-// decode_color_mode_exiv2 - same as exiftool
 
-/// Decode OpticalZoomMode value (tag 0x0034) - ExifTool format
-pub fn decode_optical_zoom_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// OpticalZoomMode (tag 0x0034): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    optical_zoom_mode,
+    both: {
         1 => "Standard",
         2 => "Extended",
-        _ => "Unknown",
     }
 }
-// decode_optical_zoom_mode_exiv2 - same as exiftool
 
-/// Decode ConversionLens value (tag 0x0035) - ExifTool format
-pub fn decode_conversion_lens_exiftool(value: u16) -> &'static str {
-    match value {
+// ConversionLens (tag 0x0035): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    conversion_lens,
+    both: {
         1 => "Off",
         2 => "Wide",
         3 => "Telephoto",
         4 => "Macro",
-        _ => "Unknown",
     }
 }
-// decode_conversion_lens_exiv2 - same as exiftool
 
-/// Decode BatteryLevel value (tag 0x0038) - ExifTool format
-pub fn decode_battery_level_exiftool(value: u16) -> &'static str {
-    match value {
+// BatteryLevel (tag 0x0038): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    battery_level,
+    both: {
         1 => "Full",
         2 => "Medium",
         3 => "Low",
@@ -561,44 +546,40 @@ pub fn decode_battery_level_exiftool(value: u16) -> &'static str {
         7 => "Near Full",
         8 => "Medium Low",
         256 => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_battery_level_exiv2 - same as exiftool
 
-/// Decode WorldTimeLocation value (tag 0x003A) - ExifTool format
-pub fn decode_world_time_location_exiftool(value: u16) -> &'static str {
-    match value {
+// WorldTimeLocation (tag 0x003A): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    world_time_location,
+    both: {
         1 => "Home",
         2 => "Destination",
-        _ => "Unknown",
     }
 }
-// decode_world_time_location_exiv2 - same as exiftool
 
-/// Decode TextStamp value (tag 0x003B) - ExifTool format
-pub fn decode_text_stamp_exiftool(value: u16) -> &'static str {
-    match value {
+// TextStamp (tag 0x003B): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    text_stamp,
+    both: {
         1 => "Off",
         2 => "On",
-        _ => "Unknown",
     }
 }
-// decode_text_stamp_exiv2 - same as exiftool
 
-/// Decode CameraOrientation value (tag 0x008F) - ExifTool format
-pub fn decode_camera_orientation_exiftool(value: u8) -> &'static str {
-    match value {
+// CameraOrientation (tag 0x008F): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    camera_orientation,
+    type: u8,
+    both: {
         0 => "Normal",
         1 => "Rotate CW",
         2 => "Rotate 180",
         3 => "Rotate CCW",
         4 => "Tilt Upwards",
         5 => "Tilt Downwards",
-        _ => "Unknown",
     }
 }
-// decode_camera_orientation_exiv2 - same as exiftool
 
 /// Parse Panasonic maker notes
 pub fn parse_panasonic_maker_notes(
