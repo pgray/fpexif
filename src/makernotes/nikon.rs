@@ -709,14 +709,20 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
         NIKON_FLASH_TYPE => decode_flash_type_exiftool(value),
         NIKON_NOISE_REDUCTION => decode_noise_reduction_exiftool(value),
         NIKON_IMAGE_PROCESSING => decode_image_processing_exiftool(value),
-        NIKON_LIGHT_SOURCE => match value.trim() {
-            "NATURAL" => "Natural",
-            "SPEEDLIGHT" => "Speedlight",
-            "COLORED" => "Colored",
-            "MIXED" => "Mixed",
-            _ => value.trim(),
+        NIKON_LIGHT_SOURCE => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                "Unknown".to_string()
+            } else {
+                match trimmed {
+                    "NATURAL" => "Natural".to_string(),
+                    "SPEEDLIGHT" => "Speedlight".to_string(),
+                    "COLORED" => "Colored".to_string(),
+                    "MIXED" => "Mixed".to_string(),
+                    _ => trimmed.to_string(),
+                }
+            }
         }
-        .to_string(),
         NIKON_ISO_SELECTION => decode_iso_selection_exiftool(value).to_string(),
         NIKON_IMAGE_STABILIZATION => decode_image_stabilization_exiftool(value).to_string(),
         _ => value.trim().to_string(),

@@ -1135,6 +1135,9 @@ define_tag_decoder! {
 define_tag_decoder! {
     metering_mode,
     exiftool: {
+        0 => "Default",
+        1 => "Spot",
+        2 => "Average",
         3 => "Evaluative",
         4 => "Partial",
         5 => "Center-weighted average",

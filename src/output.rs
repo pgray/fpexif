@@ -17,13 +17,26 @@ fn gcd(a: u32, b: u32) -> u32 {
     }
 }
 
-/// Format EXIF MeteringMode - always use standard EXIF decode
-/// MakerNote MeteringMode will override this for cameras that use different values
+/// Format EXIF MeteringMode - use manufacturer-specific naming where appropriate
 #[cfg(feature = "serde")]
-fn format_metering_mode(value: u16, _make: Option<&str>) -> String {
-    // Use standard EXIF metering mode description
-    // For cameras like Canon CR2 that use different internal values,
-    // the MakerNote MeteringMode will override this in to_exiftool_json()
+fn format_metering_mode(value: u16, make: Option<&str>) -> String {
+    // Olympus uses "ESP" (Electro-Selective Pattern) instead of "Multi-segment"
+    if let Some(m) = make {
+        if m.to_uppercase().contains("OLYMPUS") || m.to_uppercase().contains("OM DIGITAL") {
+            return match value {
+                0 => "Unknown",
+                1 => "Average",
+                2 => "Center-weighted average",
+                3 => "Spot",
+                4 => "Multi-spot",
+                5 => "ESP",
+                6 => "Partial",
+                255 => "Other",
+                _ => "Unknown",
+            }
+            .to_string();
+        }
+    }
     crate::tags::get_metering_mode_description(value).to_string()
 }
 
