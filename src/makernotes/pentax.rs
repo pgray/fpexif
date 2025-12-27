@@ -5,6 +5,7 @@
 // - exiv2/src/pentaxmn_int.cpp
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
@@ -178,9 +179,11 @@ pub fn get_pentax_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
-/// Decode Quality value - ExifTool format
-pub fn decode_quality_exiftool(value: u16) -> &'static str {
-    match value {
+// Tag decoders using the define_tag_decoder! macro
+
+define_tag_decoder! {
+    pentax_quality,
+    exiftool: {
         0 => "Good",
         1 => "Better",
         2 => "Best",
@@ -191,13 +194,21 @@ pub fn decode_quality_exiftool(value: u16) -> &'static str {
         8 => "Dynamic Pixel Shift",
         9 => "Monochrome",
         65535 => "n/a",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Good",
+        1 => "Better",
+        2 => "Best",
+        3 => "TIFF",
+        4 => "RAW",
+        5 => "Premium",
+        65535 => "n/a",
     }
 }
 
-/// Decode FocusMode value - ExifTool format
-pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_focus_mode,
+    exiftool: {
         0x00 => "Normal",
         0x01 => "Macro",
         0x02 => "Infinity",
@@ -206,32 +217,55 @@ pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
         0x05 => "Pan Focus",
         0x06 => "Auto-area",
         0x07 => "Zone Select",
+        0x08 => "Select",
+        0x09 => "Pinpoint",
+        0x0a => "Tracking",
+        0x0b => "Continuous",
+        0x0c => "Snap",
         0x10 => "AF-S (Focus-priority)",
-        0x11 => "AF-S (Release-priority)",
-        0x12 => "AF-C (Focus-priority)",
-        0x13 => "AF-C (Release-priority)",
-        0x14 => "Single Point",
-        0x15 => "Tracking",
-        0x16 => "Face Detection",
-        0x20 => "Touch AF",
-        _ => "Unknown",
+        0x11 => "AF-C (Focus-priority)",
+        0x12 => "AF-A (Focus-priority)",
+        0x20 => "Contrast-detect (Focus-priority)",
+        0x21 => "Tracking Contrast-detect (Focus-priority)",
+        0x110 => "AF-S (Release-priority)",
+        0x111 => "AF-C (Release-priority)",
+        0x112 => "AF-A (Release-priority)",
+        0x120 => "Contrast-detect (Release-priority)",
+    },
+    exiv2: {
+        0 => "Normal",
+        1 => "Macro",
+        2 => "Infinity",
+        3 => "Manual",
+        4 => "Super Macro",
+        5 => "Pan Focus",
+        16 => "AF-S",
+        17 => "AF-C",
+        18 => "AF-A",
+        32 => "Contrast-detect",
+        33 => "Tracking Contrast-detect",
+        288 => "Face Detect",
     }
 }
 
-/// Decode MeteringMode value - ExifTool format
-pub fn decode_metering_mode_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_metering_mode,
+    exiftool: {
         0 => "Multi-segment",
         1 => "Center-weighted average",
         2 => "Spot",
         6 => "Highlight",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Multi Segment",
+        1 => "Center Weighted",
+        2 => "Spot",
     }
 }
 
-/// Decode WhiteBalance value - ExifTool format
-pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_white_balance,
+    exiftool: {
         0 => "Auto",
         1 => "Daylight",
         2 => "Shade",
@@ -249,17 +283,34 @@ pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
         17 => "Kelvin",
         65534 => "Unknown",
         65535 => "User-Selected",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Auto",
+        1 => "Daylight",
+        2 => "Shade",
+        3 => "Fluorescent",
+        4 => "Tungsten",
+        5 => "Manual",
+        6 => "DaylightFluorescent",
+        7 => "DaywhiteFluorescent",
+        8 => "WhiteFluorescent",
+        9 => "Flash",
+        10 => "Cloudy",
+        15 => "Color Temperature Enhancement",
+        17 => "Kelvin",
+        65534 => "Unknown",
+        65535 => "User Selected",
     }
 }
 
-/// Decode FlashMode value - ExifTool format
-pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_flash_mode,
+    exiftool: {
         0x0000 => "Auto, Did not fire",
         0x0001 => "Off, Did not fire",
         0x0002 => "On, Did not fire",
         0x0003 => "Auto, Did not fire, Red-eye reduction",
+        0x0005 => "On, Did not fire, Wireless (Master)",
         0x0100 => "Auto, Fired",
         0x0102 => "On, Fired",
         0x0103 => "Auto, Fired, Red-eye reduction",
@@ -270,79 +321,348 @@ pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
         0x0109 => "On, Slow-sync",
         0x010a => "On, Slow-sync, Red-eye reduction",
         0x010b => "On, Trailing-curtain Sync",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0x000 => "Auto, Did not fire",
+        0x001 => "Off, Did not fire",
+        0x002 => "Off, Did not fire",
+        0x003 => "Auto, Did not fire, Red-eye reduction",
+        0x005 => "On. Did not fire. Wireless (Master)",
+        0x100 => "Auto, Fired",
+        0x102 => "On, Fired",
+        0x103 => "Auto, Fired, Red-eye reduction",
+        0x104 => "On, Red-eye reduction",
+        0x105 => "On, Wireless (Master)",
+        0x106 => "On, Wireless (Control)",
+        0x108 => "On, Soft",
+        0x109 => "On, Slow-sync",
+        0x10a => "On, Slow-sync, Red-eye reduction",
+        0x10b => "On, Trailing-curtain Sync",
     }
 }
 
-/// Decode Saturation value - ExifTool format
-pub fn decode_saturation_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_saturation,
+    exiftool: {
+        0 => "-2 (low)",
+        1 => "0 (normal)",
+        2 => "+2 (high)",
+        3 => "-1 (medium low)",
+        4 => "+1 (medium high)",
+        5 => "-3 (very low)",
+        6 => "+3 (very high)",
+        7 => "-4 (minimum)",
+        8 => "+4 (maximum)",
+        65535 => "None",
+    },
+    exiv2: {
         0 => "Low",
         1 => "Normal",
         2 => "High",
-        3 => "Medium Low",
-        4 => "Medium High",
+        3 => "Med Low",
+        4 => "Med High",
         5 => "Very Low",
         6 => "Very High",
         7 => "-4",
         8 => "+4",
         65535 => "None",
-        _ => "Unknown",
     }
 }
 
-/// Decode Contrast value - ExifTool format
-pub fn decode_contrast_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_contrast,
+    exiftool: {
+        0 => "-2 (low)",
+        1 => "0 (normal)",
+        2 => "+2 (high)",
+        3 => "-1 (medium low)",
+        4 => "+1 (medium high)",
+        5 => "-3 (very low)",
+        6 => "+3 (very high)",
+        7 => "-4 (minimum)",
+        8 => "+4 (maximum)",
+        65535 => "n/a",
+    },
+    exiv2: {
         0 => "Low",
         1 => "Normal",
         2 => "High",
-        3 => "Medium Low",
-        4 => "Medium High",
+        3 => "Med Low",
+        4 => "Med High",
         5 => "Very Low",
         6 => "Very High",
         7 => "-4",
         8 => "+4",
-        _ => "Unknown",
     }
 }
 
-/// Decode Sharpness value - ExifTool format
-pub fn decode_sharpness_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_sharpness,
+    exiftool: {
+        0 => "-2 (soft)",
+        1 => "0 (normal)",
+        2 => "+2 (hard)",
+        3 => "-1 (medium soft)",
+        4 => "+1 (medium hard)",
+        5 => "-3 (very soft)",
+        6 => "+3 (very hard)",
+        7 => "-4 (minimum)",
+        8 => "+4 (maximum)",
+    },
+    exiv2: {
         0 => "Soft",
         1 => "Normal",
         2 => "Hard",
-        3 => "Medium Soft",
-        4 => "Medium Hard",
+        3 => "Med Soft",
+        4 => "Med Hard",
         5 => "Very Soft",
         6 => "Very Hard",
         7 => "-4",
         8 => "+4",
-        _ => "Unknown",
     }
 }
 
-/// Decode DriveMode value - ExifTool format
-pub fn decode_drive_mode_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_drive_mode,
+    exiftool: {
+        0 => "Single-frame",
+        1 => "Continuous",
+        2 => "Continuous (Lo)",
+        3 => "Burst",
+        4 => "Continuous (Medium)",
+        5 => "Continuous (Low)",
+        255 => "Video",
+    },
+    exiv2: {
         0 => "Single-frame",
         1 => "Continuous",
         2 => "Continuous (Hi)",
         3 => "Burst",
-        4 => "Continuous (Lo)",
         255 => "Video",
-        _ => "Unknown",
     }
 }
 
-/// Decode ColorSpace value - ExifTool format
-pub fn decode_color_space_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    pentax_color_space,
+    both: {
         0 => "sRGB",
         1 => "Adobe RGB",
-        _ => "Unknown",
     }
+}
+
+// Additional tags from Pentax.pm and pentaxmn_int.cpp
+
+define_tag_decoder! {
+    pentax_picture_mode,
+    exiftool: {
+        0 => "Program",
+        1 => "Shutter Speed Priority",
+        2 => "Program AE",
+        3 => "Manual",
+        5 => "Portrait",
+        6 => "Landscape",
+        8 => "Sport",
+        9 => "Night Scene",
+        11 => "Soft",
+        12 => "Surf & Snow",
+        13 => "Candlelight",
+        14 => "Autumn",
+        15 => "Macro",
+        17 => "Fireworks",
+        18 => "Text",
+        19 => "Panorama",
+        20 => "3-D",
+        21 => "Black & White",
+        22 => "Sepia",
+        23 => "Red",
+        24 => "Pink",
+        25 => "Purple",
+        26 => "Blue",
+        27 => "Green",
+        28 => "Yellow",
+        30 => "Self Portrait",
+        31 => "Illustrations",
+        33 => "Digital Filter",
+        35 => "Night Scene Portrait",
+        37 => "Museum",
+        38 => "Food",
+        39 => "Underwater",
+        40 => "Green Mode",
+        49 => "Light Pet",
+        50 => "Dark Pet",
+        51 => "Medium Pet",
+        53 => "Underwater",
+        54 => "Candlelight",
+        55 => "Natural Skin Tone",
+        56 => "Synchro Sound Record",
+        58 => "Frame Composite",
+        60 => "Kids",
+        61 => "Blur Reduction",
+        63 => "Panorama 2",
+        65 => "Half-length Portrait",
+        80 => "Scene Mode",
+        81 => "Shutter Priority",
+        82 => "Aperture Priority",
+        83 => "Program",
+        85 => "Portrait",
+        221 => "Video",
+        255 => "Digital Filter?",
+    },
+    exiv2: {
+        0 => "Program",
+        1 => "Hi-speed Program",
+        2 => "DOF Program",
+        3 => "MTF Program",
+        4 => "Standard",
+        5 => "Portrait",
+        6 => "Landscape",
+        7 => "Macro",
+        8 => "Sport",
+        9 => "Night Scene Portrait",
+        10 => "No Flash",
+        11 => "Night Scene",
+        12 => "Surf & Snow",
+        13 => "Text",
+        14 => "Sunset",
+        15 => "Kids",
+        16 => "Pet",
+        17 => "Candlelight",
+        18 => "Museum",
+    }
+}
+
+define_tag_decoder! {
+    pentax_image_tone,
+    both: {
+        0 => "Natural",
+        1 => "Bright",
+        2 => "Portrait",
+        3 => "Landscape",
+        4 => "Vibrant",
+        5 => "Monochrome",
+        6 => "Muted",
+        7 => "Reversal Film",
+        8 => "Bleach Bypass",
+        9 => "Radiant",
+        10 => "Cross Processing",
+        11 => "Flat",
+    }
+}
+
+define_tag_decoder! {
+    pentax_dynamic_range_expansion,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
+define_tag_decoder! {
+    pentax_high_iso_noise_reduction,
+    exiftool: {
+        0 => "Off",
+        1 => "Weakest",
+        2 => "Weak",
+        3 => "Strong",
+        4 => "Custom",
+    },
+    exiv2: {
+        0 => "Off",
+        1 => "Weakest",
+        2 => "Weak",
+        3 => "Strong",
+        4 => "Custom",
+    }
+}
+
+define_tag_decoder! {
+    pentax_shake_reduction,
+    both: {
+        0 => "Off",
+        1 => "On",
+        4 => "On (4)",
+        5 => "On but Disabled",
+        6 => "On (Video)",
+        7 => "On (Composition Adjust)",
+        15 => "On (IBIS Only)",
+        39 => "On (S-R Auto)",
+    }
+}
+
+define_tag_decoder! {
+    pentax_af_point_selected,
+    both: {
+        0 => "None",
+        1 => "Upper-left",
+        2 => "Top",
+        3 => "Upper-right",
+        4 => "Left",
+        5 => "Mid-left",
+        6 => "Center",
+        7 => "Mid-right",
+        8 => "Right",
+        9 => "Lower-left",
+        10 => "Bottom",
+        11 => "Lower-right",
+        65531 => "AF Select",
+        65532 => "Face Detect AF",
+        65533 => "Automatic Tracking AF",
+        65534 => "Fixed Center",
+        65535 => "Auto",
+    }
+}
+
+define_tag_decoder! {
+    pentax_image_processing,
+    both: {
+        0 => "Unprocessed",
+        1 => "Resized",
+        2 => "Cropped",
+        3 => "Color Filter",
+        4 => "Digital Filter",
+        16 => "Frame Synthesis?",
+    }
+}
+
+// Legacy function aliases for backward compatibility
+pub fn decode_quality_exiftool(value: u16) -> &'static str {
+    decode_pentax_quality_exiftool(value)
+}
+
+pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
+    decode_pentax_focus_mode_exiftool(value)
+}
+
+pub fn decode_metering_mode_exiftool(value: u16) -> &'static str {
+    decode_pentax_metering_mode_exiftool(value)
+}
+
+pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
+    decode_pentax_white_balance_exiftool(value)
+}
+
+pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
+    decode_pentax_flash_mode_exiftool(value)
+}
+
+pub fn decode_saturation_exiftool(value: u16) -> &'static str {
+    decode_pentax_saturation_exiftool(value)
+}
+
+pub fn decode_contrast_exiftool(value: u16) -> &'static str {
+    decode_pentax_contrast_exiftool(value)
+}
+
+pub fn decode_sharpness_exiftool(value: u16) -> &'static str {
+    decode_pentax_sharpness_exiftool(value)
+}
+
+pub fn decode_drive_mode_exiftool(value: u16) -> &'static str {
+    decode_pentax_drive_mode_exiftool(value)
+}
+
+pub fn decode_color_space_exiftool(value: u16) -> &'static str {
+    decode_pentax_color_space_exiftool(value)
 }
 
 /// Parse Pentax maker notes
