@@ -4869,22 +4869,11 @@ pub fn parse_canon_maker_notes(
                 continue;
             }
 
-            // Special handling for CameraInfo - extract PictureStyleInfo
+            // TODO: CameraInfo parsing is model-specific with different offsets per camera
+            // Disabled to avoid outputting incorrect values
+            // Each Canon model has different CameraInfo structure (32+ variants in ExifTool)
             if tag_id == CANON_CAMERA_INFO {
-                if let ExifValue::Undefined(bytes) | ExifValue::Byte(bytes) = &value {
-                    let decoded = decode_camera_info_50d(bytes);
-                    for (field_name, field_value) in decoded {
-                        tags.insert(
-                            synthetic_tag_id,
-                            MakerNoteTag {
-                                tag_id: synthetic_tag_id,
-                                tag_name: Some(Box::leak(field_name.into_boxed_str())),
-                                value: field_value,
-                            },
-                        );
-                        synthetic_tag_id = synthetic_tag_id.wrapping_add(1);
-                    }
-                }
+                // Skip CameraInfo binary blob for now
                 continue;
             }
 
@@ -5057,6 +5046,23 @@ pub fn parse_canon_maker_notes(
                     if let ExifValue::Short(ref shorts) = value {
                         if !shorts.is_empty() {
                             ExifValue::Ascii(decode_date_stamp_mode_exiftool(shorts[0]).to_string())
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // InternalSerialNumber - strip trailing null bytes and non-printable chars
+                CANON_SERIAL_INFO => {
+                    if let ExifValue::Ascii(ref s) = value {
+                        // Strip after first null byte and non-printable chars
+                        let cleaned: String = s
+                            .chars()
+                            .take_while(|&c| c != '\0' && c.is_ascii_graphic())
+                            .collect();
+                        if !cleaned.is_empty() {
+                            ExifValue::Ascii(cleaned)
                         } else {
                             value
                         }
