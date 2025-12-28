@@ -723,8 +723,44 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
                 }
             }
         }
+        NIKON_COLOR_HUE => {
+            // Transform MODE1 -> Mode1, MODE3a -> Mode3a, etc.
+            let trimmed = value.trim();
+            if let Some(suffix) = trimmed.strip_prefix("MODE") {
+                format!("Mode{}", suffix)
+            } else {
+                trimmed.to_string()
+            }
+        }
         NIKON_ISO_SELECTION => decode_iso_selection_exiftool(value).to_string(),
         NIKON_IMAGE_STABILIZATION => decode_image_stabilization_exiftool(value).to_string(),
+        NIKON_AUXILIARY_LENS => {
+            // Transform OFF -> Off
+            let trimmed = value.trim();
+            match trimmed {
+                "OFF" => "Off".to_string(),
+                "TC-14E" | "TC-14E II" | "TC-17E II" | "TC-20E" | "TC-20E II" => {
+                    trimmed.to_string()
+                }
+                _ => trimmed.to_string(),
+            }
+        }
+        NIKON_IMAGE_OPTIMIZATION => {
+            // Transform NORMAL -> Normal, etc.
+            let trimmed = value.trim();
+            match trimmed {
+                "NORMAL" => "Normal".to_string(),
+                "VIVID" => "Vivid".to_string(),
+                "SHARPER" => "Sharper".to_string(),
+                "SOFTER" => "Softer".to_string(),
+                "DIRECT PRINT" => "Direct Print".to_string(),
+                "PORTRAIT" => "Portrait".to_string(),
+                "LANDSCAPE" => "Landscape".to_string(),
+                "CUSTOM" => "Custom".to_string(),
+                "B & W" => "B & W".to_string(),
+                _ => trimmed.to_string(),
+            }
+        }
         _ => value.trim().to_string(),
     }
 }
@@ -1083,7 +1119,7 @@ pub fn decode_flash_setting_exiftool(value: &str) -> String {
         "RED-EYE" | "REDEYE" => "Red-eye",
         "RED-EYE SLOW" | "REDEYE SLOW" => "Red-eye Slow",
         "SLOW REAR" => "Slow Rear",
-        "" => "Normal",
+        "" => "",                             // Keep empty as empty to match ExifTool
         _ => return value.trim().to_string(), // Return original value
     };
     result.to_string()
@@ -1433,7 +1469,7 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
         if data.len() > 0x30 {
             let adjust = data[0x30];
             let adjust_str = match adjust {
-                0 => "Default",
+                0 => "Default Settings",
                 1 => "Quick Adjust",
                 2 => "Full Control",
                 _ => "Unknown",
@@ -2281,6 +2317,9 @@ pub fn parse_nikon_maker_notes(
                         ExifValue::Ascii(decode_flash_mode_exiftool(bytes[0]).to_string())
                     } else if tag_id == NIKON_IMAGE_AUTHENTICATION && !bytes.is_empty() {
                         ExifValue::Ascii(decode_image_authentication_exiftool(bytes[0]).to_string())
+                    } else if tag_id == NIKON_SHOOTING_MODE && !bytes.is_empty() {
+                        // ShootingMode can be stored as Byte on older cameras
+                        ExifValue::Ascii(decode_shooting_mode_exiftool(bytes[0] as u16))
                     } else {
                         ExifValue::Byte(bytes)
                     }

@@ -626,6 +626,14 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                         String::new()
                     }
                 }
+                0xA300 if v.len() == 1 => {
+                    // FileSource
+                    crate::tags::get_file_source_description(v[0]).to_string()
+                }
+                0xA301 if v.len() == 1 => {
+                    // SceneType
+                    crate::tags::get_scene_type_description(v[0]).to_string()
+                }
                 _ => format!("(Binary data {} bytes)", v.len()),
             }
         }
