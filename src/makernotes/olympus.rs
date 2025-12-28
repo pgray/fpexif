@@ -968,6 +968,59 @@ define_tag_decoder! {
     }
 }
 
+// RawDevColorSpace (RD 0x0108): Olympus.pm
+define_tag_decoder! {
+    raw_dev_color_space,
+    both: {
+        0 => "sRGB",
+        1 => "Adobe RGB",
+        2 => "Pro Photo RGB",
+    }
+}
+
+// RawDevEngine (RD 0x0109): Olympus.pm
+define_tag_decoder! {
+    raw_dev_engine,
+    both: {
+        0 => "High Speed",
+        1 => "High Function",
+        2 => "Advanced High Speed",
+        3 => "Advanced High Function",
+    }
+}
+
+// RawDevNoiseReduction (RD 0x010A): Olympus.pm
+define_tag_decoder! {
+    raw_dev_noise_reduction,
+    both: {
+        0 => "(none)",
+        1 => "Noise Reduction",
+        2 => "Noise Filter",
+        3 => "Noise Reduction, Noise Filter",
+        4 => "Noise Filter (ISO Boost)",
+    }
+}
+
+// RawDevEditStatus (RD 0x010B): Olympus.pm
+define_tag_decoder! {
+    raw_dev_edit_status,
+    both: {
+        0 => "Original",
+        1 => "Edited (Landscape)",
+        6 => "Edited (Portrait)",
+        8 => "Edited (Portrait)",
+    }
+}
+
+// PanoramaMode (CS 0x0601): Olympus.pm
+define_tag_decoder! {
+    panorama_mode,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
 // =============================================================================
 // IFD Parsing Functions
 // =============================================================================
@@ -1195,8 +1248,8 @@ fn parse_olympus_ifd(
             }
 
             // Convert specific tags to decoded values
-            let value = if ifd_type == OlympusIfdType::Main {
-                match tag_id {
+            let value = match ifd_type {
+                OlympusIfdType::Main => match tag_id {
                     OLYMPUS_CAMERA_ID => {
                         // CameraID is actually an ASCII string with null terminator
                         if let ExifValue::Undefined(bytes) = &value {
@@ -1219,9 +1272,292 @@ fn parse_olympus_ifd(
                         }
                     }
                     _ => value,
-                }
-            } else {
-                value
+                },
+                OlympusIfdType::CameraSettings => match tag_id {
+                    CS_EXPOSURE_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_exposure_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_METERING_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_metering_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_MACRO_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_macro_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_FOCUS_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_focus_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_FOCUS_PROCESS => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_focus_process_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_AF_SEARCH => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_af_search_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_FLASH_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_flash_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_WHITE_BALANCE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_white_balance_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_COLOR_SPACE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_color_space_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_SCENE_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_scene_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_NOISE_REDUCTION => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_noise_reduction_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_AE_LOCK => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_ae_lock_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_FLASH_REMOTE_CONTROL => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_flash_remote_control_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_FLASH_CONTROL_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_flash_control_mode_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_MODIFIED_SATURATION => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_modified_saturation_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_PANORAMA_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_panorama_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_IMAGE_STABILIZATION => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_image_stabilization_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    _ => value,
+                },
+                OlympusIfdType::RawDevelopment => match tag_id {
+                    RD_COLOR_SPACE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_raw_dev_color_space_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    RD_ENGINE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_raw_dev_engine_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    RD_NOISE_REDUCTION => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_raw_dev_noise_reduction_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    RD_EDIT_STATUS => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_raw_dev_edit_status_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    _ => value,
+                },
+                OlympusIfdType::ImageProcessing => match tag_id {
+                    IP_MULTIPLE_EXPOSURE_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_multiple_exposure_mode_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    IP_ASPECT_RATIO => {
+                        if let ExifValue::Byte(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_aspect_ratio_exiftool(vals[0] as u16).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    _ => value,
+                },
+                _ => value,
             };
 
             tags.insert(
