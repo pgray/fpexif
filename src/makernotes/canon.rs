@@ -2645,27 +2645,55 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
 
     // Camera ISO (index 16)
     // Canon uses a special encoding: if bit 0x4000 is set, the lower 14 bits are the ISO value
-    // Otherwise it's a lookup table value (15=Auto, 16=50, 17=100, 18=200, 19=400, 20=800)
+    // Otherwise it's a lookup table value (0=n/a, 14=Auto High, 15=Auto, 16=50, 17=100, etc.)
     if data.len() > 16 && data[16] != 0x7FFF {
         let raw_iso = data[16];
-        let iso_value = if raw_iso & 0x4000 != 0 {
+        if raw_iso & 0x4000 != 0 {
             // Direct ISO value in lower 14 bits
-            raw_iso & 0x3FFF
+            let iso_value = raw_iso & 0x3FFF;
+            decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![iso_value]));
         } else {
-            // Lookup table value
+            // Lookup table value - some return strings, others return numbers
             match raw_iso {
-                0 => 0,  // n/a
-                14 => 0, // Auto High (show as 0)
-                15 => 0, // Auto (show as 0)
-                16 => 50,
-                17 => 100,
-                18 => 200,
-                19 => 400,
-                20 => 800,
-                _ => raw_iso, // Unknown, return raw value
+                0 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Ascii("n/a".to_string()));
+                }
+                14 => {
+                    decoded.insert(
+                        "CameraISO".to_string(),
+                        ExifValue::Ascii("Auto High".to_string()),
+                    );
+                }
+                15 => {
+                    decoded.insert(
+                        "CameraISO".to_string(),
+                        ExifValue::Ascii("Auto".to_string()),
+                    );
+                }
+                16 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![50]));
+                }
+                17 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![100]));
+                }
+                18 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![200]));
+                }
+                19 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![400]));
+                }
+                20 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![800]));
+                }
+                _ => {
+                    // Unknown value - output as "Unknown (N)"
+                    decoded.insert(
+                        "CameraISO".to_string(),
+                        ExifValue::Ascii(format!("Unknown ({})", raw_iso)),
+                    );
+                }
             }
-        };
-        decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![iso_value]));
+        }
     }
 
     // Focal units per mm (index 25) - already calculated above as focal_units
@@ -3049,22 +3077,56 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     }
 
     // Camera ISO (index 16)
+    // Canon uses a special encoding: if bit 0x4000 is set, the lower 14 bits are the ISO value
+    // Otherwise it's a lookup table value (0=n/a, 14=Auto High, 15=Auto, 16=50, 17=100, etc.)
     if data.len() > 16 && data[16] != 0x7FFF {
         let raw_iso = data[16];
-        let iso_value = if raw_iso & 0x4000 != 0 {
-            raw_iso & 0x3FFF
+        if raw_iso & 0x4000 != 0 {
+            // Direct ISO value in lower 14 bits
+            let iso_value = raw_iso & 0x3FFF;
+            decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![iso_value]));
         } else {
+            // Lookup table value - some return strings, others return numbers
             match raw_iso {
-                0 | 14 | 15 => 0,
-                16 => 50,
-                17 => 100,
-                18 => 200,
-                19 => 400,
-                20 => 800,
-                _ => raw_iso,
+                0 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Ascii("n/a".to_string()));
+                }
+                14 => {
+                    decoded.insert(
+                        "CameraISO".to_string(),
+                        ExifValue::Ascii("Auto High".to_string()),
+                    );
+                }
+                15 => {
+                    decoded.insert(
+                        "CameraISO".to_string(),
+                        ExifValue::Ascii("Auto".to_string()),
+                    );
+                }
+                16 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![50]));
+                }
+                17 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![100]));
+                }
+                18 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![200]));
+                }
+                19 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![400]));
+                }
+                20 => {
+                    decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![800]));
+                }
+                _ => {
+                    // Unknown value - output as "Unknown (N)"
+                    decoded.insert(
+                        "CameraISO".to_string(),
+                        ExifValue::Ascii(format!("Unknown ({})", raw_iso)),
+                    );
+                }
             }
-        };
-        decoded.insert("CameraISO".to_string(), ExifValue::Short(vec![iso_value]));
+        }
     }
 
     // Focal units per mm (index 25)
