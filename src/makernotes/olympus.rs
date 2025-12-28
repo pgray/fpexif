@@ -480,6 +480,43 @@ define_tag_decoder! {
     }
 }
 
+/// Decode SpecialMode value (0x0200) - 3 values: shooting mode, sequence, panorama direction
+/// Format: "Mode, Sequence: N, Panorama: Direction"
+pub fn decode_special_mode(values: &[u32]) -> String {
+    if values.len() < 3 {
+        return format!("{:?}", values);
+    }
+
+    let mode = match values[0] {
+        0 => "Normal",
+        1 => "Unknown (1)",
+        2 => "Fast",
+        3 => "Panorama",
+        n => {
+            return format!(
+                "Unknown ({}), Sequence: {}, Panorama: Unknown",
+                n, values[1]
+            )
+        }
+    };
+
+    let panorama = match values[2] {
+        0 => "(none)",
+        1 => "Left to Right",
+        2 => "Right to Left",
+        3 => "Bottom to Top",
+        4 => "Top to Bottom",
+        n => {
+            return format!(
+                "{}, Sequence: {}, Panorama: Unknown ({})",
+                mode, values[1], n
+            )
+        }
+    };
+
+    format!("{}, Sequence: {}, Panorama: {}", mode, values[1], panorama)
+}
+
 /// Decode FlashMode value (CS 0x0400) - ExifTool format (bitmask)
 /// Note: exiv2 uses identical values - no separate version needed
 pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
@@ -1157,6 +1194,36 @@ fn parse_olympus_ifd(
                 continue;
             }
 
+            // Convert specific tags to decoded values
+            let value = if ifd_type == OlympusIfdType::Main {
+                match tag_id {
+                    OLYMPUS_CAMERA_ID => {
+                        // CameraID is actually an ASCII string with null terminator
+                        if let ExifValue::Undefined(bytes) = &value {
+                            let s: String = bytes
+                                .iter()
+                                .take_while(|&&b| b != 0)
+                                .map(|&b| b as char)
+                                .collect();
+                            ExifValue::Ascii(s.trim().to_string())
+                        } else {
+                            value
+                        }
+                    }
+                    OLYMPUS_SPECIAL_MODE => {
+                        // SpecialMode is 3 uint32 values that need to be formatted
+                        if let ExifValue::Long(vals) = &value {
+                            ExifValue::Ascii(decode_special_mode(vals))
+                        } else {
+                            value
+                        }
+                    }
+                    _ => value,
+                }
+            } else {
+                value
+            };
+
             tags.insert(
                 storage_id,
                 MakerNoteTag {
@@ -1298,8 +1365,9 @@ pub fn parse_olympus_maker_notes(
     // - Version 0x0003 (2 bytes)
     // - IFD starts immediately at byte 12 (no offset pointer like standard TIFF)
     //
-    // The base offset for value pointers is after "OLYMPUS\0" (byte 8)
-    let base_offset = 8;
+    // Value offsets in Olympus maker notes are relative to the start of the
+    // maker note data (position 0), not after the header
+    let base_offset = 0;
     let ifd_offset = 12; // IFD count starts at byte 12
 
     // Parse the main IFD
