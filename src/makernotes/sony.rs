@@ -1299,7 +1299,8 @@ fn parse_ifd_entry(
     data: &[u8],
     entry_offset: usize,
     endian: Endianness,
-    base_offset: usize,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Option<(u16, ExifValue)> {
     if entry_offset + 12 > data.len() {
         return None;
@@ -1322,23 +1323,32 @@ fn parse_ifd_entry(
     let total_size = count * type_size;
 
     // Get the actual data location
-    // Sony maker notes use offsets relative to the maker note start
+    // Sony maker notes use offsets relative to the TIFF header (like Canon)
     let value_data: &[u8] = if total_size <= 4 {
         value_offset_bytes
     } else {
         let offset = read_u32(value_offset_bytes, endian) as usize;
-        // Try maker note-relative offset
-        let abs_offset = if offset >= base_offset {
-            offset - base_offset
+
+        // Try to use TIFF data first (Sony uses TIFF-relative offsets)
+        if let Some(tiff) = tiff_data {
+            let abs_offset = tiff_offset + offset;
+            if abs_offset + total_size <= tiff.len() {
+                &tiff[abs_offset..abs_offset + total_size]
+            } else {
+                // Fall back to MakerNote-relative offset
+                if offset + total_size <= data.len() {
+                    &data[offset..offset + total_size]
+                } else {
+                    return None;
+                }
+            }
         } else {
-            offset
-        };
-        if abs_offset + total_size <= data.len() {
-            &data[abs_offset..abs_offset + total_size]
-        } else if offset + total_size <= data.len() {
-            &data[offset..offset + total_size]
-        } else {
-            return None;
+            // No TIFF data, try MakerNote-relative offset
+            if offset + total_size <= data.len() {
+                &data[offset..offset + total_size]
+            } else {
+                return None;
+            }
         }
     };
 
@@ -1552,12 +1562,13 @@ fn parse_ifd_entry(
 pub fn parse_sony_maker_notes(
     data: &[u8],
     endian: Endianness,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
     // Sony maker notes can start with "SONY DSC " or be in standard TIFF IFD format
     let mut offset = 0;
-    let base_offset = 0usize;
 
     if data.len() >= 12 && data.starts_with(b"SONY DSC ") {
         offset = 12;
@@ -1578,7 +1589,9 @@ pub fn parse_sony_maker_notes(
             break;
         }
 
-        if let Some((tag_id, value)) = parse_ifd_entry(data, entry_offset, endian, base_offset) {
+        if let Some((tag_id, value)) =
+            parse_ifd_entry(data, entry_offset, endian, tiff_data, tiff_offset)
+        {
             tags.insert(
                 tag_id,
                 MakerNoteTag {
