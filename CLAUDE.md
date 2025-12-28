@@ -187,3 +187,35 @@ These are the common tags every manufacturer module should decode:
 | ModelID         | `%*ModelID`                        | `*ModelId[]`      |
 
 json files in ./test-data are `exiftool -j` output saved with Binary fields removed
+
+## Regression Prevention
+
+Use `./bin/mfr-test` to track progress and prevent regressions when working on MakerNote parsing:
+
+```bash
+# Before starting work on a manufacturer, save baseline
+./bin/mfr-test <manufacturer> --save-baseline
+
+# After making changes, check for regressions
+./bin/mfr-test <manufacturer> --check
+
+# View current match rate without baseline comparison
+./bin/mfr-test <manufacturer>
+
+# List all saved baselines
+./bin/mfr-test --list-baselines
+```
+
+Supported manufacturers: `canon`, `nikon`, `sony`, `fujifilm`, `panasonic`, `olympus`, `minolta`, `kodak`, `dng`
+
+The `--check` flag shows:
+- **Matching/Mismatched/Missing/Extra** counts with delta from baseline
+- **IMPROVEMENTS** - tags that now match that didn't before
+- **REGRESSIONS** - tags that stopped matching (investigate before committing)
+
+**Workflow:**
+1. Save baseline before starting: `./bin/mfr-test olympus --save-baseline`
+2. Make changes to the makernote parser
+3. Check for regressions: `./bin/mfr-test olympus --check`
+4. If regressions appear, investigate and fix before committing
+5. Run `./bin/ccc` before pushing
