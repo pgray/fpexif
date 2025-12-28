@@ -167,19 +167,14 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
             let distance = num as f64 / den as f64;
             Value::String(format!("{} m", distance))
         }
-        // Nikon MakerNote tags that should always show decimal format
+        // Nikon MakerNote tags that should always show decimal format as JSON number
         0x008B | 0x0017 => {
             // LensFStops (0x008B), FlashExposureBracketValue (0x0017)
-            // These should always show decimal format, even for whole numbers (e.g., "6.0" not "6")
+            // Return as JSON number to match ExifTool's output
             let decimal = num as f64 / den as f64;
-            if decimal.fract() == 0.0 && decimal.is_finite() {
-                // Force .0 format for whole numbers by outputting as string
-                Value::String(format!("{:.1}", decimal))
-            } else {
-                serde_json::Number::from_f64(decimal)
-                    .map(Value::Number)
-                    .unwrap_or_else(|| Value::String(decimal.to_string()))
-            }
+            serde_json::Number::from_f64(decimal)
+                .map(Value::Number)
+                .unwrap_or_else(|| Value::Number(0.into()))
         }
         _ => {
             // Default: show as decimal, strip .0 for whole numbers to match ExifTool
@@ -215,16 +210,12 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
         }
         // Nikon MakerNote tags that should always show decimal format
         0x0017 => {
-            // FlashExposureBracketValue (0x0017) - always show decimal format
+            // FlashExposureBracketValue (0x0017) - always show decimal format as JSON number
             let decimal = num as f64 / den as f64;
-            if decimal.fract() == 0.0 && decimal.is_finite() {
-                // Force .0 format for whole numbers by outputting as string
-                Value::String(format!("{:.1}", decimal))
-            } else {
-                serde_json::Number::from_f64(decimal)
-                    .map(Value::Number)
-                    .unwrap_or_else(|| Value::String(decimal.to_string()))
-            }
+            // Return as JSON number to match ExifTool's output
+            serde_json::Number::from_f64(decimal)
+                .map(Value::Number)
+                .unwrap_or_else(|| Value::Number(0.into()))
         }
         _ => {
             // Default: show as decimal, strip .0 for whole numbers to match ExifTool
