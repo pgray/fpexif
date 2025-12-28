@@ -854,6 +854,12 @@ pub fn decode_image_stabilization_exiftool(value: &str) -> &'static str {
         "2" | "ON (2)" => "On (2)",
         "3" | "ON (3)" => "On (3)",
         "4" | "ON (4)" => "On (4)",
+        "VR-ON" => "VR-On",
+        "VR-OFF" => "VR-Off",
+        "VR ON" => "VR On",
+        "VR OFF" => "VR Off",
+        "VR-On" => "VR-On",
+        "VR-Off" => "VR-Off",
         _ => "Unknown",
     }
 }
