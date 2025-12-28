@@ -1121,7 +1121,7 @@ pub fn get_orientation_description(value: u16) -> &'static str {
 /// Human-readable descriptions for various EXIF exposure program values
 pub fn get_exposure_program_description(value: u16) -> &'static str {
     match value {
-        0 => "Not defined",
+        0 => "Not Defined",
         1 => "Manual",
         2 => "Program AE",
         3 => "Aperture-priority AE",

@@ -761,6 +761,32 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
                 _ => trimmed.to_string(),
             }
         }
+        NIKON_VARI_PROGRAM => {
+            // Transform AUTO -> Auto, SPORT -> Sport, etc.
+            let trimmed = value.trim();
+            match trimmed {
+                "AUTO" => "Auto".to_string(),
+                "SPORT" => "Sport".to_string(),
+                "PORTRAIT" => "Portrait".to_string(),
+                "LANDSCAPE" => "Landscape".to_string(),
+                "CHILD" => "Child".to_string(),
+                "NIGHT PORTRAIT" => "Night Portrait".to_string(),
+                "PARTY/INDOOR" => "Party/Indoor".to_string(),
+                "BEACH/SNOW" => "Beach/Snow".to_string(),
+                "SUNSET" => "Sunset".to_string(),
+                "DUSK/DAWN" => "Dusk/Dawn".to_string(),
+                "PET PORTRAIT" => "Pet Portrait".to_string(),
+                "CANDLELIGHT" => "Candlelight".to_string(),
+                "BLOSSOM" => "Blossom".to_string(),
+                "AUTUMN COLORS" => "Autumn Colors".to_string(),
+                "FOOD" => "Food".to_string(),
+                "SILHOUETTE" => "Silhouette".to_string(),
+                "HIGH KEY" => "High Key".to_string(),
+                "LOW KEY" => "Low Key".to_string(),
+                "" => "".to_string(),
+                _ => trimmed.to_string(),
+            }
+        }
         _ => value.trim().to_string(),
     }
 }
