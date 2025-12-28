@@ -653,6 +653,68 @@ define_tag_decoder! {
     }
 }
 
+// ZoneMatching (tag 0xB024): Sony.pm
+define_tag_decoder! {
+    zone_matching,
+    type: u32,
+    both: {
+        0 => "ISO Setting Used",
+        1 => "High Key",
+        2 => "Low Key",
+    }
+}
+
+// ColorMode (tag 0xB029): Sony.pm uses Minolta::sonyColorMode
+define_tag_decoder! {
+    color_mode,
+    type: u32,
+    both: {
+        0 => "Standard",
+        1 => "Vivid",
+        2 => "Portrait",
+        3 => "Landscape",
+        4 => "Sunset",
+        5 => "Night View/Portrait",
+        6 => "B&W",
+        7 => "Adobe RGB",
+        12 => "Neutral",
+        13 => "Clear",
+        14 => "Deep",
+        15 => "Light",
+        16 => "Autumn Leaves",
+        17 => "Sepia",
+        18 => "FL",
+        19 => "Vivid 2",
+        20 => "IN",
+        21 => "SH",
+        22 => "FL2",
+        23 => "FL3",
+    }
+}
+
+/// Decode Sony FileFormat from 4 bytes (tag 0xB000)
+/// Format: [major, minor, patch, 0] -> "ARW major.minor" or "ARW major.minor.patch"
+pub fn decode_file_format(bytes: &[u8]) -> Option<String> {
+    if bytes.len() < 4 {
+        return None;
+    }
+    let key = format!("{} {} {} {}", bytes[0], bytes[1], bytes[2], bytes[3]);
+    match key.as_str() {
+        "0 0 0 2" => Some("JPEG".to_string()),
+        "1 0 0 0" => Some("SR2".to_string()),
+        "2 0 0 0" => Some("ARW 1.0".to_string()),
+        "3 0 0 0" => Some("ARW 2.0".to_string()),
+        "3 1 0 0" => Some("ARW 2.1".to_string()),
+        "3 2 0 0" => Some("ARW 2.2".to_string()),
+        "3 3 0 0" => Some("ARW 2.3".to_string()),
+        "3 3 1 0" => Some("ARW 2.3.1".to_string()),
+        "3 3 2 0" => Some("ARW 2.3.2".to_string()),
+        "3 3 3 0" => Some("ARW 2.3.3".to_string()),
+        "3 3 5 0" => Some("ARW 2.3.5".to_string()),
+        _ => None,
+    }
+}
+
 // ImageQuality (tag 0x0102): Sony.pm / sonymn_int.cpp
 define_tag_decoder! {
     image_quality,
@@ -1302,6 +1364,13 @@ fn parse_ifd_entry(
             } else if tag_id == SONY_LENS_SPEC && bytes.len() >= 8 {
                 // Format LensSpec byte array
                 ExifValue::Ascii(format_lens_spec(&bytes))
+            } else if tag_id == SONY_FILE_FORMAT && bytes.len() >= 4 {
+                // Decode Sony FileFormat (ARW version)
+                if let Some(fmt) = decode_file_format(&bytes) {
+                    ExifValue::Ascii(fmt)
+                } else {
+                    ExifValue::Byte(bytes)
+                }
             } else {
                 ExifValue::Byte(bytes)
             }
@@ -1426,6 +1495,10 @@ fn parse_ifd_entry(
                     ExifValue::Ascii(decode_multi_frame_noise_reduction_exiftool(v).to_string())
                 } else if tag_id == SONY_IMAGE_QUALITY {
                     ExifValue::Ascii(decode_quality_exiftool(v).to_string())
+                } else if tag_id == SONY_ZONE_MATCHING {
+                    ExifValue::Ascii(decode_zone_matching_exiftool(v).to_string())
+                } else if tag_id == SONY_COLOR_MODE {
+                    ExifValue::Ascii(decode_color_mode_exiftool(v).to_string())
                 } else if v <= u16::MAX as u32 {
                     // Then check tags that fit in u16
                     let v16 = v as u16;
