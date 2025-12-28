@@ -935,6 +935,14 @@ define_tag_decoder! {
         2 => "Uncompressed",
         3 => "Lossless",
         4 => "Lossy (type 2)",
+        5 => "Striped packed 12 bits",
+        6 => "Uncompressed (reduced to 12 bit)",
+        7 => "Unpacked 12 bits",
+        8 => "Small",
+        9 => "Packed 12 bits",
+        10 => "Packed 14 bits",
+        13 => "High Efficiency",
+        14 => "High Efficiency*",
     }
 }
 

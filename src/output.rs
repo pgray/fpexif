@@ -120,13 +120,20 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
             let gcd_val = gcd(num, den);
             let simplified_num = num / gcd_val;
             let simplified_den = den / gcd_val;
-            if simplified_num == 1 {
+            if simplified_num == 1 && simplified_den == 1 {
+                // For 1 second exposure, ExifTool outputs just "1"
+                Value::Number(1.into())
+            } else if simplified_num == 1 {
                 Value::String(format!("1/{}", simplified_den))
             } else {
                 // Approximate to 1/n form: calculate equivalent denominator
                 let exposure_time = num as f64 / den as f64;
                 let approx_den = (1.0 / exposure_time).round() as u32;
-                Value::String(format!("1/{}", approx_den))
+                if approx_den == 1 {
+                    Value::Number(1.into())
+                } else {
+                    Value::String(format!("1/{}", approx_den))
+                }
             }
         }
         0x9201 => {
@@ -234,31 +241,13 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
     }
 }
 
-/// Simple base64 encoding
-fn base64_encode(data: &[u8]) -> String {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut result = String::new();
-
-    for chunk in data.chunks(3) {
-        let b1 = chunk[0];
-        let b2 = chunk.get(1).copied().unwrap_or(0);
-        let b3 = chunk.get(2).copied().unwrap_or(0);
-
-        result.push(CHARS[(b1 >> 2) as usize] as char);
-        result.push(CHARS[(((b1 & 0x03) << 4) | (b2 >> 4)) as usize] as char);
-        result.push(if chunk.len() > 1 {
-            CHARS[(((b2 & 0x0f) << 2) | (b3 >> 6)) as usize] as char
-        } else {
-            '='
-        });
-        result.push(if chunk.len() > 2 {
-            CHARS[(b3 & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-    }
-
-    result
+/// Format binary data in ExifTool's style
+/// Returns "(Binary data X bytes, use -b option to extract)"
+fn format_binary_data(data: &[u8]) -> String {
+    format!(
+        "(Binary data {} bytes, use -b option to extract)",
+        data.len()
+    )
 }
 
 /// Format Undefined type data with tag-specific interpretation
@@ -352,12 +341,12 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
                 }
             }
 
-            // Check if entire data is nulls (empty comment without charset marker)
-            if data.iter().all(|&b| b == 0) {
+            // Check if entire data is nulls or spaces (empty comment without charset marker)
+            if data.iter().all(|&b| b == 0 || b == 0x20) {
                 return Value::String(String::new());
             }
 
-            // Default: return as base64 for non-empty binary data
+            // Default: return as binary data message for non-empty binary data
             if data.len() <= 32 {
                 Value::String(
                     data.iter()
@@ -366,7 +355,7 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
                         .join(" "),
                 )
             } else {
-                Value::String(base64_encode(data))
+                Value::String(format_binary_data(data))
             }
         }
         0xA300 if data.len() == 1 => {
@@ -377,12 +366,12 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
             // SceneType
             Value::String(crate::tags::get_scene_type_description(data[0]).to_string())
         }
-        // CFAPattern in EXIF SubIFD (0xA302) as Undefined type
-        0xA302 if data.len() >= 4 => {
+        // CFAPattern (0xA302 EXIF SubIFD, 0x828E TIFF/EP) as Undefined type
+        0xA302 | 0x828E if data.len() >= 4 => {
             if let Some(formatted) = format_cfa_pattern(data) {
                 Value::String(formatted)
             } else {
-                Value::String(base64_encode(data))
+                Value::String(format_binary_data(data))
             }
         }
         _ => {
@@ -396,7 +385,7 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
                 )
             } else {
                 // For longer data, use base64
-                Value::String(base64_encode(data))
+                Value::String(format_binary_data(data))
             }
         }
     }
