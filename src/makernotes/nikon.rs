@@ -1658,7 +1658,7 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
     tags.push(("FlashInfoVersion".to_string(), version.clone()));
 
     // FlashInfo0102 structure (D300 uses this)
-    if version == "0102" && data.len() >= 25 {
+    if version == "0102" && data.len() >= 16 {
         // Offset 0x04: FlashSource (int8u)
         let source = data[4];
         let source_str = match source {
@@ -1994,6 +1994,310 @@ fn parse_lens_data(data: &[u8]) -> Vec<(String, String)> {
     }
     // Version 02xx: Encrypted - requires decryption
     // TODO: Implement decryption for 0201, 0202, 0203, 0204
+
+    tags
+}
+
+/// Parse AFInfo tag data (tag 0x0088)
+/// Extracts AF mode and focus point information
+fn parse_af_info(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.is_empty() {
+        return tags;
+    }
+
+    // Byte 0: AFAreaMode
+    let af_area_mode = match data[0] {
+        0 => "Single Area",
+        1 => "Dynamic Area",
+        2 => "Dynamic Area (closest subject)",
+        3 => "Group Dynamic",
+        4 => "Single Area (wide)",
+        5 => "Dynamic Area (wide)",
+        _ => "Unknown",
+    };
+    tags.push(("AFAreaMode".to_string(), af_area_mode.to_string()));
+
+    // Byte 1: AFPoint
+    if data.len() >= 2 {
+        let af_point = match data[1] {
+            0 => "Center",
+            1 => "Top",
+            2 => "Bottom",
+            3 => "Mid-left",
+            4 => "Mid-right",
+            5 => "Upper-left",
+            6 => "Upper-right",
+            7 => "Lower-left",
+            8 => "Lower-right",
+            9 => "Far Left",
+            10 => "Far Right",
+            _ => "Unknown",
+        };
+        tags.push(("AFPoint".to_string(), af_point.to_string()));
+    }
+
+    // Bytes 2-3: AFPointsInFocus (bitmask)
+    if data.len() >= 4 {
+        let af_points_mask = ((data[2] as u16) << 8) | (data[3] as u16);
+        if af_points_mask == 0 {
+            tags.push(("AFPointsInFocus".to_string(), "(none)".to_string()));
+        } else {
+            let mut points = Vec::new();
+            let point_names = [
+                "Center",
+                "Top",
+                "Bottom",
+                "Mid-left",
+                "Mid-right",
+                "Upper-left",
+                "Upper-right",
+                "Lower-left",
+                "Lower-right",
+                "Far Left",
+                "Far Right",
+            ];
+            for (i, name) in point_names.iter().enumerate() {
+                if af_points_mask & (1 << i) != 0 {
+                    points.push(*name);
+                }
+            }
+            if points.is_empty() {
+                tags.push(("AFPointsInFocus".to_string(), "(none)".to_string()));
+            } else {
+                tags.push(("AFPointsInFocus".to_string(), points.join(", ")));
+            }
+        }
+    }
+
+    tags
+}
+
+/// Parse AFInfo2 tag data (tag 0x00B7)
+/// For cameras with LiveView (D3, D300, D700, D5000, etc.)
+fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 5 {
+        return tags;
+    }
+
+    // Bytes 0-3: AFInfo2Version
+    if let Ok(version) = std::str::from_utf8(&data[0..4]) {
+        tags.push(("AFInfo2Version".to_string(), version.to_string()));
+    }
+
+    // Byte 4: ContrastDetectAF
+    let contrast_detect = data[4];
+    let contrast_detect_str = match contrast_detect {
+        0 => "Off",
+        1 => "On",
+        2 => "On (2)",
+        _ => "Unknown",
+    };
+    tags.push((
+        "ContrastDetectAF".to_string(),
+        contrast_detect_str.to_string(),
+    ));
+
+    // Byte 5: AFAreaMode (depends on ContrastDetectAF)
+    if data.len() >= 6 {
+        let af_area_mode = if contrast_detect == 0 {
+            // Phase detect mode
+            match data[5] {
+                0 => "Single Area",
+                1 => "Dynamic Area",
+                2 => "Dynamic Area (closest subject)",
+                3 => "Group Dynamic",
+                4 => "Dynamic Area (9 points)",
+                5 => "Dynamic Area (21 points)",
+                6 => "Dynamic Area (51 points)",
+                7 => "Dynamic Area (51 points, 3D-tracking)",
+                8 => "Auto-area",
+                9 => "Dynamic Area (3D-tracking)",
+                10 => "Single Area (wide)",
+                11 => "Dynamic Area (wide)",
+                12 => "Dynamic Area (wide, 3D-tracking)",
+                13 => "Group Area",
+                14 => "Dynamic Area (25 points)",
+                15 => "Dynamic Area (72 points)",
+                16 => "Group Area (HL)",
+                17 => "Group Area (VL)",
+                18 => "Dynamic Area (49 points)",
+                _ => "Unknown",
+            }
+        } else {
+            // Contrast detect mode
+            match data[5] {
+                0 => "Contrast-detect",
+                1 => "Contrast-detect (normal area)",
+                2 => "Contrast-detect (wide area)",
+                3 => "Contrast-detect (face priority)",
+                4 => "Contrast-detect (subject tracking)",
+                _ => "Unknown",
+            }
+        };
+        tags.push(("AFAreaMode".to_string(), af_area_mode.to_string()));
+    }
+
+    // Byte 6: PhaseDetectAF
+    if data.len() >= 7 {
+        let phase_detect = match data[6] {
+            0 => "Off",
+            1 => "On (51-point)",
+            2 => "On (11-point)",
+            3 => "On (39-point)",
+            4 => "On (73-point)",
+            5 => "On (5-point)",
+            6 => "On (105-point)",
+            7 => "On (153-point)",
+            8 => "On (81-point)",
+            9 => "On (105-point)",
+            _ => "Unknown",
+        };
+        tags.push(("PhaseDetectAF".to_string(), phase_detect.to_string()));
+    }
+
+    tags
+}
+
+/// Parse WorldTime tag data (tag 0x0024)
+fn parse_world_time(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 4 {
+        return tags;
+    }
+
+    // Bytes 0-1: Timezone (signed, in minutes)
+    let tz_minutes = ((data[0] as i16) << 8) | (data[1] as i16);
+    let tz_hours = tz_minutes / 60;
+    let tz_mins = (tz_minutes % 60).abs();
+    let tz_str = if tz_minutes >= 0 {
+        format!("+{:02}:{:02}", tz_hours, tz_mins)
+    } else {
+        format!("{:03}:{:02}", tz_hours, tz_mins)
+    };
+    tags.push(("TimeZone".to_string(), tz_str));
+
+    // Byte 2: DaylightSavings
+    if data.len() >= 3 {
+        let dst = if data[2] == 0 { "No" } else { "Yes" };
+        tags.push(("DaylightSavings".to_string(), dst.to_string()));
+    }
+
+    // Byte 3: DateDisplayFormat
+    if data.len() >= 4 {
+        let date_format = match data[3] {
+            0 => "Y/M/D",
+            1 => "M/D/Y",
+            2 => "D/M/Y",
+            _ => "Unknown",
+        };
+        tags.push(("DateDisplayFormat".to_string(), date_format.to_string()));
+    }
+
+    tags
+}
+
+/// Parse ColorBalance tag data (tag 0x0097)
+/// Extracts white balance levels
+fn parse_color_balance(data: &[u8], _endian: Endianness) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 8 {
+        return tags;
+    }
+
+    // First 4 bytes: version
+    let version = match std::str::from_utf8(&data[0..4]) {
+        Ok(v) => v,
+        Err(_) => return tags,
+    };
+
+    // ColorBalance structures have WB levels at different offsets
+    // Version 0100: RBGG at offset 72 (0x48), big-endian
+    // Version 0102/02xx: RGGB at offset 4, encrypted for later models
+    let (wb_offset, wb_tag, channel_order) = match version {
+        "0100" => (72, "WB_RBGGLevels", [0, 2, 3, 1]), // RBGG -> R, G1, G2, B indices
+        "0103" => (4, "WB_RGBGLevels", [0, 1, 3, 2]),  // RGBG -> R, G1, B, G2
+        _ => (4, "WB_RGGBLevels", [0, 1, 2, 3]),       // RGGB standard order
+    };
+
+    if data.len() >= wb_offset + 8 {
+        // ColorBalance data is big-endian for version 0100
+        let mut cursor = Cursor::new(&data[wb_offset..]);
+        let vals: [u16; 4] = [
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+        ];
+
+        // Skip if all zeros (encrypted or invalid)
+        if vals.iter().all(|&v| v == 0) {
+            return tags;
+        }
+
+        tags.push((
+            wb_tag.to_string(),
+            format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+        ));
+
+        // Extract R, G1, G2, B according to channel order
+        let r = vals[channel_order[0]];
+        let g1 = vals[channel_order[1]];
+        let g2 = vals[channel_order[2]];
+        let b = vals[channel_order[3]];
+
+        // Calculate RedBalance and BlueBalance
+        // RedBalance = R / G_avg, BlueBalance = B / G_avg
+        let g_avg = ((g1 as f64) + (g2 as f64)) / 2.0;
+        if g_avg > 0.0 && r > 0 && b > 0 {
+            let red_balance = (r as f64) / g_avg;
+            let blue_balance = (b as f64) / g_avg;
+            tags.push(("RedBalance".to_string(), format!("{:.6}", red_balance)));
+            tags.push(("BlueBalance".to_string(), format!("{:.6}", blue_balance)));
+        }
+    }
+
+    tags
+}
+
+/// Parse CropHiSpeed tag data (tag 0x001A)
+fn parse_crop_hi_speed(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 14 {
+        return tags;
+    }
+
+    let mut cursor = Cursor::new(data);
+
+    // First SHORT: CropHiSpeed mode
+    let mode = match endian {
+        Endianness::Little => cursor.read_u16::<LittleEndian>().unwrap_or(0),
+        Endianness::Big => cursor.read_u16::<BigEndian>().unwrap_or(0),
+    };
+
+    let mode_str = match mode {
+        0 => "Off",
+        1 => "1.3x Crop",
+        2 => "DX Crop",
+        3 => "5:4 Crop",
+        4 => "3:2 Crop",
+        6 => "16:9 Crop",
+        8 => "2.7x Crop",
+        9 => "DX Movie Crop",
+        10 => "1.3x Movie Crop",
+        11 => "FX Uncropped",
+        12 => "DX Uncropped",
+        15 => "1.5x Movie Crop",
+        17 => "1:1 Crop",
+        _ => "Unknown",
+    };
+    tags.push(("CropHiSpeed".to_string(), mode_str.to_string()));
 
     tags
 }
@@ -2764,8 +3068,101 @@ pub fn parse_nikon_maker_notes(
                         }
                     }
                 }
+                NIKON_AF_INFO => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_af_info(bytes) {
+                            tags.insert(
+                                0x9500 + tags.len() as u16,
+                                MakerNoteTag {
+                                    tag_id: 0x9500 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                NIKON_AF_INFO_2 => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_af_info2(bytes) {
+                            tags.insert(
+                                0x9600 + tags.len() as u16,
+                                MakerNoteTag {
+                                    tag_id: 0x9600 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                NIKON_WORLD_TIME => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_world_time(bytes) {
+                            tags.insert(
+                                0x9700 + tags.len() as u16,
+                                MakerNoteTag {
+                                    tag_id: 0x9700 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                NIKON_COLOR_BALANCE => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_color_balance(bytes, maker_endian) {
+                            tags.insert(
+                                0x9800 + tags.len() as u16,
+                                MakerNoteTag {
+                                    tag_id: 0x9800 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                NIKON_CROP_HI_SPEED => {
+                    if let ExifValue::Short(ref vals) = value {
+                        // Convert shorts to bytes for parsing
+                        let bytes: Vec<u8> =
+                            vals.iter().flat_map(|v| v.to_le_bytes().to_vec()).collect();
+                        for (name, val) in parse_crop_hi_speed(&bytes, maker_endian) {
+                            tags.insert(
+                                0x9900 + tags.len() as u16,
+                                MakerNoteTag {
+                                    tag_id: 0x9900 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
                 _ => {}
             }
+        }
+    }
+
+    // Add computed AutoFocus tag based on FocusMode
+    // AutoFocus is "On" unless FocusMode starts with "Manual"
+    if let Some(focus_mode_tag) = tags.get(&NIKON_FOCUS_MODE) {
+        if let ExifValue::Ascii(ref mode) = focus_mode_tag.value {
+            let auto_focus = if mode.starts_with("Manual") {
+                "Off"
+            } else {
+                "On"
+            };
+            tags.insert(
+                0xA000, // Pseudo tag ID for AutoFocus
+                MakerNoteTag {
+                    tag_id: 0xA000,
+                    tag_name: Some("AutoFocus"),
+                    value: ExifValue::Ascii(auto_focus.to_string()),
+                },
+            );
         }
     }
 
