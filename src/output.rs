@@ -102,6 +102,8 @@ fn format_short_value_with_make(value: u16, tag_id: u16, make: Option<&str>) -> 
         0xC65A | 0xC65B => {
             Value::String(crate::tags::get_light_source_description(value).to_string())
         }
+        // FocalLengthIn35mmFormat - add "mm" suffix
+        0xA405 => Value::String(format!("{} mm", value)),
         _ => Value::Number(value.into()),
     }
 }

@@ -892,7 +892,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_EXPOSURE_TIME_MAIN, "ExposureTime");
     map.insert(TAG_F_NUMBER_MAIN, "FNumber");
     map.insert(TAG_EXPOSURE_PROGRAM_MAIN, "ExposureProgram");
-    map.insert(TAG_EXPOSURE_BIAS_VALUE_MAIN, "ExposureBiasValue");
+    map.insert(TAG_EXPOSURE_BIAS_VALUE_MAIN, "ExposureCompensation");
     map.insert(TAG_MAX_APERTURE_VALUE_MAIN, "MaxApertureValue");
     map.insert(TAG_METERING_MODE_MAIN, "MeteringMode");
     map.insert(TAG_LIGHT_SOURCE_MAIN, "LightSource");
@@ -977,7 +977,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_SHUTTER_SPEED_VALUE, "ShutterSpeedValue");
     map.insert(TAG_APERTURE_VALUE, "ApertureValue");
     map.insert(TAG_BRIGHTNESS_VALUE, "BrightnessValue");
-    map.insert(TAG_EXPOSURE_BIAS_VALUE, "ExposureBiasValue");
+    map.insert(TAG_EXPOSURE_BIAS_VALUE, "ExposureCompensation");
     map.insert(TAG_MAX_APERTURE_VALUE, "MaxApertureValue");
     map.insert(TAG_SUBJECT_DISTANCE, "SubjectDistance");
     map.insert(TAG_METERING_MODE, "MeteringMode");
@@ -1013,7 +1013,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_EXPOSURE_MODE, "ExposureMode");
     map.insert(TAG_WHITE_BALANCE, "WhiteBalance");
     map.insert(TAG_DIGITAL_ZOOM_RATIO, "DigitalZoomRatio");
-    map.insert(TAG_FOCAL_LENGTH_IN_35MM_FILM, "FocalLengthIn35mmFilm");
+    map.insert(TAG_FOCAL_LENGTH_IN_35MM_FILM, "FocalLengthIn35mmFormat");
     map.insert(TAG_SCENE_CAPTURE_TYPE, "SceneCaptureType");
     map.insert(TAG_GAIN_CONTROL, "GainControl");
     map.insert(TAG_CONTRAST, "Contrast");

@@ -422,6 +422,8 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                     0xA401 => tags::get_custom_rendered_description(v[0]).to_string(),
                     0x9217 | 0xA217 => tags::get_sensing_method_description(v[0]).to_string(),
                     0x8830 => tags::get_sensitivity_type_description(v[0]).to_string(),
+                    // FocalLengthIn35mmFormat - add "mm" suffix
+                    0xA405 => format!("{} mm", v[0]),
                     _ => format_values_space(v),
                 }
             } else if v.len() == 2 && tag_id == 0x100A {
