@@ -671,6 +671,8 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "B6 3C B0 B0 3C 3C D0 0E" => Some("AF-S VR Nikkor 800mm f/5.6E FL ED"),
         "B7 44 60 98 34 3C D1 0E" => Some("AF-S Nikkor 80-400mm f/4.5-5.6G ED VR"),
         "B8 40 2D 44 2C 34 D2 0E" => Some("AF-S DX Nikkor 18-35mm f/3.5-4.5G ED"),
+        // Additional DX lenses not in above list
+        "7F 40 2D 5C 2C 34 84 06" => Some("AF-S DX Zoom-Nikkor 18-70mm f/3.5-4.5G IF-ED"),
         // Z-mount lenses (Nikon Z)
         "01 00 00 00 00 00 00 00" => Some("Nikon Z Lens"),
         _ => None,
@@ -1893,21 +1895,24 @@ fn get_shot_info_shutter_offset(version: &str, data_len: usize) -> Option<(usize
 /// Extracts lens parameters from the binary blob
 /// Version 0100: D100, D1X (unencrypted)
 /// Version 0101/02xx: D70, D200, etc. (encrypted after byte 4)
-fn parse_lens_data(data: &[u8]) -> Vec<(String, String)> {
+/// Returns (tags, lens_id_bytes) where lens_id_bytes are the 7 raw bytes needed for LensID
+fn parse_lens_data(data: &[u8]) -> (Vec<(String, String)>, Option<[u8; 7]>) {
     let mut tags = Vec::new();
 
     if data.len() < 4 {
-        return tags;
+        return (tags, None);
     }
 
     // Get version string
     let version = match std::str::from_utf8(&data[0..4]) {
         Ok(v) => v,
-        Err(_) => return tags,
+        Err(_) => return (tags, None),
     };
 
     // Add LensDataVersion
     tags.push(("LensDataVersion".to_string(), version.to_string()));
+
+    let mut lens_id_bytes: Option<[u8; 7]> = None;
 
     // Version 0100: D100, D1X - unencrypted
     if version == "0100" && data.len() >= 13 {
@@ -1949,6 +1954,17 @@ fn parse_lens_data(data: &[u8]) -> Vec<(String, String)> {
         // Offset 0x0c: MCUVersion
         let mcu_version = data[12];
         tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
+
+        // Store raw bytes for LensID: IDNumber, FStops, MinFocal, MaxFocal, MaxApMin, MaxApMax, MCU
+        lens_id_bytes = Some([
+            lens_id_number,
+            lens_f_stops_raw,
+            min_focal_raw,
+            max_focal_raw,
+            max_ap_min_raw,
+            max_ap_max_raw,
+            mcu_version,
+        ]);
     }
     // Version 0101: D70, D70s - unencrypted
     else if version == "0101" && data.len() >= 18 {
@@ -1991,11 +2007,22 @@ fn parse_lens_data(data: &[u8]) -> Vec<(String, String)> {
         // Offset 0x11: MCUVersion
         let mcu_version = data[17];
         tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
+
+        // Store raw bytes for LensID
+        lens_id_bytes = Some([
+            lens_id_number,
+            lens_f_stops_raw,
+            min_focal_raw,
+            max_focal_raw,
+            max_ap_min_raw,
+            max_ap_max_raw,
+            mcu_version,
+        ]);
     }
     // Version 02xx: Encrypted - requires decryption
     // TODO: Implement decryption for 0201, 0202, 0203, 0204
 
-    tags
+    (tags, lens_id_bytes)
 }
 
 /// Parse AFInfo tag data (tag 0x0088)
@@ -2635,6 +2662,10 @@ pub fn parse_nikon_maker_notes(
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
+    // Variables for LensID composite lookup
+    let mut lens_type_raw: Option<u8> = None;
+    let mut lens_id_bytes: Option<[u8; 7]> = None;
+
     // Nikon maker notes often start with "Nikon\0" header
     if data.len() < 18 {
         return Ok(tags);
@@ -2765,6 +2796,8 @@ pub fn parse_nikon_maker_notes(
                     let bytes = value_bytes[..count as usize].to_vec();
                     // Apply decoder for specific tags
                     if tag_id == NIKON_LENS_TYPE && !bytes.is_empty() {
+                        // Store raw byte for LensID composite lookup
+                        lens_type_raw = Some(bytes[0]);
                         ExifValue::Ascii(decode_lens_type_exiftool(bytes[0]))
                     } else if tag_id == NIKON_FLASH_MODE && !bytes.is_empty() {
                         ExifValue::Ascii(decode_flash_mode_exiftool(bytes[0]).to_string())
@@ -3055,8 +3088,11 @@ pub fn parse_nikon_maker_notes(
                     }
                 }
                 NIKON_LENS_DATA => {
-                    if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_lens_data(bytes) {
+                    if let ExifValue::Undefined(ref data_bytes) = value {
+                        let (lens_data_tags, raw_bytes) = parse_lens_data(data_bytes);
+                        // Store raw bytes for LensID composite lookup
+                        lens_id_bytes = raw_bytes;
+                        for (name, val) in lens_data_tags {
                             tags.insert(
                                 0x9400 + tags.len() as u16, // Pseudo tag ID
                                 MakerNoteTag {
@@ -3161,6 +3197,46 @@ pub fn parse_nikon_maker_notes(
                     tag_id: 0xA000,
                     tag_name: Some("AutoFocus"),
                     value: ExifValue::Ascii(auto_focus.to_string()),
+                },
+            );
+        }
+    }
+
+    // Add LensID composite lookup
+    // LensID is constructed from 8 bytes: 7 from LensData + LensType
+    if let (Some(id_bytes), Some(lens_type)) = (lens_id_bytes, lens_type_raw) {
+        let lens_id = format!(
+            "{:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}",
+            id_bytes[0], // LensIDNumber
+            id_bytes[1], // LensFStops
+            id_bytes[2], // MinFocalLength
+            id_bytes[3], // MaxFocalLength
+            id_bytes[4], // MaxApertureAtMinFocal
+            id_bytes[5], // MaxApertureAtMaxFocal
+            id_bytes[6], // MCUVersion
+            lens_type,   // LensType
+        );
+
+        // Look up lens name - if found, output as LensID (matches ExifTool)
+        // ExifTool shows "Lens ID" as the full resolved lens name
+        let lookup_result = get_nikon_lens_name(&lens_id);
+        if let Some(lens_name) = lookup_result {
+            tags.insert(
+                0xA003, // Pseudo tag ID for LensID (avoiding 0xA001 ColorSpace conflict)
+                MakerNoteTag {
+                    tag_id: 0xA003,
+                    tag_name: Some("LensID"),
+                    value: ExifValue::Ascii(lens_name.to_string()),
+                },
+            );
+        } else {
+            // If not found in database, output the hex composite ID
+            tags.insert(
+                0xA003,
+                MakerNoteTag {
+                    tag_id: 0xA003,
+                    tag_name: Some("LensID"),
+                    value: ExifValue::Ascii(lens_id),
                 },
             );
         }
