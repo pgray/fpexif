@@ -1,5 +1,7 @@
 #!/bin/bash
 
+[[ "$CI" != "" ]] && return
+
 function success {
   ffmpeg \
     -f lavfi -i "sine=frequency=440:duration=0.2" \
