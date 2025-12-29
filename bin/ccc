@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/beep"
+
 cargo fmt --check \
   && cargo check \
   && cargo clippy --all-targets --all-features -- -D warnings
+
+if [ $? -eq 0 ] && command -v ffmpeg &>/dev/null; then
+  success
+elif command -v ffmpeg &>/dev/null; then
+  failure
+fi

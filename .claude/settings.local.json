@@ -40,7 +40,9 @@
       "Bash(deno run:*)",
       "Bash(sort:*)",
       "Bash(for f in /fpexif/raws/RAW_FUJIFILM*.RAF /fpexif/raws/RAW_FUJI*.RAF)",
-      "Bash(do echo '=== $f ===')"
+      "Bash(do echo '=== $f ===')",
+      "Bash(ffmpeg:*)",
+      "Bash(paplay:*)"
     ],
     "deny": [],
     "ask": []

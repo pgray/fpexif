@@ -1,0 +1,29 @@
+#!/bin/bash
+
+function success {
+  ffmpeg \
+    -f lavfi -i "sine=frequency=440:duration=0.2" \
+    -f lavfi -i "sine=frequency=460:duration=0.2" \
+    -f lavfi -i "sine=frequency=480:duration=0.2" \
+    -f lavfi -i "sine=frequency=500:duration=0.2" \
+    -f lavfi -i "sine=frequency=520:duration=0.7" \
+    -filter_complex "[0]apad=pad_dur=0.1[a];[1]apad=pad_dur=0.1[b];[2]apad=pad_dur=0.1[c];[3]apad=pad_dur=0.1[d];[a][b][c][d][4]concat=n=5:v=0:a=1,volume=8" \
+    -f wav - 2>/dev/null | paplay
+}
+
+function failure {
+  ffmpeg \
+    -f lavfi -i "sine=frequency=520:duration=0.2" \
+    -f lavfi -i "sine=frequency=500:duration=0.2" \
+    -f lavfi -i "sine=frequency=480:duration=0.2" \
+    -f lavfi -i "sine=frequency=460:duration=0.2" \
+    -f lavfi -i "sine=frequency=440:duration=0.7" \
+    -filter_complex "[0]apad=pad_dur=0.1[a];[1]apad=pad_dur=0.1[b];[2]apad=pad_dur=0.1[c];[3]apad=pad_dur=0.1[d];[a][b][c][d][4]concat=n=5:v=0:a=1,volume=8" \
+    -f wav - 2>/dev/null | paplay
+}
+
+# Call with: success or failure
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  # Script run directly, not sourced
+  "${1:-success}"
+fi
