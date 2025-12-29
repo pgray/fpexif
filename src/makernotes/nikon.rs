@@ -502,7 +502,7 @@ pub const NIKON_EYE_DETECTION: u16 = 0x00C5;
 /// Get the name of a Nikon MakerNote tag
 pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
     match tag_id {
-        NIKON_VERSION => Some("NikonMakerNoteVersion"),
+        NIKON_VERSION => Some("MakerNoteVersion"),
         NIKON_ISO_SETTING => Some("ISO"),
         NIKON_COLOR_MODE => Some("ColorMode"),
         NIKON_QUALITY => Some("Quality"),
@@ -1889,6 +1889,115 @@ fn get_shot_info_shutter_offset(version: &str, data_len: usize) -> Option<(usize
     }
 }
 
+/// Parse LensData tag data (tag 0x0098)
+/// Extracts lens parameters from the binary blob
+/// Version 0100: D100, D1X (unencrypted)
+/// Version 0101/02xx: D70, D200, etc. (encrypted after byte 4)
+fn parse_lens_data(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 4 {
+        return tags;
+    }
+
+    // Get version string
+    let version = match std::str::from_utf8(&data[0..4]) {
+        Ok(v) => v,
+        Err(_) => return tags,
+    };
+
+    // Add LensDataVersion
+    tags.push(("LensDataVersion".to_string(), version.to_string()));
+
+    // Version 0100: D100, D1X - unencrypted
+    if version == "0100" && data.len() >= 13 {
+        // Offset 0x06: LensIDNumber
+        let lens_id_number = data[6];
+        tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
+
+        // Offset 0x07: LensFStops (value / 12)
+        let lens_f_stops_raw = data[7];
+        let lens_f_stops = lens_f_stops_raw as f64 / 12.0;
+        tags.push(("LensFStops".to_string(), format!("{:.2}", lens_f_stops)));
+
+        // Offset 0x08: MinFocalLength (5 * 2^(value/24))
+        let min_focal_raw = data[8];
+        let min_focal = 5.0 * 2.0_f64.powf(min_focal_raw as f64 / 24.0);
+        tags.push(("MinFocalLength".to_string(), format!("{:.1} mm", min_focal)));
+
+        // Offset 0x09: MaxFocalLength (5 * 2^(value/24))
+        let max_focal_raw = data[9];
+        let max_focal = 5.0 * 2.0_f64.powf(max_focal_raw as f64 / 24.0);
+        tags.push(("MaxFocalLength".to_string(), format!("{:.1} mm", max_focal)));
+
+        // Offset 0x0a: MaxApertureAtMinFocal (2^(value/24))
+        let max_ap_min_raw = data[10];
+        let max_ap_min = 2.0_f64.powf(max_ap_min_raw as f64 / 24.0);
+        tags.push((
+            "MaxApertureAtMinFocal".to_string(),
+            format!("{:.1}", max_ap_min),
+        ));
+
+        // Offset 0x0b: MaxApertureAtMaxFocal (2^(value/24))
+        let max_ap_max_raw = data[11];
+        let max_ap_max = 2.0_f64.powf(max_ap_max_raw as f64 / 24.0);
+        tags.push((
+            "MaxApertureAtMaxFocal".to_string(),
+            format!("{:.1}", max_ap_max),
+        ));
+
+        // Offset 0x0c: MCUVersion
+        let mcu_version = data[12];
+        tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
+    }
+    // Version 0101: D70, D70s - unencrypted
+    else if version == "0101" && data.len() >= 18 {
+        // Different offsets for 0101
+        // Offset 0x0b: LensIDNumber
+        let lens_id_number = data[11];
+        tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
+
+        // Offset 0x0c: LensFStops
+        let lens_f_stops_raw = data[12];
+        let lens_f_stops = lens_f_stops_raw as f64 / 12.0;
+        tags.push(("LensFStops".to_string(), format!("{:.2}", lens_f_stops)));
+
+        // Offset 0x0d: MinFocalLength
+        let min_focal_raw = data[13];
+        let min_focal = 5.0 * 2.0_f64.powf(min_focal_raw as f64 / 24.0);
+        tags.push(("MinFocalLength".to_string(), format!("{:.1} mm", min_focal)));
+
+        // Offset 0x0e: MaxFocalLength
+        let max_focal_raw = data[14];
+        let max_focal = 5.0 * 2.0_f64.powf(max_focal_raw as f64 / 24.0);
+        tags.push(("MaxFocalLength".to_string(), format!("{:.1} mm", max_focal)));
+
+        // Offset 0x0f: MaxApertureAtMinFocal
+        let max_ap_min_raw = data[15];
+        let max_ap_min = 2.0_f64.powf(max_ap_min_raw as f64 / 24.0);
+        tags.push((
+            "MaxApertureAtMinFocal".to_string(),
+            format!("{:.1}", max_ap_min),
+        ));
+
+        // Offset 0x10: MaxApertureAtMaxFocal
+        let max_ap_max_raw = data[16];
+        let max_ap_max = 2.0_f64.powf(max_ap_max_raw as f64 / 24.0);
+        tags.push((
+            "MaxApertureAtMaxFocal".to_string(),
+            format!("{:.1}", max_ap_max),
+        ));
+
+        // Offset 0x11: MCUVersion
+        let mcu_version = data[17];
+        tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
+    }
+    // Version 02xx: Encrypted - requires decryption
+    // TODO: Implement decryption for 0201, 0202, 0203, 0204
+
+    tags
+}
+
 /// Parse ShotInfo and extract ShutterCount if available
 /// serial: Camera serial number (for decryption key)
 /// shutter_count: ShutterCount from tag 0x00a7 (for decryption key)
@@ -2500,6 +2609,40 @@ pub fn parse_nikon_maker_notes(
                 7 => {
                     // UNDEFINED - handle packed rational values specially
                     match tag_id {
+                        // MakerNoteVersion - format as "X.Y" or "X.YZ" from ASCII bytes
+                        NIKON_VERSION => {
+                            if value_bytes.len() >= 4 {
+                                // Try to parse as ASCII string "0200" -> "2.0" or "0210" -> "2.1"
+                                if let Ok(s) = std::str::from_utf8(&value_bytes[..4]) {
+                                    // Parse as XXYY -> X.Y or X.YZ (strip trailing zero if YY ends in 0)
+                                    if s.len() == 4 && s.chars().all(|c| c.is_ascii_digit()) {
+                                        let major: u8 = s[0..2].parse().unwrap_or(0);
+                                        let minor: u8 = s[2..4].parse().unwrap_or(0);
+                                        // Format minor: if divisible by 10, show as single digit
+                                        let formatted = if minor.is_multiple_of(10) {
+                                            format!("{}.{}", major, minor / 10)
+                                        } else {
+                                            format!("{}.{}", major, minor)
+                                        };
+                                        ExifValue::Ascii(formatted)
+                                    } else {
+                                        ExifValue::Ascii(s.to_string())
+                                    }
+                                } else {
+                                    // Binary format - convert bytes to version
+                                    let major = value_bytes[0];
+                                    let minor = value_bytes[1] * 10 + value_bytes[2];
+                                    let formatted = if minor.is_multiple_of(10) {
+                                        format!("{}.{}", major, minor / 10)
+                                    } else {
+                                        format!("{}.{}", major, minor)
+                                    };
+                                    ExifValue::Ascii(formatted)
+                                }
+                            } else {
+                                ExifValue::Undefined(value_bytes)
+                            }
+                        }
                         // Signed packed rationals (a * b/c where a,b,c are signed)
                         NIKON_PROGRAM_SHIFT
                         | NIKON_EXPOSURE_DIFFERENCE
@@ -2600,6 +2743,20 @@ pub fn parse_nikon_maker_notes(
                                 0x9300 + tags.len() as u16, // Pseudo tag ID
                                 MakerNoteTag {
                                     tag_id: 0x9300 + tags.len() as u16,
+                                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                                    value: ExifValue::Ascii(val),
+                                },
+                            );
+                        }
+                    }
+                }
+                NIKON_LENS_DATA => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_lens_data(bytes) {
+                            tags.insert(
+                                0x9400 + tags.len() as u16, // Pseudo tag ID
+                                MakerNoteTag {
+                                    tag_id: 0x9400 + tags.len() as u16,
                                     tag_name: Some(Box::leak(name.into_boxed_str())),
                                     value: ExifValue::Ascii(val),
                                 },
