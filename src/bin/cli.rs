@@ -504,6 +504,11 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                             let rounded = (f_number * 10.0).round() / 10.0;
                             format!("{}", rounded)
                         }
+                        0x008B => {
+                            // LensFStops (Nikon) - format with 2 decimal places
+                            let val = n as f64 / d as f64;
+                            format!("{:.2}", val)
+                        }
                         _ => {
                             let val = n as f64 / d as f64;
                             if val == val.floor() {
@@ -547,10 +552,15 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                             if bias == 0.0 {
                                 "0".to_string()
                             } else {
-                                format!("{:.6}", bias)
+                                let formatted = format!("{:.6}", bias.abs())
                                     .trim_end_matches('0')
                                     .trim_end_matches('.')
-                                    .to_string()
+                                    .to_string();
+                                if bias > 0.0 {
+                                    format!("+{}", formatted)
+                                } else {
+                                    format!("-{}", formatted)
+                                }
                             }
                         }
                         _ => format!("{:.6}", n as f64 / d as f64)

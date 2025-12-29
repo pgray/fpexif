@@ -714,7 +714,7 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
         NIKON_LIGHT_SOURCE => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
-                "Unknown".to_string()
+                String::new() // ExifTool outputs empty string for empty LightSource
             } else {
                 match trimmed {
                     "NATURAL" => "Natural".to_string(),
@@ -1894,9 +1894,19 @@ fn get_shot_info_shutter_offset(version: &str, data_len: usize) -> Option<(usize
 /// Parse LensData tag data (tag 0x0098)
 /// Extracts lens parameters from the binary blob
 /// Version 0100: D100, D1X (unencrypted)
-/// Version 0101/02xx: D70, D200, etc. (encrypted after byte 4)
+/// Version 0101: D70, D70s (unencrypted)
+/// Version 02xx: D200, D300, D800, etc. (encrypted after byte 4)
 /// Returns (tags, lens_id_bytes) where lens_id_bytes are the 7 raw bytes needed for LensID
-fn parse_lens_data(data: &[u8]) -> (Vec<(String, String)>, Option<[u8; 7]>) {
+///
+/// Parameters:
+/// - data: Raw LensData bytes
+/// - serial: SerialNumber from tag 0x001D (for decryption)
+/// - shutter_count: ShutterCount from tag 0x00A7 (for decryption)
+fn parse_lens_data(
+    data: &[u8],
+    serial: Option<u32>,
+    shutter_count: Option<u32>,
+) -> (Vec<(String, String)>, Option<[u8; 7]>) {
     let mut tags = Vec::new();
 
     if data.len() < 4 {
@@ -1920,10 +1930,9 @@ fn parse_lens_data(data: &[u8]) -> (Vec<(String, String)>, Option<[u8; 7]>) {
         let lens_id_number = data[6];
         tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
 
-        // Offset 0x07: LensFStops (value / 12)
+        // Offset 0x07: LensFStops raw value (for lens_id_bytes)
+        // Don't output here - use NIKON_LENS_F_STOPS (0x008B) tag instead to avoid duplicates
         let lens_f_stops_raw = data[7];
-        let lens_f_stops = lens_f_stops_raw as f64 / 12.0;
-        tags.push(("LensFStops".to_string(), format!("{:.2}", lens_f_stops)));
 
         // Offset 0x08: MinFocalLength (5 * 2^(value/24))
         let min_focal_raw = data[8];
@@ -1973,10 +1982,9 @@ fn parse_lens_data(data: &[u8]) -> (Vec<(String, String)>, Option<[u8; 7]>) {
         let lens_id_number = data[11];
         tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
 
-        // Offset 0x0c: LensFStops
+        // Offset 0x0c: LensFStops raw value (for lens_id_bytes)
+        // Don't output here - use NIKON_LENS_F_STOPS (0x008B) tag instead to avoid duplicates
         let lens_f_stops_raw = data[12];
-        let lens_f_stops = lens_f_stops_raw as f64 / 12.0;
-        tags.push(("LensFStops".to_string(), format!("{:.2}", lens_f_stops)));
 
         // Offset 0x0d: MinFocalLength
         let min_focal_raw = data[13];
@@ -2020,7 +2028,66 @@ fn parse_lens_data(data: &[u8]) -> (Vec<(String, String)>, Option<[u8; 7]>) {
         ]);
     }
     // Version 02xx: Encrypted - requires decryption
-    // TODO: Implement decryption for 0201, 0202, 0203, 0204
+    // Versions 0201, 0202, 0203, 0204, 0205 use same structure as 0101 but encrypted
+    else if version.starts_with("02") && data.len() >= 18 {
+        if let (Some(ser), Some(count)) = (serial, shutter_count) {
+            // Make mutable copy for decryption
+            let mut decrypted = data.to_vec();
+
+            // Decrypt starting at byte 4 (version string is unencrypted)
+            nikon_decrypt(ser, count, &mut decrypted, 4);
+
+            // Same offsets as 0101 but on decrypted data
+            // Offset 0x0b (11): LensIDNumber
+            let lens_id_number = decrypted[11];
+            tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
+
+            // Offset 0x0c (12): LensFStops raw value (for lens_id_bytes)
+            // Don't output here - use NIKON_LENS_F_STOPS (0x008B) tag instead to avoid duplicates
+            let lens_f_stops_raw = decrypted[12];
+
+            // Offset 0x0d (13): MinFocalLength
+            let min_focal_raw = decrypted[13];
+            let min_focal = 5.0 * 2.0_f64.powf(min_focal_raw as f64 / 24.0);
+            tags.push(("MinFocalLength".to_string(), format!("{:.1} mm", min_focal)));
+
+            // Offset 0x0e (14): MaxFocalLength
+            let max_focal_raw = decrypted[14];
+            let max_focal = 5.0 * 2.0_f64.powf(max_focal_raw as f64 / 24.0);
+            tags.push(("MaxFocalLength".to_string(), format!("{:.1} mm", max_focal)));
+
+            // Offset 0x0f (15): MaxApertureAtMinFocal
+            let max_ap_min_raw = decrypted[15];
+            let max_ap_min = 2.0_f64.powf(max_ap_min_raw as f64 / 24.0);
+            tags.push((
+                "MaxApertureAtMinFocal".to_string(),
+                format!("{:.1}", max_ap_min),
+            ));
+
+            // Offset 0x10 (16): MaxApertureAtMaxFocal
+            let max_ap_max_raw = decrypted[16];
+            let max_ap_max = 2.0_f64.powf(max_ap_max_raw as f64 / 24.0);
+            tags.push((
+                "MaxApertureAtMaxFocal".to_string(),
+                format!("{:.1}", max_ap_max),
+            ));
+
+            // Offset 0x11 (17): MCUVersion
+            let mcu_version = decrypted[17];
+            tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
+
+            // Store raw bytes for LensID composite lookup
+            lens_id_bytes = Some([
+                lens_id_number,
+                lens_f_stops_raw,
+                min_focal_raw,
+                max_focal_raw,
+                max_ap_min_raw,
+                max_ap_max_raw,
+                mcu_version,
+            ]);
+        }
+    }
 
     (tags, lens_id_bytes)
 }
@@ -2666,6 +2733,12 @@ pub fn parse_nikon_maker_notes(
     let mut lens_type_raw: Option<u8> = None;
     let mut lens_id_bytes: Option<[u8; 7]> = None;
 
+    // Variables for LensData decryption
+    let mut serial_number: Option<u32> = None;
+    let mut shutter_count_val: Option<u32> = None;
+    // Store LensData for deferred processing (needs serial/shutter_count which come later)
+    let mut lens_data_bytes: Option<Vec<u8>> = None;
+
     // Nikon maker notes often start with "Nikon\0" header
     if data.len() < 18 {
         return Ok(tags);
@@ -2815,6 +2888,13 @@ pub fn parse_nikon_maker_notes(
                     let s = String::from_utf8_lossy(&value_bytes[..count as usize])
                         .trim_end_matches('\0')
                         .to_string();
+
+                    // Capture SerialNumber for LensData decryption
+                    if tag_id == NIKON_SERIAL_NUMBER {
+                        // Try to parse as u32, otherwise use fallback
+                        serial_number = s.trim().parse::<u32>().ok().or(Some(0x60));
+                    }
+
                     // Apply value decoders for specific tags
                     let decoded = decode_nikon_ascii_value(tag_id, &s);
                     ExifValue::Ascii(decoded)
@@ -2902,6 +2982,10 @@ pub fn parse_nikon_maker_notes(
                     // Special handling for ShutterCount
                     if tag_id == NIKON_SHUTTER_COUNT && values.len() == 1 {
                         let v = values[0];
+                        // Capture ShutterCount for LensData decryption
+                        if v != 4294965247 {
+                            shutter_count_val = Some(v);
+                        }
                         if v == 4294965247 {
                             ExifValue::Ascii("n/a".to_string())
                         } else {
@@ -3088,20 +3172,9 @@ pub fn parse_nikon_maker_notes(
                     }
                 }
                 NIKON_LENS_DATA => {
+                    // Store LensData for deferred processing after serial/shutter_count are captured
                     if let ExifValue::Undefined(ref data_bytes) = value {
-                        let (lens_data_tags, raw_bytes) = parse_lens_data(data_bytes);
-                        // Store raw bytes for LensID composite lookup
-                        lens_id_bytes = raw_bytes;
-                        for (name, val) in lens_data_tags {
-                            tags.insert(
-                                0x9400 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9400 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
-                        }
+                        lens_data_bytes = Some(data_bytes.clone());
                     }
                 }
                 NIKON_AF_INFO => {
@@ -3179,6 +3252,23 @@ pub fn parse_nikon_maker_notes(
                 }
                 _ => {}
             }
+        }
+    }
+
+    // Deferred LensData processing - need serial_number and shutter_count_val
+    // which may appear after LensData in the IFD (ShutterCount is 0x00A7, LensData is 0x0098)
+    if let Some(data) = lens_data_bytes {
+        let (parsed_tags, id_bytes) = parse_lens_data(&data, serial_number, shutter_count_val);
+        lens_id_bytes = id_bytes;
+        for (name, val) in parsed_tags {
+            tags.insert(
+                0x9400 + tags.len() as u16,
+                MakerNoteTag {
+                    tag_id: 0x9400 + tags.len() as u16,
+                    tag_name: Some(Box::leak(name.into_boxed_str())),
+                    value: ExifValue::Ascii(val),
+                },
+            );
         }
     }
 

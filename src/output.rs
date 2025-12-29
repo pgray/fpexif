@@ -164,12 +164,29 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
                 Value::String(format!("{} mm", focal_length))
             }
         }
-        0x9203 | 0x9204 => {
-            // Other APEX values - show as decimal
+        0x9203 => {
+            // BrightnessValue - show as decimal number
             let decimal = num as f64 / den as f64;
             serde_json::Number::from_f64(decimal)
                 .map(Value::Number)
                 .unwrap_or_else(|| Value::String(decimal.to_string()))
+        }
+        0x9204 => {
+            // ExposureBiasValue/ExposureCompensation - format as string with +/- prefix
+            let decimal = num as f64 / den as f64;
+            if decimal == 0.0 {
+                Value::Number(0.into())
+            } else {
+                let formatted = format!("{:.6}", decimal.abs())
+                    .trim_end_matches('0')
+                    .trim_end_matches('.')
+                    .to_string();
+                if decimal > 0.0 {
+                    Value::String(format!("+{}", formatted))
+                } else {
+                    Value::String(format!("-{}", formatted))
+                }
+            }
         }
         0x9206 => {
             // SubjectDistance - add " m" suffix
@@ -177,8 +194,16 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
             Value::String(format!("{} m", distance))
         }
         // Nikon MakerNote tags that should always show decimal format as JSON number
-        0x008B | 0x0017 => {
-            // LensFStops (0x008B), FlashExposureBracketValue (0x0017)
+        0x008B => {
+            // LensFStops - ExifTool outputs with exactly 2 decimal places (e.g., 6.00)
+            // Use serde_json RawValue to preserve the exact formatting
+            let decimal = num as f64 / den as f64;
+            let formatted = format!("{:.2}", decimal);
+            // Parse back as a number to get the correct JSON representation
+            serde_json::from_str(&formatted).unwrap_or_else(|_| Value::Number(0.into()))
+        }
+        0x0017 => {
+            // FlashExposureBracketValue
             // Return as JSON number to match ExifTool's output
             let decimal = num as f64 / den as f64;
             serde_json::Number::from_f64(decimal)
@@ -216,6 +241,23 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
             let shutter_speed = 2f64.powf(apex_value);
             let denominator = shutter_speed.round() as i32;
             Value::String(format!("1/{}", denominator))
+        }
+        0x9204 => {
+            // ExposureBiasValue/ExposureCompensation - format as string with +/- prefix
+            let decimal = num as f64 / den as f64;
+            if decimal == 0.0 {
+                Value::Number(0.into())
+            } else {
+                let formatted = format!("{:.6}", decimal.abs())
+                    .trim_end_matches('0')
+                    .trim_end_matches('.')
+                    .to_string();
+                if decimal > 0.0 {
+                    Value::String(format!("+{}", formatted))
+                } else {
+                    Value::String(format!("-{}", formatted))
+                }
+            }
         }
         // Nikon MakerNote tags that should always show decimal format
         0x0017 => {
@@ -1016,7 +1058,7 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // value is more accurate (like MeteringMode for Canon cameras)
     if let Some(maker_notes) = exif_data.get_maker_notes() {
         // Tags where MakerNote should override EXIF (ExifTool behavior)
-        const MAKERNOTE_PRIORITY_TAGS: &[&str] = &["MeteringMode", "WhiteBalance"];
+        const MAKERNOTE_PRIORITY_TAGS: &[&str] = &["MeteringMode", "WhiteBalance", "LightSource"];
 
         for (tag_id, maker_tag) in maker_notes.iter() {
             let tag_name = maker_tag
