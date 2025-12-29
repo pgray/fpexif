@@ -1592,12 +1592,39 @@ pub fn parse_sony_maker_notes(
         if let Some((tag_id, value)) =
             parse_ifd_entry(data, entry_offset, endian, tiff_data, tiff_offset)
         {
+            // Decode certain tag values to human-readable strings for ExifTool compatibility
+            let decoded_value = match tag_id {
+                SONY_SOFT_SKIN_EFFECT => {
+                    if let ExifValue::Long(ref v) = value {
+                        if !v.is_empty() {
+                            ExifValue::Ascii(decode_soft_skin_effect_exiv2(v[0]).to_string())
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                SONY_QUALITY_2 | SONY_IMAGE_QUALITY => {
+                    if let ExifValue::Long(ref v) = value {
+                        if !v.is_empty() {
+                            ExifValue::Ascii(decode_quality_exiftool(v[0]).to_string())
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                _ => value,
+            };
+
             tags.insert(
                 tag_id,
                 MakerNoteTag {
                     tag_id,
                     tag_name: get_sony_tag_name(tag_id),
-                    value,
+                    value: decoded_value,
                 },
             );
         }
