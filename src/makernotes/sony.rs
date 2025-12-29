@@ -1077,30 +1077,112 @@ pub fn format_flash_comp(value: i16) -> String {
     }
 }
 
-/// Format LensSpec byte array as a readable string
-/// LensSpec is 8 bytes: [flags1, short_focal, long_focal, max_ap_short, max_ap_long, flags2, ?, ?]
+/// Decode a single BCD byte to its decimal value
+/// e.g., 0x55 -> 55 (not 85)
+fn decode_bcd_byte(byte: u8) -> u16 {
+    let high = (byte >> 4) as u16;
+    let low = (byte & 0x0f) as u16;
+    high * 10 + low
+}
+
+/// Decode two BCD bytes to a focal length value
+/// e.g., [0x00, 0x55] -> 55, [0x02, 0x00] -> 200
+fn decode_bcd_focal(high_byte: u8, low_byte: u8) -> u16 {
+    decode_bcd_byte(high_byte) * 100 + decode_bcd_byte(low_byte)
+}
+
+/// Format LensSpec byte array as a readable string matching ExifTool's format
+/// LensSpec is 8 bytes in ExifTool format:
+/// - byte 0: flags1 (lens mount type: DT=0x01, FE=0x02, E=0x03, etc.)
+/// - bytes 1-2: short focal length (as hex digits forming decimal number)
+/// - bytes 3-4: long focal length (as hex digits forming decimal number)
+/// - byte 5: max aperture at short focal (divided by 10)
+/// - byte 6: max aperture at long focal (divided by 10)
+/// - byte 7: flags2 (lens features: SSM=0x01, SAM=0x02, ZA=0x04, G=0x08, etc.)
 pub fn format_lens_spec(bytes: &[u8]) -> String {
     if bytes.len() < 8 {
         return format!("{:?}", bytes);
     }
 
-    // Simple formatting: just show the focal length and aperture info
-    let short_focal = bytes[1];
-    let long_focal = bytes[2];
-    let max_ap_short = bytes[3];
-    let max_ap_long = bytes[4];
+    let flags1 = bytes[0];
+    // Focal lengths are stored as BCD (Binary Coded Decimal)
+    // Each byte's hex representation forms decimal digits
+    // e.g., 0x00 0x55 -> "0055" -> 55mm (not 0x0055 = 85)
+    let short_focal = decode_bcd_focal(bytes[1], bytes[2]);
+    let long_focal = decode_bcd_focal(bytes[3], bytes[4]);
+    // Apertures are also BCD and divided by 10
+    let max_ap_short = decode_bcd_byte(bytes[5]) as f32 / 10.0;
+    let max_ap_long = decode_bcd_byte(bytes[6]) as f32 / 10.0;
+    let flags2 = bytes[7];
 
-    if short_focal == long_focal {
-        format!("{}mm F{}", short_focal, max_ap_short as f32 / 10.0)
-    } else {
-        format!(
-            "{}-{}mm F{}-{}",
-            short_focal,
-            long_focal,
-            max_ap_short as f32 / 10.0,
-            max_ap_long as f32 / 10.0
-        )
+    // Check if all zeros (unknown lens)
+    if short_focal == 0 && long_focal == 0 && bytes[5] == 0 && bytes[6] == 0 {
+        return format!(
+            "Unknown ({:02x} {} {} {} {} {:02x})",
+            flags1, bytes[1], bytes[2], bytes[3], bytes[4], flags2
+        );
     }
+
+    // Build lens type prefix from flags1
+    let mut prefix = String::new();
+    if flags1 & 0x40 != 0 {
+        prefix.push_str("PZ ");
+    }
+    match flags1 & 0x03 {
+        0x01 => prefix.push_str("DT "),
+        0x02 => prefix.push_str("FE "),
+        0x03 => prefix.push_str("E "),
+        _ => {}
+    }
+
+    // Build focal length string
+    let focal_str = if short_focal == long_focal || long_focal == 0 {
+        format!("{}mm", short_focal)
+    } else {
+        format!("{}-{}mm", short_focal, long_focal)
+    };
+
+    // Build aperture string
+    let aperture_str = if max_ap_short == max_ap_long || max_ap_long == 0.0 {
+        if max_ap_short == max_ap_short.floor() {
+            format!("F{}", max_ap_short as u32)
+        } else {
+            format!("F{}", max_ap_short)
+        }
+    } else {
+        let short_str = if max_ap_short == max_ap_short.floor() {
+            format!("{}", max_ap_short as u32)
+        } else {
+            format!("{}", max_ap_short)
+        };
+        let long_str = if max_ap_long == max_ap_long.floor() {
+            format!("{}", max_ap_long as u32)
+        } else {
+            format!("{}", max_ap_long)
+        };
+        format!("F{}-{}", short_str, long_str)
+    };
+
+    // Build suffix from flags2
+    let mut suffix = String::new();
+    match flags2 & 0x0c {
+        0x04 => suffix.push_str(" ZA"),
+        0x08 => suffix.push_str(" G"),
+        _ => {}
+    }
+    match flags2 & 0x03 {
+        0x01 => suffix.push_str(" SSM"),
+        0x02 => suffix.push_str(" SAM"),
+        _ => {}
+    }
+    if flags1 & 0x80 != 0 {
+        suffix.push_str(" OSS");
+    }
+    if flags1 & 0x20 != 0 {
+        suffix.push_str(" LE");
+    }
+
+    format!("{}{} {}{}", prefix, focal_str, aperture_str, suffix)
 }
 
 /// Decode FlashAction value (tag 0x2017) - exiv2 format

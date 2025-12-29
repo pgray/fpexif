@@ -211,11 +211,20 @@ where
                 _ => None,
             });
 
+        // Get the camera model for model-specific formatting (e.g., Canon SerialNumber)
+        let model = exif_data
+            .get_tag_by_id(0x0110) // Model tag
+            .and_then(|v| match v {
+                ExifValue::Ascii(s) => Some(s.as_str()),
+                _ => None,
+            });
+
         // Parse the maker notes
         // Pass the full app1_data and tiff_offset for manufacturers that use TIFF-relative offsets (e.g., Canon)
         if let Ok(parsed_maker_notes) = crate::makernotes::parse_maker_notes_with_tiff_data(
             maker_note_data,
             make,
+            model,
             endian,
             Some(&app1_data),
             tiff_offset,

@@ -4838,6 +4838,7 @@ pub fn parse_canon_maker_notes(
     endian: Endianness,
     tiff_data: Option<&[u8]>,
     tiff_offset: usize,
+    model: Option<&str>,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -5012,11 +5013,19 @@ pub fn parse_canon_maker_notes(
                         value
                     }
                 }
-                // SerialNumber - output as 10-digit string with leading zeros
+                // SerialNumber - format depends on camera model
+                // EOS-1D series: 6 digits, all other models: 10 digits
                 CANON_SERIAL_NUMBER => {
                     if let ExifValue::Long(ref longs) = value {
                         if !longs.is_empty() {
-                            ExifValue::Ascii(format!("{:010}", longs[0]))
+                            // Check if this is an EOS-1D series camera
+                            let is_1d_series = model.map(|m| m.contains("EOS-1D")).unwrap_or(false);
+
+                            if is_1d_series {
+                                ExifValue::Ascii(format!("{:06}", longs[0]))
+                            } else {
+                                ExifValue::Ascii(format!("{:010}", longs[0]))
+                            }
                         } else {
                             value
                         }

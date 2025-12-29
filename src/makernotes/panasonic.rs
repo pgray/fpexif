@@ -425,6 +425,15 @@ define_tag_decoder! {
     }
 }
 
+// ShadingCompensation (tag 0x008A): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    shading_compensation,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
 // Audio (tag 0x0020): Panasonic.pm / panasonicmn_int.cpp
 define_tag_decoder! {
     audio,
@@ -686,6 +695,9 @@ pub fn parse_panasonic_maker_notes(
                             PANA_CAMERA_ORIENTATION => {
                                 Some(decode_camera_orientation_exiftool(bytes[0]).to_string())
                             }
+                            PANA_INTELLIGENT_RESOLUTION => Some(
+                                decode_intelligent_resolution_exiftool(bytes[0] as u16).to_string(),
+                            ),
                             _ => None,
                         };
                         if let Some(s) = decoded {
@@ -821,6 +833,28 @@ pub fn parse_panasonic_maker_notes(
                             }
                             PANA_TEXT_STAMP | PANA_TEXT_STAMP_2 => {
                                 Some(decode_text_stamp_exiftool(v).to_string())
+                            }
+                            PANA_SHADING_COMPENSATION => {
+                                Some(decode_shading_compensation_exiftool(v).to_string())
+                            }
+                            PANA_PROGRAM_ISO | PANA_TRAVEL_DAY => {
+                                // 65535 means "n/a" for these tags
+                                if v == 65535 {
+                                    Some("n/a".to_string())
+                                } else {
+                                    None
+                                }
+                            }
+                            PANA_FLASH_BIAS => {
+                                // FlashBias is signed, divided by 3
+                                let signed_v = v as i16;
+                                let bias = signed_v / 3;
+                                Some(format!("{}", bias))
+                            }
+                            PANA_ACCELEROMETER_X | PANA_ACCELEROMETER_Y | PANA_ACCELEROMETER_Z => {
+                                // Accelerometer values are signed
+                                let signed_v = v as i16;
+                                Some(format!("{}", signed_v))
                             }
                             _ => None,
                         };

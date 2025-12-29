@@ -17,6 +17,52 @@ fn gcd(a: u32, b: u32) -> u32 {
     }
 }
 
+/// Convert a decimal exposure compensation value to a fraction string like "+1/3" or "-2/3"
+/// This matches ExifTool's PrintConv for ExposureCompensation
+#[cfg(feature = "serde")]
+fn decimal_to_exposure_fraction(decimal: f64) -> String {
+    if decimal == 0.0 {
+        return "0".to_string();
+    }
+
+    let sign = if decimal > 0.0 { "+" } else { "-" };
+    let abs_val = decimal.abs();
+
+    // Check for whole numbers first
+    if (abs_val - abs_val.round()).abs() < 0.001 {
+        return format!("{}{}", sign, abs_val.round() as i32);
+    }
+
+    // Common exposure compensation fractions - check for 1/2, 1/3, 2/3 increments
+    // Use tolerance for floating point comparison
+    let tolerance = 0.01;
+
+    // Extract whole part and fractional part
+    let whole = abs_val.trunc() as i32;
+    let frac = abs_val - abs_val.trunc();
+
+    // Check common fractions
+    let frac_str = if (frac - 1.0 / 3.0).abs() < tolerance {
+        "1/3"
+    } else if (frac - 2.0 / 3.0).abs() < tolerance {
+        "2/3"
+    } else if (frac - 0.5).abs() < tolerance {
+        "1/2"
+    } else {
+        // Fallback to decimal for unusual values
+        return format!("{}{:.6}", sign, abs_val)
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string();
+    };
+
+    if whole == 0 {
+        format!("{}{}", sign, frac_str)
+    } else {
+        format!("{}{} {}", sign, whole, frac_str)
+    }
+}
+
 /// Format EXIF MeteringMode - use manufacturer-specific naming where appropriate
 #[cfg(feature = "serde")]
 fn format_metering_mode(value: u16, make: Option<&str>) -> String {
@@ -172,20 +218,13 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
                 .unwrap_or_else(|| Value::String(decimal.to_string()))
         }
         0x9204 => {
-            // ExposureBiasValue/ExposureCompensation - format as string with +/- prefix
+            // ExposureBiasValue/ExposureCompensation - format as fraction string
             let decimal = num as f64 / den as f64;
-            if decimal == 0.0 {
+            let formatted = decimal_to_exposure_fraction(decimal);
+            if formatted == "0" {
                 Value::Number(0.into())
             } else {
-                let formatted = format!("{:.6}", decimal.abs())
-                    .trim_end_matches('0')
-                    .trim_end_matches('.')
-                    .to_string();
-                if decimal > 0.0 {
-                    Value::String(format!("+{}", formatted))
-                } else {
-                    Value::String(format!("-{}", formatted))
-                }
+                Value::String(formatted)
             }
         }
         0x9206 => {
@@ -243,20 +282,13 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
             Value::String(format!("1/{}", denominator))
         }
         0x9204 => {
-            // ExposureBiasValue/ExposureCompensation - format as string with +/- prefix
+            // ExposureBiasValue/ExposureCompensation - format as fraction string
             let decimal = num as f64 / den as f64;
-            if decimal == 0.0 {
+            let formatted = decimal_to_exposure_fraction(decimal);
+            if formatted == "0" {
                 Value::Number(0.into())
             } else {
-                let formatted = format!("{:.6}", decimal.abs())
-                    .trim_end_matches('0')
-                    .trim_end_matches('.')
-                    .to_string();
-                if decimal > 0.0 {
-                    Value::String(format!("+{}", formatted))
-                } else {
-                    Value::String(format!("-{}", formatted))
-                }
+                Value::String(formatted)
             }
         }
         // Nikon MakerNote tags that should always show decimal format
