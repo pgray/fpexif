@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/beep"
+
+cargo test "$@"
+
+if [ $? -eq 0 ] && command -v ffmpeg &>/dev/null; then
+  success
+elif command -v ffmpeg &>/dev/null; then
+  failure
+fi
