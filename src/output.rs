@@ -1115,14 +1115,28 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
-    // ImageSize - compute from ImageWidth and ImageHeight/ImageLength
-    // TIFF uses ImageLength for height, EXIF uses ImageHeight
-    let width = output.get("ImageWidth").and_then(|v| match v {
-        Value::Number(n) => n.as_u64(),
-        _ => None,
-    });
+    // Add ExifImageWidth/Height aliases for PixelXDimension/PixelYDimension
+    // ExifTool uses "ExifImageWidth" for tag 0xA002
+    if let Some(pxd) = output.get("PixelXDimension").cloned() {
+        output.insert("ExifImageWidth".to_string(), pxd);
+    }
+    if let Some(pyd) = output.get("PixelYDimension").cloned() {
+        output.insert("ExifImageHeight".to_string(), pyd);
+    }
+
+    // ImageSize - compute from actual image dimensions
+    // Prefer PixelXDimension/PixelYDimension (EXIF tags 0xA002/0xA003) over ImageWidth/ImageLength
+    // TIFF ImageWidth/ImageLength often refer to thumbnail dimensions in raw files
+    let width = output
+        .get("PixelXDimension")
+        .or_else(|| output.get("ImageWidth"))
+        .and_then(|v| match v {
+            Value::Number(n) => n.as_u64(),
+            _ => None,
+        });
     let height = output
-        .get("ImageHeight")
+        .get("PixelYDimension")
+        .or_else(|| output.get("ImageHeight"))
         .or_else(|| output.get("ImageLength"))
         .and_then(|v| match v {
             Value::Number(n) => n.as_u64(),
