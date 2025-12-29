@@ -809,6 +809,7 @@ define_tag_decoder! {
 }
 
 // Adjustment values (tags 0x2004/0x2005/0x2006): Contrast/Saturation/Sharpness
+// ExifTool PrintConv: '$val > 0 ? "+$val" : $val' (shows raw number, + prefix for positive)
 define_tag_decoder! {
     adjustment,
     type: i32,
@@ -816,7 +817,7 @@ define_tag_decoder! {
         -3 => "-3",
         -2 => "-2",
         -1 => "-1",
-        0 => "Normal",
+        0 => "0",
         1 => "+1",
         2 => "+2",
         3 => "+3",
@@ -1113,6 +1114,17 @@ pub fn decode_flash_action_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode FlashAction value (tag 0x2017) - ExifTool format
+pub fn decode_flash_action_exiftool(value: u32) -> &'static str {
+    match value {
+        0 => "Did not fire",
+        1 => "Flash Fired",
+        2 => "External Flash Fired",
+        3 => "Wireless Controlled Flash Fired",
+        _ => "Unknown",
+    }
+}
+
 /// Decode AFTracking value (tag 0x2021) - exiv2 format
 pub fn decode_af_tracking_exiv2(value: u16) -> &'static str {
     match value {
@@ -1207,6 +1219,12 @@ pub fn decode_auto_portrait_framed_exiv2(value: u16) -> &'static str {
         1 => "Yes",
         _ => "Unknown",
     }
+}
+
+/// Decode AutoPortraitFramed value (tag 0x2016) - ExifTool format
+/// Same values as exiv2
+pub fn decode_auto_portrait_framed_exiftool(value: u16) -> &'static str {
+    decode_auto_portrait_framed_exiv2(value)
 }
 
 /// Decode AFIlluminator value (tag 0xB044) - exiv2 format
@@ -1436,6 +1454,9 @@ fn parse_ifd_entry(
                     SONY_RELEASE_MODE => Some(decode_release_mode_exiftool(v).to_string()),
                     SONY_INTELLIGENT_AUTO => Some(decode_intelligent_auto_exiftool(v).to_string()),
                     SONY_QUALITY_2 => Some(decode_quality_exiftool(v as u32).to_string()),
+                    SONY_AUTO_PORTRAIT_FRAMED => {
+                        Some(decode_auto_portrait_framed_exiftool(v).to_string())
+                    }
                     _ => None,
                 };
 
@@ -1509,6 +1530,8 @@ fn parse_ifd_entry(
                     ExifValue::Ascii(decode_zone_matching_exiftool(v).to_string())
                 } else if tag_id == SONY_COLOR_MODE {
                     ExifValue::Ascii(decode_color_mode_exiftool(v).to_string())
+                } else if tag_id == SONY_FLASH_ACTION {
+                    ExifValue::Ascii(decode_flash_action_exiftool(v).to_string())
                 } else if v <= u16::MAX as u32 {
                     // Then check tags that fit in u16
                     let v16 = v as u16;
