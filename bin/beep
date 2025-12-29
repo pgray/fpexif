@@ -1,6 +1,11 @@
 #!/bin/bash
 
-[[ "$CI" != "" ]] && return
+# In CI or when ffmpeg/paplay not available, define no-op functions
+if [[ "$CI" != "" ]] || ! command -v ffmpeg &>/dev/null || ! command -v paplay &>/dev/null; then
+  function success { :; }
+  function failure { :; }
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]] || return
+fi
 
 function success {
   ffmpeg \
