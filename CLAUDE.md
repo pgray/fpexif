@@ -6,6 +6,15 @@ don't allow dead code
 
 don't run --release builds
 
+## Audio Notifications
+
+Use `./bin/beep` to notify when tasks complete:
+
+- `./bin/beep success` - Play ascending tones when a task completes successfully
+- `./bin/beep failure` - Play descending tones when you need user input or something failed
+
+Always beep when finishing a significant task or series of tasks.
+
 ## Reference Implementations
 
 The following submodules contain reference implementations for EXIF parsing:
