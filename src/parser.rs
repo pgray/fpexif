@@ -156,8 +156,54 @@ where
     parse_subifd(0x8825, TagGroup::Gps); // GPS SubIFD
     parse_subifd(0xA005, TagGroup::Interop); // Interoperability SubIFD
 
+    // Follow the entire IFD chain (IFD1 → IFD2 → IFD3 → ...)
+    // This is important for Canon CR2 files where IFD3 contains raw data metadata
+    // Only override specific tags that should come from raw data IFD:
+    // StripOffsets, StripByteCounts, RowsPerStrip, SamplesPerPixel, etc.
+    // Use lenient parsing - some files have corrupt IFD offsets
+    let mut current_ifd_offset = next_ifd_offset;
+    let mut ifd_count = 0;
+    const MAX_IFD_CHAIN: u32 = 10; // Prevent infinite loops
+
+    // Tags that should be taken from the last (raw data) IFD
+    const RAW_DATA_TAGS: [u16; 7] = [
+        0x0111, // StripOffsets
+        0x0117, // StripByteCounts
+        0x0116, // RowsPerStrip
+        0x0115, // SamplesPerPixel
+        0x011C, // PlanarConfiguration
+        0x0106, // PhotometricInterpretation
+        0x0103, // Compression (for raw data IFD)
+    ];
+
+    while current_ifd_offset > 0
+        && ifd_count < MAX_IFD_CHAIN
+        && tiff_offset + current_ifd_offset as usize + 2 <= app1_data.len()
+    {
+        if let Ok((ifd_tags, next_offset)) = parse_ifd(
+            &app1_data,
+            tiff_offset + current_ifd_offset as usize,
+            tiff_offset,
+            endian,
+            TagGroup::Main,
+            config,
+        ) {
+            // Only override specific raw-data tags, skip others
+            for (tag_id, value) in ifd_tags {
+                if RAW_DATA_TAGS.contains(&tag_id.id) {
+                    exif_data.tags.insert(tag_id, value);
+                }
+            }
+            current_ifd_offset = next_offset;
+        } else {
+            break;
+        }
+        ifd_count += 1;
+    }
+
     // Parse SubIFDs pointed to by SubIFDs tag (0x014A)
-    // These contain RAW image data and metadata in some formats (e.g., Nikon TIFF)
+    // These contain RAW image data and metadata in some formats (e.g., Canon CR2, Nikon NEF)
+    // Parse AFTER IFD1 so raw data values override thumbnail values
     let subifd_offsets = exif_data.get_tag_by_id(0x014A).and_then(|v| match v {
         ExifValue::Long(offsets) => Some(offsets.clone()),
         _ => None,
@@ -179,24 +225,6 @@ where
                         exif_data.tags.insert(tag_id, value);
                     }
                 }
-            }
-        }
-    }
-
-    // Parse thumbnail IFD (IFD1) if present
-    // Use lenient parsing - some files have corrupt thumbnail IFD offsets
-    if next_ifd_offset > 0 && tiff_offset + next_ifd_offset as usize + 2 <= app1_data.len() {
-        if let Ok((thumbnail_tags, _)) = parse_ifd(
-            &app1_data,
-            tiff_offset + next_ifd_offset as usize,
-            tiff_offset,
-            endian,
-            TagGroup::Thumbnail,
-            config,
-        ) {
-            // Add the thumbnail tags
-            for (tag_id, value) in thumbnail_tags {
-                exif_data.tags.insert(tag_id, value);
             }
         }
     }
