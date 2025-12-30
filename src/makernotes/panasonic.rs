@@ -425,6 +425,37 @@ define_tag_decoder! {
     }
 }
 
+/// Decode AFAreaMode from 2-byte array (tag 0x000F)
+/// Format is "byte0 byte1" -> description string
+pub fn decode_af_area_mode_pair(byte0: u8, byte1: u8) -> &'static str {
+    match (byte0, byte1) {
+        (0, 1) => "9-area",
+        (0, 16) => "3-area (high speed)",
+        (0, 23) => "23-area",
+        (0, 49) => "49-area",
+        (0, 225) => "225-area",
+        (1, 0) => "Spot Focusing",
+        (1, 1) => "5-area",
+        (16, 0) => "1-area",
+        (16, 16) => "1-area (high speed)",
+        (16, 32) => "1-area +",
+        (17, 0) => "Full Area",
+        (32, 0) => "Tracking",
+        (32, 1) => "3-area (left)",
+        (32, 2) => "3-area (center)",
+        (32, 3) => "3-area (right)",
+        (32, 16) => "Zone",
+        (32, 18) => "Zone (horizontal/vertical)",
+        (64, 0) => "Face Detect",
+        (64, 1) => "Face Detect + 3-area (left)",
+        (64, 2) => "Face Detect + 3-area (center)",
+        (64, 3) => "Face Detect + 3-area (right)",
+        (64, 4) => "Face Detect + 1-area",
+        (128, 0) => "Pinpoint",
+        _ => "Unknown",
+    }
+}
+
 // ShadingCompensation (tag 0x008A): Panasonic.pm / panasonicmn_int.cpp
 define_tag_decoder! {
     shading_compensation,
@@ -705,6 +736,15 @@ pub fn parse_panasonic_maker_notes(
                         } else {
                             ExifValue::Byte(bytes)
                         }
+                    } else if count == 2 && bytes.len() >= 2 {
+                        // Handle 2-byte tags like AFAreaMode
+                        if tag_id == PANA_AF_AREA_MODE {
+                            ExifValue::Ascii(
+                                decode_af_area_mode_pair(bytes[0], bytes[1]).to_string(),
+                            )
+                        } else {
+                            ExifValue::Byte(bytes)
+                        }
                     } else {
                         ExifValue::Byte(bytes)
                     }
@@ -871,7 +911,33 @@ pub fn parse_panasonic_maker_notes(
                 4 => {
                     // LONG
                     if count == 1 {
-                        ExifValue::Long(vec![value_offset])
+                        // Check for special decoding
+                        if tag_id == PANA_TIME_SINCE_POWER_ON {
+                            // Format as "[DD days ]HH:MM:SS.ss"
+                            let centiseconds = value_offset;
+                            let total_seconds = centiseconds as f64 / 100.0;
+
+                            let mut val = total_seconds;
+                            let mut prefix = String::new();
+
+                            // Handle days if >= 24 hours
+                            if val >= 24.0 * 3600.0 {
+                                let days = (val / (24.0 * 3600.0)) as u32;
+                                prefix = format!("{} days ", days);
+                                val -= days as f64 * 24.0 * 3600.0;
+                            }
+
+                            let hours = (val / 3600.0) as u32;
+                            val -= hours as f64 * 3600.0;
+                            let minutes = (val / 60.0) as u32;
+                            val -= minutes as f64 * 60.0;
+
+                            let formatted =
+                                format!("{}{:02}:{:02}:{:05.2}", prefix, hours, minutes, val);
+                            ExifValue::Ascii(formatted)
+                        } else {
+                            ExifValue::Long(vec![value_offset])
+                        }
                     } else {
                         let offset = value_offset as usize;
                         if offset + value_size <= data.len() {
@@ -945,11 +1011,27 @@ pub fn parse_panasonic_maker_notes(
                 }
                 7 => {
                     // UNDEFINED
-                    let offset = value_offset as usize;
-                    if offset + count as usize <= data.len() {
-                        ExifValue::Undefined(data[offset..offset + count as usize].to_vec())
+                    if count <= 4 {
+                        // Inline value for small undefined
+                        let bytes = match endian {
+                            Endianness::Little => value_offset.to_le_bytes(),
+                            Endianness::Big => value_offset.to_be_bytes(),
+                        };
+                        // Special handling for FirmwareVersion (4 bytes -> "x.x.x.x")
+                        if tag_id == PANA_FIRMWARE_VERSION && count == 4 {
+                            let version_str =
+                                format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3]);
+                            ExifValue::Ascii(version_str)
+                        } else {
+                            ExifValue::Undefined(bytes[..count as usize].to_vec())
+                        }
                     } else {
-                        continue;
+                        let offset = value_offset as usize;
+                        if offset + count as usize <= data.len() {
+                            ExifValue::Undefined(data[offset..offset + count as usize].to_vec())
+                        } else {
+                            continue;
+                        }
                     }
                 }
                 8 => {

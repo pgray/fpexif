@@ -200,6 +200,16 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
                 .map(Value::Number)
                 .unwrap_or_else(|| Value::String(rounded.to_string()))
         }
+        0x829D => {
+            // FNumber - format with at least one decimal place for ExifTool compatibility
+            let f_number = num as f64 / den as f64;
+            let rounded = (f_number * 10.0).round() / 10.0;
+            // ExifTool always shows one decimal place (e.g., 8.0, not 8)
+            Value::Number(
+                serde_json::Number::from_f64(rounded)
+                    .unwrap_or_else(|| serde_json::Number::from(0)),
+            )
+        }
         0x920A => {
             // FocalLength - add mm unit with decimal formatting
             let focal_length = num as f64 / den as f64;
