@@ -3368,10 +3368,10 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     }
 
     // Target exposure time (index 5) - Canon APEX time value
-    // exposure time = 2^(-value/32), displayed as fraction
+    // exposure time = 2^(-CanonEv(value)), displayed as fraction
     if data.len() > 5 && data[5] > 0 {
-        let apex = data[5] as f64 / 32.0;
-        let time = 2f64.powf(-apex);
+        let ev = canon_ev(data[5] as i16);
+        let time = 2f64.powf(-ev);
         // Format as fraction if less than 1 second
         let formatted = if time < 1.0 {
             let denominator = (1.0 / time).round() as u32;
@@ -3639,8 +3639,8 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
 
     // Target exposure time (index 5)
     if data.len() > 5 && data[5] > 0 {
-        let apex = data[5] as f64 / 32.0;
-        let time = 2f64.powf(-apex);
+        let ev = canon_ev(data[5] as i16);
+        let time = 2f64.powf(-ev);
         let formatted = if time < 1.0 {
             let denominator = (1.0 / time).round() as u32;
             format!("1/{}", denominator)
