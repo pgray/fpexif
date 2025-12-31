@@ -180,6 +180,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Print all EXIF data in exiftool text format: `Tag Name                        : Value`
 fn print_exif_data_exiftool(exif_data: &ExifData) {
+    use std::collections::HashSet;
+
+    // Tags where MakerNote should override EXIF (ExifTool behavior)
+    // Note: Saturation/Contrast/Sharpness are NOT included here - for most Sony cameras,
+    // the EXIF values are preferred. Only the MinoltaRaw data in SR2Private would override,
+    // but we don't parse that yet.
+    const MAKERNOTE_PRIORITY_TAGS: &[&str] = &["MeteringMode", "WhiteBalance", "LightSource"];
+
+    // Build set of MakerNote tag names for priority/dedup logic
+    let makernote_tags: HashSet<&str> = exif_data
+        .get_maker_notes()
+        .map(|notes| notes.iter().filter_map(|(_, note)| note.tag_name).collect())
+        .unwrap_or_default();
+
+    // Track which tags we've already printed
+    let mut printed_tags: HashSet<String> = HashSet::new();
+
     // Output RAF-specific metadata first (for Fujifilm RAF files)
     if let Some(raf_metadata) = exif_data.get_raf_metadata() {
         // Output in a consistent order
@@ -207,22 +224,35 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
         for key in ordered_keys {
             if let Some(value) = raf_metadata.tags.get(key) {
                 println!("{:<32}: {}", key, value);
+                printed_tags.insert(key.to_string());
             }
         }
     }
 
     for (tag_id, value) in exif_data.iter() {
         let tag_name = tag_id.name().unwrap_or("Unknown");
+
+        // Skip priority tags if they exist in MakerNote (MakerNote value takes precedence)
+        if MAKERNOTE_PRIORITY_TAGS.contains(&tag_name) && makernote_tags.contains(tag_name) {
+            continue;
+        }
+
         let display_value = format_exiftool_text_value(value, tag_id.id);
         println!("{:<32}: {}", tag_name, display_value);
+        printed_tags.insert(tag_name.to_string());
     }
 
     // Output maker notes
     if let Some(maker_notes) = exif_data.get_maker_notes() {
         for (_, note) in maker_notes.iter() {
             if let Some(name) = note.tag_name {
+                // Skip if already printed (non-priority tags)
+                if printed_tags.contains(name) {
+                    continue;
+                }
                 let display_value = format_exiftool_text_value(&note.value, note.tag_id);
                 println!("{:<32}: {}", name, display_value);
+                printed_tags.insert(name.to_string());
             }
         }
     }
@@ -264,9 +294,15 @@ fn print_computed_fields(exif_data: &ExifData) {
         }
     }
 
-    // ImageSize - computed from ImageWidth (0x0100) and ImageLength (0x0101)
-    let width = get_dimension(exif_data, 0xA002).or_else(|| get_dimension(exif_data, 0x0100));
-    let height = get_dimension(exif_data, 0xA003).or_else(|| get_dimension(exif_data, 0x0101));
+    // ImageSize - computed from image dimensions
+    // Priority: MakerNote dimensions > PixelXDimension/PixelYDimension > ImageWidth/ImageLength
+    let (makernote_width, makernote_height) = get_makernote_image_dimensions(exif_data);
+    let width = makernote_width
+        .or_else(|| get_dimension(exif_data, 0xA002))
+        .or_else(|| get_dimension(exif_data, 0x0100));
+    let height = makernote_height
+        .or_else(|| get_dimension(exif_data, 0xA003))
+        .or_else(|| get_dimension(exif_data, 0x0101));
 
     if let (Some(w), Some(h)) = (width, height) {
         println!("{:<32}: {}x{}", "ImageSize", w, h);
@@ -356,6 +392,41 @@ fn get_dimension(exif_data: &ExifData, tag_id: u16) -> Option<u32> {
     } else {
         None
     }
+}
+
+/// Get image dimensions from MakerNotes (manufacturer-specific)
+/// Returns (width, height) if available
+fn get_makernote_image_dimensions(exif_data: &ExifData) -> (Option<u32>, Option<u32>) {
+    use fpexif::data_types::ExifValue;
+
+    let mut width = None;
+    let mut height = None;
+
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        for (_, note) in maker_notes.iter() {
+            if let Some(name) = note.tag_name {
+                match name {
+                    "PanasonicImageWidth" => {
+                        if let ExifValue::Long(v) = &note.value {
+                            if !v.is_empty() {
+                                width = Some(v[0]);
+                            }
+                        }
+                    }
+                    "PanasonicImageHeight" => {
+                        if let ExifValue::Long(v) = &note.value {
+                            if !v.is_empty() {
+                                height = Some(v[0]);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    (width, height)
 }
 
 /// Format an ExifValue for exiftool-style text output

@@ -5,6 +5,23 @@ use std::io::{Read, Seek, SeekFrom};
 
 const RAF_SIGNATURE: &[u8] = b"FUJIFILMCCD-RAW";
 
+/// Format a float value like ExifTool does (7 decimal places, trailing zeros removed)
+fn format_float_exiftool(val: f64) -> String {
+    // Round to 7 decimal places
+    let rounded = (val * 10_000_000.0).round() / 10_000_000.0;
+
+    // Format with up to 7 decimal places
+    let s = format!("{:.7}", rounded);
+
+    // Trim trailing zeros after decimal point
+    if s.contains('.') {
+        let trimmed = s.trim_end_matches('0').trim_end_matches('.');
+        trimmed.to_string()
+    } else {
+        s
+    }
+}
+
 /// RAF-specific metadata extracted from RAF header and directory
 #[derive(Debug, Clone, Default)]
 pub struct RafMetadata {
@@ -132,6 +149,8 @@ fn parse_raf_directory(buffer: &[u8]) -> RafMetadata {
                     let height = u16::from_be_bytes([value_data[0], value_data[1]]);
                     let width = u16::from_be_bytes([value_data[2], value_data[3]]);
                     metadata.insert("RawImageCroppedSize", format!("{}x{}", width, height));
+                    metadata.insert("RawImageCroppedWidth", format!("{}", width));
+                    metadata.insert("RawImageCroppedHeight", format!("{}", height));
                 }
             }
             0x121 => {
@@ -464,7 +483,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format!("{}", val)
+                                                format_float_exiftool(val)
                                             } else {
                                                 "0".to_string()
                                             }
@@ -483,7 +502,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format!("{}", val)
+                                                format_float_exiftool(val)
                                             } else {
                                                 "0".to_string()
                                             }
@@ -502,7 +521,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format!("{}", val)
+                                                format_float_exiftool(val)
                                             } else {
                                                 "0".to_string()
                                             }

@@ -17,52 +17,6 @@ fn gcd(a: u32, b: u32) -> u32 {
     }
 }
 
-/// Convert a decimal exposure compensation value to a fraction string like "+1/3" or "-2/3"
-/// This matches ExifTool's PrintConv for ExposureCompensation
-#[cfg(feature = "serde")]
-fn decimal_to_exposure_fraction(decimal: f64) -> String {
-    if decimal == 0.0 {
-        return "0".to_string();
-    }
-
-    let sign = if decimal > 0.0 { "+" } else { "-" };
-    let abs_val = decimal.abs();
-
-    // Check for whole numbers first
-    if (abs_val - abs_val.round()).abs() < 0.001 {
-        return format!("{}{}", sign, abs_val.round() as i32);
-    }
-
-    // Common exposure compensation fractions - check for 1/2, 1/3, 2/3 increments
-    // Use tolerance for floating point comparison
-    let tolerance = 0.01;
-
-    // Extract whole part and fractional part
-    let whole = abs_val.trunc() as i32;
-    let frac = abs_val - abs_val.trunc();
-
-    // Check common fractions
-    let frac_str = if (frac - 1.0 / 3.0).abs() < tolerance {
-        "1/3"
-    } else if (frac - 2.0 / 3.0).abs() < tolerance {
-        "2/3"
-    } else if (frac - 0.5).abs() < tolerance {
-        "1/2"
-    } else {
-        // Fallback to decimal for unusual values
-        return format!("{}{:.6}", sign, abs_val)
-            .trim_end_matches('0')
-            .trim_end_matches('.')
-            .to_string();
-    };
-
-    if whole == 0 {
-        format!("{}{}", sign, frac_str)
-    } else {
-        format!("{}{} {}", sign, whole, frac_str)
-    }
-}
-
 /// Format EXIF MeteringMode - use manufacturer-specific naming where appropriate
 #[cfg(feature = "serde")]
 fn format_metering_mode(value: u16, make: Option<&str>) -> String {
@@ -118,24 +72,10 @@ fn format_short_value_with_make(value: u16, tag_id: u16, make: Option<&str>) -> 
         0xA406 => Value::String(crate::tags::get_scene_capture_type_description(value).to_string()),
         0xA407 => Value::String(crate::tags::get_gain_control_description(value).to_string()),
         // Contrast (0xA408), Saturation (0xA409), Sharpness (0xA40A)
-        0xA408 | 0xA409 => Value::String(
-            match value {
-                0 => "Normal",
-                1 => "Low",
-                2 => "High",
-                _ => "Unknown",
-            }
-            .to_string(),
-        ),
-        0xA40A => Value::String(
-            match value {
-                0 => "Normal",
-                1 => "Soft",
-                2 => "Hard",
-                _ => "Unknown",
-            }
-            .to_string(),
-        ),
+        // Use text descriptions for all manufacturers
+        0xA408 => Value::String(crate::tags::get_contrast_description(value).to_string()),
+        0xA409 => Value::String(crate::tags::get_saturation_description(value).to_string()),
+        0xA40A => Value::String(crate::tags::get_sharpness_description(value).to_string()),
         0xA40C => {
             Value::String(crate::tags::get_subject_distance_range_description(value).to_string())
         }
@@ -228,13 +168,33 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
                 .unwrap_or_else(|| Value::String(decimal.to_string()))
         }
         0x9204 => {
-            // ExposureBiasValue/ExposureCompensation - format as fraction string
+            // ExposureBiasValue/ExposureCompensation (unsigned version - rare)
+            // ExifTool outputs fractions when denominator simplifies to 3 or 2
             let decimal = num as f64 / den as f64;
-            let formatted = decimal_to_exposure_fraction(decimal);
-            if formatted == "0" {
+            if decimal == 0.0 {
                 Value::Number(0.into())
             } else {
-                Value::String(formatted)
+                // Simplify the fraction (unsigned values are always positive)
+                let gcd_val = gcd(num, den);
+                let simple_num = num / gcd_val;
+                let simple_den = den / gcd_val;
+
+                if simple_den == 3 || simple_den == 2 {
+                    // Output as fraction (e.g., +1/3, +2/3, +1/2)
+                    Value::String(format!("+{}/{}", simple_num, simple_den))
+                } else if decimal.fract() == 0.0 {
+                    // Whole number (e.g., +1, +2)
+                    let int_val = decimal as i32;
+                    Value::String(format!("+{}", int_val))
+                } else {
+                    // Decimal format (e.g., +0.33, +0.67)
+                    let rounded = (decimal * 100.0).round() / 100.0;
+                    let formatted = format!("+{:.2}", rounded)
+                        .trim_end_matches('0')
+                        .trim_end_matches('.')
+                        .to_string();
+                    Value::String(formatted)
+                }
             }
         }
         0x9206 => {
@@ -258,6 +218,14 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
             serde_json::Number::from_f64(decimal)
                 .map(Value::Number)
                 .unwrap_or_else(|| Value::Number(0.into()))
+        }
+        0xA20E | 0xA20F => {
+            // FocalPlaneXResolution, FocalPlaneYResolution - round to 6 decimal places
+            let decimal = num as f64 / den as f64;
+            let rounded = (decimal * 1_000_000.0).round() / 1_000_000.0;
+            serde_json::Number::from_f64(rounded)
+                .map(Value::Number)
+                .unwrap_or_else(|| Value::String(rounded.to_string()))
         }
         _ => {
             // Default: show as decimal, strip .0 for whole numbers to match ExifTool
@@ -292,13 +260,41 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
             Value::String(format!("1/{}", denominator))
         }
         0x9204 => {
-            // ExposureBiasValue/ExposureCompensation - format as fraction string
+            // ExposureBiasValue/ExposureCompensation
+            // ExifTool outputs fractions when denominator simplifies to 3 or 2
             let decimal = num as f64 / den as f64;
-            let formatted = decimal_to_exposure_fraction(decimal);
-            if formatted == "0" {
+            if decimal == 0.0 {
                 Value::Number(0.into())
             } else {
-                Value::String(formatted)
+                // Simplify the fraction
+                let gcd_val = gcd(num.unsigned_abs(), den.unsigned_abs());
+                let simple_num = num.unsigned_abs() / gcd_val;
+                let simple_den = den.unsigned_abs() / gcd_val;
+                let sign = if decimal > 0.0 { "+" } else { "-" };
+
+                if simple_den == 3 || simple_den == 2 {
+                    // Output as fraction (e.g., +1/3, -2/3, +1/2)
+                    Value::String(format!("{}{}/{}", sign, simple_num, simple_den))
+                } else if decimal.fract() == 0.0 {
+                    // Whole number (e.g., +1, -2)
+                    let int_val = decimal.abs() as i32;
+                    Value::String(format!("{}{}", sign, int_val))
+                } else {
+                    // Decimal format (e.g., +0.33, -0.67)
+                    let rounded = (decimal * 100.0).round() / 100.0;
+                    let formatted = if rounded > 0.0 {
+                        format!("+{:.2}", rounded)
+                            .trim_end_matches('0')
+                            .trim_end_matches('.')
+                            .to_string()
+                    } else {
+                        format!("{:.2}", rounded)
+                            .trim_end_matches('0')
+                            .trim_end_matches('.')
+                            .to_string()
+                    };
+                    Value::String(formatted)
+                }
             }
         }
         // Nikon MakerNote tags that should always show decimal format
@@ -741,9 +737,17 @@ pub fn format_exif_value_for_json_with_make(
         ExifValue::Float(v) if v.len() == 1 => serde_json::Number::from_f64(v[0] as f64)
             .map(Value::Number)
             .unwrap_or_else(|| Value::String(v[0].to_string())),
-        ExifValue::Double(v) if v.len() == 1 => serde_json::Number::from_f64(v[0])
-            .map(Value::Number)
-            .unwrap_or_else(|| Value::String(v[0].to_string())),
+        ExifValue::Double(v) if v.len() == 1 => {
+            let val = v[0];
+            // Output as integer if value is a whole number (like MinAperture: 36 not 36.0)
+            if val.fract() == 0.0 && val.abs() < i64::MAX as f64 {
+                Value::Number((val as i64).into())
+            } else {
+                serde_json::Number::from_f64(val)
+                    .map(Value::Number)
+                    .unwrap_or_else(|| Value::String(val.to_string()))
+            }
+        }
 
         // Single-value Rational - use helper function
         ExifValue::Rational(v) if v.len() == 1 => {
@@ -1100,6 +1104,7 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // value is more accurate (like MeteringMode for Canon cameras)
     if let Some(maker_notes) = exif_data.get_maker_notes() {
         // Tags where MakerNote should override EXIF (ExifTool behavior)
+        // Note: Saturation/Contrast/Sharpness removed - use EXIF standard values for all
         const MAKERNOTE_PRIORITY_TAGS: &[&str] = &["MeteringMode", "WhiteBalance", "LightSource"];
 
         for (tag_id, maker_tag) in maker_notes.iter() {
@@ -1123,10 +1128,26 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
 
     // Add computed fields for exiftool compatibility
 
-    // LensID is a copy of LensType (for Canon)
-    if let Some(lens_type) = output.get("LensType").cloned() {
-        if !output.contains_key("LensID") {
-            output.insert("LensID".to_string(), lens_type);
+    // LensID computation:
+    // For Nikon: Use LensModel if available (contains full lens name like "1 NIKKOR 10mm f/2.8")
+    // For Canon: Use LensType as LensID (the lens type lookup value)
+    if !output.contains_key("LensID") {
+        let is_canon = make_ref
+            .map(|m| m.to_uppercase().contains("CANON"))
+            .unwrap_or(false);
+
+        if is_canon {
+            // Canon: LensID should come from LensType (the decoded lens type value)
+            if let Some(lens_type) = output.get("LensType").cloned() {
+                output.insert("LensID".to_string(), lens_type);
+            }
+        } else {
+            // Nikon and others: Use LensModel if available
+            if let Some(lens_model) = output.get("LensModel").cloned() {
+                output.insert("LensID".to_string(), lens_model);
+            } else if let Some(lens_type) = output.get("LensType").cloned() {
+                output.insert("LensID".to_string(), lens_type);
+            }
         }
     }
 
@@ -1166,18 +1187,48 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         output.insert("ExifImageHeight".to_string(), pyd);
     }
 
+    // Add RAF-specific metadata if present (for Fujifilm RAF files)
+    // This must come before ImageSize calculation so we can use RawImageCroppedWidth/Height
+    if let Some(raf_metadata) = exif_data.get_raf_metadata() {
+        for (key, value) in &raf_metadata.tags {
+            // Try to parse as number for fields that should be numeric
+            if key == "RawImageWidth"
+                || key == "RawImageHeight"
+                || key == "RawImageFullWidth"
+                || key == "RawImageFullHeight"
+                || key == "RawImageCroppedWidth"
+                || key == "RawImageCroppedHeight"
+            {
+                if let Ok(n) = value.parse::<i64>() {
+                    output.insert(key.clone(), Value::Number(n.into()));
+                } else {
+                    output.insert(key.clone(), Value::String(value.clone()));
+                }
+            } else {
+                output.insert(key.clone(), Value::String(value.clone()));
+            }
+        }
+    }
+
     // ImageSize - compute from actual image dimensions
-    // Prefer PixelXDimension/PixelYDimension (EXIF tags 0xA002/0xA003) over ImageWidth/ImageLength
-    // TIFF ImageWidth/ImageLength often refer to thumbnail dimensions in raw files
+    // Priority order:
+    // 1. RawImageCroppedWidth/Height - RAF metadata for Fuji (actual cropped image size)
+    // 2. PanasonicImageWidth/Height - MakerNote values for actual image dimensions
+    // 3. PixelXDimension/PixelYDimension (EXIF tags 0xA002/0xA003) - may be thumbnail in RAW
+    // 4. ImageWidth/ImageLength - TIFF tags, often thumbnail dimensions in raw files
     let width = output
-        .get("PixelXDimension")
+        .get("RawImageCroppedWidth")
+        .or_else(|| output.get("PanasonicImageWidth"))
+        .or_else(|| output.get("PixelXDimension"))
         .or_else(|| output.get("ImageWidth"))
         .and_then(|v| match v {
             Value::Number(n) => n.as_u64(),
             _ => None,
         });
     let height = output
-        .get("PixelYDimension")
+        .get("RawImageCroppedHeight")
+        .or_else(|| output.get("PanasonicImageHeight"))
+        .or_else(|| output.get("PixelYDimension"))
         .or_else(|| output.get("ImageHeight"))
         .or_else(|| output.get("ImageLength"))
         .and_then(|v| match v {
@@ -1200,22 +1251,29 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
-    // Add RAF-specific metadata if present (for Fujifilm RAF files)
-    if let Some(raf_metadata) = exif_data.get_raf_metadata() {
-        for (key, value) in &raf_metadata.tags {
-            // Try to parse as number for fields that should be numeric
-            if key == "RawImageWidth"
-                || key == "RawImageHeight"
-                || key == "RawImageFullWidth"
-                || key == "RawImageFullHeight"
-            {
-                if let Ok(n) = value.parse::<i64>() {
-                    output.insert(key.clone(), Value::Number(n.into()));
-                } else {
-                    output.insert(key.clone(), Value::String(value.clone()));
+    // Compute RedBalance and BlueBalance from WB_GRBLevels if available
+    // WB_GRBLevels format is "G R B" (green, red, blue values)
+    // RedBalance = R / G, BlueBalance = B / G
+    if let Some(Value::String(wb_levels)) = output.get("WB_GRBLevels") {
+        let parts: Vec<f64> = wb_levels
+            .split_whitespace()
+            .filter_map(|s| s.parse::<f64>().ok())
+            .collect();
+        if parts.len() >= 3 && parts[0] != 0.0 {
+            let g = parts[0];
+            let r = parts[1];
+            let b = parts[2];
+            if !output.contains_key("RedBalance") {
+                let red_balance = r / g;
+                if let Some(num) = serde_json::Number::from_f64(red_balance) {
+                    output.insert("RedBalance".to_string(), Value::Number(num));
                 }
-            } else {
-                output.insert(key.clone(), Value::String(value.clone()));
+            }
+            if !output.contains_key("BlueBalance") {
+                let blue_balance = b / g;
+                if let Some(num) = serde_json::Number::from_f64(blue_balance) {
+                    output.insert("BlueBalance".to_string(), Value::Number(num));
+                }
             }
         }
     }

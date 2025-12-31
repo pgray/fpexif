@@ -2229,6 +2229,17 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
                 2 => "Contrast-detect (wide area)",
                 3 => "Contrast-detect (face priority)",
                 4 => "Contrast-detect (subject tracking)",
+                128 => "Single",
+                129 => "Auto (41 points)",
+                130 => "Subject Tracking (41 points)",
+                131 => "Face Priority (41 points)",
+                192 => "Pinpoint",
+                193 => "Single",
+                194 => "Dynamic",
+                195 => "Wide (S)",
+                196 => "Wide (L)",
+                197 => "Auto",
+                199 => "Auto",
                 _ => "Unknown",
             }
         };
@@ -2243,7 +2254,7 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
             2 => "On (11-point)",
             3 => "On (39-point)",
             4 => "On (73-point)",
-            5 => "On (5-point)",
+            5 => "On (5)",
             6 => "On (105-point)",
             7 => "On (153-point)",
             8 => "On (81-point)",
@@ -2264,8 +2275,8 @@ fn parse_world_time(data: &[u8]) -> Vec<(String, String)> {
         return tags;
     }
 
-    // Bytes 0-1: Timezone (signed, in minutes)
-    let tz_minutes = ((data[0] as i16) << 8) | (data[1] as i16);
+    // Bytes 0-1: Timezone (signed, in minutes, little-endian - Nikon uses Intel byte order)
+    let tz_minutes = i16::from_le_bytes([data[0], data[1]]);
     let tz_hours = tz_minutes / 60;
     let tz_mins = (tz_minutes % 60).abs();
     let tz_str = if tz_minutes >= 0 {

@@ -370,6 +370,74 @@ fn extract_make_from_ifd(tiff_data: &[u8], is_little_endian: bool) -> Option<Str
     None
 }
 
+/// Extract Compression tag (0x000B) from the first IFD of a Panasonic RW2 file
+/// RW2 files have Compression in IFD0 but use embedded JPEG for EXIF, so this
+/// value needs to be extracted separately
+pub fn extract_rw2_compression<R: Read + Seek>(mut reader: R) -> ExifResult<Option<u16>> {
+    // Read TIFF header
+    let mut header = [0u8; 8];
+    reader.read_exact(&mut header)?;
+
+    // Verify TIFF signature and check if it's RW2 (magic 0x0055)
+    if !((header[0] == b'I' && header[1] == b'I') || (header[0] == b'M' && header[1] == b'M')) {
+        return Ok(None);
+    }
+
+    let is_little_endian = header[0] == b'I';
+    let magic = if is_little_endian {
+        u16::from_le_bytes([header[2], header[3]])
+    } else {
+        u16::from_be_bytes([header[2], header[3]])
+    };
+
+    // Only process RW2 files
+    if magic != 0x0055 {
+        return Ok(None);
+    }
+
+    // Read IFD0 offset
+    let ifd_offset = if is_little_endian {
+        u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize
+    } else {
+        u32::from_be_bytes([header[4], header[5], header[6], header[7]]) as usize
+    };
+
+    // Read IFD0 content
+    reader.seek(SeekFrom::Start(ifd_offset as u64))?;
+    let mut ifd_header = [0u8; 2];
+    reader.read_exact(&mut ifd_header)?;
+
+    let num_entries = if is_little_endian {
+        u16::from_le_bytes(ifd_header)
+    } else {
+        u16::from_be_bytes(ifd_header)
+    } as usize;
+
+    // Search for Panasonic Compression tag (0x000B in RW2, not standard 0x0103)
+    for _ in 0..num_entries {
+        let mut entry = [0u8; 12];
+        reader.read_exact(&mut entry)?;
+
+        let tag_id = if is_little_endian {
+            u16::from_le_bytes([entry[0], entry[1]])
+        } else {
+            u16::from_be_bytes([entry[0], entry[1]])
+        };
+
+        if tag_id == 0x000B {
+            // Panasonic Compression tag found - read value from bytes 8-9 (for SHORT type)
+            let compression = if is_little_endian {
+                u16::from_le_bytes([entry[8], entry[9]])
+            } else {
+                u16::from_be_bytes([entry[8], entry[9]])
+            };
+            return Ok(Some(compression));
+        }
+    }
+
+    Ok(None)
+}
+
 /// Check if the TIFF data contains DNG-specific tags
 fn has_dng_tags(tiff_data: &[u8], is_little_endian: bool) -> bool {
     if tiff_data.len() < 8 {

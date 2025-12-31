@@ -70,6 +70,13 @@ where
         exif_data.set_raf_metadata(raf_metadata);
     }
 
+    // Reset reader position for RW2 Compression extraction
+    reader.seek(std::io::SeekFrom::Start(0))?;
+
+    // For Panasonic RW2 files, extract Compression from main IFD0 before EXIF extraction
+    // (RW2 files use embedded JPEG for EXIF which loses the main Compression value)
+    let rw2_compression = formats::tiff::extract_rw2_compression(&mut reader)?;
+
     // Reset reader position for EXIF extraction
     reader.seek(std::io::SeekFrom::Start(0))?;
 
@@ -261,6 +268,14 @@ where
                 exif_data.maker_notes = Some(parsed_maker_notes);
             }
         }
+    }
+
+    // Override Compression for RW2 files with the value from main IFD0
+    if let Some(compression) = rw2_compression {
+        let tag_id = crate::tags::ExifTagId::new(0x0103, crate::tags::TagGroup::Main);
+        exif_data
+            .tags
+            .insert(tag_id, ExifValue::Short(vec![compression]));
     }
 
     Ok(exif_data)

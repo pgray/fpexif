@@ -1126,11 +1126,12 @@ pub fn get_exposure_program_description(value: u16) -> &'static str {
         2 => "Program AE",
         3 => "Aperture-priority AE",
         4 => "Shutter speed priority AE",
-        5 => "Creative program (biased toward depth of field)",
-        6 => "Action program (biased toward fast shutter speed)",
-        7 => "Portrait mode (for closeup photos with the background out of focus)",
-        8 => "Landscape mode (for landscape photos with the background in focus)",
-        _ => "Unknown exposure program",
+        5 => "Creative (Slow speed)",
+        6 => "Action (High speed)",
+        7 => "Portrait",
+        8 => "Landscape",
+        9 => "Bulb",
+        _ => "Unknown",
     }
 }
 
@@ -1256,8 +1257,8 @@ pub fn get_scene_capture_type_description(value: u16) -> &'static str {
 pub fn get_contrast_description(value: u16) -> &'static str {
     match value {
         0 => "Normal",
-        1 => "Soft",
-        2 => "Hard",
+        1 => "Low",
+        2 => "High",
         _ => "Unknown",
     }
 }
@@ -1335,8 +1336,12 @@ pub fn get_compression_description(value: u16) -> &'static str {
         34661 => "JBIG",
         34676 => "SGILog",
         34677 => "SGILog24",
+        34316 => "Panasonic RAW 1",
         34712 => "JPEG 2000",
         34713 => "Nikon NEF Compressed",
+        34826 => "Panasonic RAW 2",
+        34828 => "Panasonic RAW 3",
+        34830 => "Panasonic RAW 4",
         34892 => "JPEG XR",
         65000 => "Kodak DCR Compressed",
         65535 => "Pentax PEF Compressed",

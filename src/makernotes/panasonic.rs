@@ -42,6 +42,8 @@ pub const PANA_PROGRAM_ISO: u16 = 0x003C;
 pub const PANA_ADVANCED_SCENE_MODE: u16 = 0x003D;
 pub const PANA_TEXT_STAMP_2: u16 = 0x003E;
 pub const PANA_FACE_DETECTED: u16 = 0x003F;
+pub const PANA_IMAGE_WIDTH: u16 = 0x004B;
+pub const PANA_IMAGE_HEIGHT: u16 = 0x004C;
 pub const PANA_LENS_TYPE: u16 = 0x0051;
 pub const PANA_LENS_SERIAL_NUMBER: u16 = 0x0052;
 pub const PANA_ACCESSORY_TYPE: u16 = 0x0053;
@@ -101,6 +103,8 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
         PANA_ADVANCED_SCENE_MODE => Some("AdvancedSceneMode"),
         PANA_TEXT_STAMP_2 => Some("TextStamp2"),
         PANA_FACE_DETECTED => Some("FaceDetected"),
+        PANA_IMAGE_WIDTH => Some("PanasonicImageWidth"),
+        PANA_IMAGE_HEIGHT => Some("PanasonicImageHeight"),
         PANA_LENS_TYPE => Some("LensType"),
         PANA_LENS_SERIAL_NUMBER => Some("LensSerialNumber"),
         PANA_ACCESSORY_TYPE => Some("AccessoryType"),
@@ -362,7 +366,7 @@ define_tag_decoder! {
     exiftool: {
         0 => "Off",
         1 => "On",
-        2 => "Auto Exposure Bracketing",
+        2 => "Auto Exposure Bracketing (AEB)",
         3 => "Focus Bracketing",
         4 => "Unlimited",
         8 => "White Balance Bracketing",
@@ -887,14 +891,41 @@ pub fn parse_panasonic_maker_notes(
                             }
                             PANA_FLASH_BIAS => {
                                 // FlashBias is signed, divided by 3
+                                // ExifTool shows "+2" for positive values
                                 let signed_v = v as i16;
                                 let bias = signed_v / 3;
-                                Some(format!("{}", bias))
+                                if bias > 0 {
+                                    Some(format!("+{}", bias))
+                                } else {
+                                    Some(format!("{}", bias))
+                                }
                             }
                             PANA_ACCELEROMETER_X | PANA_ACCELEROMETER_Y | PANA_ACCELEROMETER_Z => {
                                 // Accelerometer values are signed
                                 let signed_v = v as i16;
                                 Some(format!("{}", signed_v))
+                            }
+                            PANA_ROLL_ANGLE => {
+                                // RollAngle: signed value divided by 10 for degrees
+                                let signed_v = v as i16;
+                                let degrees = signed_v as f64 / 10.0;
+                                // Format without decimal if value is integer
+                                if degrees.fract() == 0.0 {
+                                    Some(format!("{}", degrees as i32))
+                                } else {
+                                    Some(format!("{:.1}", degrees))
+                                }
+                            }
+                            PANA_PITCH_ANGLE => {
+                                // PitchAngle: negative of signed value divided by 10
+                                let signed_v = v as i16;
+                                let degrees = -(signed_v as f64) / 10.0;
+                                // Format without decimal if value is integer
+                                if degrees.fract() == 0.0 {
+                                    Some(format!("{}", degrees as i32))
+                                } else {
+                                    Some(format!("{:.1}", degrees))
+                                }
                             }
                             _ => None,
                         };
