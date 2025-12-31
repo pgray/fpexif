@@ -152,13 +152,10 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
         }
         0x920A => {
             // FocalLength - add mm unit with decimal formatting
+            // ExifTool shows "55.0 mm" for CR2/standard EXIF
+            // CRW shows "400 mm" but that comes from MakerNote, not EXIF
             let focal_length = num as f64 / den as f64;
-            // Format with at least one decimal place for exiftool compatibility
-            if focal_length.fract() == 0.0 {
-                Value::String(format!("{:.1} mm", focal_length))
-            } else {
-                Value::String(format!("{} mm", focal_length))
-            }
+            Value::String(format!("{:.1} mm", focal_length))
         }
         0x9203 => {
             // BrightnessValue - show as decimal number
@@ -473,22 +470,6 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
     }
 }
 
-/// Tags that should be formatted as space-separated strings instead of JSON arrays
-#[cfg(feature = "serde")]
-fn should_format_as_space_separated(tag_id: u16) -> bool {
-    matches!(
-        tag_id,
-        0x0102 // BitsPerSample
-        | 0x0013 // ThumbnailImageValidArea (Canon)
-        | 0x828D // CFARepeatPatternDim
-        | 0x0214 // ReferenceBlackWhite
-        | 0xC620 // DefaultCropSize (DNG)
-        // Nikon makernote tags
-        | 0x0099 // RawImageCenter
-        | 0x0016 // ImageBoundary
-    )
-}
-
 /// Special handling for RetouchHistory (Nikon 0x009E) - return "None" if all zeros
 #[cfg(feature = "serde")]
 fn format_retouch_history(values: &[u16]) -> Option<Value> {
@@ -507,22 +488,6 @@ fn format_retouch_history(values: &[u16]) -> Option<Value> {
             Some(Value::String(decoded.join(", ")))
         }
     }
-}
-
-/// Tags that should be formatted as space-separated decimals for rational/srational arrays
-#[cfg(feature = "serde")]
-fn should_format_rationals_as_space_separated(tag_id: u16) -> bool {
-    matches!(
-        tag_id,
-        0x013E // WhitePoint
-        | 0x013F // PrimaryChromaticities
-        | 0x0211 // YCbCrCoefficients
-        | 0x0214 // ReferenceBlackWhite
-        | 0xC621 // ColorMatrix1 (DNG)
-        | 0xC622 // ColorMatrix2 (DNG)
-        | 0xC627 // AnalogBalance (DNG)
-        | 0xC628 // AsShotNeutral (DNG)
-    )
 }
 
 /// Format GPS coordinate (latitude or longitude) as DMS string
@@ -668,14 +633,46 @@ fn format_cfa_pattern(data: &[u8]) -> Option<String> {
 }
 
 /// Check if a string is a pure numeric value that can be output as a JSON number
-/// Returns true if the string contains only digits and has no leading zeros
-/// (unless it's just "0")
+/// Returns true for integers (including negatives) and decimals
 #[cfg(feature = "serde")]
 fn is_numeric_string(s: &str) -> bool {
     if s.is_empty() {
         return false;
     }
-    // Check if all characters are digits
+
+    // Handle optional leading minus sign
+    let s = s.strip_prefix('-').unwrap_or(s);
+
+    if s.is_empty() {
+        return false;
+    }
+
+    // Check for decimal point
+    if let Some(dot_pos) = s.find('.') {
+        // Check integer part (before dot)
+        let int_part = &s[..dot_pos];
+        let frac_part = &s[dot_pos + 1..];
+
+        // Integer part must have at least one digit (or be empty for ".5" style)
+        if !int_part.is_empty() {
+            if !int_part.chars().all(|c| c.is_ascii_digit()) {
+                return false;
+            }
+            // No leading zeros except for "0.x"
+            if int_part.len() > 1 && int_part.starts_with('0') {
+                return false;
+            }
+        }
+
+        // Fraction part must have at least one digit
+        if frac_part.is_empty() || !frac_part.chars().all(|c| c.is_ascii_digit()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    // Pure integer - check if all characters are digits
     if !s.chars().all(|c| c.is_ascii_digit()) {
         return false;
     }
@@ -706,8 +703,19 @@ pub fn format_exif_value_for_json_with_make(
             // ExifTool outputs pure numeric strings (like SerialNumber, SubSecTime)
             // as JSON numbers, so we do the same
             if is_numeric_string(cleaned) {
+                // Try parsing as unsigned integer first
                 if let Ok(n) = cleaned.parse::<u64>() {
                     return Value::Number(n.into());
+                }
+                // Try parsing as signed integer
+                if let Ok(n) = cleaned.parse::<i64>() {
+                    return Value::Number(n.into());
+                }
+                // Try parsing as float
+                if let Ok(f) = cleaned.parse::<f64>() {
+                    if let Some(num) = serde_json::Number::from_f64(f) {
+                        return Value::Number(num);
+                    }
                 }
             }
             Value::String(cleaned.to_string())
@@ -773,15 +781,14 @@ pub fn format_exif_value_for_json_with_make(
                 } else {
                     Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
                 }
-            } else if should_format_as_space_separated(tag_id) {
+            } else {
+                // Default to space-separated strings (ExifTool behavior)
                 Value::String(
                     v.iter()
                         .map(|n| n.to_string())
                         .collect::<Vec<_>>()
                         .join(" "),
                 )
-            } else {
-                Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
             }
         }
         ExifValue::Short(v) => {
@@ -807,16 +814,13 @@ pub fn format_exif_value_for_json_with_make(
                 };
                 return Value::String(format!("Red {}, Blue {}", red_str, blue_str));
             }
-            if should_format_as_space_separated(tag_id) {
-                Value::String(
-                    v.iter()
-                        .map(|n| n.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                )
-            } else {
-                Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
-            }
+            // Default to space-separated strings (ExifTool behavior)
+            Value::String(
+                v.iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
         }
         ExifValue::Long(v) => {
             // Fuji ImageStabilization (0x1422) - format as "Type; Mode; Param"
@@ -837,18 +841,20 @@ pub fn format_exif_value_for_json_with_make(
                 };
                 return Value::String(format!("{}; {}; {}", is_type, is_mode, v[2]));
             }
-            if should_format_as_space_separated(tag_id) {
-                Value::String(
-                    v.iter()
-                        .map(|n| n.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                )
-            } else {
-                Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
-            }
+            // Default to space-separated strings (ExifTool behavior)
+            Value::String(
+                v.iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
         }
-        ExifValue::SByte(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
+        ExifValue::SByte(v) => Value::String(
+            v.iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
         ExifValue::SShort(v) => {
             // Fuji WhiteBalanceFineTune (0x100A) - format as "Red +X, Blue +Y"
             if tag_id == 0x100A && v.len() == 2 {
@@ -866,103 +872,63 @@ pub fn format_exif_value_for_json_with_make(
                 };
                 return Value::String(format!("Red {}, Blue {}", red_str, blue_str));
             }
-            if should_format_as_space_separated(tag_id) {
-                Value::String(
-                    v.iter()
-                        .map(|n| n.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                )
-            } else {
-                Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
-            }
+            // Default to space-separated strings (ExifTool behavior)
+            Value::String(
+                v.iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
         }
-        ExifValue::SLong(v) => Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect()),
-
-        // Multi-value Float/Double
-        ExifValue::Float(v) => Value::Array(
+        ExifValue::SLong(v) => Value::String(
             v.iter()
-                .map(|&f| {
-                    serde_json::Number::from_f64(f as f64)
-                        .map(Value::Number)
-                        .unwrap_or_else(|| Value::String(f.to_string()))
-                })
-                .collect(),
-        ),
-        ExifValue::Double(v) => Value::Array(
-            v.iter()
-                .map(|&f| {
-                    serde_json::Number::from_f64(f)
-                        .map(Value::Number)
-                        .unwrap_or_else(|| Value::String(f.to_string()))
-                })
-                .collect(),
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
         ),
 
-        // Multi-value Rationals
+        // Multi-value Float/Double - space-separated strings (ExifTool behavior)
+        ExifValue::Float(v) => Value::String(
+            v.iter()
+                .map(|&f| f.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        ExifValue::Double(v) => Value::String(
+            v.iter()
+                .map(|&f| f.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+
+        // Multi-value Rationals - format as space-separated decimals (ExifTool behavior)
         ExifValue::Rational(v) => {
-            if should_format_rationals_as_space_separated(tag_id) {
-                // Format as space-separated decimals for DNG color matrix tags
-                let decimals: Vec<String> = v
-                    .iter()
-                    .map(|&(num, den)| {
-                        if den == 0 {
-                            "inf".to_string()
-                        } else {
-                            let decimal = num as f64 / den as f64;
-                            decimal.to_string()
-                        }
-                    })
-                    .collect();
-                Value::String(decimals.join(" "))
-            } else {
-                Value::Array(
-                    v.iter()
-                        .map(|&(num, den)| {
-                            if den == 0 {
-                                Value::String("inf".to_string())
-                            } else {
-                                let decimal = num as f64 / den as f64;
-                                serde_json::Number::from_f64(decimal)
-                                    .map(Value::Number)
-                                    .unwrap_or_else(|| Value::String(decimal.to_string()))
-                            }
-                        })
-                        .collect(),
-                )
-            }
+            let decimals: Vec<String> = v
+                .iter()
+                .map(|&(num, den)| {
+                    if den == 0 {
+                        "inf".to_string()
+                    } else {
+                        let decimal = num as f64 / den as f64;
+                        decimal.to_string()
+                    }
+                })
+                .collect();
+            Value::String(decimals.join(" "))
         }
         ExifValue::SRational(v) => {
-            if should_format_rationals_as_space_separated(tag_id) {
-                // Format as space-separated decimals for DNG color matrix tags
-                let decimals: Vec<String> = v
-                    .iter()
-                    .map(|&(num, den)| {
-                        if den == 0 {
-                            "inf".to_string()
-                        } else {
-                            let decimal = num as f64 / den as f64;
-                            decimal.to_string()
-                        }
-                    })
-                    .collect();
-                Value::String(decimals.join(" "))
-            } else {
-                Value::Array(
-                    v.iter()
-                        .map(|&(num, den)| {
-                            if den == 0 {
-                                Value::String("inf".to_string())
-                            } else {
-                                let decimal = num as f64 / den as f64;
-                                serde_json::Number::from_f64(decimal)
-                                    .map(Value::Number)
-                                    .unwrap_or_else(|| Value::String(decimal.to_string()))
-                            }
-                        })
-                        .collect(),
-                )
-            }
+            let decimals: Vec<String> = v
+                .iter()
+                .map(|&(num, den)| {
+                    if den == 0 {
+                        "inf".to_string()
+                    } else {
+                        let decimal = num as f64 / den as f64;
+                        decimal.to_string()
+                    }
+                })
+                .collect();
+            Value::String(decimals.join(" "))
         }
 
         // Undefined - use helper function
@@ -1250,6 +1216,16 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             }
         }
     }
+
+    // Add ExifByteOrder - indicates TIFF byte order
+    let byte_order_str = match exif_data.endian {
+        crate::data_types::Endianness::Little => "Little-endian (Intel, II)",
+        crate::data_types::Endianness::Big => "Big-endian (Motorola, MM)",
+    };
+    output.insert(
+        "ExifByteOrder".to_string(),
+        Value::String(byte_order_str.to_string()),
+    );
 
     // Compute RedBalance and BlueBalance from WB_GRBLevels if available
     // WB_GRBLevels format is "G R B" (green, red, blue values)

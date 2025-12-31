@@ -551,6 +551,8 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                         }
                         0x920A => {
                             // FocalLength - format with decimal and mm unit
+                            // ExifTool shows "55.0 mm" for CR2/standard EXIF
+                            // CRW shows "400 mm" but that comes from MakerNote, not EXIF
                             let focal_length = n as f64 / d as f64;
                             format!("{:.1} mm", focal_length)
                         }
@@ -618,19 +620,34 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                             format!("1/{}", denominator)
                         }
                         0x9204 => {
-                            // ExposureBiasValue - format as +/- EV
+                            // ExposureBiasValue - format as fraction when possible
                             let bias = n as f64 / d as f64;
                             if bias == 0.0 {
                                 "0".to_string()
                             } else {
-                                let formatted = format!("{:.6}", bias.abs())
-                                    .trim_end_matches('0')
-                                    .trim_end_matches('.')
-                                    .to_string();
-                                if bias > 0.0 {
-                                    format!("+{}", formatted)
+                                // Simplify fraction and check for 1/3, 2/3, 1/2
+                                fn gcd(a: i32, b: i32) -> i32 {
+                                    if b == 0 {
+                                        a.abs()
+                                    } else {
+                                        gcd(b, a % b)
+                                    }
+                                }
+                                let g = gcd(n.abs(), d.abs());
+                                let simple_n = n.abs() / g;
+                                let simple_d = d.abs() / g;
+                                let sign = if bias > 0.0 { "+" } else { "-" };
+
+                                if simple_d == 3 || simple_d == 2 {
+                                    format!("{}{}/{}", sign, simple_n, simple_d)
+                                } else if bias.fract() == 0.0 {
+                                    format!("{}{}", sign, bias.abs() as i32)
                                 } else {
-                                    format!("-{}", formatted)
+                                    let formatted = format!("{:.2}", bias.abs())
+                                        .trim_end_matches('0')
+                                        .trim_end_matches('.')
+                                        .to_string();
+                                    format!("{}{}", sign, formatted)
                                 }
                             }
                         }

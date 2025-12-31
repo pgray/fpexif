@@ -1,29 +1,21 @@
 # Sony EXIF Improvements Plan
 
-## Current State
-- Match rate: 35.2%
+## Current State (Updated 2025-12-31)
+- Match rate: 36.6% (up from 35.2%)
 - Files tested: 1 SRF, 1 SR2, 31 ARW
-- Matching: 2,366 | Mismatched: 344 | Missing: 4,004 | Extra: 2,110
+- Matching: 2,457 | Mismatched: 317 | Missing: 3,940 | Extra: 1,757
 
 ## Top Mismatches by Frequency
 
 | Tag | Count | Issue | Fix |
 |-----|-------|-------|-----|
-| LensSpec | 18 | Formatting | Format as "MinFL-MaxFL mm f/MinAp-MaxAp" |
-| SoftSkinEffect | 10 | Decode values wrong | Fix decode_soft_skin_effect_exiftool |
-| SequenceNumber | 8 | Formatting | Check ExifTool format |
-| AFPointSelected | 8 | Decode values | Add/fix decode function |
-| AutoPortraitFramed | 7 | Decode values | Add decode function |
-| Sharpness | 6 | Decode mismatch | Fix decode values |
-| Quality | 6 | Decode mismatch | Fix decode values |
-| LensID | 6 | Lens lookup failing | Fix lens database lookup |
-| HDR | 6 | Decode values | Add/fix decode function |
-| FlashAction | 6 | Decode values | Add decode function |
-| Saturation | 5 | Decode mismatch | Fix decode values |
-| LateralChromaticAberration | 5 | Formatting | Check format |
-| AFPointsUsed | 5 | Decode/format | Fix decode function |
-| Contrast | 4 | Decode mismatch | Fix decode values |
-| FocusMode | 3 | Decode mismatch | Verify decode values |
+| Sharpness/Contrast/Saturation | ~15 | Returns "Normal" instead of "0" | ExifTool outputs numeric values for some cameras |
+| AFMode | ~10 | Returns "Unknown" instead of correct value | Fix AFMode decode function |
+| WhiteBalance | ~10 | Wrong decode values | Fix decode_white_balance_exiftool |
+| ImageSize/Megapixels | ~8 | Wrong dimensions for some cameras | Check sensor vs output dimensions |
+| FocusMode | ~5 | Decode mismatch | Verify decode values |
+| LensID | ~5 | Lens lookup failing | Fix lens database lookup |
+| ExposureMode | ~5 | Decode values | Check decode function |
 
 ## Implementation Steps
 

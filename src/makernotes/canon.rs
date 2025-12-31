@@ -497,6 +497,46 @@ pub const CANON_MY_COLOR_MODE: u16 = 0x002D;
 pub const CANON_FACE_DETECT_INFO: u16 = 0x002E;
 pub const CANON_THUMBNAIL_IMAGE: u16 = 0x0032;
 
+/// Convert Canon hex-based EV value to standard EV
+/// Canon uses special encoding where lower 5 bits contain fractional part
+/// with special codes 0x0c (12) for 1/3 and 0x14 (20) for 2/3 stops
+/// Reference: ExifTool Canon.pm CanonEv function
+fn canon_ev(val: i16) -> f64 {
+    let sign = if val < 0 { -1.0 } else { 1.0 };
+    let abs_val = val.unsigned_abs();
+
+    let frac = abs_val & 0x1f;
+    let whole = abs_val - frac;
+
+    // Convert 1/3 and 2/3 codes
+    let frac_val = match frac {
+        0x0c => 32.0 / 3.0, // 1/3 stop
+        0x14 => 64.0 / 3.0, // 2/3 stop
+        _ => frac as f64,
+    };
+
+    sign * (whole as f64 + frac_val) / 32.0
+}
+
+/// Convert Canon EV value to f-number and format with %.2g like ExifTool
+fn canon_ev_to_fnumber(val: u16) -> f64 {
+    let ev = canon_ev(val as i16);
+    2f64.powf(ev / 2.0)
+}
+
+/// Format f-number using %.2g format like ExifTool
+fn format_fnumber_2g(f_number: f64) -> f64 {
+    // %.2g means 2 significant figures
+    // For values like 1.3, 3.6, 11, etc.
+    if f_number >= 10.0 {
+        f_number.round()
+    } else if f_number >= 1.0 {
+        (f_number * 10.0).round() / 10.0
+    } else {
+        (f_number * 100.0).round() / 100.0
+    }
+}
+
 /// Get Canon lens name from lens type ID
 /// Based on ExifTool's canonLensTypes database
 pub fn get_canon_lens_name(lens_id: u16) -> Option<&'static str> {
@@ -1159,25 +1199,6 @@ fn read_i32(data: &[u8], endian: Endianness) -> i32 {
         Endianness::Little => i32::from_le_bytes([data[0], data[1], data[2], data[3]]),
         Endianness::Big => i32::from_be_bytes([data[0], data[1], data[2], data[3]]),
     }
-}
-
-/// Convert Canon's EV representation to a floating point value
-/// This matches ExifTool's CanonEv function
-fn canon_ev(val: i16) -> f64 {
-    let sign = if val < 0 { -1.0 } else { 1.0 };
-    let val_abs = val.unsigned_abs();
-
-    let mut frac = (val_abs & 0x1f) as f64;
-    let val_int = val_abs - (val_abs & 0x1f);
-
-    // Convert 1/3 and 2/3 codes
-    if (val_abs & 0x1f) == 0x0c {
-        frac = 0x20 as f64 / 3.0;
-    } else if (val_abs & 0x1f) == 0x14 {
-        frac = 0x40 as f64 / 3.0;
-    }
-
-    sign * (val_int as f64 + frac) / 0x20 as f64
 }
 
 /// Format EV compensation as a fraction like ExifTool's PrintFraction
@@ -2627,17 +2648,16 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     }
 
     // Max aperture (index 26) - Convert Canon aperture value to f-number
+    // Uses Canon EV encoding with special 1/3 and 2/3 stop codes
     if data.len() > 26 && data[26] > 0 {
-        let apex = data[26] as f64 / 32.0;
-        let f_number = 2f64.powf(apex / 2.0);
-        let rounded = (f_number * 10.0).round() / 10.0;
+        let f_number = canon_ev_to_fnumber(data[26]);
+        let rounded = format_fnumber_2g(f_number);
         decoded.insert("MaxAperture".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Min aperture (index 27) - Convert Canon aperture value to f-number
     if data.len() > 27 && data[27] > 0 {
-        let apex = data[27] as f64 / 32.0;
-        let f_number = 2f64.powf(apex / 2.0);
+        let f_number = canon_ev_to_fnumber(data[27]);
         // ExifTool rounds to integer for MinAperture
         let rounded = f_number.round();
         decoded.insert("MinAperture".to_string(), ExifValue::Double(vec![rounded]));
@@ -3060,18 +3080,16 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
         );
     }
 
-    // Max aperture (index 26)
+    // Max aperture (index 26) - Uses Canon EV encoding
     if data.len() > 26 && data[26] > 0 {
-        let apex = data[26] as f64 / 32.0;
-        let f_number = 2f64.powf(apex / 2.0);
-        let rounded = (f_number * 10.0).round() / 10.0;
+        let f_number = canon_ev_to_fnumber(data[26]);
+        let rounded = format_fnumber_2g(f_number);
         decoded.insert("MaxAperture".to_string(), ExifValue::Double(vec![rounded]));
     }
 
     // Min aperture (index 27)
     if data.len() > 27 && data[27] > 0 {
-        let apex = data[27] as f64 / 32.0;
-        let f_number = 2f64.powf(apex / 2.0);
+        let f_number = canon_ev_to_fnumber(data[27]);
         let rounded = f_number.round();
         decoded.insert("MinAperture".to_string(), ExifValue::Double(vec![rounded]));
     }
@@ -3347,20 +3365,32 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     // Measured EV (index 3) - Canon APEX value, stored as value/32 with +5.0 offset
     // MeasuredEV represents the metered exposure value
     // ExifTool uses: MeasuredEV = (raw / 32.0) + 5.0
+    // ExifTool uses banker's rounding (round half to even)
     if data.len() > 3 {
         let raw = data[3] as i16; // Treat as signed for negative EV values
         let ev = (raw as f64 / 32.0) + 5.0;
-        // Round to 2 decimal places
-        let rounded = (ev * 100.0).round() / 100.0;
-        decoded.insert("MeasuredEV".to_string(), ExifValue::Double(vec![rounded]));
+        // Banker's rounding to 2 decimal places
+        let scaled = ev * 100.0;
+        let rounded = if scaled.fract() == 0.5 {
+            // Round half to even
+            if (scaled.floor() as i64) % 2 == 0 {
+                scaled.floor()
+            } else {
+                scaled.ceil()
+            }
+        } else {
+            scaled.round()
+        };
+        decoded.insert(
+            "MeasuredEV".to_string(),
+            ExifValue::Double(vec![rounded / 100.0]),
+        );
     }
 
-    // Target aperture (index 4) - Canon APEX aperture value
-    // f-number = 2^(value/64)
+    // Target aperture (index 4) - Canon APEX aperture value with Canon EV encoding
     if data.len() > 4 && data[4] > 0 {
-        let apex = data[4] as f64 / 64.0;
-        let f_number = 2f64.powf(apex);
-        let rounded = (f_number * 10.0).round() / 10.0;
+        let f_number = canon_ev_to_fnumber(data[4]);
+        let rounded = format_fnumber_2g(f_number);
         decoded.insert(
             "TargetAperture".to_string(),
             ExifValue::Double(vec![rounded]),
@@ -3618,19 +3648,30 @@ pub fn decode_shot_info_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
-    // Measured EV (index 3)
+    // Measured EV (index 3) - ExifTool uses banker's rounding
     if data.len() > 3 {
         let raw = data[3] as i16;
         let ev = (raw as f64 / 32.0) + 5.0;
-        let rounded = (ev * 100.0).round() / 100.0;
-        decoded.insert("MeasuredEV".to_string(), ExifValue::Double(vec![rounded]));
+        let scaled = ev * 100.0;
+        let rounded = if scaled.fract() == 0.5 {
+            if (scaled.floor() as i64) % 2 == 0 {
+                scaled.floor()
+            } else {
+                scaled.ceil()
+            }
+        } else {
+            scaled.round()
+        };
+        decoded.insert(
+            "MeasuredEV".to_string(),
+            ExifValue::Double(vec![rounded / 100.0]),
+        );
     }
 
-    // Target aperture (index 4)
+    // Target aperture (index 4) - Uses Canon EV encoding
     if data.len() > 4 && data[4] > 0 {
-        let apex = data[4] as f64 / 64.0;
-        let f_number = 2f64.powf(apex);
-        let rounded = (f_number * 10.0).round() / 10.0;
+        let f_number = canon_ev_to_fnumber(data[4]);
+        let rounded = format_fnumber_2g(f_number);
         decoded.insert(
             "TargetAperture".to_string(),
             ExifValue::Double(vec![rounded]),
@@ -3872,12 +3913,12 @@ pub fn decode_focal_length_exiftool(data: &[u16]) -> HashMap<String, ExifValue> 
 
     // Focal length (index 1)
     // Canon stores focal length multiplied by FocalUnits (typically 1)
-    // Exiftool shows this as "55.0 mm" format
+    // ExifTool shows "400 mm" for CRW (integer, no decimal)
     if data.len() > 1 {
-        let fl = data[1] as f64;
+        let fl = data[1];
         decoded.insert(
             "FocalLength".to_string(),
-            ExifValue::Ascii(format!("{:.1} mm", fl)),
+            ExifValue::Ascii(format!("{} mm", fl)),
         );
     }
 
@@ -3988,6 +4029,7 @@ pub fn decode_processing_info_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     }
 
     // Sharpness (index 2) - numeric value
+    // Note: ExifTool formatting varies by source block (CameraSettings uses +, ColorData doesn't)
     if data.len() > 2 {
         let sharpness = data[2] as i16;
         decoded.insert("Sharpness".to_string(), ExifValue::SShort(vec![sharpness]));
@@ -4081,15 +4123,15 @@ pub fn decode_af_info2(data: &[u16]) -> HashMap<String, ExifValue> {
 pub fn decode_af_info2_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
-    // AFInfo2 structure:
+    // AFInfo2 structure (from ExifTool Canon.pm):
     // Index 0: Byte count/header
     // Index 1: AFAreaMode
     // Index 2: NumAFPoints
     // Index 3: ValidAFPoints
-    // Index 4: AFImageWidth
-    // Index 5: AFImageHeight
-    // Index 6: CanonImageWidth
-    // Index 7: CanonImageHeight
+    // Index 4: CanonImageWidth (full sensor width)
+    // Index 5: CanonImageHeight (full sensor height)
+    // Index 6: AFImageWidth (AF area width)
+    // Index 7: AFImageHeight (AF area height)
     // Index 8+: Widths[N], Heights[N], XPositions[N], YPositions[N]
 
     // AF area mode (index 1, after header)
@@ -4113,39 +4155,39 @@ pub fn decode_af_info2_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
             decoded.insert("ValidAFPoints".to_string(), ExifValue::Short(vec![data[3]]));
         }
 
-        // AFImageWidth (index 4)
+        // CanonImageWidth (index 4) - full sensor dimensions
         if data.len() > 4 {
-            decoded.insert("AFImageWidth".to_string(), ExifValue::Short(vec![data[4]]));
-        }
-
-        // AFImageHeight (index 5)
-        if data.len() > 5 {
-            decoded.insert("AFImageHeight".to_string(), ExifValue::Short(vec![data[5]]));
-        }
-
-        // CanonImageWidth (index 6)
-        if data.len() > 6 {
             decoded.insert(
                 "CanonImageWidth".to_string(),
-                ExifValue::Short(vec![data[6]]),
+                ExifValue::Short(vec![data[4]]),
             );
         }
 
-        // CanonImageHeight (index 7)
-        if data.len() > 7 {
+        // CanonImageHeight (index 5)
+        if data.len() > 5 {
             decoded.insert(
                 "CanonImageHeight".to_string(),
-                ExifValue::Short(vec![data[7]]),
+                ExifValue::Short(vec![data[5]]),
             );
+        }
+
+        // AFImageWidth (index 6) - AF area dimensions
+        if data.len() > 6 {
+            decoded.insert("AFImageWidth".to_string(), ExifValue::Short(vec![data[6]]));
+        }
+
+        // AFImageHeight (index 7)
+        if data.len() > 7 {
+            decoded.insert("AFImageHeight".to_string(), ExifValue::Short(vec![data[7]]));
         }
 
         // AF area arrays start at index 8 (after the header fields)
         let base = 8usize;
         let n = num_af_points as usize;
 
-        // Widths (index 3 to 3+N-1)
+        // Widths (index 3 to 3+N-1) - signed values
         if data.len() >= base + n {
-            let widths: Vec<u16> = data[base..base + n].to_vec();
+            let widths: Vec<i16> = data[base..base + n].iter().map(|&v| v as i16).collect();
             // Format as space-separated string like ExifTool
             let widths_str = widths
                 .iter()
@@ -4155,9 +4197,12 @@ pub fn decode_af_info2_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
             decoded.insert("AFAreaWidths".to_string(), ExifValue::Ascii(widths_str));
         }
 
-        // Heights (index 3+N to 3+2N-1)
+        // Heights (index 3+N to 3+2N-1) - signed values
         if data.len() >= base + 2 * n {
-            let heights: Vec<u16> = data[base + n..base + 2 * n].to_vec();
+            let heights: Vec<i16> = data[base + n..base + 2 * n]
+                .iter()
+                .map(|&v| v as i16)
+                .collect();
             let heights_str = heights
                 .iter()
                 .map(|v| v.to_string())
@@ -4228,9 +4273,9 @@ pub fn decode_af_info2_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
         let base = 8usize;
         let n = num_af_points as usize;
 
-        // Widths
+        // Widths - signed values
         if data.len() >= base + n {
-            let widths: Vec<u16> = data[base..base + n].to_vec();
+            let widths: Vec<i16> = data[base..base + n].iter().map(|&v| v as i16).collect();
             let widths_str = widths
                 .iter()
                 .map(|v| v.to_string())
@@ -4239,9 +4284,12 @@ pub fn decode_af_info2_exiv2(data: &[u16]) -> HashMap<String, ExifValue> {
             decoded.insert("AFAreaWidths".to_string(), ExifValue::Ascii(widths_str));
         }
 
-        // Heights
+        // Heights - signed values
         if data.len() >= base + 2 * n {
-            let heights: Vec<u16> = data[base + n..base + 2 * n].to_vec();
+            let heights: Vec<i16> = data[base + n..base + 2 * n]
+                .iter()
+                .map(|&v| v as i16)
+                .collect();
             let heights_str = heights
                 .iter()
                 .map(|v| v.to_string())

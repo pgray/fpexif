@@ -4,7 +4,21 @@
 
 Implement decryption for Nikon LensData version 02xx (0201, 0202, 0203, 0204) to enable proper LensID composite lookup. This will fix ~33 LensID mismatches across test files.
 
-## Current State
+## Current State (Updated 2025-12-31)
+- Match rate: 50.0%
+- Files tested: 4 NRW, 47 NEF
+- Matching: 4,820 | Mismatched: 447 | Missing: 4,376 | Extra: 1,723
+
+### Key Mismatches
+| Tag | Count | Issue |
+|-----|-------|-------|
+| AFAreaMode | ~20 | Returns "Unknown" instead of correct value |
+| RedBalance/BlueBalance | ~30 | Wrong color balance values (encryption issue?) |
+| MakerNoteVersion | ~10 | Minor formatting differences |
+| Lens | ~10 | Focal length rounding differences |
+| LensID | ~10 | Missing decryption for 02xx versions |
+
+## Implementation Status
 
 - LensData parsing exists for unencrypted versions (0100, 0101) in `src/makernotes/nikon.rs`
 - Decryption function `nikon_decrypt()` already exists (lines 1318-1342)

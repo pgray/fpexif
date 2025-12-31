@@ -774,24 +774,33 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
         }
     }
 
-    // Add FocalLength (tag 0x920A) - RATIONAL
+    // Add FocalLength (tag 0x920A) - ASCII for CRW files
+    // ExifTool formats CRW FocalLength from MakerNotes:
+    // - Whole numbers without decimal: "400 mm"
+    // - Fractional values with decimals: "7.5 mm" or "7.1875 mm"
     if let Some(fl) = metadata.focal_length {
-        let units = metadata.focal_units.unwrap_or(1) as u32;
+        let units = metadata.focal_units.unwrap_or(1);
         if units > 0 && fl > 0 {
-            let fl_mm = fl as u32;
-            let mut rational = Vec::new();
-            rational.extend_from_slice(&fl_mm.to_le_bytes());
-            rational.extend_from_slice(&units.to_le_bytes());
-            ifd_entries.push((0x920A, 5, 1, rational));
+            let fl_mm = fl as f64 / units as f64;
+            // Format: whole numbers without decimals, fractional with up to 5 decimal places
+            let fl_str = if fl_mm.fract() == 0.0 {
+                format!("{} mm", fl_mm as u32)
+            } else {
+                // ExifTool uses up to 5 decimal places for fractional focal lengths
+                let formatted = format!("{:.5}", fl_mm).trim_end_matches('0').to_string();
+                format!("{} mm", formatted)
+            };
+            let mut fl_bytes = fl_str.as_bytes().to_vec();
+            fl_bytes.push(0); // Null terminator
+            ifd_entries.push((0x920A, 2, fl_bytes.len() as u32, fl_bytes));
         }
     }
 
     // Add ExposureBiasValue (tag 0x9204) - SRATIONAL
     if let Some(ev_comp) = metadata.exposure_compensation {
-        // Canon stores as value * 32 (e.g., -32 = -1 EV)
-        // EXIF wants it as a rational in EV
-        let num = ev_comp as i32;
-        let denom = 32i32;
+        // Canon uses special EV encoding where 12 (0x0c) = 1/3 stop, 20 (0x14) = 2/3 stop
+        // We need to convert to proper EXIF fraction
+        let (num, denom) = canon_ev_to_fraction(ev_comp);
         let mut rational = Vec::new();
         rational.extend_from_slice(&num.to_le_bytes());
         rational.extend_from_slice(&denom.to_le_bytes());
@@ -975,6 +984,35 @@ fn days_to_ymd(days: i64) -> (i32, u32, u32) {
 
 fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+/// Convert Canon EV value to EXIF-compatible signed rational (numerator, denominator)
+/// Canon uses special encoding where lower 5 bits contain fractional part:
+/// - 0x0c (12) = 1/3 stop
+/// - 0x14 (20) = 2/3 stop
+/// - Other values = value/32 stops
+fn canon_ev_to_fraction(val: i16) -> (i32, i32) {
+    if val == 0 {
+        return (0, 1);
+    }
+
+    let sign = if val < 0 { -1 } else { 1 };
+    let abs_val = val.unsigned_abs();
+    let frac = abs_val & 0x1f;
+    let whole = (abs_val >> 5) as i32;
+
+    match frac {
+        0x00 => (sign * whole, 1),           // Whole stop: n EV
+        0x0c => (sign * (whole * 3 + 1), 3), // +1/3 stop
+        0x14 => (sign * (whole * 3 + 2), 3), // +2/3 stop
+        0x10 => (sign * (whole * 2 + 1), 2), // +1/2 stop
+        _ => {
+            // Fallback: approximate to nearest 1/3
+            let ev = (abs_val as f64) / 32.0;
+            let thirds = (ev * 3.0).round() as i32;
+            (sign * thirds, 3)
+        }
+    }
 }
 
 #[cfg(test)]

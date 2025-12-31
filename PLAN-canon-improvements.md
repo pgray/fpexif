@@ -1,24 +1,22 @@
 # Canon EXIF Improvements Plan
 
-## Current State
-- Match rate: 37.9%
+## Current State (Updated 2025-12-31)
+- Match rate: 41.0% (up from 37.9%)
 - Files tested: 54 CR2, 18 CRW
-- Matching: 6,513 | Mismatched: 498 | Missing: 10,163 | Extra: 2,209
+- Matching: 7,044 | Mismatched: 291 | Missing: 9,839 | Extra: 2,101
 
 ## Top Mismatches by Frequency
 
 | Tag | Count | Issue | Fix |
 |-----|-------|-------|-----|
-| StripOffsets/ByteCounts | 35 | SubIFD prioritization | Same fix as Nikon - prefer raw data SubIFD |
-| TargetExposureTime | 19 | Formatting difference | Check ExifTool format |
-| Megapixels | 16 | Computed field missing | Add computation from ImageWidth/Height |
-| LensInfo | 15 | Not parsed | Parse from MakerNote |
-| ImageSize | 14 | Computed field | Add "WxH" format |
-| ISO | 12 | Formatting | Check format differences |
-| CanonImageWidth/Height | 12/11 | Wrong IFD selection | Fix IFD priority |
-| MeteringMode | 11 | Decode mismatch | Check decode values |
-| LensType/LensID | 8/7 | Lens lookup | Add lens database |
-| ExposureCompensation | 7 | Formatting | Already fixed? Check Canon-specific |
+| AFImageWidth/Height | ~8 | Swapped with CanonImageWidth/Height | Fix which IFD is used for each |
+| CanonImageWidth/Height | ~8 | Swapped with AFImageWidth/Height | Fix IFD selection logic |
+| FNumber | ~5 | Precision formatting | Format to match ExifTool (e.g., "10" not "10.4") |
+| ExposureCompensation | ~5 | Formatting difference | Check exact ExifTool format |
+| TargetExposureTime | ~5 | Formatting difference | Check ExifTool format |
+| ISO | ~5 | Formatting | Check format differences |
+| MeteringMode | ~5 | Decode mismatch | Check decode values |
+| LensType/LensID | ~5 | Lens lookup | Add lens database |
 
 ## Implementation Steps
 
