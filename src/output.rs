@@ -1254,6 +1254,338 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
+    // Also try WB_RGGBLevels format (R G G B) - common in Canon
+    if !output.contains_key("RedBalance") || !output.contains_key("BlueBalance") {
+        if let Some(Value::String(wb_levels)) = output.get("WB_RGGBLevels") {
+            let parts: Vec<f64> = wb_levels
+                .split_whitespace()
+                .filter_map(|s| s.parse::<f64>().ok())
+                .collect();
+            if parts.len() >= 4 {
+                let r = parts[0];
+                let g1 = parts[1];
+                let g2 = parts[2];
+                let b = parts[3];
+                let g = (g1 + g2) / 2.0;
+                if g != 0.0 {
+                    if !output.contains_key("RedBalance") {
+                        if let Some(num) = serde_json::Number::from_f64(r / g) {
+                            output.insert("RedBalance".to_string(), Value::Number(num));
+                        }
+                    }
+                    if !output.contains_key("BlueBalance") {
+                        if let Some(num) = serde_json::Number::from_f64(b / g) {
+                            output.insert("BlueBalance".to_string(), Value::Number(num));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ImageHeight - alias for ImageLength (TIFF uses ImageLength, ExifTool uses ImageHeight)
+    if !output.contains_key("ImageHeight") {
+        if let Some(val) = output.get("ImageLength").cloned() {
+            output.insert("ImageHeight".to_string(), val);
+        }
+    }
+
+    // InteropIndex - format as "R98 - DCF basic file (sRGB)" or "THM - DCF thumbnail file"
+    if let Some(Value::String(idx)) = output.get("InteropIndex").cloned() {
+        let formatted = match idx.as_str() {
+            "R98" => "R98 - DCF basic file (sRGB)",
+            "THM" => "THM - DCF thumbnail file",
+            "R03" => "R03 - DCF option file (Adobe RGB)",
+            _ => &idx,
+        };
+        output.insert("InteropIndex".to_string(), Value::String(formatted.to_string()));
+    }
+
+    // InteropVersion - convert "30 31 30 30" hex bytes to "0100"
+    if let Some(Value::String(ver)) = output.get("InteropVersion").cloned() {
+        if ver.contains(' ') {
+            // It's hex bytes like "30 31 30 30" - convert to ASCII string
+            let decoded: String = ver
+                .split_whitespace()
+                .filter_map(|hex| u8::from_str_radix(hex, 16).ok())
+                .filter(|&b| b.is_ascii_alphanumeric())
+                .map(|b| b as char)
+                .collect();
+            if !decoded.is_empty() {
+                output.insert("InteropVersion".to_string(), Value::String(decoded));
+            }
+        }
+    }
+
+    // ============================================================================
+    // Calculated/Composite fields (like ExifTool's Composite tags)
+    // ============================================================================
+
+    // Helper function to extract f64 from JSON value
+    fn parse_f64_value(v: &Value) -> Option<f64> {
+        match v {
+            Value::Number(n) => n.as_f64(),
+            Value::String(s) => {
+                let s = s
+                    .trim()
+                    .trim_end_matches(" mm")
+                    .trim_end_matches(" s")
+                    .trim_end_matches(" m");
+                // Try parsing as fraction (e.g., "1/800")
+                if let Some(slash_pos) = s.find('/') {
+                    let num = s[..slash_pos].parse::<f64>().ok()?;
+                    let denom = s[slash_pos + 1..].parse::<f64>().ok()?;
+                    if denom != 0.0 {
+                        return Some(num / denom);
+                    }
+                }
+                // Try parsing as plain number
+                s.parse::<f64>().ok()
+            }
+            _ => None,
+        }
+    }
+
+    // Extract all values we need first (before any inserts)
+    let focal_length = output.get("FocalLength").and_then(parse_f64_value);
+    let aperture = output
+        .get("Aperture")
+        .and_then(parse_f64_value)
+        .or_else(|| output.get("FNumber").and_then(parse_f64_value));
+    let exposure_time = output.get("ExposureTime").and_then(parse_f64_value);
+    let iso = output
+        .get("ISO")
+        .and_then(parse_f64_value)
+        .or_else(|| output.get("ISOSpeedRatings").and_then(parse_f64_value));
+    let fl35_raw = output.get("FocalLengthIn35mmFilm").and_then(parse_f64_value);
+    let min_fl = output.get("MinFocalLength").and_then(parse_f64_value);
+    let max_fl = output.get("MaxFocalLength").and_then(parse_f64_value);
+    let focus_dist_str = output.get("FocusDistanceUpper").cloned();
+
+    // For ScaleFactor calculation from sensor size
+    let image_width = output.get("ExifImageWidth").and_then(parse_f64_value);
+    let image_height = output.get("ExifImageHeight").and_then(parse_f64_value);
+    let focal_plane_x_res = output.get("FocalPlaneXResolution").and_then(parse_f64_value);
+    let focal_plane_y_res = output.get("FocalPlaneYResolution").and_then(parse_f64_value);
+    let focal_plane_res_unit = output.get("FocalPlaneResolutionUnit").and_then(parse_f64_value);
+    // MakerNote sensor size tags
+    let sensor_width = output.get("SensorWidth").and_then(parse_f64_value);
+    let sensor_height = output.get("SensorHeight").and_then(parse_f64_value);
+    let focal_plane_diag = output.get("FocalPlaneDiagonal").and_then(parse_f64_value);
+
+    let has_shutter_speed = output.contains_key("ShutterSpeed");
+    let has_scale_factor = output.contains_key("ScaleFactor35efl");
+    let has_focal_length_35 = output.contains_key("FocalLength35efl");
+    let has_lens_35 = output.contains_key("Lens35efl");
+    let has_coc = output.contains_key("CircleOfConfusion");
+    let has_hyperfocal = output.contains_key("HyperfocalDistance");
+    let has_fov = output.contains_key("FOV");
+    let has_lv = output.contains_key("LightValue");
+    let has_dof = output.contains_key("DOF");
+
+    // Now do all inserts
+
+    // ShutterSpeed - from ExposureTime or ShutterSpeedValue
+    if !has_shutter_speed {
+        if let Some(exp_time) = exposure_time {
+            if exp_time > 0.0 {
+                let formatted = if exp_time >= 1.0 {
+                    format!("{}", exp_time.round() as u32)
+                } else {
+                    format!("1/{}", (1.0 / exp_time).round() as u32)
+                };
+                output.insert("ShutterSpeed".to_string(), Value::String(formatted));
+            }
+        }
+    }
+
+    // ScaleFactor35efl - crop factor relative to 35mm full frame
+    // Full frame diagonal = sqrt(36² + 24²) = 43.2666mm
+    const FF_DIAG: f64 = 43.2666;
+
+    // Try multiple sources in order of preference:
+    // 1. FocalLengthIn35mmFilm / FocalLength (most accurate)
+    // 2. FocalPlaneDiagonal from MakerNotes (Olympus, etc.)
+    // 3. SensorWidth/Height from MakerNotes (Canon, Panasonic, etc.)
+    // 4. FocalPlaneResolution + image dimensions (fallback)
+    let scale_factor = if let (Some(fl35), Some(fl)) = (fl35_raw, focal_length) {
+        if fl > 0.0 && fl35 > 0.0 {
+            Some(fl35 / fl)
+        } else {
+            None
+        }
+    } else if let Some(diag) = focal_plane_diag {
+        // FocalPlaneDiagonal is sensor diagonal in mm
+        if diag > 0.0 {
+            Some(FF_DIAG / diag)
+        } else {
+            None
+        }
+    } else if let (Some(sw), Some(sh)) = (sensor_width, sensor_height) {
+        // SensorWidth/Height are in pixels - need to convert to mm
+        // For Canon, these are actual sensor dimensions in some unit
+        // Check if values look like mm (typically 15-40mm for APS-C/FF)
+        let diag = (sw * sw + sh * sh).sqrt();
+        if diag > 10.0 && diag < 50.0 {
+            // Values are likely in mm
+            Some(FF_DIAG / diag)
+        } else if let (Some(w), Some(h), Some(xres), Some(yres)) =
+            (image_width, image_height, focal_plane_x_res, focal_plane_y_res)
+        {
+            // SensorWidth/Height are in pixels, use focal plane res to convert
+            let unit_to_mm = match focal_plane_res_unit.unwrap_or(2.0) as u32 {
+                2 => 25.4,
+                3 => 10.0,
+                4 => 1.0,
+                5 => 0.001,
+                _ => 25.4,
+            };
+            // Scale sensor dimensions by pixel ratio
+            let sw_mm = sw * unit_to_mm / xres;
+            let sh_mm = sh * unit_to_mm / yres;
+            let sensor_diag = (sw_mm * sw_mm + sh_mm * sh_mm).sqrt();
+            if sensor_diag > 0.0 {
+                Some(FF_DIAG / sensor_diag)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else if let (Some(w), Some(h), Some(xres), Some(yres)) =
+        (image_width, image_height, focal_plane_x_res, focal_plane_y_res)
+    {
+        // Calculate sensor dimensions from focal plane resolution
+        let unit_to_mm = match focal_plane_res_unit.unwrap_or(2.0) as u32 {
+            2 => 25.4,
+            3 => 10.0,
+            4 => 1.0,
+            5 => 0.001,
+            _ => 25.4,
+        };
+        let sw_mm = w * unit_to_mm / xres;
+        let sh_mm = h * unit_to_mm / yres;
+        let sensor_diag = (sw_mm * sw_mm + sh_mm * sh_mm).sqrt();
+        if sensor_diag > 0.0 {
+            Some(FF_DIAG / sensor_diag)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    if let Some(sf) = scale_factor {
+        if !has_scale_factor && sf > 0.5 && sf < 10.0 {
+            if let Some(num) = serde_json::Number::from_f64((sf * 10.0).round() / 10.0) {
+                output.insert("ScaleFactor35efl".to_string(), Value::Number(num));
+            }
+        }
+    }
+
+    // FocalLength35efl - focal length in 35mm equivalent
+    if !has_focal_length_35 {
+        if let Some(fl35) = fl35_raw {
+            let formatted = format!("{:.1} mm", fl35);
+            output.insert("FocalLength35efl".to_string(), Value::String(formatted));
+        } else if let (Some(fl), Some(sf)) = (focal_length, scale_factor) {
+            let fl35 = fl * sf;
+            let formatted = format!("{:.1} mm", fl35);
+            output.insert("FocalLength35efl".to_string(), Value::String(formatted));
+        }
+    }
+
+    // Lens35efl - lens focal range in 35mm equivalent
+    if !has_lens_35 {
+        if let Some(sf) = scale_factor {
+            if let (Some(min), Some(max)) = (min_fl, max_fl) {
+                let min35 = min * sf;
+                let max35 = max * sf;
+                let formatted = if (min - max).abs() < 0.01 {
+                    format!("{:.0} mm", min35)
+                } else {
+                    format!("{:.0}-{:.0} mm", min35, max35)
+                };
+                output.insert("Lens35efl".to_string(), Value::String(formatted));
+            }
+        }
+    }
+
+    // CircleOfConfusion - sensor diagonal / 1440
+    // Full frame diagonal = sqrt(24² + 36²) = 43.27mm
+    // CoC = 43.27 / (ScaleFactor × 1440)
+    let coc = scale_factor.map(|sf| 43.27 / (sf * 1440.0));
+    if let Some(c) = coc {
+        if !has_coc {
+            let formatted = format!("{:.3} mm", c);
+            output.insert("CircleOfConfusion".to_string(), Value::String(formatted));
+        }
+    }
+
+    // HyperfocalDistance = (FocalLength² / (Aperture × CoC)) + FocalLength
+    if !has_hyperfocal {
+        if let (Some(fl), Some(ap), Some(c)) = (focal_length, aperture, coc) {
+            if ap > 0.0 && c > 0.0 {
+                let hyper = (fl * fl) / (ap * c) + fl;
+                let hyper_m = hyper / 1000.0;
+                let formatted = format!("{:.2} m", hyper_m);
+                output.insert("HyperfocalDistance".to_string(), Value::String(formatted));
+            }
+        }
+    }
+
+    // FOV (Field of View) = 2 × atan(SensorWidth / (2 × FocalLength))
+    if !has_fov {
+        if let (Some(fl), Some(sf)) = (focal_length, scale_factor) {
+            if fl > 0.0 {
+                let sensor_width = 36.0 / sf;
+                let fov_rad = 2.0 * (sensor_width / (2.0 * fl)).atan();
+                let fov_deg = fov_rad * 180.0 / std::f64::consts::PI;
+                let formatted = format!("{:.1} deg", fov_deg);
+                output.insert("FOV".to_string(), Value::String(formatted));
+            }
+        }
+    }
+
+    // LightValue = 2 × log2(Aperture) - log2(ShutterSpeed) - log2(ISO/100)
+    if !has_lv {
+        if let (Some(ap), Some(exp), Some(iso_val)) = (aperture, exposure_time, iso) {
+            if ap > 0.0 && exp > 0.0 && iso_val > 0.0 {
+                let lv = 2.0 * ap.log2() - exp.log2() - (iso_val / 100.0).log2();
+                if let Some(num) = serde_json::Number::from_f64((lv * 10.0).round() / 10.0) {
+                    output.insert("LightValue".to_string(), Value::Number(num));
+                }
+            }
+        }
+    }
+
+    // DOF (Depth of Field) - requires focus distance
+    if !has_dof {
+        if let Some(Value::String(s)) = focus_dist_str {
+            if let Ok(focus_m) = s.trim_end_matches(" m").parse::<f64>() {
+                if let (Some(fl), Some(ap), Some(c)) = (focal_length, aperture, coc) {
+                    let focus_mm = focus_m * 1000.0;
+                    if focus_mm > fl && ap > 0.0 {
+                        let hyper = (fl * fl) / (ap * c) + fl;
+                        let near = (hyper * focus_mm) / (hyper + (focus_mm - fl));
+                        let far = if focus_mm < hyper {
+                            (hyper * focus_mm) / (hyper - (focus_mm - fl))
+                        } else {
+                            f64::INFINITY
+                        };
+                        let dof = far - near;
+                        let formatted = if dof.is_infinite() {
+                            "inf".to_string()
+                        } else {
+                            format!("{:.2} m", dof / 1000.0)
+                        };
+                        output.insert("DOF".to_string(), Value::String(formatted));
+                    }
+                }
+            }
+        }
+    }
+
     // Wrap in an array like exiftool does
     Value::Array(vec![Value::Object(output)])
 }

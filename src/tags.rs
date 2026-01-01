@@ -829,6 +829,16 @@ pub const TAG_GPS_SPEED: ExifTagId = ExifTagId {
     ifd: TagGroup::Gps,
 };
 
+// Interoperability IFD tags
+pub const TAG_INTEROP_INDEX: ExifTagId = ExifTagId {
+    id: 0x0001,
+    ifd: TagGroup::Interop,
+};
+pub const TAG_INTEROP_VERSION: ExifTagId = ExifTagId {
+    id: 0x0002,
+    ifd: TagGroup::Interop,
+};
+
 // A static mapping of tag IDs to names
 static TAG_NAMES: OnceLock<HashMap<ExifTagId, &'static str>> = OnceLock::new();
 
@@ -1044,6 +1054,10 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_GPS_DOP, "GPSDOP");
     map.insert(TAG_GPS_SPEED_REF, "GPSSpeedRef");
     map.insert(TAG_GPS_SPEED, "GPSSpeed");
+
+    // Interoperability tags
+    map.insert(TAG_INTEROP_INDEX, "InteropIndex");
+    map.insert(TAG_INTEROP_VERSION, "InteropVersion");
 
     map
 }
