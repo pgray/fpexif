@@ -1058,11 +1058,21 @@ fn read_i32(data: &[u8], endian: Endianness) -> i32 {
 }
 
 /// Parse a single IFD entry and return the tag value
+///
+/// # Arguments
+/// * `data` - The IFD data containing entries
+/// * `entry_offset` - Offset to this entry within data
+/// * `base_offset` - Base offset for value offsets
+/// * `endian` - Byte order
+/// * `value_data` - Optional alternate data source for value offsets (for old format)
+/// * `value_base_offset` - Base offset when using value_data
 fn parse_ifd_entry(
     data: &[u8],
     entry_offset: usize,
     base_offset: usize,
     endian: Endianness,
+    value_data: Option<&[u8]>,
+    value_base_offset: usize,
 ) -> Option<(u16, ExifValue)> {
     if entry_offset + 12 > data.len() {
         return None;
@@ -1085,25 +1095,41 @@ fn parse_ifd_entry(
     let total_size = count * type_size;
 
     // Get the actual data location
-    let value_data = if total_size <= 4 {
+    // For values > 4 bytes, use value_data (TIFF data) if provided, else use data
+    let value_bytes: &[u8] = if total_size <= 4 {
         value_offset_bytes
     } else {
-        let offset = read_u32(value_offset_bytes, endian) as usize + base_offset;
-        if offset + total_size > data.len() {
+        let raw_offset = read_u32(value_offset_bytes, endian) as usize;
+
+        // Use alternate data source if provided (for old Olympus format)
+        let (src_data, src_base) = if let Some(vd) = value_data {
+            (vd, value_base_offset)
+        } else {
+            (data, base_offset)
+        };
+
+        let offset = raw_offset + src_base;
+        if tag_id == 0x2010 || tag_id == 0x2020 {
+            eprintln!(
+                "DEBUG: tag {:04x}: raw_offset={}, src_base={}, offset={}, src_data.len={}, total_size={}",
+                tag_id, raw_offset, src_base, offset, src_data.len(), total_size
+            );
+        }
+        if offset + total_size > src_data.len() {
             return None;
         }
-        &data[offset..offset + total_size]
+        &src_data[offset..offset + total_size]
     };
 
     // Parse based on type
     let value = match tag_type {
         1 => {
             // BYTE
-            ExifValue::Byte(value_data[..count].to_vec())
+            ExifValue::Byte(value_bytes[..count].to_vec())
         }
         2 => {
             // ASCII
-            let s = value_data[..count]
+            let s = value_bytes[..count]
                 .iter()
                 .take_while(|&&b| b != 0)
                 .map(|&b| b as char)
@@ -1114,8 +1140,8 @@ fn parse_ifd_entry(
             // SHORT
             let mut values = Vec::with_capacity(count);
             for i in 0..count {
-                if i * 2 + 2 <= value_data.len() {
-                    values.push(read_u16(&value_data[i * 2..], endian));
+                if i * 2 + 2 <= value_bytes.len() {
+                    values.push(read_u16(&value_bytes[i * 2..], endian));
                 }
             }
             ExifValue::Short(values)
@@ -1124,8 +1150,8 @@ fn parse_ifd_entry(
             // LONG
             let mut values = Vec::with_capacity(count);
             for i in 0..count {
-                if i * 4 + 4 <= value_data.len() {
-                    values.push(read_u32(&value_data[i * 4..], endian));
+                if i * 4 + 4 <= value_bytes.len() {
+                    values.push(read_u32(&value_bytes[i * 4..], endian));
                 }
             }
             ExifValue::Long(values)
@@ -1134,9 +1160,9 @@ fn parse_ifd_entry(
             // RATIONAL
             let mut values = Vec::with_capacity(count);
             for i in 0..count {
-                if i * 8 + 8 <= value_data.len() {
-                    let num = read_u32(&value_data[i * 8..], endian);
-                    let den = read_u32(&value_data[i * 8 + 4..], endian);
+                if i * 8 + 8 <= value_bytes.len() {
+                    let num = read_u32(&value_bytes[i * 8..], endian);
+                    let den = read_u32(&value_bytes[i * 8 + 4..], endian);
                     values.push((num, den));
                 }
             }
@@ -1144,18 +1170,18 @@ fn parse_ifd_entry(
         }
         6 => {
             // SBYTE
-            ExifValue::SByte(value_data[..count].iter().map(|&b| b as i8).collect())
+            ExifValue::SByte(value_bytes[..count].iter().map(|&b| b as i8).collect())
         }
         7 => {
             // UNDEFINED
-            ExifValue::Undefined(value_data[..count.min(value_data.len())].to_vec())
+            ExifValue::Undefined(value_bytes[..count.min(value_bytes.len())].to_vec())
         }
         8 => {
             // SSHORT
             let mut values = Vec::with_capacity(count);
             for i in 0..count {
-                if i * 2 + 2 <= value_data.len() {
-                    values.push(read_i16(&value_data[i * 2..], endian));
+                if i * 2 + 2 <= value_bytes.len() {
+                    values.push(read_i16(&value_bytes[i * 2..], endian));
                 }
             }
             ExifValue::SShort(values)
@@ -1164,8 +1190,8 @@ fn parse_ifd_entry(
             // SLONG
             let mut values = Vec::with_capacity(count);
             for i in 0..count {
-                if i * 4 + 4 <= value_data.len() {
-                    values.push(read_i32(&value_data[i * 4..], endian));
+                if i * 4 + 4 <= value_bytes.len() {
+                    values.push(read_i32(&value_bytes[i * 4..], endian));
                 }
             }
             ExifValue::SLong(values)
@@ -1174,9 +1200,9 @@ fn parse_ifd_entry(
             // SRATIONAL
             let mut values = Vec::with_capacity(count);
             for i in 0..count {
-                if i * 8 + 8 <= value_data.len() {
-                    let num = read_i32(&value_data[i * 8..], endian);
-                    let den = read_i32(&value_data[i * 8 + 4..], endian);
+                if i * 8 + 8 <= value_bytes.len() {
+                    let num = read_i32(&value_bytes[i * 8..], endian);
+                    let den = read_i32(&value_bytes[i * 8 + 4..], endian);
                     values.push((num, den));
                 }
             }
@@ -1205,7 +1231,31 @@ fn parse_ifd_entry(
     Some((tag_id, value))
 }
 
+/// Parse an embedded sub-IFD (old Olympus format where sub-IFD data is stored directly)
+fn parse_embedded_sub_ifd(
+    sub_data: &[u8],
+    endian: Endianness,
+    ifd_type: OlympusIfdType,
+    tags: &mut HashMap<u16, MakerNoteTag>,
+    prefix: &str,
+) {
+    // Embedded sub-IFDs have self-contained data, no need for TIFF data
+    parse_olympus_ifd(sub_data, 0, 0, endian, ifd_type, tags, prefix, None, 0);
+}
+
 /// Parse an Olympus IFD and return tags
+///
+/// # Arguments
+/// * `data` - The IFD data (maker note data)
+/// * `ifd_offset` - Offset to IFD entry count within data
+/// * `base_offset` - Base offset for IFD entry offsets
+/// * `endian` - Byte order
+/// * `ifd_type` - Type of IFD being parsed
+/// * `tags` - Output HashMap for parsed tags
+/// * `prefix` - Tag name prefix
+/// * `value_data` - Optional alternate data source for value offsets (for old format)
+/// * `value_base_offset` - Base offset when using value_data
+#[allow(clippy::too_many_arguments)]
 fn parse_olympus_ifd(
     data: &[u8],
     ifd_offset: usize,
@@ -1214,6 +1264,8 @@ fn parse_olympus_ifd(
     ifd_type: OlympusIfdType,
     tags: &mut HashMap<u16, MakerNoteTag>,
     prefix: &str,
+    value_data: Option<&[u8]>,
+    value_base_offset: usize,
 ) {
     if ifd_offset + 2 > data.len() {
         return;
@@ -1221,15 +1273,27 @@ fn parse_olympus_ifd(
 
     let num_entries = read_u16(&data[ifd_offset..], endian) as usize;
 
-    // Sanity check
-    if num_entries > 500 || ifd_offset + 2 + num_entries * 12 > data.len() {
+    // Sanity check - relax by a few bytes to handle slightly short embedded IFDs
+    if num_entries > 500 || ifd_offset + 2 + num_entries * 12 > data.len() + 4 {
         return;
     }
 
-    for i in 0..num_entries {
+    // Calculate how many entries we can actually read
+    let available_bytes = data.len().saturating_sub(ifd_offset + 2);
+    let max_entries = available_bytes / 12;
+    let actual_entries = num_entries.min(max_entries);
+
+    for i in 0..actual_entries {
         let entry_offset = ifd_offset + 2 + i * 12;
 
-        if let Some((tag_id, value)) = parse_ifd_entry(data, entry_offset, base_offset, endian) {
+        if let Some((tag_id, value)) = parse_ifd_entry(
+            data,
+            entry_offset,
+            base_offset,
+            endian,
+            value_data,
+            value_base_offset,
+        ) {
             let tag_name = get_olympus_tag_name(tag_id, ifd_type);
 
             // Create a unique tag ID for storage (combine prefix with tag ID)
@@ -1573,15 +1637,32 @@ fn parse_olympus_ifd(
             if ifd_type == OlympusIfdType::Main {
                 match tag_id {
                     OLYMPUS_EQUIPMENT_IFD => {
-                        if let ExifValue::Long(offsets) =
-                            tags.get(&storage_id).map(|t| &t.value).unwrap()
-                        {
-                            if !offsets.is_empty() {
-                                let sub_offset = offsets[0] as usize + base_offset;
+                        // Extract sub-IFD info before borrowing tags mutably
+                        let sub_ifd_info = tags.get(&storage_id).and_then(|tag| match &tag.value {
+                            ExifValue::Long(offsets) if !offsets.is_empty() => {
+                                Some((Some(offsets[0] as usize + base_offset), None))
+                            }
+                            ExifValue::Undefined(sub_data) if sub_data.len() > 2 => {
+                                Some((None, Some(sub_data.clone())))
+                            }
+                            _ => None,
+                        });
+                        if let Some((sub_offset_opt, sub_data_opt)) = sub_ifd_info {
+                            if let Some(sub_offset) = sub_offset_opt {
                                 parse_olympus_ifd(
                                     data,
                                     sub_offset,
                                     base_offset,
+                                    endian,
+                                    OlympusIfdType::Equipment,
+                                    tags,
+                                    &format!("{}Equipment.", prefix),
+                                    value_data,
+                                    value_base_offset,
+                                );
+                            } else if let Some(sub_data) = sub_data_opt {
+                                parse_embedded_sub_ifd(
+                                    &sub_data,
                                     endian,
                                     OlympusIfdType::Equipment,
                                     tags,
@@ -1591,15 +1672,31 @@ fn parse_olympus_ifd(
                         }
                     }
                     OLYMPUS_CAMERA_SETTINGS_IFD => {
-                        if let ExifValue::Long(offsets) =
-                            tags.get(&storage_id).map(|t| &t.value).unwrap()
-                        {
-                            if !offsets.is_empty() {
-                                let sub_offset = offsets[0] as usize + base_offset;
+                        let sub_ifd_info = tags.get(&storage_id).and_then(|tag| match &tag.value {
+                            ExifValue::Long(offsets) if !offsets.is_empty() => {
+                                Some((Some(offsets[0] as usize + base_offset), None))
+                            }
+                            ExifValue::Undefined(sub_data) if sub_data.len() > 2 => {
+                                Some((None, Some(sub_data.clone())))
+                            }
+                            _ => None,
+                        });
+                        if let Some((sub_offset_opt, sub_data_opt)) = sub_ifd_info {
+                            if let Some(sub_offset) = sub_offset_opt {
                                 parse_olympus_ifd(
                                     data,
                                     sub_offset,
                                     base_offset,
+                                    endian,
+                                    OlympusIfdType::CameraSettings,
+                                    tags,
+                                    &format!("{}CameraSettings.", prefix),
+                                    value_data,
+                                    value_base_offset,
+                                );
+                            } else if let Some(sub_data) = sub_data_opt {
+                                parse_embedded_sub_ifd(
+                                    &sub_data,
                                     endian,
                                     OlympusIfdType::CameraSettings,
                                     tags,
@@ -1622,6 +1719,8 @@ fn parse_olympus_ifd(
                                     OlympusIfdType::RawDevelopment,
                                     tags,
                                     &format!("{}RawDev.", prefix),
+                                    value_data,
+                                    value_base_offset,
                                 );
                             }
                         }
@@ -1640,6 +1739,8 @@ fn parse_olympus_ifd(
                                     OlympusIfdType::ImageProcessing,
                                     tags,
                                     &format!("{}ImageProc.", prefix),
+                                    value_data,
+                                    value_base_offset,
                                 );
                             }
                         }
@@ -1658,6 +1759,8 @@ fn parse_olympus_ifd(
                                     OlympusIfdType::FocusInfo,
                                     tags,
                                     &format!("{}FocusInfo.", prefix),
+                                    value_data,
+                                    value_base_offset,
                                 );
                             }
                         }
@@ -1673,48 +1776,58 @@ fn parse_olympus_ifd(
 pub fn parse_olympus_maker_notes(
     data: &[u8],
     _endian: Endianness,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
-    // Olympus maker notes start with "OLYMPUS\0II\x03\0" or "OLYMPUS\0MM\x00\x03"
-    if data.len() < 14 {
+    // Olympus maker notes have two formats:
+    // 1. New format: "OLYMPUS\0II\x03\0" or "OLYMPUS\0MM\x00\x03" (12 byte header)
+    //    - Offsets are relative to maker note start
+    // 2. Old format: "OLYMP\0" (6 byte header) - used by older cameras like E-1, E-300
+    //    - Offsets are relative to TIFF header (need tiff_data to resolve)
+    if data.len() < 8 {
         return Ok(tags);
     }
 
-    // Check for OLYMPUS header
-    if !data.starts_with(b"OLYMPUS\0") {
-        return Ok(tags);
-    }
-
-    // Determine endianness from the header
-    let mn_endian = if data[8] == b'I' && data[9] == b'I' {
-        Endianness::Little
-    } else if data[8] == b'M' && data[9] == b'M' {
-        Endianness::Big
+    // Determine format and endianness
+    let (mn_endian, ifd_offset, is_old_format) = if data.starts_with(b"OLYMPUS\0") {
+        // New format: 8-byte header + 2-byte endian + 2-byte version
+        if data.len() < 14 {
+            return Ok(tags);
+        }
+        let endian = if data[8] == b'I' && data[9] == b'I' {
+            Endianness::Little
+        } else if data[8] == b'M' && data[9] == b'M' {
+            Endianness::Big
+        } else {
+            return Ok(tags);
+        };
+        (endian, 12, false)
+    } else if data.starts_with(b"OLYMP\0") {
+        // Old format: 6-byte header + 2-byte version, IFD at byte 8
+        // Always little-endian based on observed files
+        (Endianness::Little, 8, true)
     } else {
         return Ok(tags);
     };
 
-    // Olympus maker note structure:
-    // - "OLYMPUS\0" (8 bytes)
-    // - "II" or "MM" (2 bytes for endianness)
-    // - Version 0x0003 (2 bytes)
-    // - IFD starts immediately at byte 12 (no offset pointer like standard TIFF)
-    //
-    // Value offsets in Olympus maker notes are relative to the start of the
-    // maker note data (position 0), not after the header
-    let base_offset = 0;
-    let ifd_offset = 12; // IFD count starts at byte 12
+    // For old format, offsets in IFD entries are relative to TIFF header.
+    // We pass tiff_data for resolving those offsets.
+    let value_data = if is_old_format { tiff_data } else { None };
+    let value_base_offset = if is_old_format { tiff_offset } else { 0 };
 
-    // Parse the main IFD
+    // Parse the main IFD from maker note data
     parse_olympus_ifd(
         data,
         ifd_offset,
-        base_offset,
+        0, // base_offset for reading IFD entries from maker note
         mn_endian,
         OlympusIfdType::Main,
         &mut tags,
         "Olympus.",
+        value_data,
+        value_base_offset,
     );
 
     Ok(tags)

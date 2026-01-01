@@ -68,7 +68,7 @@ pub fn parse_maker_notes_with_tiff_data(
     } else if make_str.contains("fuji") {
         fuji::parse_fuji_maker_notes(data, endian)
     } else if make_str.contains("olympus") {
-        olympus::parse_olympus_maker_notes(data, endian)
+        olympus::parse_olympus_maker_notes(data, endian, tiff_data, tiff_offset)
     } else if make_str.contains("panasonic") {
         panasonic::parse_panasonic_maker_notes(data, endian)
     } else if make_str.contains("pentax") || make_str.contains("ricoh") {

@@ -533,6 +533,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_COLOR_BALANCE => Some("ColorBalance"),
         NIKON_LENS_DATA => Some("LensData"),
         NIKON_RAW_IMAGE_CENTER => Some("RawImageCenter"),
+        NIKON_SENSOR_PIXEL_SIZE => Some("SensorPixelSize"),
         NIKON_FLASH_INFO => Some("FlashInfo"),
         NIKON_HIGH_ISO_NOISE_REDUCTION => Some("HighISONoiseReduction"),
         NIKON_DATE_STAMP_MODE => Some("DateStampMode"),

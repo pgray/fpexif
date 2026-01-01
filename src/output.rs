@@ -1298,7 +1298,10 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             "R03" => "R03 - DCF option file (Adobe RGB)",
             _ => &idx,
         };
-        output.insert("InteropIndex".to_string(), Value::String(formatted.to_string()));
+        output.insert(
+            "InteropIndex".to_string(),
+            Value::String(formatted.to_string()),
+        );
     }
 
     // InteropVersion - convert "30 31 30 30" hex bytes to "0100"
@@ -1357,7 +1360,10 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         .get("ISO")
         .and_then(parse_f64_value)
         .or_else(|| output.get("ISOSpeedRatings").and_then(parse_f64_value));
-    let fl35_raw = output.get("FocalLengthIn35mmFilm").and_then(parse_f64_value);
+    let fl35_raw = output
+        .get("FocalLengthIn35mmFilm")
+        .or_else(|| output.get("FocalLengthIn35mmFormat"))
+        .and_then(parse_f64_value);
     let min_fl = output.get("MinFocalLength").and_then(parse_f64_value);
     let max_fl = output.get("MaxFocalLength").and_then(parse_f64_value);
     let focus_dist_str = output.get("FocusDistanceUpper").cloned();
@@ -1365,13 +1371,35 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // For ScaleFactor calculation from sensor size
     let image_width = output.get("ExifImageWidth").and_then(parse_f64_value);
     let image_height = output.get("ExifImageHeight").and_then(parse_f64_value);
-    let focal_plane_x_res = output.get("FocalPlaneXResolution").and_then(parse_f64_value);
-    let focal_plane_y_res = output.get("FocalPlaneYResolution").and_then(parse_f64_value);
-    let focal_plane_res_unit = output.get("FocalPlaneResolutionUnit").and_then(parse_f64_value);
+    let focal_plane_x_res = output
+        .get("FocalPlaneXResolution")
+        .and_then(parse_f64_value);
+    let focal_plane_y_res = output
+        .get("FocalPlaneYResolution")
+        .and_then(parse_f64_value);
+    let focal_plane_res_unit = output
+        .get("FocalPlaneResolutionUnit")
+        .and_then(parse_f64_value);
     // MakerNote sensor size tags
     let sensor_width = output.get("SensorWidth").and_then(parse_f64_value);
     let sensor_height = output.get("SensorHeight").and_then(parse_f64_value);
     let focal_plane_diag = output.get("FocalPlaneDiagonal").and_then(parse_f64_value);
+    // Nikon SensorPixelSize: "7.8 7.8" = width height in micrometers
+    let sensor_pixel_size = output.get("SensorPixelSize").and_then(|v| {
+        if let Value::String(s) = v {
+            let parts: Vec<f64> = s
+                .split_whitespace()
+                .filter_map(|p| p.parse().ok())
+                .collect();
+            if parts.len() >= 2 {
+                Some((parts[0], parts[1]))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    });
 
     let has_shutter_speed = output.contains_key("ShutterSpeed");
     let has_scale_factor = output.contains_key("ScaleFactor35efl");
@@ -1407,7 +1435,8 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // 1. FocalLengthIn35mmFilm / FocalLength (most accurate)
     // 2. FocalPlaneDiagonal from MakerNotes (Olympus, etc.)
     // 3. SensorWidth/Height from MakerNotes (Canon, Panasonic, etc.)
-    // 4. FocalPlaneResolution + image dimensions (fallback)
+    // 4. SensorPixelSize from MakerNotes (Nikon) + image dimensions
+    // 5. FocalPlaneResolution + image dimensions (fallback)
     let scale_factor = if let (Some(fl35), Some(fl)) = (fl35_raw, focal_length) {
         if fl > 0.0 && fl35 > 0.0 {
             Some(fl35 / fl)
@@ -1429,9 +1458,12 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         if diag > 10.0 && diag < 50.0 {
             // Values are likely in mm
             Some(FF_DIAG / diag)
-        } else if let (Some(w), Some(h), Some(xres), Some(yres)) =
-            (image_width, image_height, focal_plane_x_res, focal_plane_y_res)
-        {
+        } else if let (Some(_w), Some(_h), Some(xres), Some(yres)) = (
+            image_width,
+            image_height,
+            focal_plane_x_res,
+            focal_plane_y_res,
+        ) {
             // SensorWidth/Height are in pixels, use focal plane res to convert
             let unit_to_mm = match focal_plane_res_unit.unwrap_or(2.0) as u32 {
                 2 => 25.4,
@@ -1452,9 +1484,25 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         } else {
             None
         }
-    } else if let (Some(w), Some(h), Some(xres), Some(yres)) =
-        (image_width, image_height, focal_plane_x_res, focal_plane_y_res)
+    } else if let (Some((px_w, px_h)), Some(w), Some(h)) =
+        (sensor_pixel_size, image_width, image_height)
     {
+        // Nikon SensorPixelSize: calculate sensor size from pixel size (µm) and image dimensions
+        // sensor_mm = pixels × pixel_size_µm / 1000
+        let sw_mm = w * px_w / 1000.0;
+        let sh_mm = h * px_h / 1000.0;
+        let sensor_diag = (sw_mm * sw_mm + sh_mm * sh_mm).sqrt();
+        if sensor_diag > 0.0 {
+            Some(FF_DIAG / sensor_diag)
+        } else {
+            None
+        }
+    } else if let (Some(w), Some(h), Some(xres), Some(yres)) = (
+        image_width,
+        image_height,
+        focal_plane_x_res,
+        focal_plane_y_res,
+    ) {
         // Calculate sensor dimensions from focal plane resolution
         let unit_to_mm = match focal_plane_res_unit.unwrap_or(2.0) as u32 {
             2 => 25.4,
