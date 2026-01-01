@@ -3987,12 +3987,12 @@ pub fn decode_focal_length_exiftool(data: &[u16]) -> HashMap<String, ExifValue> 
 
     // Focal length (index 1)
     // Canon stores focal length multiplied by FocalUnits (typically 1)
-    // ExifTool shows "400 mm" for CRW (integer, no decimal)
+    // ExifTool shows "55.0 mm" with one decimal place
     if data.len() > 1 {
-        let fl = data[1];
+        let fl = data[1] as f64;
         decoded.insert(
             "FocalLength".to_string(),
-            ExifValue::Ascii(format!("{} mm", fl)),
+            ExifValue::Ascii(format!("{:.1} mm", fl)),
         );
     }
 
