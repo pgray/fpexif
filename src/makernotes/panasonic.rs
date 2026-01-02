@@ -58,7 +58,7 @@ pub const PANA_ROLL_ANGLE: u16 = 0x0090;
 pub const PANA_PITCH_ANGLE: u16 = 0x0091;
 pub const PANA_BATTERY_LEVEL: u16 = 0x0038;
 pub const PANA_CITY: u16 = 0x006D;
-pub const PANA_LANDMARK: u16 = 0x006E;
+pub const PANA_LANDMARK: u16 = 0x006F;
 pub const PANA_INTELLIGENT_RESOLUTION: u16 = 0x0070;
 pub const PANA_CLEAR_RETOUCH: u16 = 0x0077;
 pub const PANA_PHOTO_STYLE: u16 = 0x0089;
@@ -1245,6 +1245,18 @@ pub fn parse_panasonic_maker_notes(
                                     Some(format!("{:.1}", degrees))
                                 }
                             }
+                            PANA_WB_RED_LEVEL | PANA_WB_GREEN_LEVEL | PANA_WB_BLUE_LEVEL => {
+                                // WB levels are stored as x*4, divide by 4 for ExifTool compatibility
+                                Some((v / 4).to_string())
+                            }
+                            PANA_LANDMARK => {
+                                // Landmark: 0 means empty/not set
+                                if v == 0 {
+                                    Some(String::new())
+                                } else {
+                                    None
+                                }
+                            }
                             _ => None,
                         };
 
@@ -1284,6 +1296,9 @@ pub fn parse_panasonic_maker_notes(
                             let formatted =
                                 format!("{}{:02}:{:02}:{:05.2}", prefix, hours, minutes, val);
                             ExifValue::Ascii(formatted)
+                        } else if tag_id == PANA_LANDMARK && value_offset == 0 {
+                            // Landmark: 0 means empty/not set
+                            ExifValue::Ascii(String::new())
                         } else {
                             ExifValue::Long(vec![value_offset])
                         }
@@ -1400,13 +1415,45 @@ pub fn parse_panasonic_maker_notes(
                             let version_str =
                                 format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3]);
                             ExifValue::Ascii(version_str)
+                        } else if tag_id == PANA_MAKERNOTE_VERSION && count == 4 {
+                            // MakerNoteVersion: ASCII bytes "0130" -> "0130"
+                            if let Ok(s) = std::str::from_utf8(&bytes[..4]) {
+                                ExifValue::Ascii(s.to_string())
+                            } else {
+                                ExifValue::Undefined(bytes[..4].to_vec())
+                            }
                         } else {
                             ExifValue::Undefined(bytes[..count as usize].to_vec())
                         }
                     } else {
                         let offset = value_offset as usize;
                         if offset + count as usize <= data.len() {
-                            ExifValue::Undefined(data[offset..offset + count as usize].to_vec())
+                            let value_bytes = &data[offset..offset + count as usize];
+                            // MakerNoteVersion: ASCII bytes -> string
+                            if tag_id == PANA_MAKERNOTE_VERSION && count == 4 {
+                                if let Ok(s) = std::str::from_utf8(value_bytes) {
+                                    ExifValue::Ascii(s.to_string())
+                                } else {
+                                    ExifValue::Undefined(value_bytes.to_vec())
+                                }
+                            } else if tag_id == PANA_LANDMARK || tag_id == PANA_CITY {
+                                // Landmark and City: string fields that show empty when all zeros
+                                // Find first non-zero byte or treat as empty if all zeros
+                                let trimmed: Vec<u8> = value_bytes
+                                    .iter()
+                                    .copied()
+                                    .take_while(|&b| b != 0)
+                                    .collect();
+                                if trimmed.is_empty() || trimmed.iter().all(|&b| b == 0) {
+                                    ExifValue::Ascii(String::new())
+                                } else if let Ok(s) = std::str::from_utf8(&trimmed) {
+                                    ExifValue::Ascii(s.to_string())
+                                } else {
+                                    ExifValue::Undefined(value_bytes.to_vec())
+                                }
+                            } else {
+                                ExifValue::Undefined(value_bytes.to_vec())
+                            }
                         } else {
                             continue;
                         }

@@ -726,6 +726,64 @@ pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
 }
 // decode_noise_reduction_exiv2 - same as exiftool, no separate function needed
 
+/// Decode Extender value from make/model bytes
+/// Returns ExifValue::Ascii with extender name or the original value
+fn decode_extender(make: u16, model: u16) -> ExifValue {
+    // ExifTool uses hex format "make model" to look up extender name
+    // Common values from Olympus.pm PrintConv:
+    // '0 00' => 'None'
+    // '1 10' => 'Olympus Zuiko Digital EC-14 1.4x Teleconverter'
+    // '1 20' => 'Olympus EX-25 Extension Tube'
+    // '1 30' => 'Olympus Zuiko Digital EC-20 2x Teleconverter'
+    let name = match (make, model) {
+        (0, 0) => "None",
+        (1, 0x10) => "Olympus Zuiko Digital EC-14 1.4x Teleconverter",
+        (1, 0x20) => "Olympus EX-25 Extension Tube",
+        (1, 0x30) => "Olympus Zuiko Digital EC-20 2x Teleconverter",
+        _ => return ExifValue::Ascii(format!("{} {:02x}", make, model)),
+    };
+    ExifValue::Ascii(name.to_string())
+}
+
+/// Decode Gradation value (CS 0x050F) - 4 int16s values
+/// First 3 values decode to gradation type, 4th value is mode
+fn decode_gradation(vals: &[i16]) -> String {
+    if vals.len() < 3 {
+        return vals
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+    }
+
+    // Decode first 3 values as gradation type
+    let gradation_type = match (vals[0], vals[1], vals[2]) {
+        (0, 0, 0) => "n/a",
+        (-1, -1, 1) => "Low Key",
+        (0, -1, 1) => "Normal",
+        (1, -1, 1) => "High Key",
+        _ => {
+            return vals
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+    };
+
+    // Decode 4th value as mode (if present)
+    if vals.len() >= 4 {
+        let mode = match vals[3] {
+            0 => "User-Selected",
+            1 => "Auto-Override",
+            _ => return format!("{}; {}", gradation_type, vals[3]),
+        };
+        format!("{}; {}", gradation_type, mode)
+    } else {
+        gradation_type.to_string()
+    }
+}
+
 // DistortionCorrection (CS 0x050B): Olympus.pm / olympusmn_int.cpp
 define_tag_decoder! {
     distortion_correction,
@@ -1337,6 +1395,34 @@ fn parse_olympus_ifd(
                     }
                     _ => value,
                 },
+                OlympusIfdType::Equipment => match tag_id {
+                    EQUIP_EXTENDER => {
+                        // Extender: 6 int8u values - decode as "None" if all zeros
+                        // Can be stored as Byte (u8) or Short (u16) depending on parser
+                        match &value {
+                            ExifValue::Byte(vals) => {
+                                if vals.len() >= 6 && vals.iter().all(|&v| v == 0) {
+                                    ExifValue::Ascii("None".to_string())
+                                } else if vals.len() >= 3 {
+                                    decode_extender(vals[0] as u16, vals[2] as u16)
+                                } else {
+                                    value
+                                }
+                            }
+                            ExifValue::Short(vals) => {
+                                if vals.len() >= 6 && vals.iter().all(|&v| v == 0) {
+                                    ExifValue::Ascii("None".to_string())
+                                } else if vals.len() >= 3 {
+                                    decode_extender(vals[0], vals[2])
+                                } else {
+                                    value
+                                }
+                            }
+                            _ => value,
+                        }
+                    }
+                    _ => value,
+                },
                 OlympusIfdType::CameraSettings => match tag_id {
                     CS_EXPOSURE_MODE => {
                         if let ExifValue::Short(vals) = &value {
@@ -1468,6 +1554,18 @@ fn parse_olympus_ifd(
                             } else {
                                 value
                             }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_GRADATION => {
+                        // Gradation: 3-4 int16s values
+                        if let ExifValue::SShort(vals) = &value {
+                            ExifValue::Ascii(decode_gradation(vals))
+                        } else if let ExifValue::Short(vals) = &value {
+                            // Convert u16 to i16 for decode
+                            let signed: Vec<i16> = vals.iter().map(|&v| v as i16).collect();
+                            ExifValue::Ascii(decode_gradation(&signed))
                         } else {
                             value
                         }

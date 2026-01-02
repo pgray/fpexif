@@ -90,6 +90,16 @@ fn format_short_value_with_make(value: u16, tag_id: u16, make: Option<&str>) -> 
         }
         // FocalLengthIn35mmFormat - add "mm" suffix
         0xA405 => Value::String(format!("{} mm", value)),
+        // Sony ARW SubIFD tags
+        0x7030 => Value::String(
+            crate::tags::get_sony_vignetting_correction_description(value).to_string(),
+        ),
+        0x7034 => Value::String(
+            crate::tags::get_sony_chromatic_aberration_correction_description(value).to_string(),
+        ),
+        0x7036 => Value::String(
+            crate::tags::get_sony_distortion_correction_description(value).to_string(),
+        ),
         _ => Value::Number(value.into()),
     }
 }
@@ -738,7 +748,24 @@ pub fn format_exif_value_for_json_with_make(
         // Single-value other numeric types
         ExifValue::Long(v) if v.len() == 1 => Value::Number(v[0].into()),
         ExifValue::SByte(v) if v.len() == 1 => Value::Number(v[0].into()),
-        ExifValue::SShort(v) if v.len() == 1 => Value::Number(v[0].into()),
+        ExifValue::SShort(v) if v.len() == 1 => {
+            // Sony ARW SubIFD correction tags are stored as SShort
+            match tag_id {
+                0x7030 => Value::String(
+                    crate::tags::get_sony_vignetting_correction_description(v[0] as u16)
+                        .to_string(),
+                ),
+                0x7034 => Value::String(
+                    crate::tags::get_sony_chromatic_aberration_correction_description(v[0] as u16)
+                        .to_string(),
+                ),
+                0x7036 => Value::String(
+                    crate::tags::get_sony_distortion_correction_description(v[0] as u16)
+                        .to_string(),
+                ),
+                _ => Value::Number(v[0].into()),
+            }
+        }
         ExifValue::SLong(v) if v.len() == 1 => Value::Number(v[0].into()),
 
         // Single-value Float/Double
@@ -936,6 +963,36 @@ pub fn format_exif_value_for_json_with_make(
     }
 }
 
+/// Get image dimensions from EXIF data, prioritizing IFD0 tags
+/// Returns (width, height) as Options
+/// Priority: IFD0 ImageWidth/Length (0x0100/0x0101) > ExifImageWidth/Height (0xa002/0xa003)
+#[cfg(feature = "serde")]
+fn get_image_dimensions(exif_data: &ExifData) -> (Option<u64>, Option<u64>) {
+    // Helper to extract dimension value
+    fn extract_dimension(value: Option<&ExifValue>) -> Option<u64> {
+        match value {
+            Some(ExifValue::Long(v)) if !v.is_empty() => Some(v[0] as u64),
+            Some(ExifValue::Short(v)) if !v.is_empty() => Some(v[0] as u64),
+            _ => None,
+        }
+    }
+
+    // Try IFD0 ImageWidth (0x0100) and ImageLength (0x0101) first
+    // These are the actual raw image dimensions for most cameras
+    let ifd0_width = extract_dimension(exif_data.get_tag_by_id(0x0100));
+    let ifd0_height = extract_dimension(exif_data.get_tag_by_id(0x0101));
+
+    if ifd0_width.is_some() && ifd0_height.is_some() {
+        return (ifd0_width, ifd0_height);
+    }
+
+    // Fall back to ExifImageWidth/Height (0xa002/0xa003)
+    let exif_width = extract_dimension(exif_data.get_tag_by_id(0xa002));
+    let exif_height = extract_dimension(exif_data.get_tag_by_id(0xa003));
+
+    (exif_width.or(ifd0_width), exif_height.or(ifd0_height))
+}
+
 /// Convert ExifData to exiftool-compatible JSON
 #[cfg(feature = "serde")]
 pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Value {
@@ -979,6 +1036,28 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     if let Some(ExifValue::Short(v)) = exif_data.get_tag_by_id(0x8827) {
         if !v.is_empty() {
             output.insert("ISO".to_string(), Value::Number(v[0].into()));
+        }
+    }
+
+    // ImageSize and Megapixels - computed from image dimensions
+    // For Sony: Use IFD0 ImageWidth/Length (0x0100/0x0101) which matches ExifTool
+    // For other brands: Let the later code handle MakerNote-specific dimensions
+    let is_sony = make_ref
+        .map(|m| m.to_uppercase().contains("SONY"))
+        .unwrap_or(false);
+    if is_sony {
+        let (width, height) = get_image_dimensions(exif_data);
+        if let (Some(w), Some(h)) = (width, height) {
+            output.insert(
+                "ImageSize".to_string(),
+                Value::String(format!("{}x{}", w, h)),
+            );
+            let megapixels = (w as f64 * h as f64) / 1_000_000.0;
+            // Round to 1 decimal place
+            let rounded = (megapixels * 10.0).round() / 10.0;
+            if let Some(num) = serde_json::Number::from_f64(rounded) {
+                output.insert("Megapixels".to_string(), Value::Number(num));
+            }
         }
     }
 

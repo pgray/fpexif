@@ -499,6 +499,24 @@ pub const NIKON_AF_C_PRIORITY: u16 = 0x00C2;
 pub const NIKON_VIEWFINDER_WARNING: u16 = 0x00C4;
 pub const NIKON_EYE_DETECTION: u16 = 0x00C5;
 
+/// Format a rational value like ExifTool does:
+/// - For whole numbers: "1" instead of "1.000000"
+/// - For fractions: show enough precision (up to 8 decimal places, no trailing zeros)
+fn format_rational_like_exiftool(n: u32, d: u32) -> String {
+    if d == 0 {
+        return n.to_string();
+    }
+    let value = n as f64 / d as f64;
+    // Check if it's a whole number
+    if (value.fract().abs() < 1e-10) || (value - value.round()).abs() < 1e-10 {
+        return format!("{}", value.round() as i64);
+    }
+    // Format with 8 decimal places and strip trailing zeros
+    let formatted = format!("{:.8}", value);
+    let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
+    trimmed.to_string()
+}
+
 /// Get the name of a Nikon MakerNote tag
 pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
     match tag_id {
@@ -507,6 +525,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_COLOR_MODE => Some("ColorMode"),
         NIKON_QUALITY => Some("Quality"),
         NIKON_WHITE_BALANCE => Some("WhiteBalance"),
+        NIKON_WB_RB_LEVELS => Some("WB_RBLevels"),
         NIKON_SHARPNESS => Some("Sharpness"),
         NIKON_FOCUS_MODE => Some("FocusMode"),
         NIKON_FLASH_SETTING => Some("FlashSetting"),
@@ -2028,9 +2047,9 @@ fn parse_lens_data(
             mcu_version,
         ]);
     }
-    // Version 02xx: Encrypted - requires decryption
-    // Versions 0201, 0202, 0203, 0204, 0205 use same structure as 0101 but encrypted
-    else if version.starts_with("02") && data.len() >= 18 {
+    // Version 0201, 0202, 0203: Encrypted, same structure as LensData01 (0101)
+    // Per ExifTool: '$$valPt =~ /^020[1-3]/' -> LensData01
+    else if (version == "0201" || version == "0202" || version == "0203") && data.len() >= 18 {
         if let (Some(ser), Some(count)) = (serial, shutter_count) {
             // Make mutable copy for decryption
             let mut decrypted = data.to_vec();
@@ -2038,13 +2057,12 @@ fn parse_lens_data(
             // Decrypt starting at byte 4 (version string is unencrypted)
             nikon_decrypt(ser, count, &mut decrypted, 4);
 
-            // Same offsets as 0101 but on decrypted data
+            // Same offsets as 0101 (LensData01)
             // Offset 0x0b (11): LensIDNumber
             let lens_id_number = decrypted[11];
             tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
 
             // Offset 0x0c (12): LensFStops raw value (for lens_id_bytes)
-            // Don't output here - use NIKON_LENS_F_STOPS (0x008B) tag instead to avoid duplicates
             let lens_f_stops_raw = decrypted[12];
 
             // Offset 0x0d (13): MinFocalLength
@@ -2075,6 +2093,66 @@ fn parse_lens_data(
 
             // Offset 0x11 (17): MCUVersion
             let mcu_version = decrypted[17];
+            tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
+
+            // Store raw bytes for LensID composite lookup
+            lens_id_bytes = Some([
+                lens_id_number,
+                lens_f_stops_raw,
+                min_focal_raw,
+                max_focal_raw,
+                max_ap_min_raw,
+                max_ap_max_raw,
+                mcu_version,
+            ]);
+        }
+    }
+    // Version 0204+: Encrypted, uses LensData0204 structure (offsets shifted by 1)
+    // Per ExifTool: '$$valPt =~ /^0204/' -> LensData0204
+    else if version.starts_with("020") && version >= "0204" && data.len() >= 19 {
+        if let (Some(ser), Some(count)) = (serial, shutter_count) {
+            // Make mutable copy for decryption
+            let mut decrypted = data.to_vec();
+
+            // Decrypt starting at byte 4 (version string is unencrypted)
+            nikon_decrypt(ser, count, &mut decrypted, 4);
+
+            // LensData0204 offsets (shifted by 1 from LensData01):
+            // Offset 0x0c (12): LensIDNumber
+            let lens_id_number = decrypted[12];
+            tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
+
+            // Offset 0x0d (13): LensFStops raw value (for lens_id_bytes)
+            let lens_f_stops_raw = decrypted[13];
+
+            // Offset 0x0e (14): MinFocalLength
+            let min_focal_raw = decrypted[14];
+            let min_focal = 5.0 * 2.0_f64.powf(min_focal_raw as f64 / 24.0);
+            tags.push(("MinFocalLength".to_string(), format!("{:.1} mm", min_focal)));
+
+            // Offset 0x0f (15): MaxFocalLength
+            let max_focal_raw = decrypted[15];
+            let max_focal = 5.0 * 2.0_f64.powf(max_focal_raw as f64 / 24.0);
+            tags.push(("MaxFocalLength".to_string(), format!("{:.1} mm", max_focal)));
+
+            // Offset 0x10 (16): MaxApertureAtMinFocal
+            let max_ap_min_raw = decrypted[16];
+            let max_ap_min = 2.0_f64.powf(max_ap_min_raw as f64 / 24.0);
+            tags.push((
+                "MaxApertureAtMinFocal".to_string(),
+                format!("{:.1}", max_ap_min),
+            ));
+
+            // Offset 0x11 (17): MaxApertureAtMaxFocal
+            let max_ap_max_raw = decrypted[17];
+            let max_ap_max = 2.0_f64.powf(max_ap_max_raw as f64 / 24.0);
+            tags.push((
+                "MaxApertureAtMaxFocal".to_string(),
+                format!("{:.1}", max_ap_max),
+            ));
+
+            // Offset 0x12 (18): MCUVersion
+            let mcu_version = decrypted[18];
             tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
 
             // Store raw bytes for LensID composite lookup
@@ -2220,6 +2298,19 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
                 16 => "Group Area (HL)",
                 17 => "Group Area (VL)",
                 18 => "Dynamic Area (49 points)",
+                // Nikon 1 cameras (1J1-1J4, 1S1-1S2, 1V1-1V3, AW1)
+                128 => "Single",
+                129 => "Auto (41 points)",
+                130 => "Subject Tracking (41 points)",
+                131 => "Face Priority (41 points)",
+                // Z cameras
+                192 => "Pinpoint",
+                193 => "Single",
+                194 => "Dynamic",
+                195 => "Wide (S)",
+                196 => "Wide (L)",
+                197 => "Auto",
+                199 => "Auto",
                 _ => "Unknown",
             }
         } else {
@@ -2230,17 +2321,31 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
                 2 => "Contrast-detect (wide area)",
                 3 => "Contrast-detect (face priority)",
                 4 => "Contrast-detect (subject tracking)",
+                // Nikon 1 cameras
                 128 => "Single",
                 129 => "Auto (41 points)",
                 130 => "Subject Tracking (41 points)",
                 131 => "Face Priority (41 points)",
+                // Z cameras
                 192 => "Pinpoint",
                 193 => "Single",
                 194 => "Dynamic",
                 195 => "Wide (S)",
                 196 => "Wide (L)",
                 197 => "Auto",
-                199 => "Auto",
+                198 => "Auto (People)",
+                199 => "Auto (Animal)",
+                // D6
+                200 => "Normal-area AF",
+                201 => "Wide-area AF",
+                202 => "Face-priority AF",
+                203 => "Subject-tracking AF",
+                // Z9
+                204 => "Dynamic Area (S)",
+                205 => "Dynamic Area (M)",
+                206 => "Dynamic Area (L)",
+                207 => "3D-tracking",
+                208 => "Wide-Area (C1/C2)",
                 _ => "Unknown",
             }
         };
@@ -2269,15 +2374,18 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
 }
 
 /// Parse WorldTime tag data (tag 0x0024)
-fn parse_world_time(data: &[u8]) -> Vec<(String, String)> {
+fn parse_world_time(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
     if data.len() < 4 {
         return tags;
     }
 
-    // Bytes 0-1: Timezone (signed, in minutes, little-endian - Nikon uses Intel byte order)
-    let tz_minutes = i16::from_le_bytes([data[0], data[1]]);
+    // Bytes 0-1: Timezone (signed, in minutes)
+    let tz_minutes = match endian {
+        Endianness::Little => i16::from_le_bytes([data[0], data[1]]),
+        Endianness::Big => i16::from_be_bytes([data[0], data[1]]),
+    };
     let tz_hours = tz_minutes / 60;
     let tz_mins = (tz_minutes % 60).abs();
     let tz_str = if tz_minutes >= 0 {
@@ -2323,17 +2431,12 @@ fn parse_color_balance(data: &[u8], _endian: Endianness) -> Vec<(String, String)
     };
 
     // ColorBalance structures have WB levels at different offsets
-    // Version 0100: RBGG at offset 72 (0x48), big-endian
-    // Version 0102/02xx: RGGB at offset 4, encrypted for later models
-    let (wb_offset, wb_tag, channel_order) = match version {
-        "0100" => (72, "WB_RBGGLevels", [0, 2, 3, 1]), // RBGG -> R, G1, G2, B indices
-        "0103" => (4, "WB_RGBGLevels", [0, 1, 3, 2]),  // RGBG -> R, G1, B, G2
-        _ => (4, "WB_RGGBLevels", [0, 1, 2, 3]),       // RGGB standard order
-    };
-
-    if data.len() >= wb_offset + 8 {
-        // ColorBalance data is big-endian for version 0100
-        let mut cursor = Cursor::new(&data[wb_offset..]);
+    // Version 0100: RBGG at offset 72 (0x48), big-endian, NOT encrypted
+    // Version 02xx: Encrypted - require decryption which we don't have keys for here
+    // Only handle version 0100 which is unencrypted
+    if version == "0100" && data.len() >= 72 + 8 {
+        // Version 0100: RBGG at offset 72, big-endian
+        let mut cursor = Cursor::new(&data[72..]);
         let vals: [u16; 4] = [
             cursor.read_u16::<BigEndian>().unwrap_or(0),
             cursor.read_u16::<BigEndian>().unwrap_or(0),
@@ -2341,32 +2444,27 @@ fn parse_color_balance(data: &[u8], _endian: Endianness) -> Vec<(String, String)
             cursor.read_u16::<BigEndian>().unwrap_or(0),
         ];
 
-        // Skip if all zeros (encrypted or invalid)
-        if vals.iter().all(|&v| v == 0) {
-            return tags;
-        }
+        // Skip if all zeros
+        if !vals.iter().all(|&v| v == 0) {
+            tags.push((
+                "WB_RBGGLevels".to_string(),
+                format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+            ));
 
-        tags.push((
-            wb_tag.to_string(),
-            format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
-        ));
-
-        // Extract R, G1, G2, B according to channel order
-        let r = vals[channel_order[0]];
-        let g1 = vals[channel_order[1]];
-        let g2 = vals[channel_order[2]];
-        let b = vals[channel_order[3]];
-
-        // Calculate RedBalance and BlueBalance
-        // RedBalance = R / G_avg, BlueBalance = B / G_avg
-        let g_avg = ((g1 as f64) + (g2 as f64)) / 2.0;
-        if g_avg > 0.0 && r > 0 && b > 0 {
-            let red_balance = (r as f64) / g_avg;
-            let blue_balance = (b as f64) / g_avg;
-            tags.push(("RedBalance".to_string(), format!("{:.6}", red_balance)));
-            tags.push(("BlueBalance".to_string(), format!("{:.6}", blue_balance)));
+            // Compute RedBalance and BlueBalance from RBGG levels
+            // Order is: R=vals[0], B=vals[1], G=vals[2], G=vals[3]
+            // G = average of two G values
+            let g = ((vals[2] as f64) + (vals[3] as f64)) / 2.0;
+            if g > 0.0 {
+                let red = (vals[0] as f64) / g;
+                let blue = (vals[1] as f64) / g;
+                tags.push(("RedBalance".to_string(), format!("{:.6}", red)));
+                tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
+            }
         }
     }
+    // Note: For encrypted versions (02xx), RedBalance/BlueBalance should come from
+    // WB_RBLevels (0x000C) which already contains the correct R/G and B/G ratios
 
     tags
 }
@@ -2681,6 +2779,19 @@ pub fn decode_lens_type_exiv2(value: u8) -> String {
     }
 }
 
+/// Format a lens focal length or aperture value like ExifTool
+/// - If value is an integer, show without decimal (e.g., 11)
+/// - If value has fractional part, show with one decimal (e.g., 27.5)
+fn format_lens_value(val: f64) -> String {
+    // Check if the value is effectively an integer
+    let rounded = val.round();
+    if (val - rounded).abs() < 0.01 {
+        format!("{:.0}", rounded)
+    } else {
+        format!("{:.1}", val)
+    }
+}
+
 /// Format lens info from 4 RATIONAL values
 /// [MinFocalLength, MaxFocalLength, MaxApertureAtMinFocal, MaxApertureAtMaxFocal]
 fn format_lens_info(values: &[(u32, u32)]) -> Option<String> {
@@ -2712,23 +2823,32 @@ fn format_lens_info(values: &[(u32, u32)]) -> Option<String> {
         return None;
     };
 
+    // Format focal lengths using smart formatting (no decimal if integer)
+    let min_f = format_lens_value(min_focal);
+    let max_f = format_lens_value(max_focal);
+
     // Format the lens description
     if (min_focal - max_focal).abs() < 0.1 {
         // Prime lens
-        Some(format!("{:.0}mm f/{:.1}", min_focal, min_aperture))
+        Some(format!("{}mm f/{}", min_f, format_lens_value(min_aperture)))
     } else {
         // Zoom lens
         if (min_aperture - max_aperture).abs() < 0.1 {
             // Constant aperture
             Some(format!(
-                "{:.0}-{:.0}mm f/{:.1}",
-                min_focal, max_focal, min_aperture
+                "{}-{}mm f/{}",
+                min_f,
+                max_f,
+                format_lens_value(min_aperture)
             ))
         } else {
             // Variable aperture
             Some(format!(
-                "{:.0}-{:.0}mm f/{:.1}-{:.1}",
-                min_focal, max_focal, min_aperture, max_aperture
+                "{}-{}mm f/{}-{}",
+                min_f,
+                max_f,
+                format_lens_value(min_aperture),
+                format_lens_value(max_aperture)
             ))
         }
     }
@@ -2973,6 +3093,36 @@ pub fn parse_nikon_maker_notes(
                     } else if tag_id == NIKON_EXPOSURE_TUNING && !values.is_empty() {
                         // ExposureTuning is a 7-element array, output only the first value
                         ExifValue::Short(vec![values[0]])
+                    } else if tag_id == NIKON_WB_RB_LEVELS && values.len() >= 2 {
+                        // WB_RBLevels as SHORT: values are R and B relative to 256
+                        // RedBalance = R/256, BlueBalance = B/256
+                        let red = values[0] as f64 / 256.0;
+                        let blue = values[1] as f64 / 256.0;
+                        // Add RedBalance and BlueBalance as separate tags
+                        tags.insert(
+                            0xFE00, // Pseudo tag ID for RedBalance
+                            MakerNoteTag {
+                                tag_id: 0xFE00,
+                                value: ExifValue::Ascii(format!("{:.6}", red)),
+                                tag_name: Some("RedBalance"),
+                            },
+                        );
+                        tags.insert(
+                            0xFE01, // Pseudo tag ID for BlueBalance
+                            MakerNoteTag {
+                                tag_id: 0xFE01,
+                                value: ExifValue::Ascii(format!("{:.6}", blue)),
+                                tag_name: Some("BlueBalance"),
+                            },
+                        );
+                        // Return WB_RBLevels as space-separated values
+                        ExifValue::Ascii(
+                            values
+                                .iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        )
                     } else {
                         ExifValue::Short(values)
                     }
@@ -3028,13 +3178,62 @@ pub fn parse_nikon_maker_notes(
                         }
                     }
 
-                    // Apply decoder for lens info
+                    // Apply decoder for specific tags
                     if tag_id == NIKON_LENS {
                         if let Some(formatted) = format_lens_info(&values) {
                             ExifValue::Ascii(formatted)
                         } else {
                             ExifValue::Rational(values)
                         }
+                    } else if tag_id == NIKON_SENSOR_PIXEL_SIZE && values.len() == 2 {
+                        // SensorPixelSize: format as "7.8 x 7.8 um"
+                        let x = if values[0].1 != 0 {
+                            values[0].0 as f64 / values[0].1 as f64
+                        } else {
+                            values[0].0 as f64
+                        };
+                        let y = if values[1].1 != 0 {
+                            values[1].0 as f64 / values[1].1 as f64
+                        } else {
+                            values[1].0 as f64
+                        };
+                        ExifValue::Ascii(format!("{} x {} um", x, y))
+                    } else if tag_id == NIKON_WB_RB_LEVELS && values.len() >= 2 {
+                        // WB_RBLevels: First two rationals are RedBalance and BlueBalance
+                        // Compute the values and add as extra tags
+                        let red = if values[0].1 != 0 {
+                            values[0].0 as f64 / values[0].1 as f64
+                        } else {
+                            values[0].0 as f64
+                        };
+                        let blue = if values[1].1 != 0 {
+                            values[1].0 as f64 / values[1].1 as f64
+                        } else {
+                            values[1].0 as f64
+                        };
+                        // Add RedBalance and BlueBalance as separate tags
+                        tags.insert(
+                            0xFE00, // Pseudo tag ID for RedBalance
+                            MakerNoteTag {
+                                tag_id: 0xFE00,
+                                value: ExifValue::Ascii(format!("{:.6}", red)),
+                                tag_name: Some("RedBalance"),
+                            },
+                        );
+                        tags.insert(
+                            0xFE01, // Pseudo tag ID for BlueBalance
+                            MakerNoteTag {
+                                tag_id: 0xFE01,
+                                value: ExifValue::Ascii(format!("{:.6}", blue)),
+                                tag_name: Some("BlueBalance"),
+                            },
+                        );
+                        // Also return the WB_RBLevels as formatted string
+                        let formatted: Vec<String> = values
+                            .iter()
+                            .map(|(n, d)| format_rational_like_exiftool(*n, *d))
+                            .collect();
+                        ExifValue::Ascii(formatted.join(" "))
                     } else {
                         ExifValue::Rational(values)
                     }
@@ -3219,7 +3418,7 @@ pub fn parse_nikon_maker_notes(
                 }
                 NIKON_WORLD_TIME => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_world_time(bytes) {
+                        for (name, val) in parse_world_time(bytes, maker_endian) {
                             tags.insert(
                                 0x9700 + tags.len() as u16,
                                 MakerNoteTag {

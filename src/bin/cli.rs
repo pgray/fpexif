@@ -242,6 +242,17 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
         printed_tags.insert(tag_name.to_string());
     }
 
+    // Add ISO alias from ISOSpeedRatings BEFORE MakerNote output
+    // This ensures ExifTool-compatible ISO (from EXIF) takes precedence over MakerNote ISO
+    if !printed_tags.contains("ISO") {
+        if let Some(fpexif::data_types::ExifValue::Short(v)) = exif_data.get_tag_by_id(0x8827) {
+            if !v.is_empty() {
+                println!("{:<32}: {}", "ISO", v[0]);
+                printed_tags.insert("ISO".to_string());
+            }
+        }
+    }
+
     // Output maker notes
     if let Some(maker_notes) = exif_data.get_maker_notes() {
         for (_, note) in maker_notes.iter() {
@@ -283,26 +294,49 @@ fn print_computed_fields(exif_data: &ExifData) {
     // PreviewImageLength - alias for StripByteCounts (0x0117)
     // (These aliases are typically only for Canon RAW files where preview is in IFD0)
 
-    // Aperture - alias for FNumber
+    // Aperture - alias for FNumber (always show one decimal place like ExifTool)
     if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829D) {
         if !v.is_empty() {
             let (n, d) = v[0];
             if d != 0 {
                 let f = n as f64 / d as f64;
-                println!("{:<32}: {}", "Aperture", f);
+                if f == 0.0 {
+                    // FNumber of 0 means infinite aperture (e.g., manual lens)
+                    println!("{:<32}: Inf", "Aperture");
+                } else {
+                    println!("{:<32}: {:.1}", "Aperture", f);
+                }
             }
         }
     }
 
     // ImageSize - computed from image dimensions
-    // Priority: MakerNote dimensions > PixelXDimension/PixelYDimension > ImageWidth/ImageLength
-    let (makernote_width, makernote_height) = get_makernote_image_dimensions(exif_data);
-    let width = makernote_width
-        .or_else(|| get_dimension(exif_data, 0xA002))
-        .or_else(|| get_dimension(exif_data, 0x0100));
-    let height = makernote_height
-        .or_else(|| get_dimension(exif_data, 0xA003))
-        .or_else(|| get_dimension(exif_data, 0x0101));
+    // For Fujifilm RAF: use RawImageCroppedSize from RAF metadata
+    // For others: MakerNote dimensions > PixelXDimension/PixelYDimension > ImageWidth/ImageLength
+    let (width, height) = if let Some(raf_metadata) = exif_data.get_raf_metadata() {
+        // Fujifilm RAF: parse RawImageCroppedSize (e.g., "4896x3264")
+        if let Some(cropped_size) = raf_metadata.tags.get("RawImageCroppedSize") {
+            let parts: Vec<&str> = cropped_size.split('x').collect();
+            if parts.len() == 2 {
+                let w = parts[0].parse::<u32>().ok();
+                let h = parts[1].parse::<u32>().ok();
+                (w, h)
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        }
+    } else {
+        let (makernote_width, makernote_height) = get_makernote_image_dimensions(exif_data);
+        let width = makernote_width
+            .or_else(|| get_dimension(exif_data, 0xA002))
+            .or_else(|| get_dimension(exif_data, 0x0100));
+        let height = makernote_height
+            .or_else(|| get_dimension(exif_data, 0xA003))
+            .or_else(|| get_dimension(exif_data, 0x0101));
+        (width, height)
+    };
 
     if let (Some(w), Some(h)) = (width, height) {
         println!("{:<32}: {}x{}", "ImageSize", w, h);
@@ -406,6 +440,7 @@ fn get_makernote_image_dimensions(exif_data: &ExifData) -> (Option<u32>, Option<
         for (_, note) in maker_notes.iter() {
             if let Some(name) = note.tag_name {
                 match name {
+                    // Panasonic-specific dimension tags
                     "PanasonicImageWidth" => {
                         if let ExifValue::Long(v) = &note.value {
                             if !v.is_empty() {
@@ -417,6 +452,25 @@ fn get_makernote_image_dimensions(exif_data: &ExifData) -> (Option<u32>, Option<
                         if let ExifValue::Long(v) = &note.value {
                             if !v.is_empty() {
                                 height = Some(v[0]);
+                            }
+                        }
+                    }
+                    // Sony/generic MakerNote dimension tags (prefer over EXIF for older Sony)
+                    "ImageWidth" => {
+                        if width.is_none() {
+                            match &note.value {
+                                ExifValue::Long(v) if !v.is_empty() => width = Some(v[0]),
+                                ExifValue::Short(v) if !v.is_empty() => width = Some(v[0] as u32),
+                                _ => {}
+                            }
+                        }
+                    }
+                    "ImageHeight" => {
+                        if height.is_none() {
+                            match &note.value {
+                                ExifValue::Long(v) if !v.is_empty() => height = Some(v[0]),
+                                ExifValue::Short(v) if !v.is_empty() => height = Some(v[0] as u32),
+                                _ => {}
                             }
                         }
                     }

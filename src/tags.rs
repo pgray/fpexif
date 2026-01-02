@@ -503,6 +503,20 @@ pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 
+// Sony ARW SubIFD tags (0x7030-0x7040 range)
+pub const TAG_SONY_VIGNETTING_CORRECTION: ExifTagId = ExifTagId {
+    id: 0x7030,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_CHROMATIC_ABERRATION_CORRECTION: ExifTagId = ExifTagId {
+    id: 0x7034,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_DISTORTION_CORRECTION: ExifTagId = ExifTagId {
+    id: 0x7036,
+    ifd: TagGroup::Main,
+};
+
 // EXIF SubIFD tags
 pub const TAG_EXPOSURE_TIME: ExifTagId = ExifTagId {
     id: 0x829A,
@@ -972,6 +986,14 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_ACTIVE_AREA, "ActiveArea");
     map.insert(TAG_RAW_IMAGE_DIGEST, "RawImageDigest");
 
+    // Sony ARW SubIFD tags
+    map.insert(TAG_SONY_VIGNETTING_CORRECTION, "VignettingCorrection");
+    map.insert(
+        TAG_SONY_CHROMATIC_ABERRATION_CORRECTION,
+        "ChromaticAberrationCorrection",
+    );
+    map.insert(TAG_SONY_DISTORTION_CORRECTION, "DistortionCorrection");
+
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
     map.insert(TAG_F_NUMBER, "FNumber");
@@ -1293,6 +1315,40 @@ pub fn get_sharpness_description(value: u16) -> &'static str {
         0 => "Normal",
         1 => "Soft",
         2 => "Hard",
+        _ => "Unknown",
+    }
+}
+
+/// Sony ARW SubIFD VignettingCorrection (tag 0x7030) values
+/// From ExifTool Exif.pm
+pub fn get_sony_vignetting_correction_description(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        2 => "Auto",
+        0xff => "No correction params available",
+        _ => "Unknown",
+    }
+}
+
+/// Sony ARW SubIFD ChromaticAberrationCorrection (tag 0x7034) values
+/// From ExifTool Exif.pm
+pub fn get_sony_chromatic_aberration_correction_description(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Auto",
+        0xff => "No correction params available",
+        _ => "Unknown",
+    }
+}
+
+/// Sony ARW SubIFD DistortionCorrection (tag 0x7036) values
+/// From ExifTool Exif.pm
+pub fn get_sony_distortion_correction_description(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Auto",
+        17 => "Auto fixed by lens",
+        0xff => "No correction params available",
         _ => "Unknown",
     }
 }

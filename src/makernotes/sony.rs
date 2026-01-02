@@ -1084,6 +1084,30 @@ define_tag_decoder! {
     }
 }
 
+/// Decode HDR image status (second u16 of HDR tag 0x200A)
+/// From Sony.pm line 999-1003
+pub fn decode_hdr_image_status(value: u16) -> &'static str {
+    match value {
+        0 => "Uncorrected image",
+        1 => "HDR image (good)",
+        2 => "HDR image (fail 1)",
+        3 => "HDR image (fail 2)",
+        _ => "Unknown",
+    }
+}
+
+/// Format complete HDR value (tag 0x200A) - stored as int32u, read as two int16u
+/// Output format: "Off; Uncorrected image"
+pub fn format_hdr_value(value: u32) -> String {
+    let low = (value & 0xFFFF) as u16; // HDR level
+    let high = ((value >> 16) & 0xFFFF) as u16; // Image status
+    format!(
+        "{}; {}",
+        decode_hdr_exiftool(low),
+        decode_hdr_image_status(high)
+    )
+}
+
 /// Decode Quality value (tag 0x0102 and 0xB047) - ExifTool format
 /// Note: This overlaps with decode_image_quality but with more values
 pub fn decode_quality_exiftool(value: u32) -> &'static str {
@@ -1309,6 +1333,35 @@ pub fn decode_multi_frame_nr_effect_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode MultiFrameNREffect value (tag 0x2023) - ExifTool format
+/// Same as exiv2 format
+pub fn decode_multi_frame_nr_effect_exiftool(value: u32) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SequenceNumber value (tag 0xB04A) - ExifTool format
+/// 0 = Single, other values are passed through as numbers
+pub fn decode_sequence_number_exiftool(value: u16) -> String {
+    match value {
+        0 => "Single".to_string(),
+        65535 => "n/a".to_string(),
+        _ => value.to_string(),
+    }
+}
+
+/// Decode ElectronicFrontCurtainShutter value (tag 0x201A) - ExifTool format
+pub fn decode_efcs_exiftool(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
+        _ => "Unknown",
+    }
+}
+
 /// Decode RAWFileType value (tag 0x2029) - exiv2 format
 pub fn decode_raw_file_type_exiv2(value: u16) -> &'static str {
     match value {
@@ -1443,6 +1496,12 @@ pub fn decode_lateral_chromatic_aberration_exiv2(value: u32) -> &'static str {
         0xffffffff => "n/a",
         _ => "Unknown",
     }
+}
+
+/// Decode LateralChromaticAberration value (tag 0x2012) - ExifTool format
+/// Same as exiv2 format
+pub fn decode_lateral_chromatic_aberration_exiftool(value: u32) -> &'static str {
+    decode_lateral_chromatic_aberration_exiv2(value)
 }
 
 /// Decode AFAreaModeSetting value (tag 0x201C) - exiv2 format Set1
@@ -2021,6 +2080,7 @@ fn parse_ifd_entry(
                             Some(decode_anti_blur_exiftool(v).to_string())
                         }
                     }
+                    SONY_SEQUENCE_NUMBER => Some(decode_sequence_number_exiftool(v)),
                     _ => None,
                 };
 
@@ -2096,6 +2156,19 @@ fn parse_ifd_entry(
                     ExifValue::Ascii(decode_color_mode_exiftool(v).to_string())
                 } else if tag_id == SONY_FLASH_ACTION {
                     ExifValue::Ascii(decode_flash_action_exiftool(v).to_string())
+                } else if tag_id == SONY_HDR {
+                    // HDR is stored as int32u, but read as two int16u values
+                    // Format: "HDRLevel; ImageStatus"
+                    ExifValue::Ascii(format_hdr_value(v))
+                } else if tag_id == SONY_MULTI_FRAME_NR_EFFECT {
+                    // MultiFrameNREffect: 0=Normal, 1=High
+                    ExifValue::Ascii(decode_multi_frame_nr_effect_exiftool(v).to_string())
+                } else if tag_id == SONY_EFCS {
+                    // ElectronicFrontCurtainShutter: 0=Off, 1=On
+                    ExifValue::Ascii(decode_efcs_exiftool(v).to_string())
+                } else if tag_id == SONY_LATERAL_CHROMATIC_ABERRATION {
+                    // LateralChromaticAberration: 0=Off, 2=Auto
+                    ExifValue::Ascii(decode_lateral_chromatic_aberration_exiftool(v).to_string())
                 } else if v <= u16::MAX as u32 {
                     // Then check tags that fit in u16
                     let v16 = v as u16;
