@@ -551,6 +551,27 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                     0xA405 => format!("{} mm", v[0]),
                     _ => format_values_space(v),
                 }
+            } else if tag_id == 0x828E && v.len() >= 4 {
+                // CFAPattern (TIFF/EP) as Short array - format as [Red,Green][Green,Blue]
+                let color_name = |c: u16| -> &'static str {
+                    match c {
+                        0 => "Red",
+                        1 => "Green",
+                        2 => "Blue",
+                        3 => "Cyan",
+                        4 => "Magenta",
+                        5 => "Yellow",
+                        6 => "White",
+                        _ => "Unknown",
+                    }
+                };
+                format!(
+                    "[{},{}][{},{}]",
+                    color_name(v[0]),
+                    color_name(v[1]),
+                    color_name(v[2]),
+                    color_name(v[3])
+                )
             } else if v.len() == 2 && tag_id == 0x100A {
                 // Fuji WhiteBalanceFineTune - format as "Red +X, Blue +Y"
                 let red = v[0] as i16;
@@ -702,6 +723,62 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                                         .trim_end_matches('.')
                                         .to_string();
                                     format!("{}{}", sign, formatted)
+                                }
+                            }
+                        }
+                        // Nikon ExposureBracketValue (0x0019) - output as fraction
+                        // ExifTool uses PrintFraction: "0", "+N", "-N", "+N/2", "-N/2", "+N/3", "-N/3"
+                        0x0019 => {
+                            let val = n as f64 / d as f64 * 1.00001; // Avoid round-off
+                            if val.abs() < 0.0001 {
+                                "0".to_string()
+                            } else if (val.trunc() / val).abs() > 0.999 {
+                                format!("{:+}", val.trunc() as i32)
+                            } else if ((val * 2.0).trunc() / (val * 2.0)).abs() > 0.999 {
+                                format!("{:+}/2", (val * 2.0).trunc() as i32)
+                            } else if ((val * 3.0).trunc() / (val * 3.0)).abs() > 0.999 {
+                                format!("{:+}/3", (val * 3.0).trunc() as i32)
+                            } else {
+                                format!("{:+.3}", n as f64 / d as f64)
+                            }
+                        }
+                        // Nikon ProgramShift (0x000D), ExposureDifference (0x000E),
+                        // FlashExposureComp (0x0012), ExternalFlashExposureComp (0x0017),
+                        // FlashExposureBracketValue (0x0018), ExposureTuning (0x001C)
+                        // Format: +0.2 / -0.2 / 0 (1 decimal, + prefix for positive)
+                        0x000D | 0x000E | 0x0012 | 0x0017 | 0x0018 | 0x001C => {
+                            let val = n as f64 / d as f64;
+                            if val == 0.0 {
+                                "0".to_string()
+                            } else {
+                                // Round to 1 decimal using banker's rounding (round half to even)
+                                // to match ExifTool/Perl behavior
+                                fn round_half_even(x: f64, decimals: i32) -> f64 {
+                                    let multiplier = 10f64.powi(decimals);
+                                    let shifted = x * multiplier;
+                                    let floor = shifted.floor();
+                                    let frac = shifted - floor;
+                                    if (frac - 0.5).abs() < 1e-9 {
+                                        // Exactly 0.5 - round to even
+                                        if floor as i64 % 2 == 0 {
+                                            floor / multiplier
+                                        } else {
+                                            (floor + 1.0) / multiplier
+                                        }
+                                    } else {
+                                        shifted.round() / multiplier
+                                    }
+                                }
+                                let rounded = round_half_even(val, 1);
+                                let formatted = format!("{:.1}", rounded.abs());
+                                // Remove trailing zeros and dot if integer
+                                let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
+                                if rounded > 0.0 {
+                                    format!("+{}", trimmed)
+                                } else if rounded < 0.0 {
+                                    format!("-{}", trimmed)
+                                } else {
+                                    "0".to_string()
                                 }
                             }
                         }

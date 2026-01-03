@@ -17,6 +17,25 @@ fn gcd(a: u32, b: u32) -> u32 {
     }
 }
 
+/// Round to specified decimal places using banker's rounding (round half to even)
+/// This matches Perl's default rounding behavior used by ExifTool
+fn round_half_even(x: f64, decimals: i32) -> f64 {
+    let multiplier = 10f64.powi(decimals);
+    let shifted = x * multiplier;
+    let floor = shifted.floor();
+    let frac = shifted - floor;
+    if (frac - 0.5).abs() < 1e-9 {
+        // Exactly 0.5 - round to even
+        if floor as i64 % 2 == 0 {
+            floor / multiplier
+        } else {
+            (floor + 1.0) / multiplier
+        }
+    } else {
+        shifted.round() / multiplier
+    }
+}
+
 /// Format EXIF MeteringMode - use manufacturer-specific naming where appropriate
 #[cfg(feature = "serde")]
 fn format_metering_mode(value: u16, make: Option<&str>) -> String {
@@ -108,7 +127,12 @@ fn format_short_value_with_make(value: u16, tag_id: u16, make: Option<&str>) -> 
 #[cfg(feature = "serde")]
 fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
     if den == 0 {
-        return Value::String("inf".to_string());
+        // Match ExifTool: 0/0 = "undef", n/0 (n!=0) = "inf"
+        return if num == 0 {
+            Value::String("undef".to_string())
+        } else {
+            Value::String("inf".to_string())
+        };
     }
 
     match tag_id {
@@ -255,7 +279,12 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
 #[cfg(feature = "serde")]
 fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
     if den == 0 {
-        return Value::String("inf".to_string());
+        // Match ExifTool: 0/0 = "undef", n/0 (n!=0) = "inf"
+        return if num == 0 {
+            Value::String("undef".to_string())
+        } else {
+            Value::String("inf".to_string())
+        };
     }
 
     match tag_id {
@@ -304,14 +333,51 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
                 }
             }
         }
-        // Nikon MakerNote tags that should always show decimal format
-        0x0017 => {
-            // FlashExposureBracketValue (0x0017) - always show decimal format as JSON number
+        // Nikon ExposureBracketValue (0x0019) - output as fraction using PrintFraction algorithm
+        // ExifTool outputs: "0", "+N", "-N", "+N/2", "-N/2", "+N/3", "-N/3", or decimal with + prefix
+        0x0019 => {
             let decimal = num as f64 / den as f64;
-            // Return as JSON number to match ExifTool's output
-            serde_json::Number::from_f64(decimal)
-                .map(Value::Number)
-                .unwrap_or_else(|| Value::Number(0.into()))
+            // Avoid round-off errors like ExifTool does (val *= 1.00001)
+            let val = decimal * 1.00001;
+            if val.abs() < 0.0001 {
+                Value::Number(0.into())
+            } else if (val.trunc() / val).abs() > 0.999 {
+                // Whole number: +N or -N
+                Value::String(format!("{:+}", val.trunc() as i32))
+            } else if ((val * 2.0).trunc() / (val * 2.0)).abs() > 0.999 {
+                // Half: +N/2 or -N/2
+                Value::String(format!("{:+}/2", (val * 2.0).trunc() as i32))
+            } else if ((val * 3.0).trunc() / (val * 3.0)).abs() > 0.999 {
+                // Third: +N/3 or -N/3
+                Value::String(format!("{:+}/3", (val * 3.0).trunc() as i32))
+            } else {
+                // Fallback to decimal with + prefix for positive
+                Value::String(format!("{:+.3}", decimal))
+            }
+        }
+        // Nikon MakerNote exposure-related tags (packed rational decode)
+        // ProgramShift (0x000D), ExposureDifference (0x000E), FlashExposureComp (0x0012),
+        // ExternalFlashExposureComp (0x0017), FlashExposureBracketValue (0x0018), ExposureTuning (0x001C)
+        // ExifTool outputs: 0 as number, negative as number, positive as string with "+"
+        0x000D | 0x000E | 0x0012 | 0x0017 | 0x0018 | 0x001C => {
+            let decimal = num as f64 / den as f64;
+            // Round to 1 decimal place using banker's rounding to match ExifTool
+            let rounded = round_half_even(decimal, 1);
+            if rounded == 0.0 {
+                Value::Number(0.into())
+            } else if rounded > 0.0 {
+                // Positive: output as string with "+" prefix (e.g., "+0.2")
+                let formatted = format!("+{:.1}", rounded)
+                    .trim_end_matches('0')
+                    .trim_end_matches('.')
+                    .to_string();
+                Value::String(formatted)
+            } else {
+                // Negative: output as number (e.g., -0.2)
+                serde_json::Number::from_f64(rounded)
+                    .map(Value::Number)
+                    .unwrap_or_else(|| Value::Number(0.into()))
+            }
         }
         _ => {
             // Default: show as decimal, strip .0 for whole numbers to match ExifTool
@@ -825,6 +891,28 @@ pub fn format_exif_value_for_json_with_make(
                     return formatted;
                 }
             }
+            // CFAPattern (0x828E TIFF/EP) as Short array - format as [Red,Green][Green,Blue]
+            if tag_id == 0x828E && v.len() >= 4 {
+                let color_name = |c: u16| -> &'static str {
+                    match c {
+                        0 => "Red",
+                        1 => "Green",
+                        2 => "Blue",
+                        3 => "Cyan",
+                        4 => "Magenta",
+                        5 => "Yellow",
+                        6 => "White",
+                        _ => "Unknown",
+                    }
+                };
+                return Value::String(format!(
+                    "[{},{}][{},{}]",
+                    color_name(v[0]),
+                    color_name(v[1]),
+                    color_name(v[2]),
+                    color_name(v[3])
+                ));
+            }
             // Fuji WhiteBalanceFineTune (0x100A) - format as "Red +X, Blue +Y"
             if tag_id == 0x100A && v.len() == 2 {
                 let red = v[0] as i16;
@@ -934,7 +1022,12 @@ pub fn format_exif_value_for_json_with_make(
                 .iter()
                 .map(|&(num, den)| {
                     if den == 0 {
-                        "inf".to_string()
+                        // Match ExifTool: 0/0 = "undef", n/0 (n!=0) = "inf"
+                        if num == 0 {
+                            "undef".to_string()
+                        } else {
+                            "inf".to_string()
+                        }
                     } else {
                         let decimal = num as f64 / den as f64;
                         decimal.to_string()
@@ -948,7 +1041,12 @@ pub fn format_exif_value_for_json_with_make(
                 .iter()
                 .map(|&(num, den)| {
                     if den == 0 {
-                        "inf".to_string()
+                        // Match ExifTool: 0/0 = "undef", n/0 (n!=0) = "inf"
+                        if num == 0 {
+                            "undef".to_string()
+                        } else {
+                            "inf".to_string()
+                        }
                     } else {
                         let decimal = num as f64 / den as f64;
                         decimal.to_string()
@@ -1017,6 +1115,11 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         } else {
             format!("Tag{}", tag_id.id)
         };
+        // For CFAPattern, prefer TIFF/EP (0x828E) over EXIF (0xA302) to match ExifTool's Composite
+        // Skip insertion if CFAPattern already exists and this is 0xA302
+        if tag_name == "CFAPattern" && tag_id.id == 0xA302 && output.contains_key("CFAPattern") {
+            continue;
+        }
         let json_value = format_exif_value_for_json_with_make(value, tag_id.id, make_ref);
         output.insert(tag_name, json_value);
     }
@@ -1445,7 +1548,11 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         .and_then(parse_f64_value);
     let min_fl = output.get("MinFocalLength").and_then(parse_f64_value);
     let max_fl = output.get("MaxFocalLength").and_then(parse_f64_value);
-    let focus_dist_str = output.get("FocusDistanceUpper").cloned();
+    // Get focus distance - prefer FocusDistance, fall back to FocusDistanceUpper
+    let focus_dist_str = output
+        .get("FocusDistance")
+        .or_else(|| output.get("FocusDistanceUpper"))
+        .cloned();
 
     // For ScaleFactor calculation from sensor size
     let image_width = output.get("ExifImageWidth").and_then(parse_f64_value);
@@ -1610,13 +1717,25 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
-    // FocalLength35efl - focal length in 35mm equivalent
+    // FocalLength35efl - focal length with 35mm equivalent
+    // ExifTool format: "XX.X mm (35 mm equivalent: YY.Y mm)" when scale factor known
+    // Otherwise just: "XX.X mm"
     if !has_focal_length_35 {
-        if let Some(fl35) = fl35_raw {
-            let formatted = format!("{:.1} mm", fl35);
-            output.insert("FocalLength35efl".to_string(), Value::String(formatted));
-        } else if let (Some(fl), Some(sf)) = (focal_length, scale_factor) {
-            let fl35 = fl * sf;
+        if let Some(fl) = focal_length {
+            // We have original focal length - check if we have scale factor too
+            if let Some(sf) = scale_factor {
+                // Calculate 35mm equivalent
+                let fl35 = fl * sf;
+                // Full format with both original and equivalent
+                let formatted = format!("{:.1} mm (35 mm equivalent: {:.1} mm)", fl, fl35);
+                output.insert("FocalLength35efl".to_string(), Value::String(formatted));
+            } else {
+                // No scale factor - just output the focal length
+                let formatted = format!("{:.1} mm", fl);
+                output.insert("FocalLength35efl".to_string(), Value::String(formatted));
+            }
+        } else if let Some(fl35) = fl35_raw {
+            // Only have 35mm equivalent from EXIF tag - output as-is
             let formatted = format!("{:.1} mm", fl35);
             output.insert("FocalLength35efl".to_string(), Value::String(formatted));
         }
@@ -1649,26 +1768,63 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
-    // HyperfocalDistance = (FocalLength² / (Aperture × CoC)) + FocalLength
+    // HyperfocalDistance = FocalLength² / (Aperture × CoC × 1000)
+    // Matches ExifTool's formula (omits the +FocalLength term for simplicity)
     if !has_hyperfocal {
         if let (Some(fl), Some(ap), Some(c)) = (focal_length, aperture, coc) {
             if ap > 0.0 && c > 0.0 {
-                let hyper = (fl * fl) / (ap * c) + fl;
-                let hyper_m = hyper / 1000.0;
+                // ExifTool formula: f² / (N × c × 1000) where f and c are in mm, result in meters
+                let hyper_m = (fl * fl) / (ap * c * 1000.0);
                 let formatted = format!("{:.2} m", hyper_m);
                 output.insert("HyperfocalDistance".to_string(), Value::String(formatted));
             }
         }
     }
 
-    // FOV (Field of View) = 2 × atan(SensorWidth / (2 × FocalLength))
+    // FOV (Field of View) - matches ExifTool's calculation
+    // Uses focus distance correction factor when available
+    // Format: "XX.X deg" or "XX.X deg (YY.YY m)" with distance
     if !has_fov {
         if let (Some(fl), Some(sf)) = (focal_length, scale_factor) {
             if fl > 0.0 {
-                let sensor_width = 36.0 / sf;
-                let fov_rad = 2.0 * (sensor_width / (2.0 * fl)).atan();
-                let fov_deg = fov_rad * 180.0 / std::f64::consts::PI;
-                let formatted = format!("{:.1} deg", fov_deg);
+                // Parse focus distance in meters
+                let focus_m: Option<f64> = focus_dist_str.as_ref().and_then(|v| {
+                    if let Value::String(s) = v {
+                        s.trim_end_matches(" m").parse().ok()
+                    } else {
+                        None
+                    }
+                });
+
+                // Calculate correction factor based on focus distance (ExifTool algorithm)
+                let corr = if let Some(fd) = focus_m {
+                    let d = 1000.0 * fd - fl; // convert distance to mm and subtract focal length
+                    if d > 0.0 {
+                        1.0 + fl / d
+                    } else {
+                        1.0
+                    }
+                } else {
+                    1.0
+                };
+
+                // ExifTool: atan2(36, 2*FocalLength*ScaleFactor*corr) * 360 / PI
+                // This is half FOV angle, multiplied by 360/PI to get full FOV in degrees
+                let half_fov = (36.0 / (2.0 * fl * sf * corr)).atan();
+                let fov_deg = half_fov * 360.0 / std::f64::consts::PI;
+
+                // Calculate FOV width at focus distance if available and reasonable
+                let formatted = if let Some(fd) = focus_m {
+                    if fd > 0.0 && fd < 10000.0 {
+                        // FOV width = 2 * FocusDistance * tan(half_fov)
+                        let fov_width = 2.0 * fd * half_fov.tan();
+                        format!("{:.1} deg ({:.2} m)", fov_deg, fov_width)
+                    } else {
+                        format!("{:.1} deg", fov_deg)
+                    }
+                } else {
+                    format!("{:.1} deg", fov_deg)
+                };
                 output.insert("FOV".to_string(), Value::String(formatted));
             }
         }

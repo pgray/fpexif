@@ -229,6 +229,50 @@ where
                 ) {
                     // Add the SubIFD tags
                     for (tag_id, value) in subifd_tags {
+                        // Special handling for Compression tag (0x0103):
+                        // Prefer RAW-specific compression types over generic TIFF types
+                        // This ensures the RAW data compression is preserved when later SubIFDs
+                        // contain preview/thumbnail data with JPEG compression
+                        if tag_id.id == 0x0103 {
+                            // Helper to check if a compression value is RAW-specific
+                            let is_raw_compression = |v: u16| {
+                                matches!(
+                                    v,
+                                    34713   // Nikon NEF Compressed
+                                        | 32767 // Sony ARW Compressed
+                                        | 34316 // Panasonic RAW 1
+                                        | 34826 // Panasonic RAW 2
+                                        | 34828 // Panasonic RAW 3
+                                        | 34830 // Panasonic RAW 4
+                                        | 65535 // Pentax PEF Compressed
+                                        | 65000 // Kodak DCR Compressed
+                                )
+                            };
+
+                            // Check if we already have a RAW-specific compression
+                            let existing_is_raw = exif_data
+                                .get_tag_by_id(0x0103)
+                                .map(|existing| {
+                                    if let ExifValue::Short(vals) = existing {
+                                        !vals.is_empty() && is_raw_compression(vals[0])
+                                    } else {
+                                        false
+                                    }
+                                })
+                                .unwrap_or(false);
+
+                            // Check if the new value is RAW-specific
+                            let new_is_raw = if let ExifValue::Short(vals) = &value {
+                                !vals.is_empty() && is_raw_compression(vals[0])
+                            } else {
+                                false
+                            };
+
+                            // Skip if existing is RAW and new is not
+                            if existing_is_raw && !new_is_raw {
+                                continue;
+                            }
+                        }
                         exif_data.tags.insert(tag_id, value);
                     }
                 }
