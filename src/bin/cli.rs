@@ -64,6 +64,30 @@ enum Commands {
         #[arg(required = true)]
         files: Vec<PathBuf>,
     },
+
+    /// Extract embedded JPEG preview from RAW file
+    #[command(name = "extract-jpeg")]
+    ExtractJpeg {
+        /// Path to the RAW file
+        #[arg(required = true)]
+        file: PathBuf,
+
+        /// Output file path (default: input_preview.jpg)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Extract thumbnail instead of preview
+        #[arg(short, long)]
+        thumbnail: bool,
+
+        /// List all embedded JPEGs without extracting
+        #[arg(short, long)]
+        list: bool,
+
+        /// Extract all embedded JPEGs (outputs to input_0.jpg, input_1.jpg, etc.)
+        #[arg(short, long)]
+        all: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -171,6 +195,102 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         eprintln!("Error parsing {}: {}", file.display(), err);
                         std::process::exit(1);
                     }
+                }
+            }
+            Ok(())
+        }
+        Commands::ExtractJpeg {
+            file,
+            output,
+            thumbnail,
+            list,
+            all,
+        } => {
+            use fpexif::extract::{extract_jpegs, JpegType};
+            use std::fs::File;
+            use std::io::BufReader;
+
+            let reader = BufReader::new(File::open(file)?);
+
+            let jpeg_type = if *all {
+                JpegType::All
+            } else if *thumbnail {
+                JpegType::Thumbnail
+            } else {
+                JpegType::Preview
+            };
+
+            match extract_jpegs(reader, jpeg_type) {
+                Ok(jpegs) => {
+                    if jpegs.is_empty() {
+                        eprintln!("No embedded JPEGs found in {}", file.display());
+                        std::process::exit(1);
+                    }
+
+                    if *list {
+                        // List mode - just show info
+                        println!("Embedded JPEGs in {}:", file.display());
+                        for (i, (info, _)) in jpegs.iter().enumerate() {
+                            let dims = info
+                                .dimensions
+                                .map(|(w, h)| format!(" ({}x{})", w, h))
+                                .unwrap_or_default();
+                            println!(
+                                "  {}: {} - {} bytes at offset {}{}",
+                                i, info.description, info.length, info.offset, dims
+                            );
+                        }
+                    } else {
+                        // Extract mode
+                        let base_name = file
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("output");
+
+                        for (i, (info, data)) in jpegs.iter().enumerate() {
+                            let out_path = if let Some(ref out) = output {
+                                if *all && jpegs.len() > 1 {
+                                    // Multiple files: add index
+                                    let stem = out
+                                        .file_stem()
+                                        .and_then(|s| s.to_str())
+                                        .unwrap_or("output");
+                                    let ext =
+                                        out.extension().and_then(|s| s.to_str()).unwrap_or("jpg");
+                                    PathBuf::from(format!("{}_{}.{}", stem, i, ext))
+                                } else {
+                                    out.clone()
+                                }
+                            } else {
+                                // Default naming
+                                let suffix = if *all && jpegs.len() > 1 {
+                                    format!("_{}", i)
+                                } else if *thumbnail {
+                                    "_thumb".to_string()
+                                } else {
+                                    "_preview".to_string()
+                                };
+                                PathBuf::from(format!("{}{}.jpg", base_name, suffix))
+                            };
+
+                            std::fs::write(&out_path, data)?;
+                            let dims = info
+                                .dimensions
+                                .map(|(w, h)| format!(" ({}x{})", w, h))
+                                .unwrap_or_default();
+                            println!(
+                                "Extracted {} ({} bytes){} -> {}",
+                                info.description,
+                                data.len(),
+                                dims,
+                                out_path.display()
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error extracting JPEG: {}", e);
+                    std::process::exit(1);
                 }
             }
             Ok(())
