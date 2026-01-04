@@ -982,6 +982,18 @@ pub fn format_exif_value_for_json_with_make(
             )
         }
         ExifValue::Long(v) => {
+            // StripOffsets (0x0111) and StripByteCounts (0x0117) - format as binary data for large arrays
+            // ExifTool outputs "(Binary data N bytes, use -b option to extract)" for these
+            // N is the text representation size (decimal strings + spaces), not binary size
+            if (tag_id == 0x0111 || tag_id == 0x0117) && v.len() > 1 {
+                // Calculate text representation size: sum of decimal lengths + spaces
+                let text_len: usize = v.iter().map(|n| n.to_string().len()).sum::<usize>()
+                    + v.len().saturating_sub(1); // spaces between values
+                return Value::String(format!(
+                    "(Binary data {} bytes, use -b option to extract)",
+                    text_len
+                ));
+            }
             // Fuji ImageStabilization (0x1422) - format as "Type; Mode; Param"
             if tag_id == 0x1422 && v.len() >= 3 {
                 let is_type = match v[0] {

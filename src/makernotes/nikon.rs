@@ -634,6 +634,7 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "43 54 50 50 0C 0C 46 02" => Some("AF Nikkor 50mm f/1.4D"),
         "4A 54 62 62 0C 0C 4D 02" => Some("AF Nikkor 85mm f/1.4D IF"),
         "4E 48 72 72 18 18 51 02" => Some("AF DC-Nikkor 135mm f/2D"),
+        "76 58 50 50 14 14 7A 02" => Some("AF Nikkor 50mm f/1.8D"),
         // AF-S lenses
         "48 48 8E 8E 24 24 4B 02" => Some("AF-S Nikkor 300mm f/2.8D IF-ED"),
         "5D 48 3C 5C 24 24 63 02" => Some("AF-S Zoom-Nikkor 28-70mm f/2.8D IF-ED"),
@@ -806,6 +807,7 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
             let trimmed = value.trim();
             match trimmed {
                 "AUTO" => "Auto".to_string(),
+                "AUTO(FLASH OFF)" => "Auto(Flash Off)".to_string(),
                 "SPORT" => "Sport".to_string(),
                 "PORTRAIT" => "Portrait".to_string(),
                 "LANDSCAPE" => "Landscape".to_string(),
@@ -1092,43 +1094,43 @@ pub fn decode_shooting_mode_exiv2(value: u16) -> String {
 
 /// Helper to decode shooting mode bits
 fn decode_shooting_mode_bits(value: u16, _is_exiv2: bool) -> String {
-    let mut modes = Vec::new();
+    let mut modes: Vec<String> = Vec::new();
 
-    if value & 0x0001 != 0 {
-        modes.push("Continuous");
-    }
-    if value & 0x0002 != 0 {
-        modes.push("Delay");
-    }
-    if value & 0x0004 != 0 {
-        modes.push("PC Control");
-    }
-    if value & 0x0008 != 0 {
-        modes.push("Self-timer");
-    }
-    if value & 0x0010 != 0 {
-        modes.push("Exposure Bracketing");
-    }
-    if value & 0x0020 != 0 {
-        // Note: For D70, bit 5 means "Unused LE-NR Slowdown"
-        // For other models it means "Auto ISO"
-        modes.push("Auto ISO");
-    }
-    if value & 0x0040 != 0 {
-        modes.push("White-Balance Bracketing");
-    }
-    if value & 0x0080 != 0 {
-        modes.push("IR Control");
-    }
-    if value & 0x0100 != 0 {
-        modes.push("D-Lighting Bracketing");
+    // Known bit mappings from ExifTool Nikon.pm
+    let known_bits: [(u16, &str); 10] = [
+        (0, "Continuous"),
+        (1, "Delay"),
+        (2, "PC Control"),
+        (3, "Self-timer"),
+        (4, "Exposure Bracketing"),
+        (5, "Auto ISO"), // Note: For D70, this means "Unused LE-NR Slowdown"
+        (6, "White-Balance Bracketing"),
+        (7, "IR Control"),
+        (8, "D-Lighting Bracketing"),
+        (11, "Pre-capture"), // Z9 pre-release burst
+    ];
+
+    // Track which bits we've handled
+    let mut handled_mask: u16 = 0;
+
+    for (bit, name) in known_bits {
+        let mask = 1u16 << bit;
+        handled_mask |= mask;
+        if value & mask != 0 {
+            modes.push(name.to_string());
+        }
     }
 
-    if modes.is_empty() {
-        "Unknown".to_string()
-    } else {
-        modes.join(", ")
+    // Output unknown bits as "[n]" format (matching ExifTool's DecodeBits)
+    for bit in 0..16 {
+        let mask = 1u16 << bit;
+        if (handled_mask & mask) == 0 && (value & mask) != 0 {
+            modes.push(format!("[{}]", bit));
+        }
     }
+
+    // Note: "Single-Frame" prefix logic is handled by decode_shooting_mode_exiftool
+    modes.join(", ")
 }
 
 // AutoBracketRelease (tag 0x008A): Nikon.pm / nikonmn_int.cpp
@@ -2306,7 +2308,8 @@ fn parse_lens_data(
 
 /// Parse AFInfo tag data (tag 0x0088)
 /// Extracts AF mode and focus point information
-fn parse_af_info(data: &[u8]) -> Vec<(String, String)> {
+/// model is used to determine byte order: DSLR (NIKON D*) uses big-endian, others use little-endian
+fn parse_af_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
     if data.is_empty() {
@@ -2345,12 +2348,22 @@ fn parse_af_info(data: &[u8]) -> Vec<(String, String)> {
     }
 
     // Bytes 2-3: AFPointsInFocus (bitmask)
+    // ExifTool uses BigEndian for DSLRs (NIKON D*), LittleEndian for others (Coolpix, etc.)
     if data.len() >= 4 {
-        let af_points_mask = ((data[2] as u16) << 8) | (data[3] as u16);
+        let is_dslr = model
+            .map(|m| m.to_uppercase().starts_with("NIKON D"))
+            .unwrap_or(false);
+        let af_points_mask = if is_dslr {
+            // Big-endian for DSLRs
+            ((data[2] as u16) << 8) | (data[3] as u16)
+        } else {
+            // Little-endian for Coolpix and other cameras
+            (data[2] as u16) | ((data[3] as u16) << 8)
+        };
         if af_points_mask == 0 {
             tags.push(("AFPointsInFocus".to_string(), "(none)".to_string()));
         } else {
-            let mut points = Vec::new();
+            let mut points: Vec<String> = Vec::new();
             let point_names = [
                 "Center",
                 "Top",
@@ -2364,9 +2377,20 @@ fn parse_af_info(data: &[u8]) -> Vec<(String, String)> {
                 "Far Left",
                 "Far Right",
             ];
+            // Track which bits we've handled
+            let mut handled_mask: u16 = 0;
             for (i, name) in point_names.iter().enumerate() {
-                if af_points_mask & (1 << i) != 0 {
-                    points.push(*name);
+                let bit_mask = 1u16 << i;
+                handled_mask |= bit_mask;
+                if af_points_mask & bit_mask != 0 {
+                    points.push(name.to_string());
+                }
+            }
+            // Output unknown bits as "[n]" format (matching ExifTool's DecodeBits)
+            for bit in 0..16 {
+                let bit_mask = 1u16 << bit;
+                if (handled_mask & bit_mask) == 0 && (af_points_mask & bit_mask) != 0 {
+                    points.push(format!("[{}]", bit));
                 }
             }
             if points.is_empty() {
@@ -3410,16 +3434,31 @@ pub fn parse_nikon_maker_notes(
                 7 => {
                     // UNDEFINED - handle packed rational values specially
                     match tag_id {
-                        // MakerNoteVersion - format as "X.Y" or "X.YZ" from ASCII bytes
+                        // MakerNoteVersion - format as "X.Y" or "X.YZ"
+                        // Can be either ASCII "0200" or binary [0, 2, 0, 0]
                         NIKON_VERSION => {
                             if value_bytes.len() >= 4 {
-                                // Try to parse as ASCII string "0200" -> "2.0" or "0210" -> "2.1"
-                                if let Ok(s) = std::str::from_utf8(&value_bytes[..4]) {
-                                    // Parse as XXYY -> X.Y or X.YZ (strip trailing zero if YY ends in 0)
+                                // Check if binary format (first byte is 0-9, not '0'-'9')
+                                let is_binary = value_bytes[0] <= 9;
+
+                                if is_binary {
+                                    // Binary format: [major_tens, major_ones, minor_tens, minor_ones]
+                                    // e.g., [0, 2, 0, 0] -> version 2.0
+                                    let major = value_bytes[0] * 10 + value_bytes[1];
+                                    let minor = value_bytes[2] * 10 + value_bytes[3];
+                                    // Format as "X.Y" - strip trailing zero from minor
+                                    let formatted = if minor.is_multiple_of(10) {
+                                        format!("{}.{}", major, minor / 10)
+                                    } else {
+                                        format!("{}.{}", major, minor)
+                                    };
+                                    ExifValue::Ascii(formatted)
+                                } else if let Ok(s) = std::str::from_utf8(&value_bytes[..4]) {
+                                    // ASCII format: "0200" -> version 2.0
                                     if s.len() == 4 && s.chars().all(|c| c.is_ascii_digit()) {
                                         let major: u8 = s[0..2].parse().unwrap_or(0);
                                         let minor: u8 = s[2..4].parse().unwrap_or(0);
-                                        // Format minor: if divisible by 10, show as single digit
+                                        // Format as "X.Y" - strip trailing zero from minor
                                         let formatted = if minor.is_multiple_of(10) {
                                             format!("{}.{}", major, minor / 10)
                                         } else {
@@ -3427,18 +3466,12 @@ pub fn parse_nikon_maker_notes(
                                         };
                                         ExifValue::Ascii(formatted)
                                     } else {
-                                        ExifValue::Ascii(s.to_string())
+                                        // Fallback: return trimmed string
+                                        ExifValue::Ascii(s.trim().to_string())
                                     }
                                 } else {
-                                    // Binary format - convert bytes to version
-                                    let major = value_bytes[0];
-                                    let minor = value_bytes[1] * 10 + value_bytes[2];
-                                    let formatted = if minor.is_multiple_of(10) {
-                                        format!("{}.{}", major, minor / 10)
-                                    } else {
-                                        format!("{}.{}", major, minor)
-                                    };
-                                    ExifValue::Ascii(formatted)
+                                    // Invalid - return raw bytes
+                                    ExifValue::Undefined(value_bytes)
                                 }
                             } else {
                                 ExifValue::Undefined(value_bytes)
@@ -3649,7 +3682,7 @@ pub fn parse_nikon_maker_notes(
                 }
                 NIKON_AF_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_af_info(bytes) {
+                        for (name, val) in parse_af_info(bytes, model) {
                             tags.insert(
                                 0x9500 + tags.len() as u16,
                                 MakerNoteTag {

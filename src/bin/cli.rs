@@ -68,9 +68,9 @@ enum Commands {
     /// Extract embedded JPEG preview from RAW file
     #[command(name = "extract-jpeg")]
     ExtractJpeg {
-        /// Path to the RAW file
-        #[arg(required = true)]
-        file: PathBuf,
+        /// Path to the RAW file (or ignored if --test-dir is used)
+        #[arg(required_unless_present = "test_dir")]
+        file: Option<PathBuf>,
 
         /// Output file path (default: input_preview.jpg)
         #[arg(short, long)]
@@ -87,6 +87,14 @@ enum Commands {
         /// Extract all embedded JPEGs (outputs to input_0.jpg, input_1.jpg, etc.)
         #[arg(short, long)]
         all: bool,
+
+        /// Test JPEG extraction across all files in a directory
+        #[arg(long)]
+        test_dir: Option<PathBuf>,
+
+        /// Validate extracted JPEGs by parsing their structure
+        #[arg(short, long)]
+        validate: bool,
     },
 }
 
@@ -205,14 +213,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             thumbnail,
             list,
             all,
+            test_dir,
+            validate,
         } => {
-            use fpexif::extract::{extract_jpegs, JpegType};
+            use fpexif::extract::{extract_jpegs, validate_jpeg, JpegType};
             use std::fs::File;
             use std::io::BufReader;
 
+            // Handle --test-dir mode
+            if let Some(dir) = test_dir {
+                return run_jpeg_extraction_test(dir, *validate);
+            }
+
+            let file = file
+                .as_ref()
+                .expect("file is required when not using --test-dir");
             let reader = BufReader::new(File::open(file)?);
 
-            let jpeg_type = if *all {
+            let jpeg_type = if *all || *list {
                 JpegType::All
             } else if *thumbnail {
                 JpegType::Thumbnail
@@ -230,15 +248,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if *list {
                         // List mode - just show info
                         println!("Embedded JPEGs in {}:", file.display());
-                        for (i, (info, _)) in jpegs.iter().enumerate() {
+                        for (i, (info, jpeg_data)) in jpegs.iter().enumerate() {
                             let dims = info
                                 .dimensions
                                 .map(|(w, h)| format!(" ({}x{})", w, h))
                                 .unwrap_or_default();
-                            println!(
-                                "  {}: {} - {} bytes at offset {}{}",
-                                i, info.description, info.length, info.offset, dims
-                            );
+
+                            if *validate {
+                                let validation = validate_jpeg(jpeg_data);
+                                let status = if validation.valid { "OK" } else { "INVALID" };
+                                let parsed_dims = match (validation.width, validation.height) {
+                                    (Some(w), Some(h)) => format!(" {}x{}", w, h),
+                                    _ => String::new(),
+                                };
+                                let eoi = if validation.has_eoi { "" } else { " [no EOI]" };
+                                println!(
+                                    "  {}: {} - {} bytes at offset {}{} [{}{}{}]",
+                                    i,
+                                    info.description,
+                                    info.length,
+                                    info.offset,
+                                    dims,
+                                    status,
+                                    parsed_dims,
+                                    eoi
+                                );
+                            } else {
+                                println!(
+                                    "  {}: {} - {} bytes at offset {}{}",
+                                    i, info.description, info.length, info.offset, dims
+                                );
+                            }
                         }
                     } else {
                         // Extract mode
@@ -1154,6 +1194,176 @@ fn print_exif_data_json(exif_data: &ExifData) -> Result<(), Box<dyn std::error::
     let json = fpexif::output::to_exiftool_json(exif_data, source_file.as_deref());
 
     println!("{}", serde_json::to_string_pretty(&json)?);
+    Ok(())
+}
+
+/// Run JPEG extraction test across all files in a directory
+fn run_jpeg_extraction_test(
+    dir: &PathBuf,
+    validate: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use fpexif::extract::{extract_jpegs, validate_jpeg, JpegType};
+    use std::fs::{self, File};
+    use std::io::BufReader;
+
+    let mut total = 0;
+    let mut with_jpegs = 0;
+    let mut failed = 0;
+    let mut no_jpegs = 0;
+    let mut invalid_jpegs = 0;
+    let mut failures: Vec<(PathBuf, String)> = Vec::new();
+    let mut invalid_files: Vec<(PathBuf, String)> = Vec::new();
+
+    // Collect and sort files
+    let mut entries: Vec<_> = fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .collect();
+    entries.sort_by_key(|e| e.path());
+
+    for entry in entries {
+        let path = entry.path();
+
+        // Skip non-image files
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .unwrap_or_default();
+
+        let is_raw = matches!(
+            ext.as_str(),
+            "nef"
+                | "cr2"
+                | "cr3"
+                | "arw"
+                | "orf"
+                | "raf"
+                | "rw2"
+                | "dng"
+                | "pef"
+                | "srw"
+                | "nrw"
+                | "raw"
+                | "mrw"
+                | "3fr"
+                | "mef"
+                | "mos"
+                | "iiq"
+                | "rwl"
+                | "kdc"
+                | "dcr"
+                | "erf"
+                | "sr2"
+                | "srf"
+                | "crw"
+        );
+
+        if !is_raw {
+            continue;
+        }
+
+        total += 1;
+
+        let reader = match File::open(&path) {
+            Ok(f) => BufReader::new(f),
+            Err(e) => {
+                failed += 1;
+                failures.push((path.clone(), format!("open error: {}", e)));
+                continue;
+            }
+        };
+
+        match extract_jpegs(reader, JpegType::All) {
+            Ok(jpegs) => {
+                if jpegs.is_empty() {
+                    no_jpegs += 1;
+                    println!(
+                        "  {} - no JPEGs",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    );
+                } else {
+                    with_jpegs += 1;
+                    let mut all_valid = true;
+                    let sizes: Vec<String> = jpegs
+                        .iter()
+                        .map(|(info, jpeg_data)| {
+                            if validate {
+                                let v = validate_jpeg(jpeg_data);
+                                if !v.valid {
+                                    all_valid = false;
+                                }
+                                match (v.width, v.height) {
+                                    (Some(w), Some(h)) => format!("{}x{}", w, h),
+                                    _ => format!("{}KB INVALID", info.length / 1024),
+                                }
+                            } else if let Some((w, h)) = info.dimensions {
+                                format!("{}x{}", w, h)
+                            } else {
+                                format!("{}KB", info.length / 1024)
+                            }
+                        })
+                        .collect();
+
+                    if validate && !all_valid {
+                        invalid_jpegs += 1;
+                        invalid_files.push((path.clone(), "Contains invalid JPEG".to_string()));
+                    }
+
+                    println!(
+                        "  {} - {} JPEGs: {}",
+                        path.file_name().unwrap_or_default().to_string_lossy(),
+                        jpegs.len(),
+                        sizes.join(", ")
+                    );
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                failures.push((path.clone(), e.to_string()));
+            }
+        }
+    }
+
+    println!("\n=== JPEG Extraction Test Results ===");
+    println!("Total RAW files:    {}", total);
+    println!(
+        "With embedded JPEG: {} ({:.1}%)",
+        with_jpegs,
+        if total > 0 {
+            with_jpegs as f64 / total as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
+    println!("No JPEG found:      {}", no_jpegs);
+    println!("Failed:             {}", failed);
+    if validate {
+        println!("Invalid JPEGs:      {}", invalid_jpegs);
+    }
+
+    if !failures.is_empty() {
+        println!("\nExtraction Failures:");
+        for (path, err) in &failures {
+            println!(
+                "  {} - {}",
+                path.file_name().unwrap_or_default().to_string_lossy(),
+                err
+            );
+        }
+    }
+
+    if validate && !invalid_files.is_empty() {
+        println!("\nInvalid JPEG Files:");
+        for (path, err) in &invalid_files {
+            println!(
+                "  {} - {}",
+                path.file_name().unwrap_or_default().to_string_lossy(),
+                err
+            );
+        }
+    }
+
     Ok(())
 }
 

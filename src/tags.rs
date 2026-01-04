@@ -1527,20 +1527,26 @@ pub fn get_planar_configuration_description(value: u16) -> &'static str {
 }
 
 /// Human-readable description for GPSLatitudeRef values
-pub fn get_gps_latitude_ref_description(value: &str) -> &'static str {
-    match value {
-        "N" => "North",
-        "S" => "South",
-        _ => "Unknown",
+pub fn get_gps_latitude_ref_description(value: &str) -> String {
+    // Trim whitespace and null bytes
+    let trimmed = value.trim().trim_matches('\0');
+    match trimmed {
+        "N" => "North".to_string(),
+        "S" => "South".to_string(),
+        "" => "Unknown ()".to_string(),
+        v => format!("Unknown ({})", v),
     }
 }
 
 /// Human-readable description for GPSLongitudeRef values
-pub fn get_gps_longitude_ref_description(value: &str) -> &'static str {
-    match value {
-        "E" => "East",
-        "W" => "West",
-        _ => "Unknown",
+pub fn get_gps_longitude_ref_description(value: &str) -> String {
+    // Trim whitespace and null bytes
+    let trimmed = value.trim().trim_matches('\0');
+    match trimmed {
+        "E" => "East".to_string(),
+        "W" => "West".to_string(),
+        "" => "Unknown ()".to_string(),
+        v => format!("Unknown ({})", v),
     }
 }
 

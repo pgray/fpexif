@@ -27,6 +27,156 @@ pub struct EmbeddedJpeg {
     pub dimensions: Option<(u32, u32)>,
 }
 
+/// Result of JPEG validation
+#[derive(Debug, Clone)]
+pub struct JpegValidation {
+    /// Whether the JPEG structure is valid
+    pub valid: bool,
+    /// Image width (from SOF marker)
+    pub width: Option<u32>,
+    /// Image height (from SOF marker)
+    pub height: Option<u32>,
+    /// Whether EOI marker was found
+    pub has_eoi: bool,
+    /// Error message if invalid
+    pub error: Option<String>,
+}
+
+/// Validate JPEG data and extract dimensions
+///
+/// Parses the JPEG segment structure to verify it's a valid JPEG
+/// and extracts width/height from the SOF (Start of Frame) marker.
+pub fn validate_jpeg(data: &[u8]) -> JpegValidation {
+    if data.len() < 4 {
+        return JpegValidation {
+            valid: false,
+            width: None,
+            height: None,
+            has_eoi: false,
+            error: Some("Data too short".to_string()),
+        };
+    }
+
+    // Check SOI (Start of Image)
+    if data[0] != 0xFF || data[1] != 0xD8 {
+        return JpegValidation {
+            valid: false,
+            width: None,
+            height: None,
+            has_eoi: false,
+            error: Some("Missing SOI marker".to_string()),
+        };
+    }
+
+    let mut pos = 2;
+    let mut width = None;
+    let mut height = None;
+    let mut has_eoi = false;
+
+    // Parse JPEG segments
+    while pos + 2 <= data.len() {
+        // Each segment starts with 0xFF
+        if data[pos] != 0xFF {
+            // Skip padding bytes (0xFF can be followed by more 0xFF)
+            pos += 1;
+            continue;
+        }
+
+        // Skip any padding 0xFF bytes
+        while pos + 1 < data.len() && data[pos + 1] == 0xFF {
+            pos += 1;
+        }
+
+        if pos + 2 > data.len() {
+            break;
+        }
+
+        let marker = data[pos + 1];
+        pos += 2;
+
+        match marker {
+            0xD8 => {
+                // SOI - shouldn't appear again
+            }
+            0xD9 => {
+                // EOI (End of Image)
+                has_eoi = true;
+                break;
+            }
+            0x00 => {
+                // Stuffed byte, skip
+            }
+            0xD0..=0xD7 => {
+                // RST markers (no length)
+            }
+            0xC0 | 0xC1 | 0xC2 | 0xC3 | 0xC5 | 0xC6 | 0xC7 | 0xC9 | 0xCA | 0xCB | 0xCD | 0xCE
+            | 0xCF => {
+                // SOF markers - contains dimensions
+                if pos + 7 <= data.len() {
+                    let _length = u16::from_be_bytes([data[pos], data[pos + 1]]);
+                    let _precision = data[pos + 2];
+                    height = Some(u16::from_be_bytes([data[pos + 3], data[pos + 4]]) as u32);
+                    width = Some(u16::from_be_bytes([data[pos + 5], data[pos + 6]]) as u32);
+                }
+                // Skip segment
+                if pos + 2 <= data.len() {
+                    let length = u16::from_be_bytes([data[pos], data[pos + 1]]) as usize;
+                    pos += length;
+                }
+            }
+            0xDA => {
+                // SOS (Start of Scan) - entropy-coded data follows
+                // Skip to find EOI at the end
+                if find_eoi(&data[pos..]).is_some() {
+                    has_eoi = true;
+                }
+                break;
+            }
+            _ => {
+                // Other segments have length field
+                if pos + 2 <= data.len() {
+                    let length = u16::from_be_bytes([data[pos], data[pos + 1]]) as usize;
+                    if length < 2 {
+                        return JpegValidation {
+                            valid: false,
+                            width,
+                            height,
+                            has_eoi: false,
+                            error: Some(format!("Invalid segment length at offset {}", pos)),
+                        };
+                    }
+                    pos += length;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    JpegValidation {
+        valid: width.is_some() && height.is_some(),
+        width,
+        height,
+        has_eoi,
+        error: if width.is_none() || height.is_none() {
+            Some("No SOF marker found".to_string())
+        } else {
+            None
+        },
+    }
+}
+
+/// Find EOI marker in data (searching from end is faster)
+fn find_eoi(data: &[u8]) -> Option<usize> {
+    // Search from the end since EOI is typically at the end
+    if data.len() < 2 {
+        return None;
+    }
+    (0..data.len() - 1)
+        .rev()
+        .find(|&i| data[i] == 0xFF && data[i + 1] == 0xD9)
+}
+
 /// Extract embedded JPEG(s) from a RAW file
 pub fn extract_jpegs<R: Read + Seek>(
     mut reader: R,
@@ -157,6 +307,26 @@ fn extract_from_tiff<R: Read + Seek>(
                 0x0117 => strip_byte_counts = Some(get_value()),
                 0x0201 => jpeg_offset = Some(get_value()),
                 0x0202 => jpeg_length = Some(get_value()),
+                0x002E => {
+                    // JpgFromRaw (Panasonic RW2) - embedded JPEG with EXIF
+                    // tag_type 7 = UNDEFINED, value is offset to data
+                    let offset = read_u32(value_offset) as usize;
+                    let length = count as usize;
+                    if length > 0 && offset + length <= data.len() {
+                        let jpeg_data = &data[offset..offset + length];
+                        if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8 {
+                            jpegs.push((
+                                EmbeddedJpeg {
+                                    offset: offset as u64,
+                                    length: length as u64,
+                                    description: format!("{} JpgFromRaw", ifd_name),
+                                    dimensions: None,
+                                },
+                                jpeg_data.to_vec(),
+                            ));
+                        }
+                    }
+                }
                 0x014A => {
                     // SubIFDs - queue them for processing
                     let subifd_offset = read_u32(value_offset) as usize;
@@ -178,6 +348,24 @@ fn extract_from_tiff<R: Read + Seek>(
                     // EXIF IFD - queue for processing
                     let exif_offset = get_value() as usize;
                     ifd_offsets_to_process.push((exif_offset, format!("{} EXIF", ifd_name)));
+                }
+                0x927C => {
+                    // MakerNote - check for Olympus format
+                    let mn_offset = read_u32(value_offset) as usize;
+                    let mn_length = count as usize;
+                    if mn_offset + 12 <= data.len() && mn_length > 12 {
+                        // Check for Olympus header "OLYMPUS\0II"
+                        if &data[mn_offset..mn_offset + 8] == b"OLYMPUS\0"
+                            && &data[mn_offset + 8..mn_offset + 10] == b"II"
+                        {
+                            // Parse Olympus MakerNotes for embedded JPEGs
+                            if let Some(extracted) =
+                                extract_olympus_makernotes(&data, mn_offset, is_little_endian)
+                            {
+                                jpegs.extend(extracted);
+                            }
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -277,6 +465,187 @@ fn extract_from_tiff<R: Read + Seek>(
     };
 
     Ok(filtered)
+}
+
+/// Extract JPEGs from Olympus MakerNotes
+/// Olympus stores thumbnail at tag 0x0100 and preview info at 0x2020 CameraSettings IFD
+fn extract_olympus_makernotes(
+    data: &[u8],
+    mn_offset: usize,
+    _file_endian: bool,
+) -> Option<Vec<(EmbeddedJpeg, Vec<u8>)>> {
+    // Olympus MakerNotes structure:
+    // 0-7: "OLYMPUS\0"
+    // 8-9: Byte order "II" or "MM"
+    // 10: Version (usually 0x03)
+    // 11: Unknown
+    // 12-15: IFD offset from start of MakerNotes
+
+    if mn_offset + 16 > data.len() {
+        return None;
+    }
+
+    let is_little_endian = &data[mn_offset + 8..mn_offset + 10] == b"II";
+    let base = mn_offset; // Olympus offsets are relative to MakerNotes start
+
+    let read_u16 = |offset: usize| -> u16 {
+        if offset + 2 > data.len() {
+            return 0;
+        }
+        if is_little_endian {
+            u16::from_le_bytes([data[offset], data[offset + 1]])
+        } else {
+            u16::from_be_bytes([data[offset], data[offset + 1]])
+        }
+    };
+    let read_u32 = |offset: usize| -> u32 {
+        if offset + 4 > data.len() {
+            return 0;
+        }
+        if is_little_endian {
+            u32::from_le_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ])
+        } else {
+            u32::from_be_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ])
+        }
+    };
+
+    let mut jpegs = Vec::new();
+
+    // IFD starts at offset 12 from MakerNotes start
+    let ifd_offset = base + 12;
+    if ifd_offset + 2 > data.len() {
+        return None;
+    }
+
+    let entry_count = read_u16(ifd_offset) as usize;
+    if entry_count == 0 || entry_count > 500 {
+        return None;
+    }
+
+    let mut camera_settings_offset: Option<usize> = None;
+
+    for i in 0..entry_count {
+        let entry_offset = ifd_offset + 2 + i * 12;
+        if entry_offset + 12 > data.len() {
+            break;
+        }
+
+        let tag_id = read_u16(entry_offset);
+        let tag_type = read_u16(entry_offset + 2);
+        let count = read_u32(entry_offset + 4) as usize;
+        let value_offset = entry_offset + 8;
+
+        match tag_id {
+            0x0100 => {
+                // ThumbnailImage - raw JPEG data
+                // Type 7 = UNDEFINED, value is offset to data
+                if tag_type == 7 && count > 100 {
+                    let offset = read_u32(value_offset) as usize;
+                    let abs_offset = base + offset;
+                    if abs_offset + count <= data.len() {
+                        let jpeg_data = &data[abs_offset..abs_offset + count];
+                        if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8 {
+                            jpegs.push((
+                                EmbeddedJpeg {
+                                    offset: abs_offset as u64,
+                                    length: count as u64,
+                                    description: "Olympus Thumbnail".to_string(),
+                                    dimensions: None,
+                                },
+                                jpeg_data.to_vec(),
+                            ));
+                        }
+                    }
+                }
+            }
+            0x2020 => {
+                // CameraSettings IFD pointer
+                // Type can be: 13 (IFD), 4 (LONG), or 7 (UNDEFINED for older models)
+                let offset = read_u32(value_offset) as usize;
+                if offset > 0 && offset < 0x1000000 {
+                    camera_settings_offset = Some(base + offset);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Parse CameraSettings IFD for PreviewImage
+    if let Some(cs_offset) = camera_settings_offset {
+        if cs_offset + 2 <= data.len() {
+            let cs_count = read_u16(cs_offset) as usize;
+            if cs_count > 0 && cs_count < 500 {
+                let mut preview_valid = false;
+                let mut preview_start: Option<u32> = None;
+                let mut preview_length: Option<u32> = None;
+
+                for i in 0..cs_count {
+                    let entry_offset = cs_offset + 2 + i * 12;
+                    if entry_offset + 12 > data.len() {
+                        break;
+                    }
+
+                    let tag_id = read_u16(entry_offset);
+                    let value_offset = entry_offset + 8;
+
+                    match tag_id {
+                        0x0100 => {
+                            // PreviewImageValid
+                            preview_valid = read_u32(value_offset) == 1;
+                        }
+                        0x0101 => {
+                            // PreviewImageStart (absolute offset from file start)
+                            preview_start = Some(read_u32(value_offset));
+                        }
+                        0x0102 => {
+                            // PreviewImageLength
+                            preview_length = Some(read_u32(value_offset));
+                        }
+                        _ => {}
+                    }
+                }
+
+                if preview_valid {
+                    if let (Some(start), Some(length)) = (preview_start, preview_length) {
+                        // Preview offset is relative to MakerNote base
+                        let abs_start = base + start as usize;
+                        let length = length as usize;
+                        if abs_start + length <= data.len() && length > 0 {
+                            let jpeg_data = &data[abs_start..abs_start + length];
+                            if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8
+                            {
+                                jpegs.push((
+                                    EmbeddedJpeg {
+                                        offset: abs_start as u64,
+                                        length: length as u64,
+                                        description: "Olympus Preview".to_string(),
+                                        dimensions: None,
+                                    },
+                                    jpeg_data.to_vec(),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if jpegs.is_empty() {
+        None
+    } else {
+        Some(jpegs)
+    }
 }
 
 /// Extract JPEGs from Fujifilm RAF files
