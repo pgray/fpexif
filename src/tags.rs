@@ -924,7 +924,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_IMAGE_NUMBER_MAIN, "ImageNumber");
     map.insert(TAG_SENSING_METHOD_MAIN, "SensingMethod");
     map.insert(TAG_DATE_TIME_ORIGINAL_MAIN, "DateTimeOriginal");
-    map.insert(TAG_TIFF_EP_STANDARD_ID_MAIN, "TIFF/EPStandardID");
+    map.insert(TAG_TIFF_EP_STANDARD_ID_MAIN, "TIFF-EPStandardID");
     // Basic TIFF structure tags in EXIF SubIFD (non-standard placement)
     map.insert(TAG_IMAGE_WIDTH_EXIF, "ImageWidth");
     map.insert(TAG_IMAGE_LENGTH_EXIF, "ImageLength");
@@ -944,7 +944,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_GPS_INFO, "GPSInfo");
     // TIFF/EP CFA tags
     map.insert(TAG_CFA_REPEAT_PATTERN_DIM, "CFARepeatPatternDim");
-    map.insert(TAG_CFA_PATTERN_TIFFEP, "CFAPattern");
+    map.insert(TAG_CFA_PATTERN_TIFFEP, "CFAPattern2");
     // JPEG tags in Main IFD
     map.insert(TAG_JPEG_INTERCHANGE_FORMAT_MAIN, "JPEGInterchangeFormat");
     map.insert(
@@ -1019,7 +1019,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_IMAGE_NUMBER, "ImageNumber");
     map.insert(TAG_SUBJECT_AREA, "SubjectArea");
     map.insert(TAG_EXPOSURE_INDEX, "ExposureIndex");
-    map.insert(TAG_TIFF_EP_STANDARD_ID, "TIFF/EPStandardID");
+    map.insert(TAG_TIFF_EP_STANDARD_ID, "TIFF-EPStandardID");
     map.insert(TAG_MAKER_NOTE, "MakerNote");
     map.insert(TAG_USER_COMMENT, "UserComment");
     map.insert(TAG_SUB_SEC_TIME, "SubSecTime");

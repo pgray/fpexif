@@ -137,25 +137,39 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
 
     match tag_id {
         0x829A => {
-            // ExposureTime - show as simplified fraction
-            // ExifTool approximates to 1/n form for readability
-            let gcd_val = gcd(num, den);
-            let simplified_num = num / gcd_val;
-            let simplified_den = den / gcd_val;
-            if simplified_num == 1 && simplified_den == 1 {
-                // For 1 second exposure, ExifTool outputs just "1"
-                Value::Number(1.into())
-            } else if simplified_num == 1 {
-                Value::String(format!("1/{}", simplified_den))
-            } else {
-                // Approximate to 1/n form: calculate equivalent denominator
-                let exposure_time = num as f64 / den as f64;
-                let approx_den = (1.0 / exposure_time).round() as u32;
-                if approx_den == 1 {
-                    Value::Number(1.into())
+            // ExposureTime - ExifTool outputs:
+            // - Integer for whole seconds (25 -> 25)
+            // - Decimal for non-standard times (0.625 -> 0.6, 4.8 -> 4.8)
+            // - Fraction 1/n for standard shutter speeds
+            let exposure_time = num as f64 / den as f64;
+            if exposure_time >= 1.0 {
+                // For exposures >= 1 second
+                if (exposure_time - exposure_time.round()).abs() < 0.01 {
+                    // Whole second - output as integer
+                    Value::Number((exposure_time.round() as u32).into())
                 } else {
-                    Value::String(format!("1/{}", approx_den))
+                    // Fractional seconds - output as decimal with 1 decimal place
+                    let rounded = (exposure_time * 10.0).round() / 10.0;
+                    serde_json::Number::from_f64(rounded)
+                        .map(Value::Number)
+                        .unwrap_or_else(|| Value::Number((exposure_time.round() as u32).into()))
                 }
+            } else if exposure_time > 0.0 {
+                // For sub-second exposures
+                let approx_den = (1.0 / exposure_time).round() as u32;
+                // Check if 1/n is a good approximation (within 10% to match ExifTool's rounding)
+                let approx_time = 1.0 / approx_den as f64;
+                if approx_den > 1 && (approx_time - exposure_time).abs() / exposure_time < 0.10 {
+                    Value::String(format!("1/{}", approx_den))
+                } else {
+                    // Use decimal for non-standard times
+                    let rounded = (exposure_time * 10.0).round() / 10.0;
+                    serde_json::Number::from_f64(rounded)
+                        .map(Value::Number)
+                        .unwrap_or_else(|| Value::Number(0.into()))
+                }
+            } else {
+                Value::Number(0.into())
             }
         }
         0x9201 => {
@@ -358,25 +372,55 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
         // Nikon MakerNote exposure-related tags (packed rational decode)
         // ProgramShift (0x000D), ExposureDifference (0x000E), FlashExposureComp (0x0012),
         // ExternalFlashExposureComp (0x0017), FlashExposureBracketValue (0x0018), ExposureTuning (0x001C)
-        // ExifTool outputs: 0 as number, negative as number, positive as string with "+"
+        // ExifTool outputs: 0 as int (except FlashExposureBracketValue which is 0.0),
+        // negative as number (int for whole numbers), positive as string with "+" (fraction for 1/3 steps)
         0x000D | 0x000E | 0x0012 | 0x0017 | 0x0018 | 0x001C => {
             let decimal = num as f64 / den as f64;
             // Round to 1 decimal place using banker's rounding to match ExifTool
             let rounded = round_half_even(decimal, 1);
             if rounded == 0.0 {
-                Value::Number(0.into())
+                // FlashExposureBracketValue (0x0018) outputs 0.0, others output 0
+                if tag_id == 0x0018 {
+                    serde_json::Number::from_f64(0.0)
+                        .map(Value::Number)
+                        .unwrap_or_else(|| Value::Number(0.into()))
+                } else {
+                    Value::Number(0.into())
+                }
             } else if rounded > 0.0 {
-                // Positive: output as string with "+" prefix (e.g., "+0.2")
-                let formatted = format!("+{:.1}", rounded)
-                    .trim_end_matches('0')
-                    .trim_end_matches('.')
-                    .to_string();
+                // Positive: output as string with "+" prefix
+                // Use fraction format for common EV steps (1/3, 2/3)
+                let frac = rounded.fract().abs();
+                let whole = rounded.trunc() as i32;
+                let formatted = if (frac - 0.3).abs() < 0.05 {
+                    if whole == 0 {
+                        "+1/3".to_string()
+                    } else {
+                        format!("+{} 1/3", whole)
+                    }
+                } else if (frac - 0.7).abs() < 0.05 {
+                    if whole == 0 {
+                        "+2/3".to_string()
+                    } else {
+                        format!("+{} 2/3", whole)
+                    }
+                } else {
+                    format!("+{:.1}", rounded)
+                        .trim_end_matches('0')
+                        .trim_end_matches('.')
+                        .to_string()
+                };
                 Value::String(formatted)
             } else {
-                // Negative: output as number (e.g., -0.2)
-                serde_json::Number::from_f64(rounded)
-                    .map(Value::Number)
-                    .unwrap_or_else(|| Value::Number(0.into()))
+                // Negative: output as number
+                // ExposureDifference (0x000E) always uses float, others use int for whole numbers
+                if rounded.fract() == 0.0 && tag_id != 0x000E {
+                    Value::Number((rounded as i64).into())
+                } else {
+                    serde_json::Number::from_f64(rounded)
+                        .map(Value::Number)
+                        .unwrap_or_else(|| Value::Number(0.into()))
+                }
             }
         }
         _ => {
@@ -521,13 +565,24 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
             // SceneType
             Value::String(crate::tags::get_scene_type_description(data[0]).to_string())
         }
-        // CFAPattern (0xA302 EXIF SubIFD, 0x828E TIFF/EP) as Undefined type
-        0xA302 | 0x828E if data.len() >= 4 => {
+        // CFAPattern (0xA302 EXIF SubIFD) as Undefined type - format as [Red,Green][Green,Blue]
+        0xA302 if data.len() >= 4 => {
             if let Some(formatted) = format_cfa_pattern(data) {
                 Value::String(formatted)
             } else {
                 Value::String(format_binary_data(data))
             }
+        }
+        // CFAPattern2 (0x828E TIFF/EP) - output as raw space-separated values
+        0x828E => Value::String(
+            data.iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        // TIFF-EPStandardID (0x9216) - format as version string "1.0.0.0"
+        0x9216 if data.len() == 4 => {
+            Value::String(format!("{}.{}.{}.{}", data[0], data[1], data[2], data[3]))
         }
         _ => {
             if data.len() <= 32 {
@@ -864,16 +919,27 @@ pub fn format_exif_value_for_json_with_make(
 
         // Multi-value arrays
         ExifValue::Byte(v) => {
-            // GPSVersionID (0x0000), DNGVersion (0xC612), DNGBackwardVersion (0xC613) should be formatted as "2.2.0.0"
-            if (tag_id == 0x0000 || tag_id == 0xC612 || tag_id == 0xC613) && v.len() == 4 {
+            // GPSVersionID (0x0000), DNGVersion (0xC612), DNGBackwardVersion (0xC613),
+            // TIFF-EPStandardID (0x9216) should be formatted as "1.0.0.0"
+            if (tag_id == 0x0000 || tag_id == 0xC612 || tag_id == 0xC613 || tag_id == 0x9216)
+                && v.len() == 4
+            {
                 Value::String(format!("{}.{}.{}.{}", v[0], v[1], v[2], v[3]))
-            // CFAPattern (0x828E TIFF/EP, 0xA302 EXIF) - format as [Red,Green][Green,Blue]
-            } else if (tag_id == 0x828E || tag_id == 0xA302) && v.len() >= 4 {
+            // CFAPattern (0xA302 EXIF) - format as [Red,Green][Green,Blue]
+            } else if tag_id == 0xA302 && v.len() >= 4 {
                 if let Some(formatted) = format_cfa_pattern(v) {
                     Value::String(formatted)
                 } else {
                     Value::Array(v.iter().map(|&n| Value::Number(n.into())).collect())
                 }
+            // CFAPattern2 (0x828E TIFF/EP) - output as raw space-separated values
+            } else if tag_id == 0x828E {
+                Value::String(
+                    v.iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
             } else {
                 // Default to space-separated strings (ExifTool behavior)
                 Value::String(
@@ -890,28 +956,6 @@ pub fn format_exif_value_for_json_with_make(
                 if let Some(formatted) = format_retouch_history(v) {
                     return formatted;
                 }
-            }
-            // CFAPattern (0x828E TIFF/EP) as Short array - format as [Red,Green][Green,Blue]
-            if tag_id == 0x828E && v.len() >= 4 {
-                let color_name = |c: u16| -> &'static str {
-                    match c {
-                        0 => "Red",
-                        1 => "Green",
-                        2 => "Blue",
-                        3 => "Cyan",
-                        4 => "Magenta",
-                        5 => "Yellow",
-                        6 => "White",
-                        _ => "Unknown",
-                    }
-                };
-                return Value::String(format!(
-                    "[{},{}][{},{}]",
-                    color_name(v[0]),
-                    color_name(v[1]),
-                    color_name(v[2]),
-                    color_name(v[3])
-                ));
             }
             // Fuji WhiteBalanceFineTune (0x100A) - format as "Red +X, Blue +Y"
             if tag_id == 0x100A && v.len() == 2 {
@@ -1109,19 +1153,48 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     let make_ref = make.as_deref();
 
     // Convert each tag to a key-value pair
+    // Process Main IFD first to give it priority, then other IFDs only if tag not already present
+    // This matches ExifTool behavior where IFD0 (Main) tags take precedence
     for (tag_id, value) in exif_data.iter() {
+        if tag_id.ifd != crate::tags::TagGroup::Main {
+            continue;
+        }
         let tag_name = if let Some(name) = tag_id.name() {
             name.to_string()
         } else {
             format!("Tag{}", tag_id.id)
         };
-        // For CFAPattern, prefer TIFF/EP (0x828E) over EXIF (0xA302) to match ExifTool's Composite
-        // Skip insertion if CFAPattern already exists and this is 0xA302
-        if tag_name == "CFAPattern" && tag_id.id == 0xA302 && output.contains_key("CFAPattern") {
+        if tag_id.id == 0xA302 {
             continue;
         }
         let json_value = format_exif_value_for_json_with_make(value, tag_id.id, make_ref);
         output.insert(tag_name, json_value);
+    }
+    // Then process other IFDs (Exif, GPS, Interop), skipping Thumbnail for most tags
+    for (tag_id, value) in exif_data.iter() {
+        if tag_id.ifd == crate::tags::TagGroup::Main {
+            continue; // Already processed
+        }
+        // Skip Thumbnail IFD for tags that should come from Main IFD
+        // ExifTool prioritizes IFD0 for Compression, BitsPerSample, etc.
+        if tag_id.ifd == crate::tags::TagGroup::Thumbnail {
+            continue;
+        }
+        let tag_name = if let Some(name) = tag_id.name() {
+            name.to_string()
+        } else {
+            format!("Tag{}", tag_id.id)
+        };
+        // Skip 0xA302 (EXIF CFAPattern) - we'll generate CFAPattern composite from CFAPattern2 (0x828E)
+        // ExifTool generates CFAPattern from CFAPattern2, not from 0xA302
+        if tag_id.id == 0xA302 {
+            continue;
+        }
+        // Only add if not already present from Main IFD
+        if !output.contains_key(&tag_name) {
+            let json_value = format_exif_value_for_json_with_make(value, tag_id.id, make_ref);
+            output.insert(tag_name, json_value);
+        }
     }
 
     // Add derived fields for exiftool compatibility
@@ -1139,6 +1212,50 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     if let Some(ExifValue::Short(v)) = exif_data.get_tag_by_id(0x8827) {
         if !v.is_empty() {
             output.insert("ISO".to_string(), Value::Number(v[0].into()));
+        }
+    }
+
+    // CFAPattern composite - generate from CFAPattern2 (0x828E) or fallback to 0xA302
+    // ExifTool generates CFAPattern from CFAPattern2 when available
+    if !output.contains_key("CFAPattern") {
+        // Try CFAPattern2 (0x828E) first - 4 bytes of pattern values
+        let pattern_values: Option<Vec<u8>> =
+            exif_data.get_tag_by_id(0x828E).and_then(|v| match v {
+                ExifValue::Byte(b) if b.len() >= 4 => Some(b.clone()),
+                ExifValue::Short(s) if s.len() >= 4 => Some(s.iter().map(|&x| x as u8).collect()),
+                ExifValue::Undefined(u) if u.len() >= 4 => Some(u.clone()),
+                _ => None,
+            });
+
+        // Fallback to EXIF CFAPattern (0xA302) - 8 bytes: 4 for dimensions + 4 for pattern
+        let pattern_values = pattern_values.or_else(|| {
+            exif_data.get_tag_by_id(0xA302).and_then(|v| match v {
+                ExifValue::Undefined(u) if u.len() >= 8 => Some(u[4..8].to_vec()),
+                _ => None,
+            })
+        });
+
+        if let Some(pattern) = pattern_values {
+            let color_name = |c: u8| -> &'static str {
+                match c {
+                    0 => "Red",
+                    1 => "Green",
+                    2 => "Blue",
+                    3 => "Cyan",
+                    4 => "Magenta",
+                    5 => "Yellow",
+                    6 => "White",
+                    _ => "Unknown",
+                }
+            };
+            let formatted = format!(
+                "[{},{}][{},{}]",
+                color_name(pattern[0]),
+                color_name(pattern[1]),
+                color_name(pattern[2]),
+                color_name(pattern[3])
+            );
+            output.insert("CFAPattern".to_string(), Value::String(formatted));
         }
     }
 
@@ -1247,6 +1364,54 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         output.insert("CreateDate".to_string(), Value::String(cleaned.to_string()));
     }
 
+    // SubSec composite date tags - date + subsec
+    // SubSecModifyDate = ModifyDate + SubSecTime
+    let subsec_time = exif_data.get_tag_by_id(0x9290).and_then(|v| match v {
+        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        _ => None,
+    });
+    let subsec_original = exif_data.get_tag_by_id(0x9291).and_then(|v| match v {
+        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        _ => None,
+    });
+    let subsec_digitized = exif_data.get_tag_by_id(0x9292).and_then(|v| match v {
+        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        _ => None,
+    });
+
+    // SubSecModifyDate = ModifyDate (0x0132) + SubSecTime (0x9290)
+    if let (Some(ExifValue::Ascii(date)), Some(subsec)) =
+        (exif_data.get_tag_by_id(0x0132), &subsec_time)
+    {
+        let cleaned = date.trim_end_matches('\0').trim();
+        output.insert(
+            "SubSecModifyDate".to_string(),
+            Value::String(format!("{}.{}", cleaned, subsec)),
+        );
+    }
+
+    // SubSecDateTimeOriginal = DateTimeOriginal (0x9003) + SubSecTimeOriginal (0x9291)
+    if let (Some(ExifValue::Ascii(date)), Some(subsec)) =
+        (exif_data.get_tag_by_id(0x9003), &subsec_original)
+    {
+        let cleaned = date.trim_end_matches('\0').trim();
+        output.insert(
+            "SubSecDateTimeOriginal".to_string(),
+            Value::String(format!("{}.{}", cleaned, subsec)),
+        );
+    }
+
+    // SubSecCreateDate = DateTimeDigitized (0x9004) + SubSecTimeDigitized (0x9292)
+    if let (Some(ExifValue::Ascii(date)), Some(subsec)) =
+        (exif_data.get_tag_by_id(0x9004), &subsec_digitized)
+    {
+        let cleaned = date.trim_end_matches('\0').trim();
+        output.insert(
+            "SubSecCreateDate".to_string(),
+            Value::String(format!("{}.{}", cleaned, subsec)),
+        );
+    }
+
     // Add maker notes if present
     // MakerNote tags can override EXIF tags for certain fields where the MakerNote
     // value is more accurate (like MeteringMode for Canon cameras)
@@ -1323,6 +1488,23 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 format!("{:.1} - {:.1} mm", min, max)
             };
             output.insert("Lens".to_string(), Value::String(lens));
+        }
+    }
+
+    // LensSpec composite - generated from Lens + LensType (for Nikon cameras)
+    // Format: "17-55mm f/2.8 G" from Lens="17-55mm f/2.8" and LensType="G"
+    if !output.contains_key("LensSpec") {
+        let lens = output.get("Lens").and_then(|v| v.as_str());
+        let lens_type = output.get("LensType").and_then(|v| v.as_str());
+
+        if let (Some(l), Some(t)) = (lens, lens_type) {
+            // Only add LensType if it's meaningful (not empty)
+            let lens_spec = if t.is_empty() {
+                l.to_string()
+            } else {
+                format!("{} {}", l, t)
+            };
+            output.insert("LensSpec".to_string(), Value::String(lens_spec));
         }
     }
 
@@ -1843,26 +2025,36 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     }
 
     // DOF (Depth of Field) - requires focus distance
+    // Format: "DOF m (near - far m)" or "inf (near m - inf)"
     if !has_dof {
         if let Some(Value::String(s)) = focus_dist_str {
             if let Ok(focus_m) = s.trim_end_matches(" m").parse::<f64>() {
                 if let (Some(fl), Some(ap), Some(c)) = (focal_length, aperture, coc) {
                     let focus_mm = focus_m * 1000.0;
-                    if focus_mm > fl && ap > 0.0 {
-                        let hyper = (fl * fl) / (ap * c) + fl;
-                        let near = (hyper * focus_mm) / (hyper + (focus_mm - fl));
-                        let far = if focus_mm < hyper {
-                            (hyper * focus_mm) / (hyper - (focus_mm - fl))
+                    if ap > 0.0 && focus_mm > 0.0 {
+                        // Edge case: focus < focal_length (physically impossible but matches ExifTool)
+                        // In this case, near and far both equal focus distance, DOF = 0
+                        if focus_mm <= fl {
+                            let formatted = format!("-0.00 m ({:.2} - {:.2} m)", focus_m, focus_m);
+                            output.insert("DOF".to_string(), Value::String(formatted));
                         } else {
-                            f64::INFINITY
-                        };
-                        let dof = far - near;
-                        let formatted = if dof.is_infinite() {
-                            "inf".to_string()
-                        } else {
-                            format!("{:.2} m", dof / 1000.0)
-                        };
-                        output.insert("DOF".to_string(), Value::String(formatted));
+                            let hyper = (fl * fl) / (ap * c) + fl;
+                            let near = (hyper * focus_mm) / (hyper + (focus_mm - fl));
+                            let far = if focus_mm < hyper {
+                                (hyper * focus_mm) / (hyper - (focus_mm - fl))
+                            } else {
+                                f64::INFINITY
+                            };
+                            let dof = far - near;
+                            let near_m = near / 1000.0;
+                            let far_m = far / 1000.0;
+                            let formatted = if dof.is_infinite() {
+                                format!("inf ({:.2} m - inf)", near_m)
+                            } else {
+                                format!("{:.2} m ({:.2} - {:.2} m)", dof / 1000.0, near_m, far_m)
+                            };
+                            output.insert("DOF".to_string(), Value::String(formatted));
+                        }
                     }
                 }
             }

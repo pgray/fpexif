@@ -232,6 +232,11 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
     for (tag_id, value) in exif_data.iter() {
         let tag_name = tag_id.name().unwrap_or("Unknown");
 
+        // Skip 0xA302 (EXIF CFAPattern) - we generate CFAPattern from CFAPattern2 (0x828E)
+        if tag_id.id == 0xA302 {
+            continue;
+        }
+
         // Skip priority tags if they exist in MakerNote (MakerNote value takes precedence)
         if MAKERNOTE_PRIORITY_TAGS.contains(&tag_name) && makernote_tags.contains(tag_name) {
             continue;
@@ -275,6 +280,38 @@ fn print_exif_data_exiftool(exif_data: &ExifData) {
 /// Print computed fields that are aliases or calculated from existing data
 fn print_computed_fields(exif_data: &ExifData) {
     use fpexif::data_types::ExifValue;
+
+    // CFAPattern composite - generated from CFAPattern2 (0x828E) values
+    // ExifTool generates CFAPattern from CFAPattern2, not from 0xA302
+    let pattern_values: Option<Vec<u8>> = exif_data.get_tag_by_id(0x828E).and_then(|v| match v {
+        ExifValue::Byte(b) if b.len() >= 4 => Some(b.clone()),
+        ExifValue::Short(s) if s.len() >= 4 => Some(s.iter().map(|&x| x as u8).collect()),
+        ExifValue::Undefined(u) if u.len() >= 4 => Some(u.clone()),
+        _ => None,
+    });
+
+    if let Some(pattern) = pattern_values {
+        let color_name = |c: u8| -> &'static str {
+            match c {
+                0 => "Red",
+                1 => "Green",
+                2 => "Blue",
+                3 => "Cyan",
+                4 => "Magenta",
+                5 => "Yellow",
+                6 => "White",
+                _ => "Unknown",
+            }
+        };
+        let formatted = format!(
+            "[{},{}][{},{}]",
+            color_name(pattern[0]),
+            color_name(pattern[1]),
+            color_name(pattern[2]),
+            color_name(pattern[3])
+        );
+        println!("{:<32}: {}", "CFAPattern", formatted);
+    }
 
     // ThumbnailOffset - alias for JPEGInterchangeFormat (0x0201)
     if let Some(ExifValue::Long(v)) = exif_data.get_tag_by_id(0x0201) {
@@ -344,6 +381,33 @@ fn print_computed_fields(exif_data: &ExifData) {
         // Megapixels
         let megapixels = (w as f64 * h as f64) / 1_000_000.0;
         println!("{:<32}: {:.1}", "Megapixels", megapixels);
+    }
+
+    // LensSpec composite - generated from Lens + LensType (for Nikon cameras)
+    // Format: "17-55mm f/2.8 G" from Lens="17-55mm f/2.8" and LensType="G"
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        let mut lens: Option<String> = None;
+        let mut lens_type: Option<String> = None;
+
+        for (_, note) in maker_notes.iter() {
+            if let Some(name) = note.tag_name {
+                if name == "Lens" {
+                    if let ExifValue::Ascii(s) = &note.value {
+                        lens = Some(s.trim_end_matches('\0').to_string());
+                    }
+                } else if name == "LensType" {
+                    lens_type = Some(format_exiftool_text_value(&note.value, note.tag_id));
+                }
+            }
+        }
+
+        if let (Some(l), Some(t)) = (lens, lens_type) {
+            if !t.is_empty() {
+                println!("{:<32}: {} {}", "LensSpec", l, t);
+            } else {
+                println!("{:<32}: {}", "LensSpec", l);
+            }
+        }
     }
 
     // RedBalance and BlueBalance from WB_RGGBLevelsAsShot
@@ -551,27 +615,6 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                     0xA405 => format!("{} mm", v[0]),
                     _ => format_values_space(v),
                 }
-            } else if tag_id == 0x828E && v.len() >= 4 {
-                // CFAPattern (TIFF/EP) as Short array - format as [Red,Green][Green,Blue]
-                let color_name = |c: u16| -> &'static str {
-                    match c {
-                        0 => "Red",
-                        1 => "Green",
-                        2 => "Blue",
-                        3 => "Cyan",
-                        4 => "Magenta",
-                        5 => "Yellow",
-                        6 => "White",
-                        _ => "Unknown",
-                    }
-                };
-                format!(
-                    "[{},{}][{},{}]",
-                    color_name(v[0]),
-                    color_name(v[1]),
-                    color_name(v[2]),
-                    color_name(v[3])
-                )
             } else if v.len() == 2 && tag_id == 0x100A {
                 // Fuji WhiteBalanceFineTune - format as "Red +X, Blue +Y"
                 let red = v[0] as i16;
@@ -864,6 +907,48 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                 0xA301 if v.len() == 1 => {
                     // SceneType
                     crate::tags::get_scene_type_description(v[0]).to_string()
+                }
+                0xA302 if v.len() == 8 => {
+                    // CFAPattern (EXIF) - 4-byte header + 4 pattern bytes
+                    // Check for 2x2 pattern (BE or LE)
+                    let horiz_be = u16::from_be_bytes([v[0], v[1]]);
+                    let vert_be = u16::from_be_bytes([v[2], v[3]]);
+                    let color_name = |c: u8| -> &'static str {
+                        match c {
+                            0 => "Red",
+                            1 => "Green",
+                            2 => "Blue",
+                            3 => "Cyan",
+                            4 => "Magenta",
+                            5 => "Yellow",
+                            6 => "White",
+                            _ => "Unknown",
+                        }
+                    };
+                    if horiz_be == 2 && vert_be == 2 {
+                        format!(
+                            "[{},{}][{},{}]",
+                            color_name(v[4]),
+                            color_name(v[5]),
+                            color_name(v[6]),
+                            color_name(v[7])
+                        )
+                    } else {
+                        // Try little-endian
+                        let horiz_le = u16::from_le_bytes([v[0], v[1]]);
+                        let vert_le = u16::from_le_bytes([v[2], v[3]]);
+                        if horiz_le == 2 && vert_le == 2 {
+                            format!(
+                                "[{},{}][{},{}]",
+                                color_name(v[4]),
+                                color_name(v[5]),
+                                color_name(v[6]),
+                                color_name(v[7])
+                            )
+                        } else {
+                            format!("(Binary data {} bytes)", v.len())
+                        }
+                    }
                 }
                 _ => format!("(Binary data {} bytes)", v.len()),
             }

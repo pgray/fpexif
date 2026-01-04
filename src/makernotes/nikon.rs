@@ -534,7 +534,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_SERIAL_NUMBER => Some("SerialNumber"),
         NIKON_COLOR_SPACE => Some("ColorSpace"),
         NIKON_VR_INFO => Some("VRInfo"),
-        NIKON_ACTIVE_D_LIGHTING => Some("ActiveDLighting"),
+        NIKON_ACTIVE_D_LIGHTING => Some("ActiveD-Lighting"),
         NIKON_PICTURE_CONTROL_DATA => Some("PictureControlData"),
         NIKON_VIGNETTE_CONTROL => Some("VignetteControl"),
         NIKON_DISTORTION_CONTROL => Some("DistortionControl"),
@@ -576,12 +576,12 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_IMAGE_STABILIZATION => Some("ImageStabilization"),
         NIKON_AF_RESPONSE => Some("AFResponse"),
         NIKON_SILENT_PHOTOGRAPHY => Some("SilentPhotography"),
-        NIKON_WHITE_BALANCE_FINE => Some("WhiteBalanceFine"),
+        NIKON_WHITE_BALANCE_FINE => Some("WhiteBalanceFineTune"),
         NIKON_PROGRAM_SHIFT => Some("ProgramShift"),
         NIKON_EXPOSURE_DIFFERENCE => Some("ExposureDifference"),
         NIKON_ISO_SELECTION => Some("ISOSelection"),
         NIKON_FLASH_EXPOSURE_COMP => Some("FlashExposureComp"),
-        NIKON_ISO_SETTING_2 => Some("ISO2"),
+        NIKON_ISO_SETTING_2 => Some("ISOSetting"),
         NIKON_IMAGE_BOUNDARY => Some("ImageBoundary"),
         NIKON_EXTERNAL_FLASH_EXPOSURE_COMP => Some("ExternalFlashExposureComp"),
         NIKON_FLASH_EXPOSURE_BRACKET_VALUE => Some("FlashExposureBracketValue"),
@@ -704,7 +704,7 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "9E 40 2D 6A 2C 3C A0 0E" => Some("AF-S DX VR Zoom-Nikkor 18-105mm f/3.5-5.6G ED"),
         "A2 40 2D 53 2C 3C BD 0E" => Some("AF-S DX Nikkor 18-55mm f/3.5-5.6G VR II"),
         "B0 4C 50 50 14 14 B2 06" => Some("AF-S Nikkor 50mm f/1.8G"),
-        "B4 40 37 62 2C 34 B6 0E" => Some("AF-S Nikkor 24-85mm f/3.5-4.5G IF-ED VR"),
+        "B4 40 37 62 2C 34 B6 0E" => Some("AF-S Zoom-Nikkor 24-85mm f/3.5-4.5G IF-ED VR"),
         // Third-party lenses
         "26 40 2D 50 2C 3C 1C 06" => Some("Sigma 18-50mm F3.5-5.6 DC"),
         "26 40 2D 70 2B 3C 1C 06" => Some("Sigma 18-125mm F3.5-5.6 DC"),
@@ -2024,15 +2024,32 @@ fn parse_lens_data(
     }
     // Version 0101: D70, D70s - unencrypted
     else if version == "0101" && data.len() >= 18 {
-        // Different offsets for 0101
-        // Offset 0x09: FocusDistance
-        let focus_dist_raw = data[9];
-        if focus_dist_raw == 0 {
-            tags.push(("FocusDistance".to_string(), "inf".to_string()));
-        } else {
-            let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
-            tags.push(("FocusDistance".to_string(), format!("{:.2} m", focus_dist)));
+        // LensData01 structure
+        // Offset 0x04: ExitPupilPosition
+        let exit_pupil_raw = data[4];
+        if exit_pupil_raw > 0 {
+            let exit_pupil = 2048.0 / exit_pupil_raw as f64;
+            tags.push((
+                "ExitPupilPosition".to_string(),
+                format!("{:.1} mm", exit_pupil),
+            ));
         }
+
+        // Offset 0x05: AFAperture
+        let af_aperture_raw = data[5];
+        let af_aperture = 2.0_f64.powf(af_aperture_raw as f64 / 24.0);
+        tags.push(("AFAperture".to_string(), format!("{:.1}", af_aperture)));
+
+        // Offset 0x08: FocusPosition
+        let focus_pos = data[8];
+        tags.push(("FocusPosition".to_string(), format!("0x{:02x}", focus_pos)));
+
+        // Offset 0x09: FocusDistance
+        // Formula: 0.01 * 10^(val/40) meters
+        // ExifTool: raw=0 gives 0.01m, not infinity
+        let focus_dist_raw = data[9];
+        let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
+        tags.push(("FocusDistance".to_string(), format!("{:.2} m", focus_dist)));
 
         // Offset 0x0b: LensIDNumber
         let lens_id_number = data[11];
@@ -2072,6 +2089,16 @@ fn parse_lens_data(
         let mcu_version = data[17];
         tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
 
+        // Offset 0x12: EffectiveMaxAperture
+        if data.len() >= 19 {
+            let eff_max_ap_raw = data[18];
+            let eff_max_ap = 2.0_f64.powf(eff_max_ap_raw as f64 / 24.0);
+            tags.push((
+                "EffectiveMaxAperture".to_string(),
+                format!("{:.1}", eff_max_ap),
+            ));
+        }
+
         // Store raw bytes for LensID
         lens_id_bytes = Some([
             lens_id_number,
@@ -2094,14 +2121,30 @@ fn parse_lens_data(
             nikon_decrypt(ser, count, &mut decrypted, 4);
 
             // Same offsets as 0101 (LensData01)
-            // Offset 0x09: FocusDistance
-            let focus_dist_raw = decrypted[9];
-            if focus_dist_raw == 0 {
-                tags.push(("FocusDistance".to_string(), "inf".to_string()));
-            } else {
-                let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
-                tags.push(("FocusDistance".to_string(), format!("{:.2} m", focus_dist)));
+            // Offset 0x04: ExitPupilPosition
+            let exit_pupil_raw = decrypted[4];
+            if exit_pupil_raw > 0 {
+                let exit_pupil = 2048.0 / exit_pupil_raw as f64;
+                tags.push((
+                    "ExitPupilPosition".to_string(),
+                    format!("{:.1} mm", exit_pupil),
+                ));
             }
+
+            // Offset 0x05: AFAperture
+            let af_aperture_raw = decrypted[5];
+            let af_aperture = 2.0_f64.powf(af_aperture_raw as f64 / 24.0);
+            tags.push(("AFAperture".to_string(), format!("{:.1}", af_aperture)));
+
+            // Offset 0x08: FocusPosition
+            let focus_pos = decrypted[8];
+            tags.push(("FocusPosition".to_string(), format!("0x{:02x}", focus_pos)));
+
+            // Offset 0x09: FocusDistance
+            // Formula: 0.01 * 10^(val/40) meters
+            let focus_dist_raw = decrypted[9];
+            let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
+            tags.push(("FocusDistance".to_string(), format!("{:.2} m", focus_dist)));
 
             // Offset 0x0b (11): LensIDNumber
             let lens_id_number = decrypted[11];
@@ -2140,6 +2183,16 @@ fn parse_lens_data(
             let mcu_version = decrypted[17];
             tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
 
+            // Offset 0x12 (18): EffectiveMaxAperture
+            if decrypted.len() >= 19 {
+                let eff_max_ap_raw = decrypted[18];
+                let eff_max_ap = 2.0_f64.powf(eff_max_ap_raw as f64 / 24.0);
+                tags.push((
+                    "EffectiveMaxAperture".to_string(),
+                    format!("{:.1}", eff_max_ap),
+                ));
+            }
+
             // Store raw bytes for LensID composite lookup
             lens_id_bytes = Some([
                 lens_id_number,
@@ -2162,15 +2215,31 @@ fn parse_lens_data(
             // Decrypt starting at byte 4 (version string is unencrypted)
             nikon_decrypt(ser, count, &mut decrypted, 4);
 
-            // LensData0204 offsets (shifted by 1 from LensData01):
-            // Offset 0x0a (10): FocusDistance (extra byte at 0x09 in this version)
-            let focus_dist_raw = decrypted[10];
-            if focus_dist_raw == 0 {
-                tags.push(("FocusDistance".to_string(), "inf".to_string()));
-            } else {
-                let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
-                tags.push(("FocusDistance".to_string(), format!("{:.2} m", focus_dist)));
+            // LensData0204 structure:
+            // Offset 0x04: ExitPupilPosition (same as LensData01)
+            let exit_pupil_raw = decrypted[4];
+            if exit_pupil_raw > 0 {
+                let exit_pupil = 2048.0 / exit_pupil_raw as f64;
+                tags.push((
+                    "ExitPupilPosition".to_string(),
+                    format!("{:.1} mm", exit_pupil),
+                ));
             }
+
+            // Offset 0x05: AFAperture (same as LensData01)
+            let af_aperture_raw = decrypted[5];
+            let af_aperture = 2.0_f64.powf(af_aperture_raw as f64 / 24.0);
+            tags.push(("AFAperture".to_string(), format!("{:.1}", af_aperture)));
+
+            // Offset 0x08: FocusPosition (same as LensData01)
+            let focus_pos = decrypted[8];
+            tags.push(("FocusPosition".to_string(), format!("0x{:02x}", focus_pos)));
+
+            // Offset 0x0a (10): FocusDistance (extra byte at 0x09 in this version)
+            // Formula: 0.01 * 10^(val/40) meters
+            let focus_dist_raw = decrypted[10];
+            let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
+            tags.push(("FocusDistance".to_string(), format!("{:.2} m", focus_dist)));
 
             // Offset 0x0c (12): LensIDNumber
             let lens_id_number = decrypted[12];
@@ -2208,6 +2277,16 @@ fn parse_lens_data(
             // Offset 0x12 (18): MCUVersion
             let mcu_version = decrypted[18];
             tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
+
+            // Offset 0x13 (19): EffectiveMaxAperture (shifted by 1 from LensData01)
+            if decrypted.len() >= 20 {
+                let eff_max_ap_raw = decrypted[19];
+                let eff_max_ap = 2.0_f64.powf(eff_max_ap_raw as f64 / 24.0);
+                tags.push((
+                    "EffectiveMaxAperture".to_string(),
+                    format!("{:.1}", eff_max_ap),
+                ));
+            }
 
             // Store raw bytes for LensID composite lookup
             lens_id_bytes = Some([
@@ -2929,6 +3008,7 @@ fn format_lens_info(values: &[(u32, u32)]) -> Option<String> {
 pub fn parse_nikon_maker_notes(
     data: &[u8],
     endian: Endianness,
+    model: Option<&str>,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -3045,6 +3125,8 @@ pub fn parse_nikon_maker_notes(
                 4 => count as usize * 4,  // LONG
                 5 => count as usize * 8,  // RATIONAL
                 7 => count as usize,      // UNDEFINED
+                8 => count as usize * 2,  // SSHORT (signed short)
+                9 => count as usize * 4,  // SLONG (signed long)
                 10 => count as usize * 8, // SRATIONAL
                 _ => 0,
             };
@@ -3096,7 +3178,13 @@ pub fn parse_nikon_maker_notes(
                     // Capture SerialNumber for LensData decryption
                     if tag_id == NIKON_SERIAL_NUMBER {
                         // Try to parse as u32, otherwise use fallback
-                        serial_number = s.trim().parse::<u32>().ok().or(Some(0x60));
+                        // D50 uses 0x22 as fallback, others use 0x60 (per ExifTool)
+                        let fallback = if model.is_some_and(|m| m.contains("D50")) {
+                            0x22
+                        } else {
+                            0x60
+                        };
+                        serial_number = s.trim().parse::<u32>().ok().or(Some(fallback));
                     }
 
                     // Apply value decoders for specific tags
@@ -3385,6 +3473,50 @@ pub fn parse_nikon_maker_notes(
                         _ => ExifValue::Undefined(value_bytes),
                     }
                 }
+                8 => {
+                    // SSHORT (signed short)
+                    let mut values = Vec::new();
+                    let mut cursor = Cursor::new(&value_bytes);
+                    for _ in 0..count {
+                        if let Ok(v) = match maker_endian {
+                            Endianness::Little => cursor.read_i16::<LittleEndian>(),
+                            Endianness::Big => cursor.read_i16::<BigEndian>(),
+                        } {
+                            values.push(v);
+                        } else {
+                            break;
+                        }
+                    }
+                    if values.len() == 1 {
+                        ExifValue::Short(vec![values[0] as u16])
+                    } else {
+                        // Multiple values - format as space-separated
+                        let formatted: Vec<String> = values.iter().map(|v| v.to_string()).collect();
+                        ExifValue::Ascii(formatted.join(" "))
+                    }
+                }
+                9 => {
+                    // SLONG (signed long)
+                    let mut values = Vec::new();
+                    let mut cursor = Cursor::new(&value_bytes);
+                    for _ in 0..count {
+                        if let Ok(v) = match maker_endian {
+                            Endianness::Little => cursor.read_i32::<LittleEndian>(),
+                            Endianness::Big => cursor.read_i32::<BigEndian>(),
+                        } {
+                            values.push(v);
+                        } else {
+                            break;
+                        }
+                    }
+                    if values.len() == 1 {
+                        ExifValue::Long(vec![values[0] as u32])
+                    } else {
+                        // Multiple values - format as space-separated
+                        let formatted: Vec<String> = values.iter().map(|v| v.to_string()).collect();
+                        ExifValue::Ascii(formatted.join(" "))
+                    }
+                }
                 10 => {
                     // SRATIONAL
                     let mut values = Vec::new();
@@ -3415,8 +3547,31 @@ pub fn parse_nikon_maker_notes(
 
             // Skip tags that are better represented by their parsed sub-structure values
             // These tags contain raw/binary data that's decoded from ISOInfo structure
-            if matches!(tag_id, NIKON_ISO_SETTING | NIKON_ISO_SETTING_2) {
+            if matches!(tag_id, NIKON_ISO_SETTING) {
                 continue;
+            }
+
+            // Special formatting for ISOSetting (0x0013) - output only second value
+            // ExifTool: PrintConv => '$_=$val;s/^0 //;$_' (removes leading "0 ")
+            if tag_id == NIKON_ISO_SETTING_2 {
+                if let ExifValue::Short(vals) = &value {
+                    if vals.len() >= 2 && vals[1] != 0 {
+                        tags.insert(
+                            tag_id,
+                            MakerNoteTag {
+                                tag_id,
+                                tag_name: get_nikon_tag_name(tag_id),
+                                value: ExifValue::Short(vec![vals[1]]),
+                            },
+                        );
+                    }
+                    // Skip if values are 0 0 (ExifTool outputs empty string)
+                    continue;
+                }
+                // Skip undefined data (ExifTool outputs empty string for 00 00 00 00)
+                if let ExifValue::Undefined(_) = &value {
+                    continue;
+                }
             }
 
             tags.insert(
@@ -3635,13 +3790,13 @@ pub fn parse_nikon_maker_notes(
                 },
             );
         } else {
-            // If not found in database, output the hex composite ID
+            // If not found in database, output as "Unknown (hex)" to match ExifTool
             tags.insert(
                 0xA003,
                 MakerNoteTag {
                     tag_id: 0xA003,
                     tag_name: Some("LensID"),
-                    value: ExifValue::Ascii(lens_id),
+                    value: ExifValue::Ascii(format!("Unknown ({})", lens_id)),
                 },
             );
         }

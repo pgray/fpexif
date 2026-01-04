@@ -227,12 +227,17 @@ where
                     TagGroup::Main,
                     config,
                 ) {
+                    // Check if this SubIFD is a main image (SubfileType = 0)
+                    // SubfileType 0 = Full-resolution image, 1 = Reduced-resolution (thumbnail)
+                    let is_main_image = subifd_tags.iter().any(|(tid, val)| {
+                        tid.id == 0x00FE
+                            && matches!(val, ExifValue::Long(v) if !v.is_empty() && v[0] == 0)
+                    });
+
                     // Add the SubIFD tags
                     for (tag_id, value) in subifd_tags {
                         // Special handling for Compression tag (0x0103):
-                        // Prefer RAW-specific compression types over generic TIFF types
-                        // This ensures the RAW data compression is preserved when later SubIFDs
-                        // contain preview/thumbnail data with JPEG compression
+                        // Prefer main image (SubfileType=0) Compression over thumbnail
                         if tag_id.id == 0x0103 {
                             // Helper to check if a compression value is RAW-specific
                             let is_raw_compression = |v: u16| {
@@ -249,27 +254,19 @@ where
                                 )
                             };
 
-                            // Check if we already have a RAW-specific compression
-                            let existing_is_raw = exif_data
-                                .get_tag_by_id(0x0103)
-                                .map(|existing| {
-                                    if let ExifValue::Short(vals) = existing {
-                                        !vals.is_empty() && is_raw_compression(vals[0])
-                                    } else {
-                                        false
-                                    }
-                                })
-                                .unwrap_or(false);
-
-                            // Check if the new value is RAW-specific
+                            // Check if new value is RAW-specific
                             let new_is_raw = if let ExifValue::Short(vals) = &value {
                                 !vals.is_empty() && is_raw_compression(vals[0])
                             } else {
                                 false
                             };
 
-                            // Skip if existing is RAW and new is not
-                            if existing_is_raw && !new_is_raw {
+                            // Allow override if: RAW-specific, or this is a main image SubIFD
+                            // Otherwise skip to preserve IFD0's Compression
+                            if !new_is_raw
+                                && !is_main_image
+                                && exif_data.get_tag_by_id(0x0103).is_some()
+                            {
                                 continue;
                             }
                         }
