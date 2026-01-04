@@ -184,6 +184,49 @@
             padding: 20px;
             color: #666;
         }
+        .jpeg-section {
+            margin-top: 20px;
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .jpeg-section h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.1em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .jpeg-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .jpeg-item {
+            border: 1px solid #eee;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .jpeg-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .jpeg-info {
+            padding: 10px;
+            background: #f9f9f9;
+            font-size: 0.85em;
+            color: #666;
+        }
+        .jpeg-info strong {
+            color: #333;
+        }
+        .no-jpegs {
+            color: #999;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -199,7 +242,7 @@
     <div id="results"></div>
 
     <script type="module">
-        import init, { parse_exif, parse_exif_json, version } from './pkg/fpexif.js';
+        import init, { parse_exif, parse_exif_json, version, list_jpegs, extract_preview, extract_thumbnail } from './pkg/fpexif.js';
 
         let wasmReady = false;
 
@@ -338,6 +381,65 @@
                         </div>
                     </div>
                 `;
+
+                // Try to extract embedded JPEGs
+                try {
+                    const jpegListJson = list_jpegs(data);
+                    const jpegList = JSON.parse(jpegListJson);
+
+                    if (jpegList.length > 0) {
+                        html += `<div class="jpeg-section"><h2>Embedded JPEGs (${jpegList.length} found)</h2><div class="jpeg-grid">`;
+
+                        // Extract preview (largest)
+                        try {
+                            const previewData = extract_preview(data);
+                            const previewBlob = new Blob([previewData], { type: 'image/jpeg' });
+                            const previewUrl = URL.createObjectURL(previewBlob);
+                            const previewInfo = jpegList.reduce((a, b) => a.length > b.length ? a : b);
+                            html += `
+                                <div class="jpeg-item">
+                                    <img src="${previewUrl}" alt="Preview">
+                                    <div class="jpeg-info">
+                                        <strong>Preview</strong> (largest)<br>
+                                        ${previewInfo.description}<br>
+                                        ${(previewInfo.length / 1024).toFixed(1)} KB
+                                        ${previewInfo.width ? ` - ${previewInfo.width}x${previewInfo.height}` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        } catch (e) {
+                            console.log('No preview:', e);
+                        }
+
+                        // Extract thumbnail (smallest) if different from preview
+                        if (jpegList.length > 1) {
+                            try {
+                                const thumbData = extract_thumbnail(data);
+                                const thumbBlob = new Blob([thumbData], { type: 'image/jpeg' });
+                                const thumbUrl = URL.createObjectURL(thumbBlob);
+                                const thumbInfo = jpegList.reduce((a, b) => a.length < b.length ? a : b);
+                                html += `
+                                    <div class="jpeg-item">
+                                        <img src="${thumbUrl}" alt="Thumbnail">
+                                        <div class="jpeg-info">
+                                            <strong>Thumbnail</strong> (smallest)<br>
+                                            ${thumbInfo.description}<br>
+                                            ${(thumbInfo.length / 1024).toFixed(1)} KB
+                                            ${thumbInfo.width ? ` - ${thumbInfo.width}x${thumbInfo.height}` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            } catch (e) {
+                                console.log('No thumbnail:', e);
+                            }
+                        }
+
+                        html += `</div></div>`;
+                    }
+                } catch (e) {
+                    // No embedded JPEGs or extraction failed - that's ok
+                    console.log('JPEG extraction:', e);
+                }
 
                 resultsDiv.innerHTML = html;
 
