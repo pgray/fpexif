@@ -1567,5 +1567,172 @@ pub fn parse_panasonic_maker_notes(
         }
     }
 
+    // Post-processing: Compute composite AdvancedSceneMode from SceneMode and AdvancedSceneType
+    // ExifTool's AdvancedSceneMode is derived from these two tags
+    if let (Some(scene_mode_tag), Some(adv_type_tag)) = (
+        tags.get(&PANA_SCENE_MODE),
+        tags.get(&PANA_ADVANCED_SCENE_MODE),
+    ) {
+        // Get the SceneMode value (either decoded string or raw value)
+        let scene_mode_val = match &scene_mode_tag.value {
+            ExifValue::Short(v) if !v.is_empty() => Some(v[0]),
+            ExifValue::Ascii(s) => {
+                // Try to reverse-lookup the scene mode from its decoded string
+                // For now, check known decoded values
+                match s.as_str() {
+                    "Off" => Some(0),
+                    "Normal" => Some(1),
+                    "Portrait" => Some(2),
+                    "Scenery" => Some(3),
+                    "Sports" => Some(4),
+                    "Night Portrait" => Some(5),
+                    "Program" => Some(6),
+                    "Aperture Priority" => Some(7),
+                    "Shutter Priority" => Some(8),
+                    "Macro" => Some(9),
+                    "Spot" => Some(10),
+                    "Manual" => Some(11),
+                    "Movie Preview" => Some(12),
+                    "Panning" => Some(13),
+                    "Simple" => Some(14),
+                    "Color Effects" => Some(15),
+                    "Self Portrait" => Some(16),
+                    "Economy" => Some(17),
+                    "Fireworks" => Some(18),
+                    "Party" => Some(19),
+                    "Snow" => Some(20),
+                    "Night Scenery" => Some(21),
+                    "Food" => Some(22),
+                    "Baby" => Some(23),
+                    "Soft Skin" => Some(24),
+                    "Candlelight" => Some(25),
+                    "Starry Night" => Some(26),
+                    "High Sensitivity" => Some(27),
+                    "Panorama Assist" => Some(28),
+                    "Underwater" => Some(29),
+                    "Beach" => Some(30),
+                    "Aerial Photo" => Some(31),
+                    "Sunset" => Some(32),
+                    "Pet" => Some(33),
+                    "Intelligent ISO" => Some(34),
+                    "Clipboard" => Some(35),
+                    "High Speed Continuous Shooting" => Some(36),
+                    "Intelligent Auto" => Some(37),
+                    "Multi-aspect" => Some(39),
+                    "Transform" => Some(41),
+                    "Flash Burst" => Some(42),
+                    "Pin Hole" => Some(43),
+                    "Film Grain" => Some(44),
+                    "My Color" => Some(45),
+                    "Photo Frame" => Some(46),
+                    "HDR" => Some(51),
+                    "Handheld Night Shot" => Some(55),
+                    "3D" => Some(57),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+
+        let adv_type_val = match &adv_type_tag.value {
+            ExifValue::Short(v) if !v.is_empty() => Some(v[0]),
+            _ => None,
+        };
+
+        if let (Some(scene), Some(adv_type)) = (scene_mode_val, adv_type_val) {
+            let composite_value = compute_advanced_scene_mode(scene, adv_type);
+            // Update the AdvancedSceneMode tag with the computed composite value
+            tags.insert(
+                PANA_ADVANCED_SCENE_MODE,
+                MakerNoteTag {
+                    tag_id: PANA_ADVANCED_SCENE_MODE,
+                    tag_name: Some("AdvancedSceneMode"),
+                    value: ExifValue::Ascii(composite_value),
+                },
+            );
+        }
+    }
+
     Ok(tags)
+}
+
+/// Compute the composite AdvancedSceneMode from SceneMode and AdvancedSceneType
+/// Based on ExifTool's Panasonic.pm composite tag logic
+fn compute_advanced_scene_mode(scene_mode: u16, adv_type: u16) -> String {
+    // First check specific (SceneMode, AdvancedType) pairs
+    match (scene_mode, adv_type) {
+        (0, 1) => return "Off".to_string(),
+        (2, 2) => return "Outdoor Portrait".to_string(),
+        (2, 3) => return "Indoor Portrait".to_string(),
+        (2, 4) => return "Creative Portrait".to_string(),
+        (3, 2) => return "Nature".to_string(),
+        (3, 3) => return "Architecture".to_string(),
+        (3, 4) => return "Creative Scenery".to_string(),
+        (4, 2) => return "Outdoor Sports".to_string(),
+        (4, 3) => return "Indoor Sports".to_string(),
+        (4, 4) => return "Creative Sports".to_string(),
+        (9, 2) => return "Flower".to_string(),
+        (9, 3) => return "Objects".to_string(),
+        (9, 4) => return "Creative Macro".to_string(),
+        (18, 1) => return "High Sensitivity".to_string(),
+        (20, 1) => return "Fireworks".to_string(),
+        (21, 2) => return "Illuminations".to_string(),
+        (21, 4) => return "Creative Night Scenery".to_string(),
+        (26, 1) => return "High-speed Burst (shot 1)".to_string(),
+        (27, 1) => return "High-speed Burst (shot 2)".to_string(),
+        (29, 1) => return "Snow".to_string(),
+        (30, 1) => return "Starry Sky".to_string(),
+        (31, 1) => return "Beach".to_string(),
+        (36, 1) => return "High-speed Burst (shot 3)".to_string(),
+        (39, 1) => return "Aerial Photo / Underwater / Multi-aspect".to_string(),
+        (45, 2) => return "Cinema".to_string(),
+        (45, 7) => return "Expressive".to_string(),
+        (45, 8) => return "Retro".to_string(),
+        (45, 9) => return "Pure".to_string(),
+        (45, 10) => return "Elegant".to_string(),
+        (45, 12) => return "Monochrome".to_string(),
+        (45, 13) => return "Dynamic Art".to_string(),
+        (45, 14) => return "Silhouette".to_string(),
+        (51, 2) => return "HDR Art".to_string(),
+        (51, 3) => return "HDR B&W".to_string(),
+        (59, 1) => return "Expressive".to_string(),
+        (59, 2) => return "Retro".to_string(),
+        (59, 3) => return "High Key".to_string(),
+        (59, 4) => return "Sepia".to_string(),
+        (59, 5) => return "High Dynamic".to_string(),
+        (59, 6) => return "Miniature".to_string(),
+        (59, 9) => return "Low Key".to_string(),
+        (59, 10) => return "Toy Effect".to_string(),
+        (59, 11) => return "Dynamic Monochrome".to_string(),
+        (59, 12) => return "Soft".to_string(),
+        (66, 1) => return "Impressive Art".to_string(),
+        (66, 2) => return "Cross Process".to_string(),
+        (66, 3) => return "Color Select".to_string(),
+        (66, 4) => return "Star".to_string(),
+        (90, 3) => return "Old Days".to_string(),
+        (90, 4) => return "Sunshine".to_string(),
+        (90, 5) => return "Bleach Bypass".to_string(),
+        (90, 6) => return "Toy Pop".to_string(),
+        (90, 7) => return "Fantasy".to_string(),
+        (90, 8) => return "Monochrome".to_string(),
+        (90, 9) => return "Rough Monochrome".to_string(),
+        (90, 10) => return "Silky Monochrome".to_string(),
+        (92, 1) => return "Handheld Night Shot".to_string(),
+        _ => {}
+    }
+
+    // If no specific pair matches, use the generic logic
+    let scene_name = decode_scene_mode_exiftool(scene_mode);
+    if scene_name != "Unknown" && scene_name != "Off" {
+        if adv_type == 1 {
+            return scene_name.to_string();
+        } else if adv_type == 5 {
+            return format!("{} (intelligent auto)", scene_name);
+        } else if adv_type == 7 {
+            return format!("{} (intelligent auto plus)", scene_name);
+        }
+    }
+
+    // Fallback
+    format!("Unknown ({} {})", scene_mode, adv_type)
 }

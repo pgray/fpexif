@@ -1393,9 +1393,41 @@ fn parse_olympus_ifd(
                             value
                         }
                     }
+                    OLYMPUS_FOCAL_PLANE_DIAGONAL => {
+                        // FocalPlaneDiagonal: add " mm" suffix
+                        match &value {
+                            ExifValue::Rational(vals) if !vals.is_empty() => {
+                                let (num, denom) = vals[0];
+                                if denom != 0 {
+                                    let v = num as f64 / denom as f64;
+                                    // Format without trailing zeros (ExifTool style)
+                                    let formatted = format!("{:.2}", v);
+                                    let formatted =
+                                        formatted.trim_end_matches('0').trim_end_matches('.');
+                                    ExifValue::Ascii(format!("{} mm", formatted))
+                                } else {
+                                    value
+                                }
+                            }
+                            _ => value,
+                        }
+                    }
                     _ => value,
                 },
                 OlympusIfdType::Equipment => match tag_id {
+                    EQUIP_VERSION => {
+                        // Version is 4 bytes of ASCII that should be displayed as string
+                        if let ExifValue::Undefined(bytes) = &value {
+                            let s: String = bytes
+                                .iter()
+                                .take_while(|&&b| b != 0)
+                                .map(|&b| b as char)
+                                .collect();
+                            ExifValue::Ascii(s)
+                        } else {
+                            value
+                        }
+                    }
                     EQUIP_EXTENDER => {
                         // Extender: 6 int8u values - decode as "None" if all zeros
                         // Can be stored as Byte (u8) or Short (u16) depending on parser
@@ -1421,9 +1453,41 @@ fn parse_olympus_ifd(
                             _ => value,
                         }
                     }
+                    EQUIP_FOCAL_PLANE_DIAGONAL => {
+                        // FocalPlaneDiagonal: add " mm" suffix
+                        match &value {
+                            ExifValue::Rational(vals) if !vals.is_empty() => {
+                                let (num, denom) = vals[0];
+                                if denom != 0 {
+                                    let v = num as f64 / denom as f64;
+                                    // Format without trailing zeros (ExifTool style)
+                                    let formatted = format!("{:.2}", v);
+                                    let formatted =
+                                        formatted.trim_end_matches('0').trim_end_matches('.');
+                                    ExifValue::Ascii(format!("{} mm", formatted))
+                                } else {
+                                    value
+                                }
+                            }
+                            _ => value,
+                        }
+                    }
                     _ => value,
                 },
                 OlympusIfdType::CameraSettings => match tag_id {
+                    CS_VERSION => {
+                        // Version is 4 bytes of ASCII that should be displayed as string
+                        if let ExifValue::Undefined(bytes) = &value {
+                            let s: String = bytes
+                                .iter()
+                                .take_while(|&&b| b != 0)
+                                .map(|&b| b as char)
+                                .collect();
+                            ExifValue::Ascii(s)
+                        } else {
+                            value
+                        }
+                    }
                     CS_EXPOSURE_MODE => {
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
@@ -1636,6 +1700,19 @@ fn parse_olympus_ifd(
                     _ => value,
                 },
                 OlympusIfdType::RawDevelopment => match tag_id {
+                    RD_VERSION => {
+                        // Version is 4 bytes of ASCII that should be displayed as string
+                        if let ExifValue::Undefined(bytes) = &value {
+                            let s: String = bytes
+                                .iter()
+                                .take_while(|&&b| b != 0)
+                                .map(|&b| b as char)
+                                .collect();
+                            ExifValue::Ascii(s)
+                        } else {
+                            value
+                        }
+                    }
                     RD_COLOR_SPACE => {
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
@@ -1691,6 +1768,19 @@ fn parse_olympus_ifd(
                     _ => value,
                 },
                 OlympusIfdType::ImageProcessing => match tag_id {
+                    IP_VERSION => {
+                        // Version is 4 bytes of ASCII that should be displayed as string
+                        if let ExifValue::Undefined(bytes) = &value {
+                            let s: String = bytes
+                                .iter()
+                                .take_while(|&&b| b != 0)
+                                .map(|&b| b as char)
+                                .collect();
+                            ExifValue::Ascii(s)
+                        } else {
+                            value
+                        }
+                    }
                     IP_MULTIPLE_EXPOSURE_MODE => {
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
@@ -1719,7 +1809,69 @@ fn parse_olympus_ifd(
                     }
                     _ => value,
                 },
-                _ => value,
+                OlympusIfdType::FocusInfo => match tag_id {
+                    FI_VERSION => {
+                        // Version is 4 bytes of ASCII that should be displayed as string
+                        if let ExifValue::Undefined(bytes) = &value {
+                            let s: String = bytes
+                                .iter()
+                                .take_while(|&&b| b != 0)
+                                .map(|&b| b as char)
+                                .collect();
+                            ExifValue::Ascii(s)
+                        } else {
+                            value
+                        }
+                    }
+                    FI_FOCUS_DISTANCE => {
+                        // FocusDistance: stored as rational64u but ExifTool reads as int32u[2]
+                        // ExifTool: Format => 'int32u', Count => 2
+                        // ValueConv => 'my ($a,$b) = split " ",$val; return 0 if $a == 0xffffffff; return $a / 1000;'
+                        // PrintConv => '$val ? "$val m" : "inf"'
+                        // The conversion only uses the first value (numerator in mm) / 1000 for meters
+                        match &value {
+                            ExifValue::Rational(vals) if !vals.is_empty() => {
+                                // Rational stores (numerator, denominator)
+                                // ExifTool just uses numerator / 1000, ignoring denominator
+                                let (num, _) = vals[0];
+                                if num == 0xFFFFFFFF {
+                                    ExifValue::Ascii("inf".to_string())
+                                } else {
+                                    let v = num as f64 / 1000.0;
+                                    if v == 0.0 {
+                                        ExifValue::Ascii("inf".to_string())
+                                    } else {
+                                        // Format without trailing zeros (ExifTool style)
+                                        let formatted = format!("{:.2}", v);
+                                        let formatted =
+                                            formatted.trim_end_matches('0').trim_end_matches('.');
+                                        ExifValue::Ascii(format!("{} m", formatted))
+                                    }
+                                }
+                            }
+                            ExifValue::Long(vals) if !vals.is_empty() => {
+                                // Format: int32u[2] - just use first value / 1000
+                                let num = vals[0];
+                                if num == 0xFFFFFFFF {
+                                    ExifValue::Ascii("inf".to_string())
+                                } else {
+                                    let v = num as f64 / 1000.0;
+                                    if v == 0.0 {
+                                        ExifValue::Ascii("inf".to_string())
+                                    } else {
+                                        // Format without trailing zeros (ExifTool style)
+                                        let formatted = format!("{:.2}", v);
+                                        let formatted =
+                                            formatted.trim_end_matches('0').trim_end_matches('.');
+                                        ExifValue::Ascii(format!("{} m", formatted))
+                                    }
+                                }
+                            }
+                            _ => value,
+                        }
+                    }
+                    _ => value,
+                },
             };
 
             tags.insert(

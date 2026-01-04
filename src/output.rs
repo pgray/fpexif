@@ -39,9 +39,25 @@ fn round_half_even(x: f64, decimals: i32) -> f64 {
 /// Format EXIF MeteringMode - use manufacturer-specific naming where appropriate
 #[cfg(feature = "serde")]
 fn format_metering_mode(value: u16, make: Option<&str>) -> String {
-    // Olympus uses "ESP" (Electro-Selective Pattern) instead of "Multi-segment"
     if let Some(m) = make {
-        if m.to_uppercase().contains("OLYMPUS") || m.to_uppercase().contains("OM DIGITAL") {
+        let make_upper = m.to_uppercase();
+        // Canon uses "Evaluative" instead of "Multi-segment", "Default" instead of "Unknown"
+        if make_upper.contains("CANON") {
+            return match value {
+                0 => "Default",
+                1 => "Average",
+                2 => "Center-weighted average",
+                3 => "Spot",
+                4 => "Multi-spot",
+                5 => "Evaluative",
+                6 => "Partial",
+                255 => "Other",
+                _ => "Unknown",
+            }
+            .to_string();
+        }
+        // Olympus uses "ESP" (Electro-Selective Pattern) instead of "Multi-segment"
+        if make_upper.contains("OLYMPUS") || make_upper.contains("OM DIGITAL") {
             return match value {
                 0 => "Unknown",
                 1 => "Average",
@@ -1469,7 +1485,22 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         } else {
             // Nikon and others: Use LensModel if available
             if let Some(lens_model) = output.get("LensModel").cloned() {
-                output.insert("LensID".to_string(), lens_model);
+                // Fujifilm: Add space before F followed by digit (e.g., "XF55-200mmF3.5" -> "XF55-200mm F3.5")
+                let is_fuji = make_ref
+                    .map(|m| m.to_uppercase().contains("FUJI"))
+                    .unwrap_or(false);
+                let lens_id = if is_fuji {
+                    if let Value::String(s) = &lens_model {
+                        // Insert space before F followed by digit if not already present
+                        let fixed = s.replace("mmF", "mm F").replace("MMF", "MM F");
+                        Value::String(fixed)
+                    } else {
+                        lens_model
+                    }
+                } else {
+                    lens_model
+                };
+                output.insert("LensID".to_string(), lens_id);
             } else if let Some(lens_type) = output.get("LensType").cloned() {
                 output.insert("LensID".to_string(), lens_type);
             }

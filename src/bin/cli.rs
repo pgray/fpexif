@@ -718,7 +718,17 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
             if cleaned.is_empty() {
                 String::new()
             } else {
-                cleaned.to_string()
+                // InteropIndex (0x0001) - add description suffix
+                if tag_id == 0x0001 {
+                    match cleaned {
+                        "R98" => "R98 - DCF basic file (sRGB)".to_string(),
+                        "THM" => "THM - DCF thumbnail file".to_string(),
+                        "R03" => "R03 - DCF option file (Adobe RGB)".to_string(),
+                        _ => cleaned.to_string(),
+                    }
+                } else {
+                    cleaned.to_string()
+                }
             }
         }
         ExifValue::Byte(v) => {
@@ -733,6 +743,8 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
             // Use tag-specific descriptions for known tags
             if v.len() == 1 {
                 match tag_id {
+                    0x0106 => tags::get_photometric_interpretation_description(v[0]).to_string(),
+                    0x011C => tags::get_planar_configuration_description(v[0]).to_string(),
                     0x0112 => tags::get_orientation_description(v[0]).to_string(),
                     0x0103 => tags::get_compression_description(v[0]).to_string(),
                     0x0128 => tags::get_resolution_unit_description(v[0]).to_string(),
@@ -1005,8 +1017,8 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
         ExifValue::Undefined(v) => {
             // Handle UserComment and other undefined tags
             match tag_id {
-                0x9000 | 0xA000 => {
-                    // ExifVersion (0x9000), FlashpixVersion (0xA000) - decode as ASCII
+                0x0002 | 0x9000 | 0xA000 => {
+                    // InteropVersion (0x0002), ExifVersion (0x9000), FlashpixVersion (0xA000)
                     // Stored as 4 bytes like "0221" or "0100"
                     String::from_utf8(v.to_vec())
                         .ok()

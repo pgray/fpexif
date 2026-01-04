@@ -1445,8 +1445,8 @@ pub fn decode_auto_portrait_framed_exiftool(value: u16) -> &'static str {
     decode_auto_portrait_framed_exiv2(value)
 }
 
-/// Decode AFIlluminator value (tag 0xB044) - exiv2 format
-pub fn decode_af_illuminator_exiv2(value: u16) -> &'static str {
+/// Decode AFIlluminator value (tag 0xB044) - exiftool format
+pub fn decode_af_illuminator_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Auto",
@@ -1455,8 +1455,13 @@ pub fn decode_af_illuminator_exiv2(value: u16) -> &'static str {
     }
 }
 
-/// Decode Macro value (tag 0xB040) - exiv2 format
-pub fn decode_macro_exiv2(value: u16) -> &'static str {
+/// Decode AFIlluminator value (tag 0xB044) - exiv2 format
+pub fn decode_af_illuminator_exiv2(value: u16) -> &'static str {
+    decode_af_illuminator_exiftool(value)
+}
+
+/// Decode Macro value (tag 0xB040) - exiftool format
+pub fn decode_macro_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "On",
@@ -1464,6 +1469,11 @@ pub fn decode_macro_exiv2(value: u16) -> &'static str {
         0xffff => "n/a",
         _ => "Unknown",
     }
+}
+
+/// Decode Macro value (tag 0xB040) - exiv2 format
+pub fn decode_macro_exiv2(value: u16) -> &'static str {
+    decode_macro_exiftool(value)
 }
 
 /// Decode DynamicRangeOptimizer2 value (tag 0xB04F) - exiv2 format
@@ -1993,7 +2003,17 @@ fn parse_ifd_entry(
                 .take_while(|&&b| b != 0)
                 .map(|&b| b as char)
                 .collect::<String>();
-            ExifValue::Ascii(s)
+            // Transform CreativeStyle ASCII values to match ExifTool naming
+            if tag_id == SONY_CREATIVE_STYLE {
+                let transformed = match s.as_str() {
+                    "Autumnleaves" => "Autumn Leaves".to_string(),
+                    "BW" => "B&W".to_string(),
+                    _ => s,
+                };
+                ExifValue::Ascii(transformed)
+            } else {
+                ExifValue::Ascii(s)
+            }
         }
         3 | 8 => {
             // SHORT or SSHORT
@@ -2081,6 +2101,8 @@ fn parse_ifd_entry(
                         }
                     }
                     SONY_SEQUENCE_NUMBER => Some(decode_sequence_number_exiftool(v)),
+                    SONY_MACRO => Some(decode_macro_exiftool(v).to_string()),
+                    SONY_AF_ILLUMINATOR => Some(decode_af_illuminator_exiftool(v).to_string()),
                     _ => None,
                 };
 
