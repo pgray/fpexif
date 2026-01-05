@@ -557,26 +557,36 @@ pub fn decode_special_mode(values: &[u32]) -> String {
     format!("{}, Sequence: {}, Panorama: {}", mode, values[1], panorama)
 }
 
-/// Decode FlashMode value (CS 0x0400) - ExifTool format (bitmask)
+/// Decode FlashMode value (CS/FI 0x0400) - ExifTool format (bitmask)
+/// BITMASK: bit0=On, bit1=Fill-in, bit2=Red-eye, bit3=Slow-sync, bit4=Forced On, bit5=2nd Curtain
 /// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
-    match value {
-        0 => "Off",
-        1 => "On",
-        2 => "Fill-in",
-        3 => "On, Fill-in",
-        4 => "Red-eye",
-        8 => "Slow-sync",
-        16 => "Forced On",
-        32 => "2nd Curtain",
-        _ => {
-            // Bitmask combinations - return simple description
-            if value & 1 != 0 {
-                "On"
-            } else {
-                "Unknown"
-            }
-        }
+pub fn decode_flash_mode_exiftool(value: u16) -> String {
+    if value == 0 {
+        return "Off".to_string();
+    }
+    let mut parts: Vec<&str> = Vec::new();
+    if value & 0x01 != 0 {
+        parts.push("On");
+    }
+    if value & 0x02 != 0 {
+        parts.push("Fill-in");
+    }
+    if value & 0x04 != 0 {
+        parts.push("Red-eye");
+    }
+    if value & 0x08 != 0 {
+        parts.push("Slow-sync");
+    }
+    if value & 0x10 != 0 {
+        parts.push("Forced On");
+    }
+    if value & 0x20 != 0 {
+        parts.push("2nd Curtain");
+    }
+    if parts.is_empty() {
+        format!("Unknown ({})", value)
+    } else {
+        parts.join(", ")
     }
 }
 // decode_flash_mode_exiv2 - same as exiftool, no separate function needed
@@ -2494,12 +2504,41 @@ fn parse_olympus_ifd(
                         }
                     }
                     CS_AF_AREAS => {
-                        // AFAreas: int32u[64], if all zeros output "none"
+                        // AFAreas: int32u[64], decode to coordinate format
+                        // Each non-zero int32u encodes 4 bytes: (x1, y1, x2, y2) in big-endian
+                        // Special values have names: 0x36794285=Left, 0x79798585=Center, 0xBD79C985=Right
                         if let ExifValue::Long(vals) = &value {
                             if vals.iter().all(|&v| v == 0) {
                                 ExifValue::Ascii("none".to_string())
                             } else {
-                                value
+                                let mut parts: Vec<String> = Vec::new();
+                                for &v in vals {
+                                    if v == 0 {
+                                        continue;
+                                    }
+                                    let x1 = ((v >> 24) & 0xFF) as u8;
+                                    let y1 = ((v >> 16) & 0xFF) as u8;
+                                    let x2 = ((v >> 8) & 0xFF) as u8;
+                                    let y2 = (v & 0xFF) as u8;
+                                    let coords = format!("({},{})-({},{})", x1, y1, x2, y2);
+                                    // Check for special named AF points
+                                    let name = match v {
+                                        0x36794285 => Some("Left"),
+                                        0x79798585 => Some("Center"),
+                                        0xBD79C985 => Some("Right"),
+                                        _ => None,
+                                    };
+                                    if let Some(n) = name {
+                                        parts.push(format!("{} {}", n, coords));
+                                    } else {
+                                        parts.push(coords);
+                                    }
+                                }
+                                if parts.is_empty() {
+                                    ExifValue::Ascii("none".to_string())
+                                } else {
+                                    ExifValue::Ascii(parts.join(", "))
+                                }
                             }
                         } else {
                             value
@@ -2545,7 +2584,7 @@ fn parse_olympus_ifd(
                     CS_FLASH_MODE => {
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                ExifValue::Ascii(decode_flash_mode_exiftool(vals[0]).to_string())
+                                ExifValue::Ascii(decode_flash_mode_exiftool(vals[0]))
                             } else {
                                 value
                             }

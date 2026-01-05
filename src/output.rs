@@ -2147,6 +2147,8 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         "CRWParam",
         "MeasuredColor",
         "PersonalFunctionValues",
+        // Olympus binary tags (ExifTool marks as Binary with variable byte counts)
+        "FaceDetectArea",
     ];
 
     // Remove all the static tags
