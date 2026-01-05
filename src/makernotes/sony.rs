@@ -491,6 +491,14 @@ fn read_u32(data: &[u8], endian: Endianness) -> u32 {
     }
 }
 
+/// Read i32 with given endianness
+fn read_i32(data: &[u8], endian: Endianness) -> i32 {
+    match endian {
+        Endianness::Little => i32::from_le_bytes([data[0], data[1], data[2], data[3]]),
+        Endianness::Big => i32::from_be_bytes([data[0], data[1], data[2], data[3]]),
+    }
+}
+
 /// Decipher Sony encrypted data (Tag9050, Tag2010, Tag94xx)
 /// Sony uses a simple substitution cipher based on cubic modular arithmetic
 /// Reference: exiv2/src/sonymn_int.cpp sonyTagCipher()
@@ -2234,8 +2242,8 @@ fn parse_ifd_entry(
                 ExifValue::Long(values)
             }
         }
-        5 | 10 => {
-            // RATIONAL or SRATIONAL
+        5 => {
+            // RATIONAL (unsigned)
             let mut values = Vec::with_capacity(count);
             for i in 0..count {
                 if i * 8 + 8 <= value_data.len() {
@@ -2245,6 +2253,18 @@ fn parse_ifd_entry(
                 }
             }
             ExifValue::Rational(values)
+        }
+        10 => {
+            // SRATIONAL (signed)
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 8 + 8 <= value_data.len() {
+                    let num = read_i32(&value_data[i * 8..], endian);
+                    let den = read_i32(&value_data[i * 8 + 4..], endian);
+                    values.push((num, den));
+                }
+            }
+            ExifValue::SRational(values)
         }
         7 => {
             // UNDEFINED

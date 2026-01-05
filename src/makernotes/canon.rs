@@ -657,7 +657,7 @@ pub fn get_canon_lens_name(lens_id: u16) -> Option<&'static str> {
         214 => Some("Canon EF-S 18-55mm f/3.5-5.6 USM"),
         215 => Some("Canon EF 55-200mm f/4.5-5.6 II USM"),
         217 => Some("Canon EF 35-80mm f/4-5.6 III"),
-        224 => Some("Canon EF 70-200mm f/2.8L IS II USM"),
+        224 => Some("Canon EF 70-200mm f/2.8L IS USM"),
         225 => Some("Canon EF 70-200mm f/2.8L IS III USM"),
         226 => Some("Canon EF 28-90mm f/4-5.6 III"),
         227 => Some("Canon EF-S 55-250mm f/4-5.6 IS STM"),
@@ -1282,6 +1282,7 @@ define_tag_decoder! {
 
 // FlashMode: Canon.pm PrintConv / canonmn_int.cpp canonCsFlashMode
 // Note: ExifTool uses "Off" for value 0 per actual -j output
+// Note: 65535 (-1 as signed) means "n/a" for EOS M MOV video etc.
 define_tag_decoder! {
     flash_mode,
     exiftool: {
@@ -1290,9 +1291,10 @@ define_tag_decoder! {
         2 => "On",
         3 => "Red-eye reduction",
         4 => "Slow-sync",
-        5 => "Auto + Red-eye reduction",
-        6 => "On + Red-eye reduction",
+        5 => "Red-eye reduction (Auto)",
+        6 => "Red-eye reduction (On)",
         16 => "External flash",
+        65535 => "n/a",
     },
     exiv2: {
         0 => "Off",
@@ -1303,6 +1305,7 @@ define_tag_decoder! {
         5 => "Auto + red-eye",
         6 => "On + red-eye",
         16 => "External",
+        65535 => "n/a",
     }
 }
 
@@ -2828,10 +2831,11 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
             if bits & 0x0010 != 0 {
                 descriptions.push("FP sync enabled");
             }
-            if bits & 0x0080 != 0 {
+            if bits & 0x4000 != 0 {
                 descriptions.push("External");
-            } else if bits & 0x0040 != 0 {
-                descriptions.push("Internal");
+            }
+            if bits & 0x2000 != 0 {
+                descriptions.push("Built-in");
             }
             if descriptions.is_empty() {
                 format!("Unknown (0x{:04x})", bits)
@@ -3259,10 +3263,11 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
             if bits & 0x0010 != 0 {
                 descriptions.push("FP sync enabled");
             }
-            if bits & 0x0080 != 0 {
+            if bits & 0x4000 != 0 {
                 descriptions.push("External");
-            } else if bits & 0x0040 != 0 {
-                descriptions.push("Internal");
+            }
+            if bits & 0x2000 != 0 {
+                descriptions.push("Built-in");
             }
             if descriptions.is_empty() {
                 format!("Unknown (0x{:04x})", bits)
@@ -5308,25 +5313,14 @@ pub fn decode_af_micro_adj(data: &[u16]) -> HashMap<String, ExifValue> {
         );
 
         // AFMicroAdjValue (index 2)
+        // Note: ExifTool's AFMicroadjustment composite comes from CanonCustom (0x0507),
+        // not from this tag (0x4013), so we don't generate the composite here.
         if data.len() > 2 {
             let value = data[2] as i16;
             decoded.insert(
                 "AFMicroAdjValue".to_string(),
                 ExifValue::SShort(vec![value]),
             );
-
-            // AFMicroadjustment - composite string
-            if data.len() > 4 {
-                let adj_str = format!(
-                    "{}; {}; {}; {}; {}",
-                    mode_str,
-                    data[2] as i16,
-                    data[3] as i16,
-                    data[4] as i16,
-                    if data.len() > 5 { data[5] as i16 } else { 0 }
-                );
-                decoded.insert("AFMicroadjustment".to_string(), ExifValue::Ascii(adj_str));
-            }
         }
     }
 
@@ -6461,6 +6455,18 @@ pub fn parse_canon_maker_notes(
                     if let ExifValue::Short(ref shorts) = value {
                         if !shorts.is_empty() {
                             ExifValue::Ascii(decode_date_stamp_mode_exiftool(shorts[0]).to_string())
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                // SuperMacro - decode using decode function
+                CANON_SUPER_MACRO => {
+                    if let ExifValue::Short(ref shorts) = value {
+                        if !shorts.is_empty() {
+                            ExifValue::Ascii(decode_super_macro_exiftool(shorts[0]).to_string())
                         } else {
                             value
                         }

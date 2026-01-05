@@ -1366,6 +1366,16 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         );
     }
 
+    // GPSStatus (0x0009) - expand A/V to Measurement Active/Void
+    if let Some(ExifValue::Ascii(status)) = exif_data.get_tag_by_id(0x0009) {
+        let expanded = match status.trim() {
+            "A" => "Measurement Active",
+            "V" => "Measurement Void",
+            other => other,
+        };
+        output.insert("GPSStatus".to_string(), Value::String(expanded.to_string()));
+    }
+
     // Add derived date fields for ExifTool compatibility
     // ModifyDate is an alias for DateTime (0x0132)
     if let Some(ExifValue::Ascii(s)) = exif_data.get_tag_by_id(0x0132) {
@@ -1458,14 +1468,17 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
 
     // LensID computation:
     // For Nikon: Use LensModel if available (contains full lens name like "1 NIKKOR 10mm f/2.8")
-    // For Canon: Use LensType as LensID (the lens type lookup value)
+    // For Canon/Olympus: Use LensType as LensID (the lens type lookup value)
     if !output.contains_key("LensID") {
         let is_canon = make_ref
             .map(|m| m.to_uppercase().contains("CANON"))
             .unwrap_or(false);
+        let is_olympus = make_ref
+            .map(|m| m.to_uppercase().contains("OLYMPUS"))
+            .unwrap_or(false);
 
-        if is_canon {
-            // Canon: LensID should come from LensType (the decoded lens type value)
+        if is_canon || is_olympus {
+            // Canon/Olympus: LensID should come from LensType (the decoded lens type value)
             if let Some(lens_type) = output.get("LensType").cloned() {
                 output.insert("LensID".to_string(), lens_type);
             }
@@ -2089,6 +2102,94 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 }
             }
         }
+    }
+
+    // Clean up output to match ExifTool behavior:
+    // 1. Remove duplicate tags where we have both EXIF name and ExifTool alias
+    // 2. Remove IFD pointer tags (ExifTool doesn't output these)
+    // 3. Remove raw binary data tags (ExifTool processes these instead of outputting raw)
+
+    // Tags to remove (EXIF names that have ExifTool aliases or are duplicates)
+    let duplicate_tags = [
+        "DateTime",          // -> ModifyDate
+        "DateTimeDigitized", // -> CreateDate
+        "ISOSpeedRatings",   // -> ISO (already handled by duplicate insertion)
+        "ImageLength",       // -> ImageHeight (already handled)
+        "PixelXDimension",   // -> ExifImageWidth (duplicate)
+        "PixelYDimension",   // -> ExifImageHeight (duplicate)
+    ];
+
+    // IFD pointer tags and structure tags (not output by ExifTool)
+    let pointer_tags = [
+        "ExifOffset",
+        "InteroperabilityIFDPointer",
+        "GPSInfo",
+        "FocusInfoIFD",
+        "ImageProcessingIFD",
+        "RawDevelopmentIFD",
+        "RawInfoIFD",
+        "SubIFDs",
+        "JPEGInterchangeFormat",       // IFD0/IFD1 thumbnail offset
+        "JPEGInterchangeFormatLength", // IFD0/IFD1 thumbnail length
+        "NewSubfileType",              // IFD subfile type
+    ];
+
+    // Raw binary tags (ExifTool processes these instead of outputting raw)
+    let binary_tags = [
+        "MakerNote",
+        "ThumbnailPrintIM",
+        "XMPMetadata",
+        "PrintIM",
+        // Canon-specific raw binary tags
+        "CanonAFInfo",
+        "CanonCustomFunctions",
+        "CanonFlashInfo",
+        "CRWParam",
+        "MeasuredColor",
+        "PersonalFunctionValues",
+    ];
+
+    // Remove all the static tags
+    for tag in duplicate_tags
+        .iter()
+        .chain(pointer_tags.iter())
+        .chain(binary_tags.iter())
+    {
+        output.remove(*tag);
+    }
+
+    // Remove unnamed MakerNote tags (e.g., MakerNote0206, MakerNote100F)
+    // These are internal tags that ExifTool doesn't output
+    let unnamed_makernote_tags: Vec<String> = output
+        .keys()
+        .filter(|k| {
+            k.starts_with("MakerNote")
+                && k.len() > 9
+                && k[9..].chars().all(|c| c.is_ascii_hexdigit())
+        })
+        .cloned()
+        .collect();
+    for tag in unnamed_makernote_tags {
+        output.remove(&tag);
+    }
+
+    // Remove GPS tags with invalid/placeholder values
+    // ExifTool doesn't output GPS tags that have invalid reference values
+    let invalid_gps_tags: Vec<String> = output
+        .iter()
+        .filter(|(k, v)| {
+            k.starts_with("GPS") && {
+                if let Value::String(s) = v {
+                    s.starts_with("Unknown") || s == "n/a"
+                } else {
+                    false
+                }
+            }
+        })
+        .map(|(k, _)| k.clone())
+        .collect();
+    for tag in invalid_gps_tags {
+        output.remove(&tag);
     }
 
     // Wrap in an array like exiftool does

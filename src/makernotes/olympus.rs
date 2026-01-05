@@ -1092,6 +1092,145 @@ define_tag_decoder! {
     }
 }
 
+// PictureModeTone (CS 0x0526): Olympus.pm
+define_tag_decoder! {
+    picture_mode_tone,
+    both: {
+        0 => "n/a",
+        1 => "Neutral",
+        2 => "Sepia",
+        3 => "Blue",
+        4 => "Purple",
+        5 => "Green",
+    }
+}
+
+/// Olympus lens type lookup - converts 6-byte lens type to lens name
+/// Format: bytes [make_hi, make_lo, model, subtype, ?, ?]
+/// Key format in ExifTool: "make model subtype" in hex (e.g., "0 13 10")
+pub fn get_olympus_lens_name(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.len() < 4 {
+        return None;
+    }
+    // Make is in byte[1], model in byte[2], subtype in byte[3]
+    let make = bytes[1];
+    let model = bytes[2];
+    let subtype = bytes[3];
+
+    // Lookup table based on ExifTool's %olympusLensTypes
+    match (make, model, subtype) {
+        (0, 0, 0) => Some("None"),
+        // Olympus 4/3 lenses (subtype 0x00 or 0x01)
+        (0, 0x01, 0x00) => Some("Olympus Zuiko Digital ED 50mm F2.0 Macro"),
+        (0, 0x01, 0x01) => Some("Olympus Zuiko Digital 40-150mm F3.5-4.5"),
+        (0, 0x02, 0x00) => Some("Olympus Zuiko Digital ED 150mm F2.0"),
+        (0, 0x03, 0x00) => Some("Olympus Zuiko Digital ED 300mm F2.8"),
+        (0, 0x05, 0x00) => Some("Olympus Zuiko Digital 14-54mm F2.8-3.5"),
+        (0, 0x05, 0x01) => Some("Olympus Zuiko Digital Pro ED 90-250mm F2.8"),
+        (0, 0x06, 0x00) => Some("Olympus Zuiko Digital ED 50-200mm F2.8-3.5"),
+        (0, 0x06, 0x01) => Some("Olympus Zuiko Digital ED 8mm F3.5 Fisheye"),
+        (0, 0x07, 0x00) => Some("Olympus Zuiko Digital 11-22mm F2.8-3.5"),
+        (0, 0x07, 0x01) => Some("Olympus Zuiko Digital 18-180mm F3.5-6.3"),
+        (0, 0x08, 0x01) => Some("Olympus Zuiko Digital 70-300mm F4.0-5.6"),
+        (0, 0x10, 0x01) => Some("Kenko Tokina Reflex 300mm F6.3 MF Macro"),
+        (0, 0x15, 0x00) => Some("Olympus Zuiko Digital ED 7-14mm F4.0"),
+        (0, 0x17, 0x00) => Some("Olympus Zuiko Digital Pro ED 35-100mm F2.0"),
+        (0, 0x18, 0x00) => Some("Olympus Zuiko Digital 14-45mm F3.5-5.6"),
+        (0, 0x20, 0x00) => Some("Olympus Zuiko Digital 35mm F3.5 Macro"),
+        (0, 0x22, 0x00) => Some("Olympus Zuiko Digital 17.5-45mm F3.5-5.6"),
+        (0, 0x23, 0x00) => Some("Olympus Zuiko Digital ED 14-42mm F3.5-5.6"),
+        (0, 0x24, 0x00) => Some("Olympus Zuiko Digital ED 40-150mm F4.0-5.6"),
+        (0, 0x30, 0x00) => Some("Olympus Zuiko Digital ED 50-200mm F2.8-3.5 SWD"),
+        (0, 0x31, 0x00) => Some("Olympus Zuiko Digital ED 12-60mm F2.8-4.0 SWD"),
+        (0, 0x32, 0x00) => Some("Olympus Zuiko Digital ED 14-35mm F2.0 SWD"),
+        (0, 0x33, 0x00) => Some("Olympus Zuiko Digital 25mm F2.8"),
+        (0, 0x34, 0x00) => Some("Olympus Zuiko Digital ED 9-18mm F4.0-5.6"),
+        (0, 0x35, 0x00) => Some("Olympus Zuiko Digital 14-54mm F2.8-3.5 II"),
+        // Olympus Micro 4/3 lenses (subtype 0x10)
+        // ExifTool uses hex strings like '0 10 10' meaning make=0, model=0x10, subtype=0x10
+        (0, 0x01, 0x10) => Some("Olympus M.Zuiko Digital ED 14-42mm F3.5-5.6"),
+        (0, 0x02, 0x10) => Some("Olympus M.Zuiko Digital 17mm F2.8 Pancake"),
+        (0, 0x03, 0x10) => Some("Olympus M.Zuiko Digital ED 14-150mm F4.0-5.6 [II]"),
+        (0, 0x04, 0x10) => Some("Olympus M.Zuiko Digital ED 9-18mm F4.0-5.6"),
+        (0, 0x05, 0x10) => Some("Olympus M.Zuiko Digital ED 14-42mm F3.5-5.6 L"),
+        (0, 0x06, 0x10) => Some("Olympus M.Zuiko Digital ED 40-150mm F4.0-5.6"),
+        (0, 0x07, 0x10) => Some("Olympus M.Zuiko Digital ED 12mm F2.0"),
+        (0, 0x08, 0x10) => Some("Olympus M.Zuiko Digital ED 75-300mm F4.8-6.7"),
+        (0, 0x09, 0x10) => Some("Olympus M.Zuiko Digital 14-42mm F3.5-5.6 II"),
+        (0, 0x10, 0x10) => Some("Olympus M.Zuiko Digital ED 12-50mm F3.5-6.3 EZ"),
+        (0, 0x11, 0x10) => Some("Olympus M.Zuiko Digital 45mm F1.8"),
+        (0, 0x12, 0x10) => Some("Olympus M.Zuiko Digital ED 60mm F2.8 Macro"),
+        (0, 0x13, 0x10) => Some("Olympus M.Zuiko Digital 14-42mm F3.5-5.6 II R"),
+        (0, 0x14, 0x10) => Some("Olympus M.Zuiko Digital ED 40-150mm F4.0-5.6 R"),
+        (0, 0x15, 0x10) => Some("Olympus M.Zuiko Digital ED 75mm F1.8"),
+        (0, 0x16, 0x10) => Some("Olympus M.Zuiko Digital 17mm F1.8"),
+        (0, 0x18, 0x10) => Some("Olympus M.Zuiko Digital ED 75-300mm F4.8-6.7 II"),
+        (0, 0x19, 0x10) => Some("Olympus M.Zuiko Digital ED 12-40mm F2.8 Pro"),
+        (0, 0x20, 0x10) => Some("Olympus M.Zuiko Digital ED 40-150mm F2.8 Pro"),
+        (0, 0x21, 0x10) => Some("Olympus M.Zuiko Digital ED 14-42mm F3.5-5.6 EZ"),
+        (0, 0x22, 0x10) => Some("Olympus M.Zuiko Digital 25mm F1.8"),
+        (0, 0x23, 0x10) => Some("Olympus M.Zuiko Digital ED 7-14mm F2.8 Pro"),
+        (0, 0x24, 0x10) => Some("Olympus M.Zuiko Digital ED 300mm F4.0 IS Pro"),
+        (0, 0x25, 0x10) => Some("Olympus M.Zuiko Digital ED 8mm F1.8 Fisheye Pro"),
+        (0, 0x26, 0x10) => Some("Olympus M.Zuiko Digital ED 12-100mm F4.0 IS Pro"),
+        (0, 0x27, 0x10) => Some("Olympus M.Zuiko Digital ED 30mm F3.5 Macro"),
+        (0, 0x28, 0x10) => Some("Olympus M.Zuiko Digital ED 25mm F1.2 Pro"),
+        (0, 0x29, 0x10) => Some("Olympus M.Zuiko Digital ED 17mm F1.2 Pro"),
+        (0, 0x30, 0x10) => Some("Olympus M.Zuiko Digital ED 45mm F1.2 Pro"),
+        (0, 0x32, 0x10) => Some("Olympus M.Zuiko Digital ED 12-200mm F3.5-6.3"),
+        (0, 0x33, 0x10) => Some("Olympus M.Zuiko Digital 150-400mm F4.5 TC1.25x IS Pro"),
+        (0, 0x34, 0x10) => Some("Olympus M.Zuiko Digital ED 12-45mm F4.0 Pro"),
+        (0, 0x35, 0x10) => Some("Olympus M.Zuiko 100-400mm F5.0-6.3"),
+        (0, 0x36, 0x10) => Some("Olympus M.Zuiko Digital ED 8-25mm F4 Pro"),
+        (0, 0x37, 0x10) => Some("Olympus M.Zuiko Digital ED 40-150mm F4.0 Pro"),
+        (0, 0x38, 0x10) => Some("Olympus M.Zuiko Digital ED 20mm F1.4 Pro"),
+        (0, 0x39, 0x10) => Some("Olympus M.Zuiko Digital ED 90mm F3.5 Macro IS Pro"),
+        (0, 0x40, 0x10) => Some("Olympus M.Zuiko Digital ED 150-600mm F5.0-6.3"),
+        (0, 0x41, 0x10) => Some("OM System M.Zuiko Digital ED 50-200mm F2.8 IS Pro"),
+        // Sigma lenses for 4/3 (subtype 0x00)
+        (1, 0x01, 0x00) => Some("Sigma 18-50mm F3.5-5.6 DC"),
+        (1, 0x02, 0x00) => Some("Sigma 55-200mm F4.0-5.6 DC"),
+        (1, 0x03, 0x00) => Some("Sigma 18-125mm F3.5-5.6 DC"),
+        (1, 0x04, 0x00) => Some("Sigma 18-125mm F3.5-5.6 DC"),
+        (1, 0x05, 0x00) => Some("Sigma 30mm F1.4 EX DC HSM"),
+        (1, 0x06, 0x00) => Some("Sigma APO 50-500mm F4.0-6.3 EX DG HSM"),
+        (1, 0x07, 0x00) => Some("Sigma Macro 105mm F2.8 EX DG"),
+        (1, 0x08, 0x00) => Some("Sigma APO Macro 150mm F2.8 EX DG HSM"),
+        // Sigma lenses for Micro 4/3 (subtype 0x10)
+        (1, 0x01, 0x10) => Some("Sigma 30mm F2.8 EX DN"),
+        (1, 0x02, 0x10) => Some("Sigma 19mm F2.8 EX DN"),
+        (1, 0x03, 0x10) => Some("Sigma 30mm F2.8 DN | A"),
+        (1, 0x04, 0x10) => Some("Sigma 19mm F2.8 DN | A"),
+        (1, 0x05, 0x10) => Some("Sigma 60mm F2.8 DN | A"),
+        (1, 0x06, 0x10) => Some("Sigma 30mm F1.4 DC DN | C"),
+        (1, 0x07, 0x10) => Some("Sigma 16mm F1.4 DC DN | C (017)"),
+        _ => None,
+    }
+}
+
+// NoiseReduction2 (IP 0x100F): Olympus.pm - BITMASK
+/// Decode NoiseReduction2 bitmask value
+pub fn decode_noise_reduction2_exiftool(value: u16) -> String {
+    if value == 0 {
+        return "(none)".to_string();
+    }
+    let mut parts = Vec::new();
+    if value & 0x01 != 0 {
+        parts.push("Noise Reduction");
+    }
+    if value & 0x02 != 0 {
+        parts.push("Noise Filter");
+    }
+    if value & 0x04 != 0 {
+        parts.push("Noise Filter (ISO Boost)");
+    }
+    if parts.is_empty() {
+        format!("Unknown ({})", value)
+    } else {
+        parts.join(", ")
+    }
+}
+
 // AFPoint (FI 0x0308): Olympus.pm - for non E-M/OM- models
 define_tag_decoder! {
     af_point,
@@ -2234,18 +2373,20 @@ fn parse_olympus_ifd(
                         }
                     }
                     EQUIP_LENS_TYPE => {
-                        // LensType: 6 int8u values - if all zeros, output "None"
+                        // LensType: 6 int8u values - lookup lens name
                         match &value {
-                            ExifValue::Byte(vals) => {
-                                if vals.len() >= 6 && vals.iter().all(|&v| v == 0) {
-                                    ExifValue::Ascii("None".to_string())
+                            ExifValue::Byte(vals) if vals.len() >= 4 => {
+                                if let Some(name) = get_olympus_lens_name(vals) {
+                                    ExifValue::Ascii(name.to_string())
                                 } else {
                                     value
                                 }
                             }
-                            ExifValue::Short(vals) => {
-                                if vals.len() >= 6 && vals.iter().all(|&v| v == 0) {
-                                    ExifValue::Ascii("None".to_string())
+                            ExifValue::Short(vals) if vals.len() >= 4 => {
+                                // Convert shorts to bytes for lookup
+                                let bytes: Vec<u8> = vals.iter().map(|&v| v as u8).collect();
+                                if let Some(name) = get_olympus_lens_name(&bytes) {
+                                    ExifValue::Ascii(name.to_string())
                                 } else {
                                     value
                                 }
@@ -2535,15 +2676,25 @@ fn parse_olympus_ifd(
                         }
                     }
                     CS_PICTURE_MODE_TONE => {
-                        // PictureModeTone: 0 = n/a, otherwise decode (stored as int16s)
-                        match &value {
-                            ExifValue::SShort(vals) if !vals.is_empty() && vals[0] == 0 => {
-                                ExifValue::Ascii("n/a".to_string())
+                        // PictureModeTone: decode using picture_mode_tone lookup
+                        if let ExifValue::SShort(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_picture_mode_tone_exiftool(vals[0] as u16).to_string(),
+                                )
+                            } else {
+                                value
                             }
-                            ExifValue::Short(vals) if !vals.is_empty() && vals[0] == 0 => {
-                                ExifValue::Ascii("n/a".to_string())
+                        } else if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_picture_mode_tone_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
                             }
-                            _ => value,
+                        } else {
+                            value
                         }
                     }
                     CS_SCENE_MODE => {
@@ -2932,14 +3083,7 @@ fn parse_olympus_ifd(
                     IP_NOISE_REDUCTION2 => {
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                let val = vals[0];
-                                // NoiseReduction2: 0 = "(none)", otherwise it's a bitmask
-                                if val == 0 {
-                                    ExifValue::Ascii("(none)".to_string())
-                                } else {
-                                    // Could decode bitmask but for now just show value
-                                    value
-                                }
+                                ExifValue::Ascii(decode_noise_reduction2_exiftool(vals[0]))
                             } else {
                                 value
                             }
@@ -3089,18 +3233,31 @@ fn parse_olympus_ifd(
                         }
                     }
                     FI_SENSOR_TEMPERATURE => {
-                        // SensorTemperature: int16s array, add " C" suffix
-                        // ExifTool strips trailing " 0 0" then adds " C"
+                        // SensorTemperature: int16s
+                        // For E-1/E-M5 or count > 1: raw value with " C" suffix
+                        // For others: apply formula 84 - 3 * val / 26, format as "%.1f C"
                         match &value {
+                            ExifValue::SShort(vals) if vals.len() == 1 => {
+                                // Single value - apply temperature formula
+                                let raw = vals[0] as f64;
+                                let temp = 84.0 - 3.0 * raw / 26.0;
+                                ExifValue::Ascii(format!("{:.1} C", temp))
+                            }
                             ExifValue::SShort(vals) => {
+                                // Multiple values - raw format with " 0 0" stripped
                                 let vals_str: Vec<String> =
                                     vals.iter().map(|v| v.to_string()).collect();
                                 let mut result = vals_str.join(" ");
-                                // Strip trailing " 0 0" if present
                                 if result.ends_with(" 0 0") {
                                     result = result[..result.len() - 4].to_string();
                                 }
                                 ExifValue::Ascii(format!("{} C", result))
+                            }
+                            ExifValue::Short(vals) if vals.len() == 1 => {
+                                // Single value - apply temperature formula
+                                let raw = vals[0] as i16 as f64;
+                                let temp = 84.0 - 3.0 * raw / 26.0;
+                                ExifValue::Ascii(format!("{:.1} C", temp))
                             }
                             ExifValue::Short(vals) => {
                                 let vals_str: Vec<String> =

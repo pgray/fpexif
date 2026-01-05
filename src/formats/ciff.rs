@@ -146,6 +146,8 @@ pub struct CiffMetadata {
     // Shot info (CanonShotInfo)
     pub auto_iso: Option<u16>,
     pub base_iso_value: Option<u16>,
+    // Direct ISO from TAG_BASE_ISO (0x101c) - the actual ISO used
+    pub direct_iso: Option<u32>,
     pub measured_ev: Option<i16>,
     pub target_aperture: Option<u16>,
     pub target_exposure_time: Option<u16>,
@@ -524,8 +526,9 @@ impl<R: Read + Seek> CiffParser<R> {
                 self.parse_shot_info(data, metadata);
             }
             TAG_BASE_ISO => {
+                // TAG_BASE_ISO contains the actual ISO used (32-bit value)
                 if data.len() >= 4 {
-                    metadata.base_iso_value = Some(LittleEndian::read_u32(&data[0..4]) as u16);
+                    metadata.direct_iso = Some(LittleEndian::read_u32(&data[0..4]));
                 }
             }
             _ => {
@@ -730,14 +733,22 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
     }
 
     // Add ISO (tag 0x8827 - ISOSpeedRatings)
-    // Use auto_iso which is stored as: ISO = 100 * 2^(value/32)
-    // A value of 0 means ISO 100
-    if let Some(auto_iso_raw) = metadata.auto_iso {
-        let iso = if auto_iso_raw == 0 {
-            100u16
-        } else {
-            (100.0 * 2.0_f64.powf(auto_iso_raw as f64 / 32.0)).round() as u16
-        };
+    // Calculate from ShotInfo APEX values: ISO = BaseISO * AutoISO / 100
+    // where BaseISO = 2^(val/32) * 100/32 and AutoISO = 2^(val/32) * 100
+    if let (Some(base_iso_raw), Some(auto_iso_raw)) = (metadata.base_iso_value, metadata.auto_iso) {
+        // Convert APEX-encoded values to actual ISO values
+        // AutoISO: 2^(val/32) * 100
+        let auto_iso = 2.0_f64.powf(auto_iso_raw as f64 / 32.0) * 100.0;
+        // BaseISO: 2^(val/32) * 100/32
+        let base_iso = 2.0_f64.powf(base_iso_raw as f64 / 32.0) * 100.0 / 32.0;
+        // Final ISO = BaseISO * AutoISO / 100
+        let iso = (base_iso * auto_iso / 100.0).round() as u16;
+        if iso > 0 {
+            ifd_entries.push((0x8827, 3, 1, iso.to_le_bytes().to_vec()));
+        }
+    } else if let Some(direct_iso) = metadata.direct_iso {
+        // Fallback to TAG_BASE_ISO (0x101c) if ShotInfo not available
+        let iso = direct_iso as u16;
         ifd_entries.push((0x8827, 3, 1, iso.to_le_bytes().to_vec()));
     }
 
