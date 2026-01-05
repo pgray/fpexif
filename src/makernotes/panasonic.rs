@@ -991,6 +991,17 @@ pub fn parse_panasonic_maker_notes(
                         } else {
                             ExifValue::Byte(bytes)
                         }
+                    } else if tag_id == PANA_CITY || tag_id == PANA_LANDMARK {
+                        // City/Landmark: string fields, if all zeros or null-terminated at start, show empty
+                        let trimmed: Vec<u8> =
+                            bytes.iter().copied().take_while(|&b| b != 0).collect();
+                        if trimmed.is_empty() || trimmed.iter().all(|&b| b == 0) {
+                            ExifValue::Ascii(String::new())
+                        } else if let Ok(s) = std::str::from_utf8(&trimmed) {
+                            ExifValue::Ascii(s.to_string())
+                        } else {
+                            ExifValue::Byte(bytes)
+                        }
                     } else {
                         ExifValue::Byte(bytes)
                     }
@@ -1009,7 +1020,7 @@ pub fn parse_panasonic_maker_notes(
 
                         // Special handling for BabyAge
                         if (tag_id == PANA_BABY_AGE || tag_id == PANA_BABY_AGE_2)
-                            && s == "9999:99:99 00:00:00"
+                            && (s == "9999:99:99 00:00:00" || s.is_empty())
                         {
                             ExifValue::Ascii("(not set)".to_string())
                         } else {
@@ -1024,7 +1035,7 @@ pub fn parse_panasonic_maker_notes(
 
                             // Special handling for BabyAge
                             if (tag_id == PANA_BABY_AGE || tag_id == PANA_BABY_AGE_2)
-                                && s == "9999:99:99 00:00:00"
+                                && (s == "9999:99:99 00:00:00" || s.is_empty())
                             {
                                 ExifValue::Ascii("(not set)".to_string())
                             } else {

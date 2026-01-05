@@ -56,21 +56,8 @@ fn format_metering_mode(value: u16, make: Option<&str>) -> String {
             }
             .to_string();
         }
-        // Olympus uses "ESP" (Electro-Selective Pattern) instead of "Multi-segment"
-        if make_upper.contains("OLYMPUS") || make_upper.contains("OM DIGITAL") {
-            return match value {
-                0 => "Unknown",
-                1 => "Average",
-                2 => "Center-weighted average",
-                3 => "Spot",
-                4 => "Multi-spot",
-                5 => "ESP",
-                6 => "Partial",
-                255 => "Other",
-                _ => "Unknown",
-            }
-            .to_string();
-        }
+        // Note: Olympus uses "ESP" in MakerNotes but ExifTool uses standard "Multi-segment"
+        // for the EXIF MeteringMode tag (0x9207), so we don't apply special handling here.
     }
     crate::tags::get_metering_mode_description(value).to_string()
 }

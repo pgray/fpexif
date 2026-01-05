@@ -172,8 +172,9 @@ pub const FI_FOCUS_STEP_NEAR: u16 = 0x0304;
 pub const FI_FOCUS_DISTANCE: u16 = 0x0305;
 pub const FI_AF_POINT: u16 = 0x0308;
 pub const FI_EXTERNAL_FLASH: u16 = 0x1201;
-pub const FI_EXTERNAL_FLASH_BOUNCE: u16 = 0x1203;
-pub const FI_EXTERNAL_FLASH_ZOOM: u16 = 0x1204;
+pub const FI_EXTERNAL_FLASH_GUIDE_NUMBER: u16 = 0x1203;
+pub const FI_EXTERNAL_FLASH_BOUNCE: u16 = 0x1204;
+pub const FI_EXTERNAL_FLASH_ZOOM: u16 = 0x1205;
 pub const FI_INTERNAL_FLASH: u16 = 0x1208;
 pub const FI_MANUAL_FLASH: u16 = 0x1209;
 pub const FI_MACRO_LED: u16 = 0x120A;
@@ -376,6 +377,7 @@ fn get_focus_info_tag_name(tag_id: u16) -> Option<&'static str> {
         FI_FOCUS_DISTANCE => Some("FocusDistance"),
         FI_AF_POINT => Some("AFPoint"),
         FI_EXTERNAL_FLASH => Some("ExternalFlash"),
+        FI_EXTERNAL_FLASH_GUIDE_NUMBER => Some("ExternalFlashGuideNumber"),
         FI_EXTERNAL_FLASH_BOUNCE => Some("ExternalFlashBounce"),
         FI_EXTERNAL_FLASH_ZOOM => Some("ExternalFlashZoom"),
         FI_INTERNAL_FLASH => Some("InternalFlash"),
@@ -459,6 +461,44 @@ define_tag_decoder! {
         2 => "Continuous AF",
         3 => "Multi AF",
         10 => "MF",
+    }
+}
+
+// FocusMode second element bitmask decoder (CS 0x0301)
+// Bits: 0=S-AF, 2=C-AF, 4=MF, 5=Face Detect, 6=Imager AF, 7=Live View Magnification Frame, 8=AF sensor, 9=Starry Sky AF
+fn decode_focus_mode_bitmask(value: u16) -> String {
+    if value == 0 {
+        return "(none)".to_string();
+    }
+    let mut parts = Vec::new();
+    if value & 0x0001 != 0 {
+        parts.push("S-AF");
+    }
+    if value & 0x0004 != 0 {
+        parts.push("C-AF");
+    }
+    if value & 0x0010 != 0 {
+        parts.push("MF");
+    }
+    if value & 0x0020 != 0 {
+        parts.push("Face Detect");
+    }
+    if value & 0x0040 != 0 {
+        parts.push("Imager AF");
+    }
+    if value & 0x0080 != 0 {
+        parts.push("Live View Magnification Frame");
+    }
+    if value & 0x0100 != 0 {
+        parts.push("AF sensor");
+    }
+    if value & 0x0200 != 0 {
+        parts.push("Starry Sky AF");
+    }
+    if parts.is_empty() {
+        format!("Unknown ({})", value)
+    } else {
+        parts.join(", ")
     }
 }
 
@@ -934,6 +974,28 @@ define_tag_decoder! {
     }
 }
 
+// NoiseFilter (CS 0x0527): Olympus.pm - decoded from 3-element int16s array
+/// Decode NoiseFilter from 3-value array
+fn decode_noise_filter(vals: &[i16]) -> Option<&'static str> {
+    if vals.len() < 3 {
+        return None;
+    }
+    // The array is (setting, min, max) where setting determines the filter
+    // '0 0 0' => 'n/a'
+    // '-2 -2 1' => 'Off'
+    // '-1 -2 1' => 'Low'
+    // '0 -2 1' => 'Standard'
+    // '1 -2 1' => 'High'
+    match (vals[0], vals[1], vals[2]) {
+        (0, 0, 0) => Some("n/a"),
+        (-2, -2, 1) => Some("Off"),
+        (-1, -2, 1) => Some("Low"),
+        (0, -2, 1) => Some("Standard"),
+        (1, -2, 1) => Some("High"),
+        _ => None,
+    }
+}
+
 // ArtFilter (CS 0x0529): Olympus.pm / olympusmn_int.cpp
 define_tag_decoder! {
     art_filter,
@@ -979,15 +1041,28 @@ define_tag_decoder! {
     }
 }
 
-// ImageStabilization (CS 0x0604): Olympus.pm / olympusmn_int.cpp
+// ImageQuality2 (CS 0x0603): Olympus.pm
+define_tag_decoder! {
+    image_quality2,
+    both: {
+        1 => "SQ",
+        2 => "HQ",
+        3 => "SHQ",
+        4 => "RAW",
+        5 => "SQ (5)",
+    }
+}
+
+// ImageStabilization (CS 0x0604): Olympus.pm (int32u)
 define_tag_decoder! {
     image_stabilization,
+    type: u32,
     both: {
         0 => "Off",
-        1 => "On, Mode 1",
-        2 => "On, Mode 2",
-        3 => "On, Mode 3",
-        4 => "On, Mode 4",
+        1 => "On, S-IS1 (All Direction Shake IS)",
+        2 => "On, S-IS2 (Vertical Shake IS)",
+        3 => "On, S-IS3 (Horizontal Shake IS)",
+        4 => "On, S-IS Auto",
     }
 }
 
@@ -1017,12 +1092,42 @@ define_tag_decoder! {
     }
 }
 
+// AFPoint (FI 0x0308): Olympus.pm - for non E-M/OM- models
+define_tag_decoder! {
+    af_point,
+    both: {
+        0 => "Left (or n/a)",
+        1 => "Center (horizontal)",
+        2 => "Right",
+        3 => "Center (vertical)",
+        255 => "None",
+    }
+}
+
 // ExternalFlashBounce (FI 0x1203): Olympus.pm / olympusmn_int.cpp
 define_tag_decoder! {
     external_flash_bounce,
     both: {
         0 => "Bounce or Off",
         1 => "Direct",
+    }
+}
+
+// ManualFlash (FI 0x1209): Olympus.pm - int16u[2] (on/off, strength)
+/// Decode ManualFlash from 2-value array
+fn decode_manual_flash(vals: &[u16]) -> String {
+    if vals.is_empty() || vals[0] == 0 {
+        return "Off".to_string();
+    }
+    // vals[0] is on/off, vals[1] is strength
+    if vals.len() < 2 {
+        return "On".to_string();
+    }
+    let strength = vals[1];
+    if strength == 1 {
+        "Full".to_string()
+    } else {
+        format!("1/{}", strength)
     }
 }
 
@@ -1076,6 +1181,551 @@ define_tag_decoder! {
     both: {
         0 => "Off",
         1 => "On",
+    }
+}
+
+// BWMode (Main 0x0203): Olympus.pm
+define_tag_decoder! {
+    bw_mode,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
+// AFFineTune (CS 0x0306): Olympus.pm
+define_tag_decoder! {
+    af_fine_tune,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
+// InternalFlash (FI 0x1208): Olympus.pm
+define_tag_decoder! {
+    internal_flash,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
+// MacroLED (FI 0x120A): Olympus.pm
+define_tag_decoder! {
+    macro_led,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
+// ExternalFlash (FI 0x1201): Olympus.pm (first value is off/on)
+define_tag_decoder! {
+    external_flash,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
+// FlashType (Equip 0x1000): Olympus.pm
+define_tag_decoder! {
+    flash_type,
+    both: {
+        0 => "None",
+        2 => "Simple E-System",
+        3 => "E-System",
+    }
+}
+
+/// Decode DriveMode (CS 0x0600): Olympus.pm
+/// Format: 2, 3, 5 or 6 int16u values
+/// 1. Mode, 2. Shot number, 3. Mode bits, 5. Shutter mode, 6. Shooting mode
+fn decode_drive_mode(values: &[u16]) -> String {
+    if values.is_empty() {
+        return String::new();
+    }
+
+    let mode = values[0];
+    let shot_num = if values.len() > 1 && values[1] > 0 {
+        format!(", Shot {}", values[1])
+    } else {
+        String::new()
+    };
+
+    // Shutter mode (5th value, index 4)
+    let shutter = if values.len() >= 5 {
+        match values[4] {
+            0 => "; Mechanical shutter",
+            2 => "; Anti-shock",
+            4 => "", // Electronic shutter (default, don't show)
+            _ => "",
+        }
+    } else {
+        ""
+    };
+
+    // Check 6th value (index 5) for newer models' shooting modes
+    if values.len() >= 6 && values[5] != 0 {
+        let mode_str = match values[5] {
+            0x01 => "Single Shot",
+            0x02 => "Sequential L",
+            0x03 => "Sequential H",
+            0x07 => "Sequential",
+            0x11 => "Single Shot",
+            0x12 => "Sequential L",
+            0x13 => "Sequential H",
+            0x14 => "Self-Timer 12 sec",
+            0x15 => "Self-Timer 2 sec",
+            0x16 => "Custom Self-Timer",
+            0x17 => "Sequential",
+            0x21 => "Single Shot",
+            0x22 => "Sequential L",
+            0x23 => "Sequential H",
+            0x24 => "Self-Timer 2 sec",
+            0x25 => "Self-Timer 12 sec",
+            0x26 => "Custom Self-Timer",
+            0x27 => "Sequential",
+            0x28 => "Sequential SH1",
+            0x29 => "Sequential SH2",
+            0x30 => "HighRes Shot",
+            0x41 => "ProCap H",
+            0x42 => "ProCap L",
+            0x43 => "ProCap",
+            0x48 => "ProCap SH1",
+            0x49 => "ProCap SH2",
+            _ => return format!("Unknown ({})", values[5]),
+        };
+        return format!("{}{}{}", mode_str, shot_num, shutter);
+    }
+
+    // Basic mode decoding
+    let mode_str = match mode {
+        0 => "Single Shot",
+        1 => "Continuous Shooting",
+        2 => "Exposure Bracketing",
+        3 => "White Balance Bracketing",
+        4 => "Exposure+WB Bracketing",
+        _ => return format!("Unknown ({})", mode),
+    };
+
+    format!("{}{}{}", mode_str, shot_num, shutter)
+}
+
+/// Format array values as "value (min min_val, max max_val)"
+/// ExifTool uses this format for settings like CustomSaturation, ContrastSetting, etc.
+fn format_min_max_array(values: &[i16]) -> String {
+    if values.len() >= 3 {
+        format!("{} (min {}, max {})", values[0], values[1], values[2])
+    } else if !values.is_empty() {
+        values
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        String::new()
+    }
+}
+
+/// Format array values from unsigned shorts
+fn format_min_max_array_u16(values: &[u16]) -> String {
+    if values.len() >= 3 {
+        // Convert to signed for proper display
+        let v0 = values[0] as i16;
+        let v1 = values[1] as i16;
+        let v2 = values[2] as i16;
+        format!("{} (min {}, max {})", v0, v1, v2)
+    } else if !values.is_empty() {
+        values
+            .iter()
+            .map(|v| (*v as i16).to_string())
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        String::new()
+    }
+}
+
+/// Decode CameraType codes to model names (from ExifTool Olympus.pm %olympusCameraTypes)
+fn decode_camera_type(val: &str) -> Option<&'static str> {
+    Some(match val {
+        "D4028" => "X-2,C-50Z",
+        "D4029" => "E-20,E-20N,E-20P",
+        "D4034" => "C720UZ",
+        "D4040" => "E-1",
+        "D4041" => "E-300",
+        "D4083" => "C2Z,D520Z,C220Z",
+        "D4106" => "u20D,S400D,u400D",
+        "D4120" => "X-1",
+        "D4122" => "u10D,S300D,u300D",
+        "D4125" => "AZ-1",
+        "D4141" => "C150,D390",
+        "D4193" => "C-5000Z",
+        "D4194" => "X-3,C-60Z",
+        "D4199" => "u30D,S410D,u410D",
+        "D4205" => "X450,D535Z,C370Z",
+        "D4210" => "C160,D395",
+        "D4211" => "C725UZ",
+        "D4213" => "FerrariMODEL2003",
+        "D4216" => "u15D",
+        "D4217" => "u25D",
+        "D4220" => "u-miniD,Stylus V",
+        "D4221" => "u40D,S500,uD500",
+        "D4231" => "FerrariMODEL2004",
+        "D4240" => "X500,D590Z,C470Z",
+        "D4244" => "uD800,S800",
+        "D4256" => "u720SW,S720SW",
+        "D4261" => "X600,D630,FE5500",
+        "D4262" => "uD600,S600",
+        "D4301" => "u810/S810",
+        "D4302" => "u710,S710",
+        "D4303" => "u700,S700",
+        "D4304" => "FE100,X710",
+        "D4305" => "FE110,X705",
+        "D4310" => "FE-130,X-720",
+        "D4311" => "FE-140,X-725",
+        "D4312" => "FE150,X730",
+        "D4313" => "FE160,X735",
+        "D4314" => "u740,S740",
+        "D4315" => "u750,S750",
+        "D4316" => "u730/S730",
+        "D4317" => "FE115,X715",
+        "D4321" => "SP550UZ",
+        "D4322" => "SP510UZ",
+        "D4324" => "FE170,X760",
+        "D4326" => "FE200",
+        "D4327" => "FE190/X750",
+        "D4328" => "u760,S760",
+        "D4330" => "FE180/X745",
+        "D4331" => "u1000/S1000",
+        "D4332" => "u770SW,S770SW",
+        "D4333" => "FE240/X795",
+        "D4334" => "FE210,X775",
+        "D4336" => "FE230/X790",
+        "D4337" => "FE220,X785",
+        "D4338" => "u725SW,S725SW",
+        "D4339" => "FE250/X800",
+        "D4341" => "u780,S780",
+        "D4343" => "u790SW,S790SW",
+        "D4344" => "u1020,S1020",
+        "D4346" => "FE15,X10",
+        "D4348" => "FE280,X820,C520",
+        "D4349" => "FE300,X830",
+        "D4350" => "u820,S820",
+        "D4351" => "u1200,S1200",
+        "D4352" => "FE270,X815,C510",
+        "D4353" => "u795SW,S795SW",
+        "D4354" => "u1030SW,S1030SW",
+        "D4355" => "SP560UZ",
+        "D4356" => "u1010,S1010",
+        "D4357" => "u830,S830",
+        "D4359" => "u840,S840",
+        "D4360" => "FE350WIDE,X865",
+        "D4361" => "u850SW,S850SW",
+        "D4362" => "FE340,X855,C560",
+        "D4363" => "FE320,X835,C540",
+        "D4364" => "SP570UZ",
+        "D4366" => "FE330,X845,C550",
+        "D4368" => "FE310,X840,C530",
+        "D4370" => "u1050SW,S1050SW",
+        "D4371" => "u1060,S1060",
+        "D4372" => "FE370,X880,C575",
+        "D4374" => "SP565UZ",
+        "D4377" => "u1040,S1040",
+        "D4378" => "FE360,X875,C570",
+        "D4379" => "FE20,X15,C25",
+        "D4380" => "uT6000,ST6000",
+        "D4381" => "uT8000,ST8000",
+        "D4382" => "u9000,S9000",
+        "D4384" => "SP590UZ",
+        "D4385" => "FE3010,X895",
+        "D4386" => "FE3000,X890",
+        "D4387" => "FE35,X30",
+        "D4388" => "u550WP,S550WP",
+        "D4390" => "FE5000,X905",
+        "D4391" => "u5000",
+        "D4392" => "u7000,S7000",
+        "D4396" => "FE5010,X915",
+        "D4397" => "FE25,X20",
+        "D4398" => "FE45,X40",
+        "D4401" => "XZ-1",
+        "D4402" => "uT6010,ST6010",
+        "D4406" => "u7010,S7010 / u7020,S7020",
+        "D4407" => "FE4010,X930",
+        "D4408" => "X560WP",
+        "D4409" => "FE26,X21",
+        "D4410" => "FE4000,X920,X925",
+        "D4411" => "FE46,X41,X42",
+        "D4412" => "FE5020,X935",
+        "D4413" => "uTough-3000",
+        "D4414" => "StylusTough-6020",
+        "D4415" => "StylusTough-8010",
+        "D4417" => "u5010,S5010",
+        "D4418" => "u7040,S7040",
+        "D4419" => "u9010,S9010",
+        "D4423" => "FE4040",
+        "D4424" => "FE47,X43",
+        "D4426" => "FE4030,X950",
+        "D4428" => "FE5030,X965,X960",
+        "D4430" => "u7030,S7030",
+        "D4432" => "SP600UZ",
+        "D4434" => "SP800UZ",
+        "D4439" => "FE4020,X940",
+        "D4442" => "FE5035",
+        "D4448" => "FE4050,X970",
+        "D4450" => "FE5050,X985",
+        "D4454" => "u-7050",
+        "D4464" => "T10,X27",
+        "D4470" => "FE5040,X980",
+        "D4472" => "TG-310",
+        "D4474" => "TG-610",
+        "D4476" => "TG-810",
+        "D4478" => "VG145,VG140,D715",
+        "D4479" => "VG130,D710",
+        "D4480" => "VG120,D705",
+        "D4482" => "VR310,D720",
+        "D4484" => "VR320,D725",
+        "D4486" => "VR330,D730",
+        "D4488" => "VG110,D700",
+        "D4490" => "SP-610UZ",
+        "D4492" => "SZ-10",
+        "D4494" => "SZ-20",
+        "D4496" => "SZ-30MR",
+        "D4498" => "SP-810UZ",
+        "D4500" => "SZ-11",
+        "D4504" => "TG-615",
+        "D4508" => "TG-620",
+        "D4510" => "TG-820",
+        "D4512" => "TG-1",
+        "D4516" => "SH-21",
+        "D4519" => "SZ-14",
+        "D4520" => "SZ-31MR",
+        "D4521" => "SH-25MR",
+        "D4523" => "SP-720UZ",
+        "D4529" => "VG170",
+        "D4530" => "VH210",
+        "D4531" => "XZ-2",
+        "D4535" => "SP-620UZ",
+        "D4536" => "TG-320",
+        "D4537" => "VR340,D750",
+        "D4538" => "VG160,X990,D745",
+        "D4541" => "SZ-12",
+        "D4545" => "VH410",
+        "D4546" => "XZ-10",
+        "D4547" => "TG-2",
+        "D4548" => "TG-830",
+        "D4549" => "TG-630",
+        "D4550" => "SH-50",
+        "D4553" => "SZ-16,DZ-105",
+        "D4562" => "SP-820UZ",
+        "D4566" => "SZ-15",
+        "D4572" => "STYLUS1",
+        "D4574" => "TG-3",
+        "D4575" => "TG-850",
+        "D4579" => "SP-100EE",
+        "D4580" => "SH-60",
+        "D4581" => "SH-1",
+        "D4582" => "TG-835",
+        "D4585" => "SH-2 / SH-3",
+        "D4586" => "TG-4",
+        "D4587" => "TG-860",
+        "D4590" => "TG-TRACKER",
+        "D4591" => "TG-870",
+        "D4593" => "TG-5",
+        "D4603" => "TG-6",
+        "D4605" => "TG-7",
+        "D4809" => "C2500L",
+        "D4842" => "E-10",
+        "D4856" => "C-1",
+        "D4857" => "C-1Z,D-150Z",
+        "DCHC" => "D500L",
+        "DCHT" => "D600L / D620L",
+        "K0055" => "AIR-A01",
+        "S0003" => "E-330",
+        "S0004" => "E-500",
+        "S0009" => "E-400",
+        "S0010" => "E-510",
+        "S0011" => "E-3",
+        "S0013" => "E-410",
+        "S0016" => "E-420",
+        "S0017" => "E-30",
+        "S0018" => "E-520",
+        "S0019" => "E-P1",
+        "S0023" => "E-620",
+        "S0026" => "E-P2",
+        "S0027" => "E-PL1",
+        "S0029" => "E-450",
+        "S0030" => "E-600",
+        "S0032" => "E-P3",
+        "S0033" => "E-5",
+        "S0034" => "E-PL2",
+        "S0036" => "E-M5",
+        "S0038" => "E-PL3",
+        "S0039" => "E-PM1",
+        "S0040" => "E-PL1s",
+        "S0042" => "E-PL5",
+        "S0043" => "E-PM2",
+        "S0044" => "E-P5",
+        "S0045" => "E-PL6",
+        "S0046" => "E-PL7",
+        "S0047" => "E-M1",
+        "S0051" => "E-M10",
+        "S0052" => "E-M5MarkII",
+        "S0059" => "E-M10MarkII",
+        "S0061" => "PEN-F",
+        "S0065" => "E-PL8",
+        "S0067" => "E-M1MarkII",
+        "S0068" => "E-M10MarkIII",
+        "S0076" => "E-PL9",
+        "S0080" => "E-M1X",
+        "S0085" => "E-PL10",
+        "S0088" => "E-M10MarkIV",
+        "S0089" => "E-M5MarkIII",
+        "S0092" => "E-M1MarkIII",
+        "S0093" => "E-P7",
+        "S0094" => "E-M10MarkIIIS",
+        "S0095" => "OM-1",
+        "S0101" => "OM-5",
+        "S0121" => "OM-1MarkII",
+        "S0123" => "OM-3",
+        "S0130" => "OM-5MarkII",
+        "SR45" => "D220",
+        "SR55" => "D320L",
+        "SR83" => "D340L",
+        "SR85" => "C830L,D340R",
+        "SR852" => "C860L,D360L",
+        "SR872" => "C900Z,D400Z",
+        "SR874" => "C960Z,D460Z",
+        "SR951" => "C2000Z",
+        "SR952" => "C21",
+        "SR953" => "C21T.commu",
+        "SR954" => "C2020Z",
+        "SR955" => "C990Z,D490Z",
+        "SR956" => "C211Z",
+        "SR959" => "C990ZS,D490Z",
+        "SR95A" => "C2100UZ",
+        "SR971" => "C100,D370",
+        "SR973" => "C2,D230",
+        "SX151" => "E100RS",
+        "SX351" => "C3000Z / C3030Z",
+        "SX354" => "C3040Z",
+        "SX355" => "C2040Z",
+        "SX357" => "C700UZ",
+        "SX358" => "C200Z,D510Z",
+        "SX374" => "C3100Z,C3020Z",
+        "SX552" => "C4040Z",
+        "SX553" => "C40Z,D40Z",
+        "SX556" => "C730UZ",
+        "SX558" => "C5050Z",
+        "SX571" => "C120,D380",
+        "SX574" => "C300Z,D550Z",
+        "SX575" => "C4100Z,C4000Z",
+        "SX751" => "X200,D560Z,C350Z",
+        "SX752" => "X300,D565Z,C450Z",
+        "SX753" => "C750UZ",
+        "SX754" => "C740UZ",
+        "SX755" => "C755UZ",
+        "SX756" => "C5060WZ",
+        "SX757" => "C8080WZ",
+        "SX758" => "X350,D575Z,C360Z",
+        "SX759" => "X400,D580Z,C460Z",
+        "SX75A" => "AZ-2ZOOM",
+        "SX75B" => "D595Z,C500Z",
+        "SX75C" => "X550,D545Z,C480Z",
+        "SX75D" => "IR-300",
+        "SX75F" => "C55Z,C5500Z",
+        "SX75G" => "C170,D425",
+        "SX75J" => "C180,D435",
+        "SX771" => "C760UZ",
+        "SX772" => "C770UZ",
+        "SX773" => "C745UZ",
+        "SX774" => "X250,D560Z,C350Z",
+        "SX775" => "X100,D540Z,C310Z",
+        "SX776" => "C460ZdelSol",
+        "SX777" => "C765UZ",
+        "SX77A" => "D555Z,C315Z",
+        "SX851" => "C7070WZ",
+        "SX852" => "C70Z,C7000Z",
+        "SX853" => "SP500UZ",
+        "SX854" => "SP310",
+        "SX855" => "SP350",
+        "SX873" => "SP320",
+        "SX875" => "FE180/X745",
+        "SX876" => "FE190/X750",
+        _ => return None, // Return None for unknown types
+    })
+}
+
+/// Decode FlashModel (from ExifTool Olympus.pm Equipment tag 0x1001)
+fn decode_flash_model(val: u16) -> &'static str {
+    match val {
+        0 => "None",
+        1 => "FL-20",
+        2 => "FL-50",
+        3 => "RF-11",
+        4 => "TF-22",
+        5 => "FL-36",
+        6 => "FL-50R",
+        7 => "FL-36R",
+        9 => "FL-14",
+        11 => "FL-600R",
+        13 => "FL-LM3",
+        15 => "FL-900R",
+        _ => "Unknown",
+    }
+}
+
+/// Format firmware version from u32
+/// ExifTool: '$val=sprintf("%x",$val);$val=~s/(.{3})$/\.$1/;$val'
+/// e.g., 4100 (0x1004) -> "1.004", 4357 (0x1105) -> "1.105"
+fn format_firmware_version(val: u32) -> String {
+    let hex = format!("{:x}", val);
+    if hex.len() >= 4 {
+        let (major, minor) = hex.split_at(hex.len() - 3);
+        format!("{}.{}", major, minor)
+    } else {
+        format!("0.{:03}", val)
+    }
+}
+
+/// Decode PictureMode (from ExifTool Olympus.pm CameraSettings tag 0x0520)
+fn decode_picture_mode(val: u16) -> &'static str {
+    match val {
+        1 => "Vivid",
+        2 => "Natural",
+        3 => "Muted",
+        4 => "Portrait",
+        5 => "i-Enhance",
+        6 => "e-Portrait",
+        7 => "Color Creator",
+        8 => "Underwater",
+        9 => "Color Profile 1",
+        10 => "Color Profile 2",
+        11 => "Color Profile 3",
+        12 => "Monochrome Profile 1",
+        13 => "Monochrome Profile 2",
+        14 => "Monochrome Profile 3",
+        17 => "Art Mode",
+        18 => "Monochrome Profile 4",
+        _ => "Unknown",
+    }
+}
+
+/// Decode PictureMode array (1 or 2 values)
+fn decode_picture_mode_array(values: &[u16]) -> String {
+    if values.is_empty() {
+        return String::new();
+    }
+    let mode = decode_picture_mode(values[0]);
+    if mode == "Unknown" {
+        return format!("Unknown ({})", values[0]);
+    }
+    if values.len() >= 2 && values[1] != 0 {
+        format!("{}; {}", mode, values[1])
+    } else {
+        mode.to_string()
     }
 }
 
@@ -1412,6 +2062,41 @@ fn parse_olympus_ifd(
                             _ => value,
                         }
                     }
+                    OLYMPUS_MACRO => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_macro_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    OLYMPUS_BW_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_bw_mode_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    OLYMPUS_CAMERA_TYPE => {
+                        // CameraType: decode internal code to model name
+                        if let ExifValue::Ascii(s) = &value {
+                            let trimmed = s.trim();
+                            if let Some(decoded) = decode_camera_type(trimmed) {
+                                ExifValue::Ascii(decoded.to_string())
+                            } else {
+                                value // Keep original if not in lookup table
+                            }
+                        } else {
+                            value
+                        }
+                    }
                     _ => value,
                 },
                 OlympusIfdType::Equipment => match tag_id {
@@ -1472,6 +2157,102 @@ fn parse_olympus_ifd(
                             _ => value,
                         }
                     }
+                    EQUIP_FLASH_TYPE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_flash_type_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    EQUIP_FLASH_MODEL => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_flash_model(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    EQUIP_LENS_FIRMWARE_VERSION => {
+                        // LensFirmwareVersion: convert u32 to hex version string
+                        if let ExifValue::Long(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(format_firmware_version(vals[0]))
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    EQUIP_BODY_FIRMWARE_VERSION => {
+                        // BodyFirmwareVersion: same format as LensFirmwareVersion
+                        if let ExifValue::Long(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(format_firmware_version(vals[0]))
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    EQUIP_MAX_APERTURE
+                    | EQUIP_MAX_APERTURE_AT_MIN_FOCAL
+                    | EQUIP_MAX_APERTURE_AT_MAX_FOCAL => {
+                        // MaxAperture tags: int16u APEX value in 1/256 units
+                        // Formula: sqrt(2)**(val/256) = 2**(val/512)
+                        // Output: formatted as %.1f
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() && vals[0] != 0 {
+                                let apex = vals[0] as f64 / 256.0;
+                                let aperture = 2.0_f64.powf(apex / 2.0);
+                                ExifValue::Ascii(format!("{:.1}", aperture))
+                            } else {
+                                ExifValue::Ascii("0".to_string())
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    EQUIP_LENS_PROPERTIES => {
+                        // LensProperties: int16u displayed as hex "0xNNNN"
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(format!("0x{:x}", vals[0]))
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    EQUIP_LENS_TYPE => {
+                        // LensType: 6 int8u values - if all zeros, output "None"
+                        match &value {
+                            ExifValue::Byte(vals) => {
+                                if vals.len() >= 6 && vals.iter().all(|&v| v == 0) {
+                                    ExifValue::Ascii("None".to_string())
+                                } else {
+                                    value
+                                }
+                            }
+                            ExifValue::Short(vals) => {
+                                if vals.len() >= 6 && vals.iter().all(|&v| v == 0) {
+                                    ExifValue::Ascii("None".to_string())
+                                } else {
+                                    value
+                                }
+                            }
+                            _ => value,
+                        }
+                    }
                     _ => value,
                 },
                 OlympusIfdType::CameraSettings => match tag_id {
@@ -1522,9 +2303,18 @@ fn parse_olympus_ifd(
                         }
                     }
                     CS_FOCUS_MODE => {
+                        // FocusMode: int16u[1 or 2], first decoded, second as bitmask
+                        // Format: "Single AF; S-AF, Imager AF"
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                ExifValue::Ascii(decode_focus_mode_exiftool(vals[0]).to_string())
+                                let first = decode_focus_mode_exiftool(vals[0]);
+                                let result = if vals.len() > 1 {
+                                    let bitmask = decode_focus_mode_bitmask(vals[1]);
+                                    format!("{}; {}", first, bitmask)
+                                } else {
+                                    first.to_string()
+                                };
+                                ExifValue::Ascii(result)
                             } else {
                                 value
                             }
@@ -1533,9 +2323,17 @@ fn parse_olympus_ifd(
                         }
                     }
                     CS_FOCUS_PROCESS => {
+                        // FocusProcess: int16u[1 or 2], first decoded, second as number
+                        // Format: "AF Used; 64"
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                ExifValue::Ascii(decode_focus_process_exiftool(vals[0]).to_string())
+                                let first = decode_focus_process_exiftool(vals[0]);
+                                let result = if vals.len() > 1 {
+                                    format!("{}; {}", first, vals[1])
+                                } else {
+                                    first.to_string()
+                                };
+                                ExifValue::Ascii(result)
                             } else {
                                 value
                             }
@@ -1547,6 +2345,55 @@ fn parse_olympus_ifd(
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
                                 ExifValue::Ascii(decode_af_search_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_AF_AREAS => {
+                        // AFAreas: int32u[64], if all zeros output "none"
+                        if let ExifValue::Long(vals) = &value {
+                            if vals.iter().all(|&v| v == 0) {
+                                ExifValue::Ascii("none".to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_AF_POINT_SELECTED => {
+                        // AFPointSelected: rational64s[5], format as "(X1%,Y1%) (X2%,Y2%)"
+                        // First check if all values contain "undef" (all undefined)
+                        let val_str = format!("{}", value);
+                        // Count number of undef entries
+                        let undef_count = val_str.matches("undef").count();
+                        if undef_count >= 5 {
+                            // All values are undefined
+                            ExifValue::Ascii("n/a".to_string())
+                        } else if let ExifValue::SRational(vals) = &value {
+                            // rational64s[5]: [?, x1, y1, x2, y2]
+                            // Convert to percentages and format (ExifTool uses floor/truncation)
+                            if vals.len() >= 5 {
+                                // Check if all zeros (both points at origin = n/a)
+                                let all_zero = vals[1..5]
+                                    .iter()
+                                    .all(|(n, d)| *d == 0 || (*n as f64 / *d as f64).abs() < 0.005);
+                                if all_zero {
+                                    ExifValue::Ascii("n/a".to_string())
+                                } else {
+                                    let x1 = (vals[1].0 as f64 / vals[1].1 as f64 * 100.0).floor()
+                                        as i32;
+                                    let y1 = (vals[2].0 as f64 / vals[2].1 as f64 * 100.0).floor()
+                                        as i32;
+                                    let x2 = (vals[3].0 as f64 / vals[3].1 as f64 * 100.0).floor()
+                                        as i32;
+                                    let y2 = (vals[4].0 as f64 / vals[4].1 as f64 * 100.0).floor()
+                                        as i32;
+                                    ExifValue::Ascii(format!("({}%,{}%) ({}%,{}%)", x1, y1, x2, y2))
+                                }
                             } else {
                                 value
                             }
@@ -1576,6 +2423,18 @@ fn parse_olympus_ifd(
                             value
                         }
                     }
+                    CS_WHITE_BALANCE_TEMPERATURE => {
+                        // WhiteBalanceTemperature: 0 = "Auto", otherwise show value
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() && vals[0] == 0 {
+                                ExifValue::Ascii("Auto".to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
                     CS_COLOR_SPACE => {
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
@@ -1585,6 +2444,106 @@ fn parse_olympus_ifd(
                             }
                         } else {
                             value
+                        }
+                    }
+                    CS_CUSTOM_SATURATION => {
+                        // CustomSaturation: 3 values - current, min, max
+                        if let ExifValue::SShort(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array(vals))
+                        } else if let ExifValue::Short(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array_u16(vals))
+                        } else {
+                            value
+                        }
+                    }
+                    CS_CONTRAST_SETTING => {
+                        if let ExifValue::SShort(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array(vals))
+                        } else if let ExifValue::Short(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array_u16(vals))
+                        } else {
+                            value
+                        }
+                    }
+                    CS_SHARPNESS_SETTING => {
+                        if let ExifValue::SShort(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array(vals))
+                        } else if let ExifValue::Short(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array_u16(vals))
+                        } else {
+                            value
+                        }
+                    }
+                    CS_NOISE_FILTER => {
+                        // NoiseFilter is int16s[3]: (setting, min, max)
+                        // The array maps to: n/a, Off, Low, Standard, High
+                        if let ExifValue::SShort(vals) = &value {
+                            if let Some(decoded) = decode_noise_filter(vals) {
+                                ExifValue::Ascii(decoded.to_string())
+                            } else {
+                                value
+                            }
+                        } else if let ExifValue::Short(vals) = &value {
+                            // Handle unsigned shorts by converting to signed
+                            let signed: Vec<i16> = vals.iter().map(|&v| v as i16).collect();
+                            if let Some(decoded) = decode_noise_filter(&signed) {
+                                ExifValue::Ascii(decoded.to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_PICTURE_MODE_SATURATION => {
+                        if let ExifValue::SShort(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array(vals))
+                        } else if let ExifValue::Short(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array_u16(vals))
+                        } else {
+                            value
+                        }
+                    }
+                    CS_PICTURE_MODE_CONTRAST => {
+                        if let ExifValue::SShort(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array(vals))
+                        } else if let ExifValue::Short(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array_u16(vals))
+                        } else {
+                            value
+                        }
+                    }
+                    CS_PICTURE_MODE_SHARPNESS => {
+                        if let ExifValue::SShort(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array(vals))
+                        } else if let ExifValue::Short(vals) = &value {
+                            ExifValue::Ascii(format_min_max_array_u16(vals))
+                        } else {
+                            value
+                        }
+                    }
+                    CS_PICTURE_MODE_BW_FILTER => {
+                        // PictureModeBWFilter: 0 = n/a (stored as int16s)
+                        match &value {
+                            ExifValue::SShort(vals) if !vals.is_empty() && vals[0] == 0 => {
+                                ExifValue::Ascii("n/a".to_string())
+                            }
+                            ExifValue::Short(vals) if !vals.is_empty() && vals[0] == 0 => {
+                                ExifValue::Ascii("n/a".to_string())
+                            }
+                            _ => value,
+                        }
+                    }
+                    CS_PICTURE_MODE_TONE => {
+                        // PictureModeTone: 0 = n/a, otherwise decode (stored as int16s)
+                        match &value {
+                            ExifValue::SShort(vals) if !vals.is_empty() && vals[0] == 0 => {
+                                ExifValue::Ascii("n/a".to_string())
+                            }
+                            ExifValue::Short(vals) if !vals.is_empty() && vals[0] == 0 => {
+                                ExifValue::Ascii("n/a".to_string())
+                            }
+                            _ => value,
                         }
                     }
                     CS_SCENE_MODE => {
@@ -1648,11 +2607,19 @@ fn parse_olympus_ifd(
                         }
                     }
                     CS_FLASH_CONTROL_MODE => {
+                        // FlashControlMode: int16u[3 or 4], first decoded, rest as numbers
+                        // Format: "Off; 0; 0; 0"
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                ExifValue::Ascii(
-                                    decode_flash_control_mode_exiftool(vals[0]).to_string(),
-                                )
+                                let first = decode_flash_control_mode_exiftool(vals[0]);
+                                let rest: Vec<String> =
+                                    vals.iter().skip(1).map(|v| v.to_string()).collect();
+                                let result = if rest.is_empty() {
+                                    first.to_string()
+                                } else {
+                                    format!("{}; {}", first, rest.join("; "))
+                                };
+                                ExifValue::Ascii(result)
                             } else {
                                 value
                             }
@@ -1684,12 +2651,117 @@ fn parse_olympus_ifd(
                             value
                         }
                     }
-                    CS_IMAGE_STABILIZATION => {
+                    CS_IMAGE_QUALITY2 => {
                         if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_image_quality2_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_IMAGE_STABILIZATION => {
+                        // ImageStabilization is int32u
+                        if let ExifValue::Long(vals) = &value {
                             if !vals.is_empty() {
                                 ExifValue::Ascii(
                                     decode_image_stabilization_exiftool(vals[0]).to_string(),
                                 )
+                            } else {
+                                value
+                            }
+                        } else if let ExifValue::Short(vals) = &value {
+                            // Fallback for older cameras that might store as Short
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_image_stabilization_exiftool(vals[0] as u32).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_DISTORTION_CORRECTION => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_distortion_correction_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_SHADING_COMPENSATION => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_shading_compensation_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_AF_FINE_TUNE => {
+                        // AFFineTune can be stored as int8u or int16u
+                        match &value {
+                            ExifValue::Short(vals) if !vals.is_empty() => {
+                                ExifValue::Ascii(decode_af_fine_tune_exiftool(vals[0]).to_string())
+                            }
+                            ExifValue::Byte(vals) if !vals.is_empty() => ExifValue::Ascii(
+                                decode_af_fine_tune_exiftool(vals[0] as u16).to_string(),
+                            ),
+                            _ => value,
+                        }
+                    }
+                    CS_DRIVE_MODE => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_drive_mode(vals))
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_PICTURE_MODE => {
+                        // PictureMode: 1 or 2 int16u values
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_picture_mode_array(vals))
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    CS_ART_FILTER | CS_MAGIC_FILTER => {
+                        // ArtFilter/MagicFilter: int16u[4], first element decoded, rest as numbers
+                        // Format: "Off; 0; 0; 0"
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                let first = decode_art_filter_exiftool(vals[0]);
+                                let rest: Vec<String> =
+                                    vals.iter().skip(1).map(|v| v.to_string()).collect();
+                                let result = if rest.is_empty() {
+                                    first.to_string()
+                                } else {
+                                    format!("{}; {}", first, rest.join("; "))
+                                };
+                                ExifValue::Ascii(result)
                             } else {
                                 value
                             }
@@ -1765,6 +2837,24 @@ fn parse_olympus_ifd(
                             value
                         }
                     }
+                    RD_SETTINGS => {
+                        // RawDevSettings: 0 = (none), otherwise bitmask
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() && vals[0] == 0 {
+                                ExifValue::Ascii("(none)".to_string())
+                            } else {
+                                value
+                            }
+                        } else if let ExifValue::Long(vals) = &value {
+                            if !vals.is_empty() && vals[0] == 0 {
+                                ExifValue::Ascii("(none)".to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
                     _ => value,
                 },
                 OlympusIfdType::ImageProcessing => match tag_id {
@@ -1782,11 +2872,17 @@ fn parse_olympus_ifd(
                         }
                     }
                     IP_MULTIPLE_EXPOSURE_MODE => {
+                        // MultipleExposureMode: int16u[2], first decoded, second as number
+                        // Format: "Off; 1"
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                ExifValue::Ascii(
-                                    decode_multiple_exposure_mode_exiftool(vals[0]).to_string(),
-                                )
+                                let first = decode_multiple_exposure_mode_exiftool(vals[0]);
+                                let result = if vals.len() > 1 {
+                                    format!("{}; {}", first, vals[1])
+                                } else {
+                                    first.to_string()
+                                };
+                                ExifValue::Ascii(result)
                             } else {
                                 value
                             }
@@ -1803,6 +2899,65 @@ fn parse_olympus_ifd(
                             } else {
                                 value
                             }
+                        } else {
+                            value
+                        }
+                    }
+                    IP_DISTORTION_CORRECTION2 => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_distortion_correction_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    IP_SHADING_COMPENSATION2 => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_shading_compensation_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    IP_NOISE_REDUCTION2 => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                let val = vals[0];
+                                // NoiseReduction2: 0 = "(none)", otherwise it's a bitmask
+                                if val == 0 {
+                                    ExifValue::Ascii("(none)".to_string())
+                                } else {
+                                    // Could decode bitmask but for now just show value
+                                    value
+                                }
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    IP_COLOR_MATRIX => {
+                        // ColorMatrix: int16s[9] - values should be interpreted as signed
+                        if let ExifValue::Short(vals) = &value {
+                            let signed: Vec<i16> = vals.iter().map(|&v| v as i16).collect();
+                            let formatted: Vec<String> =
+                                signed.iter().map(|v| v.to_string()).collect();
+                            ExifValue::Ascii(formatted.join(" "))
+                        } else if let ExifValue::SShort(vals) = &value {
+                            let formatted: Vec<String> =
+                                vals.iter().map(|v| v.to_string()).collect();
+                            ExifValue::Ascii(formatted.join(" "))
                         } else {
                             value
                         }
@@ -1866,6 +3021,95 @@ fn parse_olympus_ifd(
                                         ExifValue::Ascii(format!("{} m", formatted))
                                     }
                                 }
+                            }
+                            _ => value,
+                        }
+                    }
+                    FI_INTERNAL_FLASH => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_internal_flash_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    FI_MACRO_LED => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_macro_led_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    FI_EXTERNAL_FLASH => {
+                        // ExternalFlash is int16u[2], first value is On/Off
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_external_flash_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    FI_EXTERNAL_FLASH_BOUNCE => {
+                        // ExternalFlashBounce: int16u, 0 => "Bounce or Off", 1 => "Direct"
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                match vals[0] {
+                                    0 => ExifValue::Ascii("Bounce or Off".to_string()),
+                                    1 => ExifValue::Ascii("Direct".to_string()),
+                                    _ => value,
+                                }
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    FI_MANUAL_FLASH => {
+                        // ManualFlash is int16u[2]: (on/off, strength)
+                        // "0 0" => "Off", "1 1" => "Full", "1 2" => "1/2", etc.
+                        if let ExifValue::Short(vals) = &value {
+                            ExifValue::Ascii(decode_manual_flash(vals))
+                        } else {
+                            value
+                        }
+                    }
+                    FI_SENSOR_TEMPERATURE => {
+                        // SensorTemperature: int16s array, add " C" suffix
+                        // ExifTool strips trailing " 0 0" then adds " C"
+                        match &value {
+                            ExifValue::SShort(vals) => {
+                                let vals_str: Vec<String> =
+                                    vals.iter().map(|v| v.to_string()).collect();
+                                let mut result = vals_str.join(" ");
+                                // Strip trailing " 0 0" if present
+                                if result.ends_with(" 0 0") {
+                                    result = result[..result.len() - 4].to_string();
+                                }
+                                ExifValue::Ascii(format!("{} C", result))
+                            }
+                            ExifValue::Short(vals) => {
+                                let vals_str: Vec<String> =
+                                    vals.iter().map(|v| (*v as i16).to_string()).collect();
+                                let mut result = vals_str.join(" ");
+                                if result.ends_with(" 0 0") {
+                                    result = result[..result.len() - 4].to_string();
+                                }
+                                ExifValue::Ascii(format!("{} C", result))
                             }
                             _ => value,
                         }

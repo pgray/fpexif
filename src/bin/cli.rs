@@ -859,13 +859,19 @@ fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16
                             let denominator = shutter_speed.round() as u32;
                             format!("1/{}", denominator)
                         }
+                        0x829D => {
+                            // FNumber - always show one decimal place to match ExifTool
+                            let f_number = n as f64 / d as f64;
+                            format!("{:.1}", f_number)
+                        }
                         0x9202 | 0x9205 => {
                             // ApertureValue, MaxApertureValue (APEX) - convert to f-number
                             // F-number = 2^(APEX/2)
+                            // Always show one decimal place to match ExifTool
                             let apex = n as f64 / d as f64;
                             let f_number = 2f64.powf(apex / 2.0);
                             let rounded = (f_number * 10.0).round() / 10.0;
-                            format!("{}", rounded)
+                            format!("{:.1}", rounded)
                         }
                         0x008B => {
                             // LensFStops (Nikon) - format with 2 decimal places

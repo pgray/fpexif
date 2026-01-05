@@ -136,7 +136,7 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         SONY_MULTI_FRAME_NOISE_REDUCTION => Some("MultiFrameNoiseReduction"),
         SONY_PICTURE_EFFECT => Some("PictureEffect"),
         SONY_VIGNETTING_CORRECTION => Some("VignettingCorrection"),
-        SONY_DISTORTION_CORRECTION => Some("DistortionCorrection"),
+        SONY_DISTORTION_CORRECTION => Some("DistortionCorrectionSetting"),
         SONY_FOCUS_MODE => Some("FocusMode"),
         SONY_AF_POINT_SELECTED => Some("AFPointSelected"),
         SONY_SONY_MODEL_ID => Some("SonyModelID"),
@@ -1498,6 +1498,22 @@ pub fn decode_high_iso_noise_reduction2_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode HighISONoiseReduction2 value (tag 0xB050) - ExifTool format
+pub fn decode_high_iso_noise_reduction2_exiftool(value: u16) -> &'static str {
+    // Same as exiv2 format for this tag
+    decode_high_iso_noise_reduction2_exiv2(value)
+}
+
+/// Check if all values in a slice are zero
+fn all_zeros_u8(vals: &[u8]) -> bool {
+    vals.iter().all(|&v| v == 0)
+}
+
+/// Check if all values in a slice are zero
+fn all_zeros_u16(vals: &[u16]) -> bool {
+    vals.iter().all(|&v| v == 0)
+}
+
 /// Decode LateralChromaticAberration value (tag 0x2012) - exiv2 format
 pub fn decode_lateral_chromatic_aberration_exiv2(value: u32) -> &'static str {
     match value {
@@ -2312,6 +2328,56 @@ pub fn parse_sony_maker_notes(
                     if let ExifValue::Long(ref v) = value {
                         if !v.is_empty() {
                             ExifValue::Ascii(decode_quality_exiftool(v[0]).to_string())
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                SONY_HIGH_ISO_NOISE_REDUCTION_2 => {
+                    // Tag 0xB050: decode noise reduction level
+                    if let ExifValue::Short(ref v) = value {
+                        if !v.is_empty() {
+                            ExifValue::Ascii(
+                                decode_high_iso_noise_reduction2_exiftool(v[0]).to_string(),
+                            )
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                SONY_AF_POINTS_USED | SONY_FOCAL_PLANE_AF_POINTS_USED => {
+                    // AFPointsUsed/FocalPlaneAFPointsUsed: all zeros => "(none)"
+                    match &value {
+                        ExifValue::Byte(vals) if all_zeros_u8(vals) => {
+                            ExifValue::Ascii("(none)".to_string())
+                        }
+                        ExifValue::Short(vals) if all_zeros_u16(vals) => {
+                            ExifValue::Ascii("(none)".to_string())
+                        }
+                        _ => value,
+                    }
+                }
+                SONY_VARIABLE_LOW_PASS_FILTER => {
+                    // VariableLowPassFilter: int16u[2], "0 0" or "65535 65535" => "n/a"
+                    if let ExifValue::Short(vals) = &value {
+                        if vals.len() >= 2 {
+                            if (vals[0] == 0 && vals[1] == 0)
+                                || (vals[0] == 65535 && vals[1] == 65535)
+                            {
+                                ExifValue::Ascii("n/a".to_string())
+                            } else if vals[0] == 1 && vals[1] == 0 {
+                                ExifValue::Ascii("Off".to_string())
+                            } else if vals[0] == 1 && vals[1] == 1 {
+                                ExifValue::Ascii("Standard".to_string())
+                            } else if vals[0] == 1 && vals[1] == 2 {
+                                ExifValue::Ascii("High".to_string())
+                            } else {
+                                value
+                            }
                         } else {
                             value
                         }
