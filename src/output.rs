@@ -1577,6 +1577,17 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 } else {
                     output.insert(key.clone(), Value::String(value.clone()));
                 }
+            } else if key == "RawExposureBias" {
+                // RawExposureBias should be a number in JSON (e.g., -0.7)
+                if let Ok(n) = value.parse::<f64>() {
+                    if let Some(num) = serde_json::Number::from_f64(n) {
+                        output.insert(key.clone(), Value::Number(num));
+                    } else {
+                        output.insert(key.clone(), Value::String(value.clone()));
+                    }
+                } else {
+                    output.insert(key.clone(), Value::String(value.clone()));
+                }
             } else {
                 output.insert(key.clone(), Value::String(value.clone()));
             }
