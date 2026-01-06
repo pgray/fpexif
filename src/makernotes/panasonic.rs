@@ -1107,7 +1107,13 @@ pub fn parse_panasonic_maker_notes(
                             PANA_PHOTO_STYLE => Some(decode_photo_style_exiftool(v).to_string()),
                             PANA_SHUTTER_TYPE => Some(decode_shutter_type_exiftool(v).to_string()),
                             PANA_CONTRAST_MODE => {
-                                Some(decode_contrast_mode_exiftool(v).to_string())
+                                // ExifTool has PrintHex flag - show hex for unknown values
+                                let decoded = decode_contrast_mode_exiftool(v);
+                                if decoded == "Unknown" {
+                                    Some(format!("Unknown (0x{:x})", v))
+                                } else {
+                                    Some(decoded.to_string())
+                                }
                             }
                             PANA_BURST_MODE => Some(decode_burst_mode_exiftool(v).to_string()),
                             PANA_INTELLIGENT_RESOLUTION => {

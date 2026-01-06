@@ -2788,19 +2788,25 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     // Max focal length (index 23)
     if data.len() > 23 {
         let fl = data[23] as f64 / focal_units;
-        decoded.insert(
-            "MaxFocalLength".to_string(),
-            ExifValue::Ascii(format!("{} mm", fl as u32)),
-        );
+        // Format with one decimal place, but show as integer if whole number
+        let fl_str = if (fl - fl.round()).abs() < 0.01 {
+            format!("{} mm", fl.round() as u32)
+        } else {
+            format!("{:.1} mm", fl)
+        };
+        decoded.insert("MaxFocalLength".to_string(), ExifValue::Ascii(fl_str));
     }
 
     // Min focal length (index 24)
     if data.len() > 24 {
         let fl = data[24] as f64 / focal_units;
-        decoded.insert(
-            "MinFocalLength".to_string(),
-            ExifValue::Ascii(format!("{} mm", fl as u32)),
-        );
+        // Format with one decimal place, but show as integer if whole number
+        let fl_str = if (fl - fl.round()).abs() < 0.01 {
+            format!("{} mm", fl.round() as u32)
+        } else {
+            format!("{:.1} mm", fl)
+        };
+        decoded.insert("MinFocalLength".to_string(), ExifValue::Ascii(fl_str));
     }
 
     // Max aperture (index 26) - Convert Canon aperture value to f-number
@@ -3222,19 +3228,25 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     // Max focal length (index 23)
     if data.len() > 23 {
         let fl = data[23] as f64 / focal_units;
-        decoded.insert(
-            "MaxFocalLength".to_string(),
-            ExifValue::Ascii(format!("{} mm", fl as u32)),
-        );
+        // Format with one decimal place, but show as integer if whole number
+        let fl_str = if (fl - fl.round()).abs() < 0.01 {
+            format!("{} mm", fl.round() as u32)
+        } else {
+            format!("{:.1} mm", fl)
+        };
+        decoded.insert("MaxFocalLength".to_string(), ExifValue::Ascii(fl_str));
     }
 
     // Min focal length (index 24)
     if data.len() > 24 {
         let fl = data[24] as f64 / focal_units;
-        decoded.insert(
-            "MinFocalLength".to_string(),
-            ExifValue::Ascii(format!("{} mm", fl as u32)),
-        );
+        // Format with one decimal place, but show as integer if whole number
+        let fl_str = if (fl - fl.round()).abs() < 0.01 {
+            format!("{} mm", fl.round() as u32)
+        } else {
+            format!("{:.1} mm", fl)
+        };
+        decoded.insert("MinFocalLength".to_string(), ExifValue::Ascii(fl_str));
     }
 
     // Max aperture (index 26) - Uses Canon EV encoding
@@ -4950,14 +4962,21 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
             );
         }
 
-        // RawMeasuredRGGB at 0x280
-        // Canon stores as int32u[4] where each int32u contains the same 16-bit value in both words
-        // e.g., 0x05200520 for value 1312 (0x0520). Just extract one of the u16 values.
-        if data.len() > 0x280 + 7 {
-            let r = data[0x280] as u32;
-            let g1 = data[0x282] as u32;
-            let g2 = data[0x284] as u32;
-            let b = data[0x286] as u32;
+        // RawMeasuredRGGB at word index 0x280 (ExifTool uses word offsets for ColorData)
+        // Format: int32u[4] with SwapWords - swap 16-bit halves of each 32-bit value
+        // Data is stored as u16 array in little-endian. Each 32-bit value spans 2 u16s.
+        let rggb_idx = 0x280; // Word index (not byte offset!)
+        if data.len() > rggb_idx + 7 {
+            // Helper to read 32-bit and apply SwapWords
+            let swap_words = |low: u16, high: u16| -> u32 {
+                // Combine to 32-bit: (high << 16) | low, then swap 16-bit halves
+                // Result: (low << 16) | high
+                ((low as u32) << 16) | (high as u32)
+            };
+            let r = swap_words(data[rggb_idx], data[rggb_idx + 1]);
+            let g1 = swap_words(data[rggb_idx + 2], data[rggb_idx + 3]);
+            let g2 = swap_words(data[rggb_idx + 4], data[rggb_idx + 5]);
+            let b = swap_words(data[rggb_idx + 6], data[rggb_idx + 7]);
             let rggb_str = format!("{} {} {} {}", r, g1, g2, b);
             decoded.insert("RawMeasuredRGGB".to_string(), ExifValue::Ascii(rggb_str));
         }
@@ -5076,12 +5095,16 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
         }
 
         if version == 10 {
-            if data.len() > 0x1ad + 7 {
-                // Same format: extract one u16 value per color channel
-                let r = data[0x1ad] as u32;
-                let g1 = data[0x1af] as u32;
-                let g2 = data[0x1b1] as u32;
-                let b = data[0x1b3] as u32;
+            // RawMeasuredRGGB at word index 0x1ad for version 10
+            // Format: int32u[4] with SwapWords
+            let rggb_idx = 0x1ad;
+            if data.len() > rggb_idx + 7 {
+                let swap_words =
+                    |low: u16, high: u16| -> u32 { ((low as u32) << 16) | (high as u32) };
+                let r = swap_words(data[rggb_idx], data[rggb_idx + 1]);
+                let g1 = swap_words(data[rggb_idx + 2], data[rggb_idx + 3]);
+                let g2 = swap_words(data[rggb_idx + 4], data[rggb_idx + 5]);
+                let b = swap_words(data[rggb_idx + 6], data[rggb_idx + 7]);
                 let rggb_str = format!("{} {} {} {}", r, g1, g2, b);
                 decoded.insert("RawMeasuredRGGB".to_string(), ExifValue::Ascii(rggb_str));
             }

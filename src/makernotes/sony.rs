@@ -267,13 +267,13 @@ pub fn get_sony_model_name(model_id: u16) -> Option<&'static str> {
         283 => Some("DSLR-A580"),
         // SLT-A series
         280 => Some("SLT-A33"),
-        281 => Some("SLT-A55"),
+        281 => Some("SLT-A55 / SLT-A55V"),
         285 => Some("SLT-A35"),
-        286 => Some("SLT-A65"),
-        287 => Some("SLT-A77"),
+        286 => Some("SLT-A65 / SLT-A65V"),
+        287 => Some("SLT-A77 / SLT-A77V"),
         291 => Some("SLT-A37"),
         292 => Some("SLT-A57"),
-        294 => Some("SLT-A99"),
+        294 => Some("SLT-A99 / SLT-A99V"),
         303 => Some("SLT-A58"),
         // NEX series
         278 => Some("NEX-5"),
@@ -496,6 +496,8 @@ pub fn get_sony_lens_name(lens_id: u32) -> Option<&'static str> {
         33095 => Some("Sony FE 70-200mm F2.8 GM OSS II (SEL70200GM2)"),
         33096 => Some("Sony FE 24-70mm F2.8 GM II (SEL2470GM2)"),
         33097 => Some("Sony FE 16-35mm F2.8 GM II (SEL1635GM2)"),
+        // 65535 = No lens or E-mount/T-mount/other non-A-mount lens
+        65535 => Some("E-Mount, T-Mount, Other Lens or no lens"),
         _ => None,
     }
 }

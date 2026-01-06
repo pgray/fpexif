@@ -2353,6 +2353,19 @@ fn parse_olympus_ifd(
                             value
                         }
                     }
+                    EQUIP_FLASH_FIRMWARE_VERSION => {
+                        // FlashFirmwareVersion: convert u32 to hex version string
+                        // e.g., 4101 decimal = 0x1005 -> "1.005"
+                        if let ExifValue::Long(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(format_firmware_version(vals[0]))
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
                     EQUIP_LENS_FIRMWARE_VERSION => {
                         // LensFirmwareVersion: convert u32 to hex version string
                         if let ExifValue::Long(vals) = &value {
@@ -2728,13 +2741,34 @@ fn parse_olympus_ifd(
                         }
                     }
                     CS_PICTURE_MODE_BW_FILTER => {
-                        // PictureModeBWFilter: 0 = n/a (stored as int16s)
-                        match &value {
-                            ExifValue::SShort(vals) if !vals.is_empty() && vals[0] == 0 => {
-                                ExifValue::Ascii("n/a".to_string())
+                        // PictureModeBWFilter: stored as int16s
+                        let decode_bw_filter = |v: i16| -> &'static str {
+                            match v {
+                                0 => "n/a",
+                                1 => "Neutral",
+                                2 => "Yellow",
+                                3 => "Orange",
+                                4 => "Red",
+                                5 => "Green",
+                                _ => "",
                             }
-                            ExifValue::Short(vals) if !vals.is_empty() && vals[0] == 0 => {
-                                ExifValue::Ascii("n/a".to_string())
+                        };
+                        match &value {
+                            ExifValue::SShort(vals) if !vals.is_empty() => {
+                                let decoded = decode_bw_filter(vals[0]);
+                                if !decoded.is_empty() {
+                                    ExifValue::Ascii(decoded.to_string())
+                                } else {
+                                    value
+                                }
+                            }
+                            ExifValue::Short(vals) if !vals.is_empty() => {
+                                let decoded = decode_bw_filter(vals[0] as i16);
+                                if !decoded.is_empty() {
+                                    ExifValue::Ascii(decoded.to_string())
+                                } else {
+                                    value
+                                }
                             }
                             _ => value,
                         }
@@ -3204,8 +3238,8 @@ fn parse_olympus_ifd(
                                     if v == 0.0 {
                                         ExifValue::Ascii("inf".to_string())
                                     } else {
-                                        // Format without trailing zeros (ExifTool style)
-                                        let formatted = format!("{:.2}", v);
+                                        // Format with 3 decimal places, trim trailing zeros (ExifTool style)
+                                        let formatted = format!("{:.3}", v);
                                         let formatted =
                                             formatted.trim_end_matches('0').trim_end_matches('.');
                                         ExifValue::Ascii(format!("{} m", formatted))
@@ -3222,8 +3256,8 @@ fn parse_olympus_ifd(
                                     if v == 0.0 {
                                         ExifValue::Ascii("inf".to_string())
                                     } else {
-                                        // Format without trailing zeros (ExifTool style)
-                                        let formatted = format!("{:.2}", v);
+                                        // Format with 3 decimal places, trim trailing zeros (ExifTool style)
+                                        let formatted = format!("{:.3}", v);
                                         let formatted =
                                             formatted.trim_end_matches('0').trim_end_matches('.');
                                         ExifValue::Ascii(format!("{} m", formatted))

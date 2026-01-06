@@ -504,6 +504,31 @@ define_tag_decoder! {
     }
 }
 
+define_tag_decoder! {
+    minolta_teleconverter,
+    type: u32,
+    both: {
+        0x00 => "None",
+        0x04 => "Minolta/Sony AF 1.4x APO (D) (0x04)",
+        0x05 => "Minolta/Sony AF 2x APO (D) (0x05)",
+        0x48 => "Minolta/Sony AF 2x APO (D)",
+        0x50 => "Minolta AF 2x APO II",
+        0x60 => "Minolta AF 2x APO",
+        0x88 => "Minolta/Sony AF 1.4x APO (D)",
+        0x90 => "Minolta AF 1.4x APO II",
+        0xa0 => "Minolta AF 1.4x APO",
+    }
+}
+
+define_tag_decoder! {
+    minolta_raw_and_jpg,
+    type: u32,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
 /// Get Minolta/Sony A-mount lens name from lens ID
 /// Reference: Minolta.pm %minoltaLensTypes
 pub fn get_minolta_lens_name(lens_id: u32) -> Option<&'static str> {
@@ -985,6 +1010,12 @@ pub fn parse_minolta_maker_notes(
                             }
                             MINOLTA_ZONE_MATCHING => {
                                 Some(decode_zone_matching_exiftool(v).to_string())
+                            }
+                            MINOLTA_TELECONVERTER => {
+                                Some(decode_minolta_teleconverter_exiftool(v).to_string())
+                            }
+                            MINOLTA_RAW_AND_JPG_RECORDING => {
+                                Some(decode_minolta_raw_and_jpg_exiftool(v).to_string())
                             }
                             MINOLTA_LENS_ID => get_minolta_lens_name(v).map(|s| s.to_string()),
                             _ => None,
