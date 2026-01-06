@@ -1298,11 +1298,12 @@ fn decode_manual_flash(vals: &[u16]) -> String {
         return "On".to_string();
     }
     let strength = vals[1];
-    if strength == 1 {
+    let strength_str = if strength == 1 {
         "Full".to_string()
     } else {
         format!("1/{}", strength)
-    }
+    };
+    format!("On ({} strength)", strength_str)
 }
 
 // RawDevColorSpace (RD 0x0108): Olympus.pm
@@ -3294,7 +3295,13 @@ fn parse_olympus_ifd(
                     FI_AF_POINT => {
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                ExifValue::Ascii(decode_af_point_exiftool(vals[0]).to_string())
+                                let decoded = decode_af_point_exiftool(vals[0]);
+                                if decoded == "Unknown" {
+                                    // Show raw value for unknown AF points
+                                    ExifValue::Ascii(format!("Unknown ({})", vals[0]))
+                                } else {
+                                    ExifValue::Ascii(decoded.to_string())
+                                }
                             } else {
                                 value
                             }

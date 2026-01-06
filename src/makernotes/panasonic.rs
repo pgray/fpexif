@@ -381,6 +381,7 @@ define_tag_decoder! {
 }
 
 // ContrastMode (tag 0x002C): Panasonic.pm / panasonicmn_int.cpp
+// Note: Uses different mappings for G2, GF1, GF2, GF3, GF5, GF6 models
 define_tag_decoder! {
     contrast_mode,
     exiftool: {
@@ -403,6 +404,45 @@ define_tag_decoder! {
         256 => "Low",
         272 => "Standard",
         288 => "High",
+    }
+}
+
+// ContrastMode for GF1, G2, GF2, GF3, GF5, GF6 models (different mapping)
+define_tag_decoder! {
+    contrast_mode_gf,
+    exiftool: {
+        0 => "-2",
+        1 => "-1",
+        2 => "Normal",
+        3 => "+1",
+        4 => "+2",
+        5 => "-1",
+        6 => "Normal",
+        7 => "+1",
+    },
+    exiv2: {
+        0 => "-2",
+        1 => "-1",
+        2 => "Normal",
+        3 => "+1",
+        4 => "+2",
+        5 => "-1",
+        6 => "Normal",
+        7 => "+1",
+    }
+}
+
+/// Decode ContrastMode with model-specific handling
+pub fn decode_contrast_mode_with_model(value: u16, model: Option<&str>) -> String {
+    // Check if this is a GF/G2 series camera
+    let is_gf_model = model
+        .map(|m| m.contains("DMC-GF") || m.contains("DMC-G2"))
+        .unwrap_or(false);
+
+    if is_gf_model {
+        decode_contrast_mode_gf_exiftool(value).to_string()
+    } else {
+        decode_contrast_mode_exiftool(value).to_string()
     }
 }
 
@@ -871,6 +911,7 @@ define_tag_decoder! {
 pub fn parse_panasonic_maker_notes(
     data: &[u8],
     endian: Endianness,
+    model: Option<&str>,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -992,7 +1033,7 @@ pub fn parse_panasonic_maker_notes(
                             ExifValue::Byte(bytes)
                         }
                     } else if tag_id == PANA_CITY || tag_id == PANA_LANDMARK {
-                        // City/Landmark: string fields, if all zeros or null-terminated at start, show empty
+                        // City/Landmark: string fields, show empty for invalid data (like ExifTool)
                         let trimmed: Vec<u8> =
                             bytes.iter().copied().take_while(|&b| b != 0).collect();
                         if trimmed.is_empty() || trimmed.iter().all(|&b| b == 0) {
@@ -1000,7 +1041,8 @@ pub fn parse_panasonic_maker_notes(
                         } else if let Ok(s) = std::str::from_utf8(&trimmed) {
                             ExifValue::Ascii(s.to_string())
                         } else {
-                            ExifValue::Byte(bytes)
+                            // Invalid UTF-8 - treat as empty
+                            ExifValue::Ascii(String::new())
                         }
                     } else {
                         ExifValue::Byte(bytes)
@@ -1107,12 +1149,13 @@ pub fn parse_panasonic_maker_notes(
                             PANA_PHOTO_STYLE => Some(decode_photo_style_exiftool(v).to_string()),
                             PANA_SHUTTER_TYPE => Some(decode_shutter_type_exiftool(v).to_string()),
                             PANA_CONTRAST_MODE => {
-                                // ExifTool has PrintHex flag - show hex for unknown values
-                                let decoded = decode_contrast_mode_exiftool(v);
+                                // Model-specific decoding for GF/G2 series
+                                let decoded = decode_contrast_mode_with_model(v, model);
                                 if decoded == "Unknown" {
+                                    // ExifTool has PrintHex flag - show hex for unknown values
                                     Some(format!("Unknown (0x{:x})", v))
                                 } else {
-                                    Some(decoded.to_string())
+                                    Some(decoded)
                                 }
                             }
                             PANA_BURST_MODE => Some(decode_burst_mode_exiftool(v).to_string()),
@@ -1454,8 +1497,8 @@ pub fn parse_panasonic_maker_notes(
                                     ExifValue::Undefined(value_bytes.to_vec())
                                 }
                             } else if tag_id == PANA_LANDMARK || tag_id == PANA_CITY {
-                                // Landmark and City: string fields that show empty when all zeros
-                                // Find first non-zero byte or treat as empty if all zeros
+                                // Landmark and City: string fields that show empty when all zeros or invalid
+                                // ExifTool returns empty for these when they don't contain valid text
                                 let trimmed: Vec<u8> = value_bytes
                                     .iter()
                                     .copied()
@@ -1466,7 +1509,8 @@ pub fn parse_panasonic_maker_notes(
                                 } else if let Ok(s) = std::str::from_utf8(&trimmed) {
                                     ExifValue::Ascii(s.to_string())
                                 } else {
-                                    ExifValue::Undefined(value_bytes.to_vec())
+                                    // Invalid UTF-8 in location field - treat as empty (like ExifTool)
+                                    ExifValue::Ascii(String::new())
                                 }
                             } else {
                                 ExifValue::Undefined(value_bytes.to_vec())

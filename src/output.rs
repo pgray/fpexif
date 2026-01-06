@@ -353,9 +353,14 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
                     // Output as fraction (e.g., +1/3, -2/3, +1/2)
                     Value::String(format!("{}{}/{}", sign, simple_num, simple_den))
                 } else if decimal.fract() == 0.0 {
-                    // Whole number (e.g., +1, -2)
-                    let int_val = decimal.abs() as i32;
-                    Value::String(format!("{}{}", sign, int_val))
+                    // Whole number - ExifTool outputs negative as number (-1),
+                    // but positive as string with + prefix ("+1")
+                    let int_val = decimal.round() as i64;
+                    if int_val < 0 {
+                        Value::Number(int_val.into())
+                    } else {
+                        Value::String(format!("+{}", int_val))
+                    }
                 } else {
                     // Decimal format (e.g., +0.33, -0.67)
                     let rounded = (decimal * 100.0).round() / 100.0;
