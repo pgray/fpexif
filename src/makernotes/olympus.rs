@@ -1076,6 +1076,31 @@ define_tag_decoder! {
     }
 }
 
+/// Decode FocusInfo ImageStabilization (FI 0x1600): binary blob
+/// From Olympus.pm: if first 4 bytes are null => Off
+/// Otherwise: On + bit 0x01 of byte 44 determines Mode 1 vs Mode 2
+pub fn decode_fi_image_stabilization(data: &[u8]) -> String {
+    if data.len() < 4 {
+        return "Unknown".to_string();
+    }
+    // If first 4 bytes are all zeros, stabilization is off
+    if data[0..4] == [0, 0, 0, 0] {
+        return "Off".to_string();
+    }
+    // Otherwise, it's on - check byte 44 to determine mode
+    if data.len() > 44 {
+        let mode = if data[44] & 0x01 != 0 {
+            "Mode 1"
+        } else {
+            "Mode 2"
+        };
+        format!("On, {}", mode)
+    } else {
+        // Not enough data to determine mode
+        "On".to_string()
+    }
+}
+
 // MultipleExposureMode (IP 0x101C): Olympus.pm / olympusmn_int.cpp
 define_tag_decoder! {
     multiple_exposure_mode,
@@ -3232,6 +3257,17 @@ fn parse_olympus_ifd(
                             value
                         }
                     }
+                    FI_AF_POINT => {
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(decode_af_point_exiftool(vals[0]).to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
                     FI_EXTERNAL_FLASH => {
                         // ExternalFlash is int16u[2], first value is On/Off
                         if let ExifValue::Short(vals) = &value {
@@ -3308,6 +3344,15 @@ fn parse_olympus_ifd(
                                 ExifValue::Ascii(format!("{} C", result))
                             }
                             _ => value,
+                        }
+                    }
+                    FI_IMAGE_STABILIZATION => {
+                        // FocusInfo ImageStabilization (0x1600): binary blob
+                        // First 4 bytes all zero = Off, otherwise On + mode from byte 44
+                        if let ExifValue::Undefined(bytes) = &value {
+                            ExifValue::Ascii(decode_fi_image_stabilization(bytes))
+                        } else {
+                            value
                         }
                     }
                     _ => value,

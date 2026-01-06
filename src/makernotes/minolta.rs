@@ -504,6 +504,64 @@ define_tag_decoder! {
     }
 }
 
+/// Get Minolta/Sony A-mount lens name from lens ID
+/// Reference: Minolta.pm %minoltaLensTypes
+pub fn get_minolta_lens_name(lens_id: u32) -> Option<&'static str> {
+    match lens_id {
+        // Low IDs (Sony SAL lenses)
+        0 => Some("Minolta AF 28-85mm F3.5-4.5"),
+        1 => Some("Minolta AF 80-200mm F2.8 HS-APO G"),
+        2 => Some("Minolta AF 28-70mm F2.8 G"),
+        3 => Some("Minolta AF 28-80mm F4-5.6"),
+        4 => Some("Minolta AF 85mm F1.4G"),
+        5 => Some("Minolta AF 35-70mm F3.5-4.5"),
+        6 => Some("Minolta AF 24-85mm F3.5-4.5"),
+        7 => Some("Minolta AF 100-300mm F4.5-5.6 APO"),
+        13 => Some("Minolta AF 75-300mm F4.5-5.6"),
+        16 => Some("Minolta AF 17-35mm F3.5 G"),
+        19 => Some("Minolta AF 35mm F1.4 G"),
+        20 => Some("Minolta/Sony 135mm F2.8 STF"),
+        25 => Some("Minolta AF 100-300mm F4.5-5.6 APO (D)"),
+        27 => Some("Minolta AF 85mm F1.4 G (D)"),
+        28 => Some("Minolta/Sony AF 100mm F2.8 Macro (D)"),
+        29 => Some("Minolta/Sony AF 75-300mm F4.5-5.6 (D)"),
+        31 => Some("Minolta/Sony AF 50mm F2.8 Macro (D)"),
+        32 => Some("Minolta/Sony AF 300mm F2.8 G APO"),
+        33 => Some("Minolta/Sony AF 70-200mm F2.8 G"),
+        38 => Some("Minolta AF 17-35mm F2.8-4 (D)"),
+        39 => Some("Minolta AF 28-75mm F2.8 (D)"),
+        40 => Some("Minolta/Sony AF DT 18-70mm F3.5-5.6 (D)"),
+        41 => Some("Minolta/Sony AF DT 11-18mm F4.5-5.6 (D)"),
+        42 => Some("Minolta/Sony AF DT 18-200mm F3.5-6.3 (D)"),
+        // High IDs from %minoltaLensTypes (older Minolta lenses)
+        25601 => Some("Minolta AF 100-200mm F4.5"),
+        25611 => Some("Minolta AF 75-300mm F4.5-5.6 (or Sigma)"),
+        25621 => Some("Minolta AF 50mm F1.4 [New]"),
+        25631 => Some("Minolta AF 300mm F2.8 APO (or Sigma)"),
+        25641 => Some("Minolta AF 50mm F2.8 Macro (or Sigma)"),
+        25651 => Some("Minolta AF 600mm F4 HS-APO G"),
+        25721 => Some("Minolta AF 500mm F8 Reflex"),
+        25781 => Some("Minolta/Sony AF 16mm F2.8 Fisheye"),
+        25811 => Some("Minolta/Sony AF 20mm F2.8"),
+        25851 => Some("Minolta AF 35-105mm F3.5-4.5"),
+        25858 => Some("Tamron SP AF 90mm F2.5 (172E)"),
+        25881 => Some("Minolta AF 70-210mm F3.5-4.5"),
+        25891 => Some("Minolta AF 80-200mm F2.8 APO"),
+        25911 => Some("Minolta AF 35mm F1.4"),
+        25921 => Some("Minolta AF 85mm F1.4 G (D)"),
+        25931 => Some("Minolta AF 200mm F2.8 APO"),
+        26011 => Some("Minolta AF 35-80mm F4-5.6"),
+        26041 => Some("Minolta AF 80-200mm F4.5-5.6"),
+        26051 => Some("Minolta AF 35-80mm F4-5.6"),
+        26061 => Some("Minolta AF 100mm F2"),
+        26071 => Some("Minolta AF 100-300mm F4.5-5.6"),
+        26121 => Some("Minolta AF 200mm F2.8 HS-APO G"),
+        26131 => Some("Minolta AF 50mm F1.7"),
+        26241 => Some("Minolta AF 35-80mm F4-5.6 Power Zoom"),
+        _ => None,
+    }
+}
+
 // Legacy function aliases for backward compatibility
 pub fn decode_exposure_mode_exiftool(value: u32) -> &'static str {
     decode_minolta_exposure_mode_exiftool(value)
@@ -928,6 +986,7 @@ pub fn parse_minolta_maker_notes(
                             MINOLTA_ZONE_MATCHING => {
                                 Some(decode_zone_matching_exiftool(v).to_string())
                             }
+                            MINOLTA_LENS_ID => get_minolta_lens_name(v).map(|s| s.to_string()),
                             _ => None,
                         };
 
@@ -977,6 +1036,12 @@ pub fn parse_minolta_maker_notes(
 
                         // Also store the raw UNDEFINED value
                         ExifValue::Undefined(value_bytes)
+                    } else if tag_id == MINOLTA_VERSION {
+                        // MakerNoteVersion is a string like "MLT0"
+                        let s = String::from_utf8_lossy(&value_bytes)
+                            .trim_end_matches('\0')
+                            .to_string();
+                        ExifValue::Ascii(s)
                     } else {
                         ExifValue::Undefined(value_bytes)
                     }

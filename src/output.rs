@@ -36,6 +36,28 @@ fn round_half_even(x: f64, decimals: i32) -> f64 {
     }
 }
 
+/// Format a float with up to 10 significant digits (ExifTool precision)
+/// Removes trailing zeros after decimal point
+fn format_float_10_sig(val: f64) -> String {
+    if val == 0.0 {
+        return "0".to_string();
+    }
+    // Special case for integers
+    if val.fract() == 0.0 && val.abs() < 1e10 {
+        return format!("{:.0}", val);
+    }
+    // Format with 10 significant digits using {:.*e} then convert back
+    // This ensures we get exactly 10 significant digits regardless of magnitude
+    let abs_val = val.abs();
+    let log10 = abs_val.log10().floor() as i32;
+    // Number of decimal places needed for 10 sig digits
+    let decimals = (9 - log10).max(0) as usize;
+    let formatted = format!("{:.*}", decimals, val);
+    // Trim trailing zeros and unnecessary decimal point
+    let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
+    trimmed.to_string()
+}
+
 /// Format EXIF MeteringMode - use manufacturer-specific naming where appropriate
 #[cfg(feature = "serde")]
 fn format_metering_mode(value: u16, make: Option<&str>) -> String {
@@ -110,6 +132,8 @@ fn format_short_value_with_make(value: u16, tag_id: u16, make: Option<&str>) -> 
         0xC65A | 0xC65B => {
             Value::String(crate::tags::get_light_source_description(value).to_string())
         }
+        // DNG CFALayout (0xC617)
+        0xC617 => Value::String(crate::tags::get_cfa_layout_description(value).to_string()),
         // FocalLengthIn35mmFormat - add "mm" suffix
         0xA405 => Value::String(format!("{} mm", value)),
         // Sony ARW SubIFD tags
@@ -820,7 +844,18 @@ fn is_numeric_string(s: &str) -> bool {
 /// Convert an ExifValue to a JSON value in exiftool-compatible format
 #[cfg(feature = "serde")]
 pub fn format_exif_value_for_json(value: &ExifValue, tag_id: u16) -> Value {
-    format_exif_value_for_json_with_make(value, tag_id, None)
+    format_exif_value_for_json_with_make_and_name(value, tag_id, None, None)
+}
+
+/// Convert an ExifValue to a JSON value in exiftool-compatible format with tag name
+/// Tag name allows for special handling of certain tags like InternalSerialNumber
+#[cfg(feature = "serde")]
+pub fn format_exif_value_for_json_with_name(
+    value: &ExifValue,
+    tag_id: u16,
+    tag_name: Option<&str>,
+) -> Value {
+    format_exif_value_for_json_with_make_and_name(value, tag_id, None, tag_name)
 }
 
 /// Convert an ExifValue to a JSON value in exiftool-compatible format with manufacturer info
@@ -830,10 +865,32 @@ pub fn format_exif_value_for_json_with_make(
     tag_id: u16,
     make: Option<&str>,
 ) -> Value {
+    format_exif_value_for_json_with_make_and_name(value, tag_id, make, None)
+}
+
+/// Convert an ExifValue to a JSON value in exiftool-compatible format with manufacturer and tag name info
+#[cfg(feature = "serde")]
+pub fn format_exif_value_for_json_with_make_and_name(
+    value: &ExifValue,
+    tag_id: u16,
+    make: Option<&str>,
+    tag_name: Option<&str>,
+) -> Value {
     match value {
         // ASCII strings - return as number if purely numeric, otherwise string
         ExifValue::Ascii(s) => {
-            let cleaned = s.trim_end_matches('\0').trim();
+            // For Olympus InternalSerialNumber, keep trailing spaces (ExifTool pads to 32 chars)
+            let is_olympus_internal_serial = tag_name == Some("InternalSerialNumber")
+                && make
+                    .map(|m| m.to_uppercase().contains("OLYMPUS"))
+                    .unwrap_or(false);
+
+            let cleaned = if is_olympus_internal_serial {
+                // Only trim null bytes, keep trailing spaces
+                s.trim_end_matches('\0')
+            } else {
+                s.trim_end_matches('\0').trim()
+            };
             // ExifTool outputs pure numeric strings (like SerialNumber, SubSecTime)
             // as JSON numbers, so we do the same
             if is_numeric_string(cleaned) {
@@ -943,6 +1000,9 @@ pub fn format_exif_value_for_json_with_make(
                         .collect::<Vec<_>>()
                         .join(" "),
                 )
+            // CFAPlaneColor (0xC616 DNG) - convert indices to color names
+            } else if tag_id == 0xC616 {
+                Value::String(crate::tags::get_cfa_plane_color_description(v))
             } else {
                 // Default to space-separated strings (ExifTool behavior)
                 Value::String(
@@ -975,6 +1035,22 @@ pub fn format_exif_value_for_json_with_make(
                     format!("{}", blue)
                 };
                 return Value::String(format!("Red {}, Blue {}", red_str, blue_str));
+            }
+            // YCbCrSubSampling (0x0212) - format as "YCbCr4:X:X (h v)"
+            if tag_id == 0x0212 && v.len() == 2 {
+                let key = format!("{} {}", v[0], v[1]);
+                let desc = match key.as_str() {
+                    "1 1" => "YCbCr4:4:4 (1 1)",
+                    "2 1" => "YCbCr4:2:2 (2 1)",
+                    "2 2" => "YCbCr4:2:0 (2 2)",
+                    "4 1" => "YCbCr4:1:1 (4 1)",
+                    "4 2" => "YCbCr4:1:0 (4 2)",
+                    "1 2" => "YCbCr4:4:0 (1 2)",
+                    "1 4" => "YCbCr4:4:1 (1 4)",
+                    "2 4" => "YCbCr4:2:1 (2 4)",
+                    _ => return Value::String(key),
+                };
+                return Value::String(desc.to_string());
             }
             // Default to space-separated strings (ExifTool behavior)
             Value::String(
@@ -1076,6 +1152,7 @@ pub fn format_exif_value_for_json_with_make(
         ),
 
         // Multi-value Rationals - format as space-separated decimals (ExifTool behavior)
+        // Use 10 significant digits to match ExifTool precision
         ExifValue::Rational(v) => {
             let decimals: Vec<String> = v
                 .iter()
@@ -1089,7 +1166,7 @@ pub fn format_exif_value_for_json_with_make(
                         }
                     } else {
                         let decimal = num as f64 / den as f64;
-                        decimal.to_string()
+                        format_float_10_sig(decimal)
                     }
                 })
                 .collect();
@@ -1108,7 +1185,7 @@ pub fn format_exif_value_for_json_with_make(
                         }
                     } else {
                         let decimal = num as f64 / den as f64;
-                        decimal.to_string()
+                        format_float_10_sig(decimal)
                     }
                 })
                 .collect();
@@ -1445,7 +1522,13 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         // Note: Saturation/Contrast/Sharpness removed - use EXIF standard values for all
         const MAKERNOTE_PRIORITY_TAGS: &[&str] = &["MeteringMode", "WhiteBalance", "LightSource"];
 
-        for (tag_id, maker_tag) in maker_notes.iter() {
+        // Sort by tag_id to ensure consistent ordering (lower IDs processed first)
+        // This is important for Olympus where CameraSettings ImageStabilization (0x2624)
+        // should take priority over FocusInfo ImageStabilization (0x3650)
+        let mut sorted_tags: Vec<_> = maker_notes.iter().collect();
+        sorted_tags.sort_by_key(|(tag_id, _)| *tag_id);
+
+        for (tag_id, maker_tag) in sorted_tags {
             let tag_name = maker_tag
                 .tag_name
                 .unwrap_or_else(|| Box::leak(format!("MakerNote{:04X}", tag_id).into_boxed_str()));
@@ -1458,7 +1541,12 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             };
 
             if should_insert {
-                let json_value = format_exif_value_for_json(&maker_tag.value, *tag_id);
+                let json_value = format_exif_value_for_json_with_make_and_name(
+                    &maker_tag.value,
+                    *tag_id,
+                    make_ref,
+                    Some(tag_name),
+                );
                 output.insert(tag_name.to_string(), json_value);
             }
         }

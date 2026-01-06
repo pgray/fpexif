@@ -1558,3 +1558,36 @@ pub fn get_gps_altitude_ref_description(value: u8) -> &'static str {
         _ => "Unknown",
     }
 }
+
+/// Human-readable description for CFALayout values (DNG tag 0xC617)
+pub fn get_cfa_layout_description(value: u16) -> &'static str {
+    match value {
+        1 => "Rectangular",
+        2 => "Even columns offset down 1/2 row",
+        3 => "Even columns offset up 1/2 row",
+        4 => "Even rows offset right 1/2 column",
+        5 => "Even rows offset left 1/2 column",
+        6 => "Even rows offset up by 1/2 row, even columns offset left by 1/2 column",
+        7 => "Even rows offset up by 1/2 row, even columns offset right by 1/2 column",
+        8 => "Even rows offset down by 1/2 row, even columns offset left by 1/2 column",
+        9 => "Even rows offset down by 1/2 row, even columns offset right by 1/2 column",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable description for CFAPlaneColor values (DNG tag 0xC616)
+/// Converts array of indices to color names: 0=Red, 1=Green, 2=Blue, etc.
+pub fn get_cfa_plane_color_description(values: &[u8]) -> String {
+    let colors = ["Red", "Green", "Blue", "Cyan", "Magenta", "Yellow", "White"];
+    let names: Vec<&str> = values
+        .iter()
+        .map(|&v| {
+            if (v as usize) < colors.len() {
+                colors[v as usize]
+            } else {
+                "Unknown"
+            }
+        })
+        .collect();
+    names.join(",")
+}

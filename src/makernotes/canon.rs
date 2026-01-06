@@ -2146,6 +2146,85 @@ pub fn decode_measured_ev_exiv2(value: i16) -> String {
     decode_measured_ev_exiftool(value)
 }
 
+/// Decode AFPointsInFocus1D - ExifTool format (from Canon.pm PrintAFPoints1D)
+/// EOS 1D has 45 AF points in 5 rows: A1-7, B1-10, C1-11, D1-10, E1-7
+/// Center point is C6
+pub fn decode_af_points_in_focus_1d(data: &[u8]) -> String {
+    if data.len() != 8 {
+        return "Unknown".to_string();
+    }
+
+    // Focus point values for decoding the first byte
+    // They are x/y positions: y is upper 3 bits, x is lower 5 bits
+    const FOCUS_PTS: [u8; 56] = [
+        0x00, 0x00, // padding
+        0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e, 0x10, 0x00, 0x00, // Row A (7 points)
+        0x21, 0x23, 0x25, 0x27, 0x29, 0x2b, 0x2d, 0x2f, 0x31, 0x33, // Row B (10 points)
+        0x40, 0x42, 0x44, 0x46, 0x48, 0x4a, 0x4c, 0x4d, 0x50, 0x52, 0x54, // Row C (11 points)
+        0x61, 0x63, 0x65, 0x67, 0x69, 0x6b, 0x6d, 0x6f, 0x71, 0x73, 0x00,
+        0x00, // Row D (10 points)
+        0x84, 0x86, 0x88, 0x8a, 0x8c, 0x8e, 0x90, 0x00, 0x00, 0x00, 0x00,
+        0x00, // Row E (7 points)
+    ];
+
+    const ROWS: [char; 56] = [
+        ' ', ' ', // padding
+        'A', 'A', 'A', 'A', 'A', 'A', 'A', ' ', ' ', // Row A
+        'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', // Row B
+        'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', // Row C
+        'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', ' ', ' ', // Row D
+        'E', 'E', 'E', 'E', 'E', 'E', 'E', ' ', ' ', ' ', ' ', ' ', // Row E
+    ];
+
+    let focus = data[0];
+
+    // Parse the bitmask from bytes 1-7
+    let mut bits = Vec::with_capacity(56);
+    for &byte in data.iter().take(8).skip(1) {
+        for bit_idx in 0..8 {
+            bits.push((byte >> bit_idx) & 1 != 0);
+        }
+    }
+
+    let mut focusing = String::new();
+    let mut points = Vec::new();
+    let mut last_row = ' ';
+    let mut col = 0u8;
+
+    for (idx, &focus_pt) in FOCUS_PTS.iter().enumerate() {
+        let row = ROWS[idx];
+        if row == last_row {
+            col += 1;
+        } else {
+            col = 1;
+        }
+        last_row = row;
+
+        if row != ' ' {
+            if focus == focus_pt {
+                focusing = format!("{}{}", row, col);
+            }
+            if idx < bits.len() && bits[idx] {
+                points.push(format!("{}{}", row, col));
+            }
+        }
+    }
+
+    if focusing.is_empty() {
+        if focus == 0xff {
+            focusing = "Auto".to_string();
+        } else {
+            focusing = format!("Unknown (0x{:02x})", focus);
+        }
+    }
+
+    if points.is_empty() {
+        format!("{} ()", focusing)
+    } else {
+        format!("{} ({})", focusing, points.join(","))
+    }
+}
+
 // SuperMacro: Canon.pm / canonmn_int.cpp canonSuperMacro
 define_tag_decoder! {
     super_macro,
@@ -6561,6 +6640,19 @@ pub fn parse_canon_maker_notes(
                         } else {
                             value
                         }
+                    } else {
+                        value
+                    }
+                }
+                // AFPointsInFocus1D - decode 8-byte bitmask to AF point names
+                CANON_AF_POINTS_IN_FOCUS_1D => {
+                    let bytes_data: Option<&[u8]> = match &value {
+                        ExifValue::Undefined(bytes) => Some(bytes.as_slice()),
+                        ExifValue::Byte(bytes) => Some(bytes.as_slice()),
+                        _ => None,
+                    };
+                    if let Some(bytes) = bytes_data {
+                        ExifValue::Ascii(decode_af_points_in_focus_1d(bytes))
                     } else {
                         value
                     }
