@@ -105,7 +105,7 @@ pub fn get_pentax_tag_name(tag_id: u16) -> Option<&'static str> {
         PENTAX_DATE => Some("Date"),
         PENTAX_TIME => Some("Time"),
         PENTAX_QUALITY => Some("Quality"),
-        PENTAX_IMAGE_SIZE => Some("ImageSize"),
+        PENTAX_IMAGE_SIZE => Some("PentaxImageSize"),
         PENTAX_FLASH_MODE => Some("FlashMode"),
         PENTAX_FOCUS_MODE => Some("FocusMode"),
         PENTAX_AF_POINT_SELECTED => Some("AFPointSelected"),
@@ -1504,10 +1504,73 @@ pub fn decode_af_point_selected_multi(data: &[u16]) -> String {
     point.to_string()
 }
 
+/// Decode Pentax ImageSize from 1 or 2 values
+/// Reference: Pentax.pm tag 0x0009
+pub fn decode_image_size(values: &[u16]) -> Option<String> {
+    if values.is_empty() {
+        return None;
+    }
+
+    // Try compound key first (2 values)
+    if values.len() >= 2 {
+        match (values[0], values[1]) {
+            (0, 0) => return Some("2304x1728".to_string()),
+            (4, 0) => return Some("1600x1200".to_string()),
+            (5, 0) => return Some("2048x1536".to_string()),
+            (8, 0) => return Some("2560x1920".to_string()),
+            (32, 2) => return Some("960x640".to_string()),
+            (33, 2) => return Some("1152x768".to_string()),
+            (34, 2) => return Some("1536x1024".to_string()),
+            (35, 1) => return Some("2400x1600".to_string()),
+            (36, 0) => return Some("3008x2008 or 3040x2024".to_string()),
+            (37, 0) => return Some("3008x2000".to_string()),
+            _ => {}
+        }
+    }
+
+    // Single value lookup
+    let v = values[0];
+    let size = match v {
+        0 => "640x480",
+        1 => "Full",
+        2 => "1024x768",
+        3 => "1280x960",
+        4 => "1600x1200",
+        5 => "2048x1536",
+        8 => "2560x1920 or 2304x1728",
+        9 => "3072x2304",
+        10 => "3264x2448",
+        19 => "320x240",
+        20 => "2288x1712",
+        21 => "2592x1944",
+        22 => "2304x1728 or 2592x1944",
+        23 => "3056x2296",
+        25 => "2816x2212 or 2816x2112",
+        27 => "3648x2736",
+        29 => "4000x3000",
+        30 => "4288x3216",
+        31 => "4608x3456",
+        129 => "1920x1080",
+        135 => "4608x2592",
+        257 => "3216x3216",
+        _ => return None,
+    };
+
+    Some(size.to_string())
+}
+
 /// Parse Pentax maker notes
+///
+/// # Arguments
+/// * `data` - The maker note data (contents of MakerNote tag)
+/// * `endian` - Default byte order
+/// * `tiff_data` - Optional full TIFF/EXIF data for resolving TIFF-relative offsets
+/// * `tiff_offset` - Offset of TIFF header within the full data
 pub fn parse_pentax_maker_notes(
     data: &[u8],
     endian: Endianness,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -1622,12 +1685,30 @@ pub fn parse_pentax_maker_notes(
                     Endianness::Big => value_offset.to_be_bytes().to_vec(),
                 }
             } else {
-                // Value at offset (relative to base)
-                let abs_offset = base_offset + value_offset as usize;
-                if abs_offset + value_size <= data.len() {
-                    data[abs_offset..abs_offset + value_size].to_vec()
+                // Value at offset - for Pentax AOC format, offsets are TIFF-relative
+                // First try reading from tiff_data if available
+                let value_bytes_opt: Option<Vec<u8>> = if let Some(tiff) = tiff_data {
+                    // Value offset is relative to TIFF header
+                    let tiff_off = tiff_offset + value_offset as usize;
+                    if tiff_off + value_size <= tiff.len() {
+                        Some(tiff[tiff_off..tiff_off + value_size].to_vec())
+                    } else {
+                        None
+                    }
                 } else {
-                    continue;
+                    None
+                };
+
+                // Fall back to reading from MakerNote data (relative to base_offset)
+                if let Some(bytes) = value_bytes_opt {
+                    bytes
+                } else {
+                    let abs_offset = base_offset + value_offset as usize;
+                    if abs_offset + value_size <= data.len() {
+                        data[abs_offset..abs_offset + value_size].to_vec()
+                    } else {
+                        continue;
+                    }
                 }
             };
 
@@ -1698,6 +1779,7 @@ pub fn parse_pentax_maker_notes(
                             let height_mm = values[1] as f64 / 500.0;
                             Some(format!("{:.3} x {:.3} mm", width_mm, height_mm))
                         }
+                        PENTAX_IMAGE_SIZE => decode_image_size(&values),
                         _ => None,
                     };
 
@@ -1731,6 +1813,13 @@ pub fn parse_pentax_maker_notes(
                             }
                             PENTAX_WHITE_BALANCE_MODE => {
                                 decode_white_balance_mode(v).map(|s| s.to_string())
+                            }
+                            // EffectiveLV: ValueConv => '$val/1024' per Pentax.pm
+                            PENTAX_EFFECTIVE_LV => {
+                                // Treat as signed int16 for negative values
+                                let signed_val = v as i16;
+                                let lv = signed_val as f64 / 1024.0;
+                                Some(format!("{:.1}", lv))
                             }
                             _ => None,
                         };

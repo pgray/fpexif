@@ -183,6 +183,21 @@ where
         0x0103, // Compression (for raw data IFD)
     ];
 
+    // Helper to check if a compression value is RAW-specific
+    let is_raw_compression = |v: u16| {
+        matches!(
+            v,
+            34713   // Nikon NEF Compressed
+                | 32767 // Sony ARW Compressed
+                | 34316 // Panasonic RAW 1
+                | 34826 // Panasonic RAW 2
+                | 34828 // Panasonic RAW 3
+                | 34830 // Panasonic RAW 4
+                | 65535 // Pentax PEF Compressed
+                | 65000 // Kodak DCR Compressed
+        )
+    };
+
     while current_ifd_offset > 0
         && ifd_count < MAX_IFD_CHAIN
         && tiff_offset + current_ifd_offset as usize + 2 <= app1_data.len()
@@ -198,6 +213,28 @@ where
             // Only override specific raw-data tags, skip others
             for (tag_id, value) in ifd_tags {
                 if RAW_DATA_TAGS.contains(&tag_id.id) {
+                    // Special handling for Compression (0x0103):
+                    // IFD0 contains the main image compression. Later IFDs (IFD1, IFD2, etc.)
+                    // typically contain thumbnails with different compression.
+                    // Only allow RAW-specific compression values from later IFDs to override.
+                    if tag_id.id == 0x0103 {
+                        // Check if we already have a compression value from IFD0
+                        let has_existing = exif_data.get_tag_by_id(0x0103).is_some();
+
+                        // Check if new value is RAW-specific (should always override)
+                        let new_is_raw = if let ExifValue::Short(vals) = &value {
+                            !vals.is_empty() && is_raw_compression(vals[0])
+                        } else {
+                            false
+                        };
+
+                        // Only allow override if:
+                        // - we don't have an existing value, OR
+                        // - new value is RAW-specific
+                        if has_existing && !new_is_raw {
+                            continue;
+                        }
+                    }
                     exif_data.tags.insert(tag_id, value);
                 }
             }

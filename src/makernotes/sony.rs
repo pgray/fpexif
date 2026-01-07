@@ -104,6 +104,13 @@ pub const SONY_FOCUS_DISTANCE: u16 = 0x0206;
 pub const SONY_NOISE_REDUCTION_2: u16 = 0x200C;
 pub const SONY_WB_RG_BG_LEVELS: u16 = 0x2024;
 
+// CameraSettings sub-tag storage IDs (A200/A300/A350/A700/A850/A900)
+// These are virtual tag IDs for sub-tags extracted from the CameraSettings binary blob
+// Base offset 0xC000 to avoid collision with real Sony tags
+pub const CS_SHARPNESS: u16 = 0xC01C; // Offset 0x1c in CameraSettings
+pub const CS_CONTRAST: u16 = 0xC01D; // Offset 0x1d in CameraSettings
+pub const CS_SATURATION: u16 = 0xC01E; // Offset 0x1e in CameraSettings
+
 // Encrypted subdirectory tags
 pub const SONY_TAG_2010: u16 = 0x2010;
 pub const SONY_TAG_9050: u16 = 0x9050;
@@ -217,6 +224,10 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         0x9106 => Some("LensFormat"),
         0x9107 => Some("LensType2"),
         0x9109 => Some("LensType"),
+        // CameraSettings sub-tags (virtual IDs)
+        CS_SHARPNESS => Some("Sharpness"),
+        CS_CONTRAST => Some("Contrast"),
+        CS_SATURATION => Some("Saturation"),
         _ => None,
     }
 }
@@ -1700,6 +1711,93 @@ pub fn decode_release_mode2_exiftool(value: u8) -> &'static str {
     }
 }
 
+/// Format adjustment value like ExifTool: positive values get '+' prefix
+/// PrintConv: '$val > 0 ? "+$val" : $val'
+fn format_adjustment_value(val: i32) -> String {
+    if val > 0 {
+        format!("+{}", val)
+    } else {
+        val.to_string()
+    }
+}
+
+/// Parse CameraSettings binary data (tag 0x0114)
+/// Extracts Sharpness/Contrast/Saturation from the binary blob
+///
+/// Supports:
+/// - CameraSettings: 280 bytes (A200/A300/A350/A700) or 364 bytes (A850/A900)
+/// - CameraSettings2: 332 bytes (A230/A290/A330/A380/A390)
+///
+/// CameraSettings3 (1536/2048 bytes) used by A450/A500/A550/A560/A580/A33/A35/A55/NEX
+/// has a completely different format (int8u) and is not supported.
+fn parse_camera_settings(data: &[u8], _endian: Endianness, tags: &mut HashMap<u16, MakerNoteTag>) {
+    // CameraSettings is an array of int16u values (big-endian)
+    // ExifTool conditions use byte count:
+    // CameraSettings: 280 bytes (A200/A300/A350/A700) or 364 bytes (A850/A900)
+    //   Sharpness at offset 0x1c (28), Contrast at 0x1d (29), Saturation at 0x1e (30)
+    //   Byte offsets: Sharpness=56, Contrast=58, Saturation=60
+    // CameraSettings2: 332 bytes (A230/A290/A330/A380/A390)
+    //   Sharpness at offset 0x19 (25), Contrast at 0x1a (26), Saturation at 0x1b (27)
+    //   Byte offsets: Sharpness=50, Contrast=52, Saturation=54
+    // CameraSettings3: 1536 or 2048 bytes (A450/A500/A550/A560/A580/A33/A35/A55/NEX)
+    //   Completely different format (int8u), skip
+
+    let data_len = data.len();
+    let (sharpness_offset, contrast_offset, saturation_offset) =
+        if data_len == 280 || data_len == 364 {
+            // CameraSettings (A200/A300/A350/A700/A850/A900)
+            (56, 58, 60)
+        } else if data_len == 332 {
+            // CameraSettings2 (A230/A290/A330/A380/A390)
+            (50, 52, 54)
+        } else {
+            // Unknown format or CameraSettings3 - skip
+            return;
+        };
+
+    // Need at least saturation_offset + 2 bytes
+    if data.len() < saturation_offset + 2 {
+        return;
+    }
+
+    // CameraSettings data is big-endian
+    // Read Sharpness
+    let sharpness_raw = u16::from_be_bytes([data[sharpness_offset], data[sharpness_offset + 1]]);
+    let sharpness = (sharpness_raw as i32) - 10;
+    tags.insert(
+        CS_SHARPNESS,
+        MakerNoteTag {
+            tag_id: CS_SHARPNESS,
+            tag_name: Some("Sharpness"),
+            value: ExifValue::Ascii(format_adjustment_value(sharpness)),
+        },
+    );
+
+    // Read Contrast
+    let contrast_raw = u16::from_be_bytes([data[contrast_offset], data[contrast_offset + 1]]);
+    let contrast = (contrast_raw as i32) - 10;
+    tags.insert(
+        CS_CONTRAST,
+        MakerNoteTag {
+            tag_id: CS_CONTRAST,
+            tag_name: Some("Contrast"),
+            value: ExifValue::Ascii(format_adjustment_value(contrast)),
+        },
+    );
+
+    // Read Saturation
+    let saturation_raw = u16::from_be_bytes([data[saturation_offset], data[saturation_offset + 1]]);
+    let saturation = (saturation_raw as i32) - 10;
+    tags.insert(
+        CS_SATURATION,
+        MakerNoteTag {
+            tag_id: CS_SATURATION,
+            tag_name: Some("Saturation"),
+            value: ExifValue::Ascii(format_adjustment_value(saturation)),
+        },
+    );
+}
+
 /// Parse Tag9050 encrypted subdirectory
 /// Returns parsed tags with synthetic tag IDs in the 0x9050xxxx range
 fn parse_tag9050(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerNoteTag>) {
@@ -2472,13 +2570,25 @@ pub fn parse_sony_maker_notes(
                 _ => value,
             };
 
-            // Handle encrypted subdirectories
+            // Handle encrypted subdirectories and CameraSettings
             if tag_id == SONY_TAG_9050 {
                 // Parse Tag9050 encrypted subdirectory
                 if let ExifValue::Undefined(ref raw_data) = decoded_value {
                     parse_tag9050(raw_data, endian, &mut tags);
                 }
                 // Don't insert the raw encrypted blob
+                continue;
+            }
+
+            // Handle CameraSettings binary blob (tag 0x0114)
+            // Used by A200, A300, A350, A700, A850, A900
+            if tag_id == SONY_CAMERA_SETTINGS {
+                if let ExifValue::Undefined(ref raw_data) = decoded_value {
+                    parse_camera_settings(raw_data, endian, &mut tags);
+                } else if let ExifValue::Byte(ref raw_data) = decoded_value {
+                    parse_camera_settings(raw_data, endian, &mut tags);
+                }
+                // Don't insert the raw binary blob
                 continue;
             }
 

@@ -1535,9 +1535,10 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // value is more accurate (like MeteringMode for Canon cameras)
     if let Some(maker_notes) = exif_data.get_maker_notes() {
         // Tags where MakerNote should override EXIF (ExifTool behavior)
-        // Note: Saturation/Contrast/Sharpness removed - use EXIF standard values for all
         // FocusMode added: Sony has multiple FocusMode tags (0x201B, 0xB042, 0xB04E) where
         // higher IDs are used for newer cameras and should take precedence
+        // Note: Saturation/Contrast/Sharpness NOT included - only CameraSettings sub-tags
+        // (for A200/A300/A350/A700/A850/A900) should override EXIF
         const MAKERNOTE_PRIORITY_TAGS: &[&str] =
             &["MeteringMode", "WhiteBalance", "LightSource", "FocusMode"];
 
@@ -1553,11 +1554,17 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 .unwrap_or_else(|| Box::leak(format!("MakerNote{:04X}", tag_id).into_boxed_str()));
 
             // Allow MakerNote to override EXIF for priority tags
-            let should_insert = if MAKERNOTE_PRIORITY_TAGS.contains(&tag_name) {
-                true // Always use MakerNote value
-            } else {
-                !output.contains_key(tag_name) // Only add if not already present
-            };
+            // Also allow Sony CameraSettings sub-tags (0xC01C-0xC01E) to override EXIF
+            // These are extracted from the CameraSettings blob for A200/A300/A350/A700/A850/A900
+            let is_sony_camera_settings_subtag = *tag_id >= 0xC01C
+                && *tag_id <= 0xC01E
+                && make_ref.is_some_and(|m| m.contains("SONY"));
+            let should_insert =
+                if MAKERNOTE_PRIORITY_TAGS.contains(&tag_name) || is_sony_camera_settings_subtag {
+                    true // Always use MakerNote value
+                } else {
+                    !output.contains_key(tag_name) // Only add if not already present
+                };
 
             if should_insert {
                 let json_value = format_exif_value_for_json_with_make_and_name(
