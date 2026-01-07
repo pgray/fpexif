@@ -5,20 +5,42 @@ use std::io::{Read, Seek, SeekFrom};
 
 const RAF_SIGNATURE: &[u8] = b"FUJIFILMCCD-RAW";
 
-/// Format a float value like ExifTool does (7 decimal places, trailing zeros removed)
+/// Format a float value like ExifTool does
+/// - Scientific notation for |val| < 0.0001
+/// - Otherwise decimal with trailing zeros trimmed
 fn format_float_exiftool(val: f64) -> String {
     // Round to 7 decimal places
     let rounded = (val * 10_000_000.0).round() / 10_000_000.0;
 
-    // Format with up to 7 decimal places
-    let s = format!("{:.7}", rounded);
-
-    // Trim trailing zeros after decimal point
-    if s.contains('.') {
-        let trimmed = s.trim_end_matches('0').trim_end_matches('.');
-        trimmed.to_string()
-    } else {
+    // ExifTool uses scientific notation for small values
+    if rounded.abs() > 0.0 && rounded.abs() < 0.0001 {
+        // Format as scientific notation (e.g., 1.6e-05 with 2-digit exponent)
+        // Rust's default is single digit, so we format manually
+        let s = format!("{:.1e}", rounded);
+        // Convert e-5 to e-05 (2-digit exponent)
+        if let Some(pos) = s.find("e-") {
+            let exp_part = &s[pos + 2..];
+            if exp_part.len() == 1 {
+                return format!("{}e-0{}", &s[..pos], exp_part);
+            }
+        } else if let Some(pos) = s.find("e") {
+            let exp_part = &s[pos + 1..];
+            if exp_part.len() == 1 {
+                return format!("{}e0{}", &s[..pos], exp_part);
+            }
+        }
         s
+    } else {
+        // Format with up to 7 decimal places
+        let s = format!("{:.7}", rounded);
+
+        // Trim trailing zeros after decimal point
+        if s.contains('.') {
+            let trimmed = s.trim_end_matches('0').trim_end_matches('.');
+            trimmed.to_string()
+        } else {
+            s
+        }
     }
 }
 

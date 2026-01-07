@@ -363,19 +363,28 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
                     }
                 } else {
                     // Decimal format (e.g., +0.33, -0.67)
+                    // ExifTool outputs negative decimals as numbers, positive as strings with + prefix
                     let rounded = (decimal * 100.0).round() / 100.0;
-                    let formatted = if rounded > 0.0 {
-                        format!("+{:.2}", rounded)
-                            .trim_end_matches('0')
-                            .trim_end_matches('.')
-                            .to_string()
+                    if rounded < 0.0 {
+                        // Negative decimal - output as number
+                        serde_json::Number::from_f64(rounded)
+                            .map(Value::Number)
+                            .unwrap_or_else(|| {
+                                Value::String(
+                                    format!("{:.2}", rounded)
+                                        .trim_end_matches('0')
+                                        .trim_end_matches('.')
+                                        .to_string(),
+                                )
+                            })
                     } else {
-                        format!("{:.2}", rounded)
+                        // Positive decimal - output as string with + prefix
+                        let formatted = format!("+{:.2}", rounded)
                             .trim_end_matches('0')
                             .trim_end_matches('.')
-                            .to_string()
-                    };
-                    Value::String(formatted)
+                            .to_string();
+                        Value::String(formatted)
+                    }
                 }
             }
         }
@@ -678,15 +687,11 @@ fn format_gps_coordinate(coords: &[(u32, u32)], ref_value: Option<&str>) -> Stri
     };
 
     // Format with appropriate precision for seconds
+    // ExifTool always uses 2 decimal places for fractional seconds
     let sec_str = if sec.fract() == 0.0 {
         format!("{:.0}", sec)
     } else {
-        // Remove trailing zeros but keep at least 2 decimal places
-        let formatted = format!("{:.2}", sec);
-        formatted
-            .trim_end_matches('0')
-            .trim_end_matches('.')
-            .to_string()
+        format!("{:.2}", sec)
     };
 
     if let Some(ref_val) = ref_value {
@@ -1421,10 +1426,16 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 }
                 _ => None,
             });
-            let formatted = if let Some(ref_str) = ref_desc {
-                format!("{:.1} m {}", altitude, ref_str)
+            // ExifTool uses integer for whole numbers, 1 decimal otherwise
+            let alt_str = if altitude.fract() == 0.0 {
+                format!("{:.0}", altitude)
             } else {
-                format!("{:.1} m", altitude)
+                format!("{:.1}", altitude)
+            };
+            let formatted = if let Some(ref_str) = ref_desc {
+                format!("{} m {}", alt_str, ref_str)
+            } else {
+                format!("{} m", alt_str)
             };
             output.insert("GPSAltitude".to_string(), Value::String(formatted));
         }
@@ -1877,9 +1888,11 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         .and_then(parse_f64_value);
     let min_fl = output.get("MinFocalLength").and_then(parse_f64_value);
     let max_fl = output.get("MaxFocalLength").and_then(parse_f64_value);
-    // Get focus distance - prefer FocusDistance, fall back to FocusDistanceUpper
+    // Get focus distance - prefer FocusDistance, then FocusDistanceLower, then Upper
+    // FocusDistanceLower is preferred over Upper for DOF calculations
     let focus_dist_str = output
         .get("FocusDistance")
+        .or_else(|| output.get("FocusDistanceLower"))
         .or_else(|| output.get("FocusDistanceUpper"))
         .cloned();
 
@@ -2178,7 +2191,7 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             if let Ok(focus_m) = s.trim_end_matches(" m").parse::<f64>() {
                 if let (Some(fl), Some(ap), Some(c)) = (focal_length, aperture, coc) {
                     let focus_mm = focus_m * 1000.0;
-                    if ap > 0.0 && focus_mm > 0.0 {
+                    if ap > 0.0 && focus_mm > 0.0 && focus_mm.is_finite() {
                         // Edge case: focus < focal_length (physically impossible but matches ExifTool)
                         // In this case, near and far both equal focus distance, DOF = 0
                         if focus_mm <= fl {

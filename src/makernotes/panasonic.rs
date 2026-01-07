@@ -908,10 +908,19 @@ define_tag_decoder! {
 }
 
 /// Parse Panasonic maker notes
+///
+/// # Arguments
+/// * `data` - The maker note data (contents of MakerNote tag)
+/// * `endian` - Byte order
+/// * `model` - Camera model string (used for model-specific formatting)
+/// * `tiff_data` - Optional full TIFF/EXIF data for resolving absolute offsets
+/// * `tiff_offset` - Offset of TIFF header within the full data
 pub fn parse_panasonic_maker_notes(
     data: &[u8],
     endian: Endianness,
     model: Option<&str>,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -1385,10 +1394,27 @@ pub fn parse_panasonic_maker_notes(
                 }
                 5 => {
                     // RATIONAL (numerator/denominator pairs)
-                    let offset = value_offset as usize;
-                    if offset + value_size <= data.len() {
+                    // Panasonic offsets are relative to TIFF header, not maker note start
+                    let abs_offset = tiff_offset + value_offset as usize;
+                    let data_slice = if let Some(tiff) = tiff_data {
+                        if abs_offset + value_size <= tiff.len() {
+                            Some(&tiff[abs_offset..abs_offset + value_size])
+                        } else {
+                            None
+                        }
+                    } else {
+                        // Fallback to maker note data for older behavior
+                        let offset = value_offset as usize;
+                        if offset + value_size <= data.len() {
+                            Some(&data[offset..offset + value_size])
+                        } else {
+                            None
+                        }
+                    };
+
+                    if let Some(slice) = data_slice {
                         let mut values = Vec::new();
-                        let mut cursor = Cursor::new(&data[offset..]);
+                        let mut cursor = Cursor::new(slice);
                         for _ in 0..count {
                             if let (Ok(num), Ok(den)) = (
                                 match endian {
@@ -1419,7 +1445,7 @@ pub fn parse_panasonic_maker_notes(
                             else if num1 >= 4194303 && den1 == 1024 {
                                 ExifValue::Ascii("n/a".to_string())
                             } else {
-                                // Format as "X Y" with 2 significant figures
+                                // Format as "X Y" with up to 2 decimal places, trim trailing zeros
                                 let x = if den1 != 0 {
                                     num1 as f64 / den1 as f64
                                 } else {
@@ -1430,7 +1456,16 @@ pub fn parse_panasonic_maker_notes(
                                 } else {
                                     0.0
                                 };
-                                ExifValue::Ascii(format!("{:.2} {:.2}", x, y))
+                                // Format and trim trailing zeros like ExifTool
+                                let x_str = format!("{:.2}", x)
+                                    .trim_end_matches('0')
+                                    .trim_end_matches('.')
+                                    .to_string();
+                                let y_str = format!("{:.2}", y)
+                                    .trim_end_matches('0')
+                                    .trim_end_matches('.')
+                                    .to_string();
+                                ExifValue::Ascii(format!("{} {}", x_str, y_str))
                             }
                         } else {
                             ExifValue::Rational(values)
