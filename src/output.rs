@@ -1536,7 +1536,10 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     if let Some(maker_notes) = exif_data.get_maker_notes() {
         // Tags where MakerNote should override EXIF (ExifTool behavior)
         // Note: Saturation/Contrast/Sharpness removed - use EXIF standard values for all
-        const MAKERNOTE_PRIORITY_TAGS: &[&str] = &["MeteringMode", "WhiteBalance", "LightSource"];
+        // FocusMode added: Sony has multiple FocusMode tags (0x201B, 0xB042, 0xB04E) where
+        // higher IDs are used for newer cameras and should take precedence
+        const MAKERNOTE_PRIORITY_TAGS: &[&str] =
+            &["MeteringMode", "WhiteBalance", "LightSource", "FocusMode"];
 
         // Sort by tag_id to ensure consistent ordering (lower IDs processed first)
         // This is important for Olympus where CameraSettings ImageStabilization (0x2624)

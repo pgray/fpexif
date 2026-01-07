@@ -67,7 +67,7 @@ pub const SONY_FLASH_LEVEL: u16 = 0xB048;
 pub const SONY_RELEASE_MODE: u16 = 0xB049;
 pub const SONY_SEQUENCE_NUMBER: u16 = 0xB04A;
 pub const SONY_ANTI_BLUR: u16 = 0xB04B;
-pub const SONY_LONG_EXPOSURE_NOISE_REDUCTION_2: u16 = 0xB04E;
+pub const SONY_FOCUS_MODE_3: u16 = 0xB04E;
 pub const SONY_DYNAMIC_RANGE_OPTIMIZER_2: u16 = 0xB04F;
 pub const SONY_HIGH_ISO_NOISE_REDUCTION_2: u16 = 0xB050;
 pub const SONY_INTELLIGENT_AUTO: u16 = 0xB052;
@@ -195,7 +195,7 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         SONY_FOCUS_MODE_2 => Some("FocusMode2"),
         SONY_DYNAMIC_RANGE_OPTIMIZER_2 => Some("DynamicRangeOptimizer2"),
         SONY_HIGH_ISO_NOISE_REDUCTION_2 => Some("HighISONoiseReduction2"),
-        SONY_LONG_EXPOSURE_NOISE_REDUCTION_2 => Some("LongExposureNoiseReduction2"),
+        SONY_FOCUS_MODE_3 => Some("FocusMode"),
         SONY_SEQUENCE_NUMBER => Some("SequenceNumber"),
         SONY_FACE_DETECTION => Some("FaceDetection"),
         SONY_SMILE_SHUTTER => Some("SmileShutter"),
@@ -1441,6 +1441,19 @@ pub fn decode_jpeg_heif_switch_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode FocusMode3 value (tag 0xB04E) - exiftool format
+/// From Sony.pm: valid for DSC-HX9V generation and newer
+pub fn decode_focus_mode3_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        2 => "AF-S",
+        3 => "AF-C",
+        5 => "Semi-manual",
+        6 => "DMF",
+        _ => "Unknown",
+    }
+}
+
 /// Decode FocusMode3 value (tag 0xB04E) - exiv2 format
 pub fn decode_focus_mode3_exiv2(value: u16) -> &'static str {
     match value {
@@ -1577,8 +1590,18 @@ pub fn decode_af_area_mode_setting_set1_exiv2(value: u16) -> &'static str {
 }
 
 /// Decode AFAreaModeSetting value (tag 0x201C) - ExifTool format
+/// Uses NEX/ILCE mapping as default since most modern Sony cameras use this
 pub fn decode_af_area_mode_setting_exiftool(value: u16) -> &'static str {
-    decode_af_area_mode_setting_set1_exiv2(value) // Use Set1 mapping
+    match value {
+        0 => "Wide",
+        1 => "Center",
+        3 => "Flexible Spot",
+        4 => "Flexible Spot (LA-EA4)",
+        9 => "Center (LA-EA4)",
+        11 => "Zone",
+        12 => "Expanded Flexible Spot",
+        _ => "Unknown",
+    }
 }
 
 /// Decode AntiBlur value (tag 0xB04B) - ExifTool format
@@ -2025,6 +2048,16 @@ fn parse_ifd_entry(
                         Some(decode_af_area_mode_setting_exiftool(v).to_string())
                     }
                     SONY_AF_TRACKING => Some(decode_af_tracking_exiftool(v).to_string()),
+                    SONY_AF_POINT_SELECTED => {
+                        // For DSC/NEX/ILCE cameras without LA-EA adapters, value 0 = "n/a"
+                        // For SLT cameras with LA-EA, value 0 = "Auto"
+                        // We use "n/a" as default since most cameras output this
+                        if v == 0 {
+                            Some("n/a".to_string())
+                        } else {
+                            None // Leave as raw value for non-zero
+                        }
+                    }
                     _ => None,
                 };
 
@@ -2139,6 +2172,10 @@ fn parse_ifd_entry(
                         } else {
                             Some(decode_focus_mode2_exiftool(v).to_string())
                         }
+                    }
+                    SONY_FOCUS_MODE_3 => {
+                        // FocusMode3 (0xB04E) - valid for DSC-HX9V generation and newer
+                        Some(decode_focus_mode3_exiftool(v).to_string())
                     }
                     SONY_AF_AREA_MODE_SETTING => {
                         Some(decode_af_area_mode_setting_exiftool(v).to_string())

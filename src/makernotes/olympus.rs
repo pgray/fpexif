@@ -2121,9 +2121,21 @@ fn parse_embedded_sub_ifd(
     ifd_type: OlympusIfdType,
     tags: &mut HashMap<u16, MakerNoteTag>,
     prefix: &str,
+    is_em_camera: &mut bool,
 ) {
     // Embedded sub-IFDs have self-contained data, no need for TIFF data
-    parse_olympus_ifd(sub_data, 0, 0, endian, ifd_type, tags, prefix, None, 0);
+    parse_olympus_ifd(
+        sub_data,
+        0,
+        0,
+        endian,
+        ifd_type,
+        tags,
+        prefix,
+        None,
+        0,
+        is_em_camera,
+    );
 }
 
 /// Parse an Olympus IFD and return tags
@@ -2149,6 +2161,7 @@ fn parse_olympus_ifd(
     prefix: &str,
     value_data: Option<&[u8]>,
     value_base_offset: usize,
+    is_em_camera: &mut bool,
 ) {
     if ifd_offset + 2 > data.len() {
         return;
@@ -2189,8 +2202,10 @@ fn parse_olympus_ifd(
                 OlympusIfdType::FocusInfo => 0x2050 + tag_id,
             };
 
-            // Skip thumbnail/preview data to save memory
-            if tag_id == OLYMPUS_THUMBNAIL_IMAGE || tag_id == OLYMPUS_PREVIEW_IMAGE {
+            // Skip thumbnail/preview data to save memory (only in Main IFD)
+            if ifd_type == OlympusIfdType::Main
+                && (tag_id == OLYMPUS_THUMBNAIL_IMAGE || tag_id == OLYMPUS_PREVIEW_IMAGE)
+            {
                 continue;
             }
 
@@ -2264,6 +2279,10 @@ fn parse_olympus_ifd(
                         if let ExifValue::Ascii(s) = &value {
                             let trimmed = s.trim();
                             if let Some(decoded) = decode_camera_type(trimmed) {
+                                // Check if this is an E-M or OM- model for AFPoint decoding
+                                if decoded.starts_with("E-M") || decoded.starts_with("OM-") {
+                                    *is_em_camera = true;
+                                }
                                 ExifValue::Ascii(decoded.to_string())
                             } else {
                                 value // Keep original if not in lookup table
@@ -2441,6 +2460,27 @@ fn parse_olympus_ifd(
                                 }
                             }
                             _ => value,
+                        }
+                    }
+                    EQUIP_CAMERA_TYPE => {
+                        // CameraType2: decode internal code and check for E-M/OM- model
+                        if let ExifValue::Ascii(s) = &value {
+                            let trimmed = s.trim();
+                            if let Some(decoded) = decode_camera_type(trimmed) {
+                                // Check if this is an E-M or OM- model for AFPoint decoding
+                                if decoded.starts_with("E-M") || decoded.starts_with("OM-") {
+                                    *is_em_camera = true;
+                                }
+                                ExifValue::Ascii(decoded.to_string())
+                            } else {
+                                // Direct check if raw value starts with E-M or OM-
+                                if trimmed.starts_with("E-M") || trimmed.starts_with("OM-") {
+                                    *is_em_camera = true;
+                                }
+                                value
+                            }
+                        } else {
+                            value
                         }
                     }
                     _ => value,
@@ -3019,6 +3059,18 @@ fn parse_olympus_ifd(
                             value
                         }
                     }
+                    CS_PREVIEW_IMAGE_VALID => {
+                        // PreviewImageValid: int32u, 0 = No, 1 = Yes
+                        match &value {
+                            ExifValue::Long(vals) if !vals.is_empty() => ExifValue::Ascii(
+                                if vals[0] == 0 { "No" } else { "Yes" }.to_string(),
+                            ),
+                            ExifValue::Short(vals) if !vals.is_empty() => ExifValue::Ascii(
+                                if vals[0] == 0 { "No" } else { "Yes" }.to_string(),
+                            ),
+                            _ => value,
+                        }
+                    }
                     _ => value,
                 },
                 OlympusIfdType::RawDevelopment => match tag_id {
@@ -3293,7 +3345,11 @@ fn parse_olympus_ifd(
                         }
                     }
                     FI_AF_POINT => {
-                        if let ExifValue::Short(vals) = &value {
+                        // ExifTool only decodes AFPoint for non-E-M/OM models
+                        // Condition: '$self{Model} !~ /^(E-M|OM-)/'
+                        if *is_em_camera {
+                            value // Leave as raw value for E-M/OM cameras
+                        } else if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
                                 let decoded = decode_af_point_exiftool(vals[0]);
                                 if decoded == "Unknown" {
@@ -3435,6 +3491,7 @@ fn parse_olympus_ifd(
                                     &format!("{}Equipment.", prefix),
                                     value_data,
                                     value_base_offset,
+                                    is_em_camera,
                                 );
                             } else if let Some(sub_data) = sub_data_opt {
                                 parse_embedded_sub_ifd(
@@ -3443,6 +3500,7 @@ fn parse_olympus_ifd(
                                     OlympusIfdType::Equipment,
                                     tags,
                                     &format!("{}Equipment.", prefix),
+                                    is_em_camera,
                                 );
                             }
                         }
@@ -3469,6 +3527,7 @@ fn parse_olympus_ifd(
                                     &format!("{}CameraSettings.", prefix),
                                     value_data,
                                     value_base_offset,
+                                    is_em_camera,
                                 );
                             } else if let Some(sub_data) = sub_data_opt {
                                 parse_embedded_sub_ifd(
@@ -3477,6 +3536,7 @@ fn parse_olympus_ifd(
                                     OlympusIfdType::CameraSettings,
                                     tags,
                                     &format!("{}CameraSettings.", prefix),
+                                    is_em_camera,
                                 );
                             }
                         }
@@ -3497,6 +3557,7 @@ fn parse_olympus_ifd(
                                     &format!("{}RawDev.", prefix),
                                     value_data,
                                     value_base_offset,
+                                    is_em_camera,
                                 );
                             }
                         }
@@ -3517,6 +3578,7 @@ fn parse_olympus_ifd(
                                     &format!("{}ImageProc.", prefix),
                                     value_data,
                                     value_base_offset,
+                                    is_em_camera,
                                 );
                             }
                         }
@@ -3537,6 +3599,7 @@ fn parse_olympus_ifd(
                                     &format!("{}FocusInfo.", prefix),
                                     value_data,
                                     value_base_offset,
+                                    is_em_camera,
                                 );
                             }
                         }
@@ -3593,6 +3656,10 @@ pub fn parse_olympus_maker_notes(
     let value_data = if is_old_format { tiff_data } else { None };
     let value_base_offset = if is_old_format { tiff_offset } else { 0 };
 
+    // Track if this is an E-M or OM- camera for AFPoint decoding
+    // ExifTool only decodes AFPoint for non-E-M/OM models
+    let mut is_em_camera = false;
+
     // Parse the main IFD from maker note data
     parse_olympus_ifd(
         data,
@@ -3604,6 +3671,7 @@ pub fn parse_olympus_maker_notes(
         "Olympus.",
         value_data,
         value_base_offset,
+        &mut is_em_camera,
     );
 
     Ok(tags)

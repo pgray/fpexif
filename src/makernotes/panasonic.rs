@@ -1437,12 +1437,18 @@ pub fn parse_panasonic_maker_notes(
                             let (num1, den1) = values[0];
                             let (num2, den2) = values[1];
 
-                            // Check for special "none" value (16777216 16777216)
-                            if num1 == 16777216 && num2 == 16777216 {
+                            // Check for special "none" value (0xFFFFFFFF/256 0xFFFFFFFF/256)
+                            // Raw numerators are 4294967295 (0xFFFFFFFF), which divided by 256
+                            // gives approximately 16777216
+                            if num1 == 0xFFFFFFFF
+                                && den1 == 256
+                                && num2 == 0xFFFFFFFF
+                                && den2 == 256
+                            {
                                 ExifValue::Ascii("none".to_string())
                             }
                             // Check for "n/a" value (4294967295/1024)
-                            else if num1 >= 4194303 && den1 == 1024 {
+                            else if num1 == 0xFFFFFFFF && den1 == 1024 {
                                 ExifValue::Ascii("n/a".to_string())
                             } else {
                                 // Format as "X Y" with up to 2 decimal places, trim trailing zeros
