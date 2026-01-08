@@ -1527,9 +1527,25 @@ pub fn parse_panasonic_maker_notes(
                             ExifValue::Undefined(bytes[..count as usize].to_vec())
                         }
                     } else {
-                        let offset = value_offset as usize;
-                        if offset + count as usize <= data.len() {
-                            let value_bytes = &data[offset..offset + count as usize];
+                        // Panasonic offsets are relative to TIFF header, not maker note start
+                        let abs_offset = tiff_offset + value_offset as usize;
+                        let value_bytes = if let Some(tiff) = tiff_data {
+                            if abs_offset + count as usize <= tiff.len() {
+                                Some(&tiff[abs_offset..abs_offset + count as usize])
+                            } else {
+                                None
+                            }
+                        } else {
+                            // Fallback to maker note data
+                            let offset = value_offset as usize;
+                            if offset + count as usize <= data.len() {
+                                Some(&data[offset..offset + count as usize])
+                            } else {
+                                None
+                            }
+                        };
+
+                        if let Some(value_bytes) = value_bytes {
                             // MakerNoteVersion: ASCII bytes -> string
                             if tag_id == PANA_MAKERNOTE_VERSION && count == 4 {
                                 if let Ok(s) = std::str::from_utf8(value_bytes) {
@@ -1552,6 +1568,34 @@ pub fn parse_panasonic_maker_notes(
                                 } else {
                                     // Invalid UTF-8 in location field - treat as empty (like ExifTool)
                                     ExifValue::Ascii(String::new())
+                                }
+                            } else if tag_id == PANA_INTERNAL_SERIAL_NUMBER {
+                                // InternalSerialNumber: decode factory code, date, and serial number
+                                // Format: XYZ14100603820 -> "(XYZ) 2014:10:06 no. 0382"
+                                if let Ok(s) = std::str::from_utf8(value_bytes) {
+                                    let s = s.trim_end_matches('\0');
+                                    // Pattern: [A-Z][0-9A-Z]{2}(\d{2})(\d{2})(\d{2})(\d{4})
+                                    if s.len() >= 13 {
+                                        let factory = &s[0..3];
+                                        if let (Ok(yr), Ok(mon), Ok(day), Ok(num)) = (
+                                            s[3..5].parse::<u32>(),
+                                            s[5..7].parse::<u32>(),
+                                            s[7..9].parse::<u32>(),
+                                            s[9..13].parse::<u32>(),
+                                        ) {
+                                            let year = if yr < 70 { 2000 + yr } else { 1900 + yr };
+                                            ExifValue::Ascii(format!(
+                                                "({}) {:04}:{:02}:{:02} no. {:04}",
+                                                factory, year, mon, day, num
+                                            ))
+                                        } else {
+                                            ExifValue::Ascii(s.to_string())
+                                        }
+                                    } else {
+                                        ExifValue::Ascii(s.to_string())
+                                    }
+                                } else {
+                                    ExifValue::Undefined(value_bytes.to_vec())
                                 }
                             } else {
                                 ExifValue::Undefined(value_bytes.to_vec())

@@ -1583,14 +1583,44 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // LensID computation:
     // For Nikon: Use LensModel if available (contains full lens name like "1 NIKKOR 10mm f/2.8")
     // For Canon/Olympus: Use LensType as LensID (the lens type lookup value)
-    if !output.contains_key("LensID") {
-        let is_canon = make_ref
-            .map(|m| m.to_uppercase().contains("CANON"))
-            .unwrap_or(false);
-        let is_olympus = make_ref
-            .map(|m| m.to_uppercase().contains("OLYMPUS"))
-            .unwrap_or(false);
+    // For Sony: Use LensType2 for E-mount lenses, LensType for A-mount
+    let is_canon = make_ref
+        .map(|m| m.to_uppercase().contains("CANON"))
+        .unwrap_or(false);
+    let is_olympus = make_ref
+        .map(|m| m.to_uppercase().contains("OLYMPUS"))
+        .unwrap_or(false);
+    let is_sony = make_ref
+        .map(|m| m.to_uppercase().contains("SONY"))
+        .unwrap_or(false);
 
+    // For Sony, check if existing LensID is the generic E-mount placeholder
+    // If so, replace it with LensType2 if available
+    if is_sony {
+        let should_replace = if let Some(Value::String(lens_id)) = output.get("LensID") {
+            lens_id.contains("E-Mount")
+                || lens_id.contains("T-Mount")
+                || lens_id.contains("Other Lens")
+        } else {
+            !output.contains_key("LensID")
+        };
+
+        if should_replace {
+            if let Some(lens_type2) = output.get("LensType2").cloned() {
+                output.insert("LensID".to_string(), lens_type2);
+            } else if let Some(lens_type) = output.get("LensType").cloned() {
+                // Only use LensType if it's not the generic E-mount placeholder
+                if let Value::String(s) = &lens_type {
+                    if !s.contains("E-Mount") && !s.contains("T-Mount") && !s.contains("Other Lens")
+                    {
+                        output.insert("LensID".to_string(), lens_type);
+                    }
+                } else {
+                    output.insert("LensID".to_string(), lens_type);
+                }
+            }
+        }
+    } else if !output.contains_key("LensID") {
         if is_canon || is_olympus {
             // Canon/Olympus: LensID should come from LensType (the decoded lens type value)
             if let Some(lens_type) = output.get("LensType").cloned() {
@@ -1969,18 +1999,68 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // Full frame diagonal = sqrt(36² + 24²) = 43.2666mm
     const FF_DIAG: f64 = 43.2666;
 
+    // Canon-specific sensor diagonal calculation
+    // Canon stores sensor dimensions in FocalPlaneResolution denominators:
+    // - numerator = image_pixels × 1000
+    // - denominator = sensor_dimension_inches × 1000
+    // So sensor_diagonal_mm = sqrt(denom_x² + denom_y²) × 0.0254
+    let canon_sensor_diag: Option<f64> = if make_ref
+        .map(|m| m.to_uppercase().contains("CANON"))
+        .unwrap_or(false)
+    {
+        // Get raw FocalPlaneResolution rational values (tag 0xA20E, 0xA20F)
+        let x_rational = exif_data.get_tag_by_id(0xA20E).and_then(|v| match v {
+            ExifValue::Rational(r) if !r.is_empty() => Some(r[0]),
+            _ => None,
+        });
+        let y_rational = exif_data.get_tag_by_id(0xA20F).and_then(|v| match v {
+            ExifValue::Rational(r) if !r.is_empty() => Some(r[0]),
+            _ => None,
+        });
+
+        if let (Some((x_num, x_den)), Some((y_num, y_den))) = (x_rational, y_rational) {
+            // Validate Canon's format:
+            // - numerators divisible by 1000
+            // - image >= 640x480 (numerator >= 640000)
+            // - sensor between 0.061" and 1.5" (denominator 61-1500)
+            // - sensor not square (denominators different)
+            if x_num % 1000 == 0
+                && y_num % 1000 == 0
+                && (640000..10000000).contains(&x_num)
+                && (480000..10000000).contains(&y_num)
+                && (61..1500).contains(&x_den)
+                && (61..1000).contains(&y_den)
+                && x_den != y_den
+            {
+                // Denominators are sensor size in inches × 1000
+                let diag_mm = ((x_den * x_den + y_den * y_den) as f64).sqrt() * 0.0254;
+                Some(diag_mm)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Try multiple sources in order of preference:
     // 1. FocalLengthIn35mmFilm / FocalLength (most accurate)
-    // 2. FocalPlaneDiagonal from MakerNotes (Olympus, etc.)
-    // 3. SensorWidth/Height from MakerNotes (Canon, Panasonic, etc.)
-    // 4. SensorPixelSize from MakerNotes (Nikon) + image dimensions
-    // 5. FocalPlaneResolution + image dimensions (fallback)
+    // 2. Canon sensor diagonal from FocalPlaneResolution denominators
+    // 3. FocalPlaneDiagonal from MakerNotes (Olympus, etc.)
+    // 4. SensorWidth/Height from MakerNotes (Canon, Panasonic, etc.)
+    // 5. SensorPixelSize from MakerNotes (Nikon) + image dimensions
+    // 6. FocalPlaneResolution + image dimensions (fallback)
     let scale_factor = if let (Some(fl35), Some(fl)) = (fl35_raw, focal_length) {
         if fl > 0.0 && fl35 > 0.0 {
             Some(fl35 / fl)
         } else {
             None
         }
+    } else if let Some(diag) = canon_sensor_diag {
+        // Canon-specific calculation using FocalPlaneResolution denominators
+        Some(FF_DIAG / diag)
     } else if let Some(diag) = focal_plane_diag {
         // FocalPlaneDiagonal is sensor diagonal in mm
         if diag > 0.0 {
@@ -2093,16 +2173,22 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
-    // Lens35efl - lens focal range in 35mm equivalent
+    // Lens35efl - lens focal range with 35mm equivalent
+    // Format: "min - max mm (35 mm equivalent: min35 - max35 mm)"
     if !has_lens_35 {
         if let Some(sf) = scale_factor {
             if let (Some(min), Some(max)) = (min_fl, max_fl) {
                 let min35 = min * sf;
                 let max35 = max * sf;
                 let formatted = if (min - max).abs() < 0.01 {
-                    format!("{:.0} mm", min35)
+                    // Single focal length lens (prime)
+                    format!("{:.1} mm (35 mm equivalent: {:.1} mm)", min, min35)
                 } else {
-                    format!("{:.0}-{:.0} mm", min35, max35)
+                    // Zoom lens
+                    format!(
+                        "{:.1} - {:.1} mm (35 mm equivalent: {:.1} - {:.1} mm)",
+                        min, max, min35, max35
+                    )
                 };
                 output.insert("Lens35efl".to_string(), Value::String(formatted));
             }

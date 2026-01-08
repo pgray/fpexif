@@ -74,9 +74,10 @@ pub const MINOLTA_CS_SHARPNESS: u16 = 33;
 pub const MINOLTA_CS_SUBJECT_PROGRAM: u16 = 34;
 pub const MINOLTA_CS_ISO_SETTING: u16 = 36;
 pub const MINOLTA_CS_MODEL_ID: u16 = 37;
-pub const MINOLTA_CS_FOCUS_MODE: u16 = 41;
-pub const MINOLTA_CS_FOCUS_AREA: u16 = 42;
-pub const MINOLTA_CS_COLOR_MODE: u16 = 45;
+pub const MINOLTA_CS_COLOR_MODE: u16 = 40;
+pub const MINOLTA_CS_COLOR_FILTER: u16 = 41;
+pub const MINOLTA_CS_FOCUS_MODE: u16 = 48;
+pub const MINOLTA_CS_FOCUS_AREA: u16 = 49;
 
 /// Get the name of a Minolta maker note tag
 pub fn get_minolta_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -373,14 +374,14 @@ define_tag_decoder! {
     minolta_model_id,
     type: u32,
     both: {
-        0 => "DiMAGE 7 | X1 | X21 | X31",
+        0 => "DiMAGE 7, X1, X21 or X31",
         1 => "DiMAGE 5",
         2 => "DiMAGE S304",
         3 => "DiMAGE S404",
         4 => "DiMAGE 7i",
         5 => "DiMAGE 7Hi",
         6 => "DiMAGE A1",
-        7 => "DiMAGE A2 | S414",
+        7 => "DiMAGE A2 or S414",
     }
 }
 
@@ -388,12 +389,12 @@ define_tag_decoder! {
     minolta_focus_mode,
     type: u32,
     exiftool: {
-        0 => "Auto Focus",
-        1 => "Manual Focus",
+        0 => "AF",
+        1 => "MF",
     },
     exiv2: {
-        0 => "Auto focus",
-        1 => "Manual focus",
+        0 => "AF",
+        1 => "MF",
     }
 }
 
@@ -798,13 +799,56 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness) -> HashMap<u16, Maker
             MINOLTA_CS_BRACKET_STEP => Some(decode_bracket_step_exiftool(value).to_string()),
             MINOLTA_CS_FLASH_FIRED => Some(decode_flash_fired_exiftool(value).to_string()),
             MINOLTA_CS_SHARPNESS => Some(decode_sharpness_exiftool(value).to_string()),
-            MINOLTA_CS_CONTRAST => Some(decode_contrast_exiftool(value).to_string()),
+            // Saturation and Contrast use ValueConv: $val - 3 (or -5 for A2)
+            // We use -3 as the default since we don't have model info here
+            MINOLTA_CS_SATURATION => Some(format!("{}", value as i32 - 3)),
+            MINOLTA_CS_CONTRAST => Some(format!("{}", value as i32 - 3)),
             MINOLTA_CS_SUBJECT_PROGRAM => Some(decode_subject_program_exiftool(value).to_string()),
             MINOLTA_CS_ISO_SETTING => Some(decode_iso_setting_exiftool(value).to_string()),
             MINOLTA_CS_MODEL_ID => Some(decode_model_id_exiftool(value).to_string()),
             MINOLTA_CS_FOCUS_MODE => Some(decode_focus_mode_exiftool(value).to_string()),
             MINOLTA_CS_FOCUS_AREA => Some(decode_focus_area_exiftool(value).to_string()),
             MINOLTA_CS_COLOR_MODE => Some(decode_color_mode_cs_exiftool(value).to_string()),
+            // MinoltaDate: packed as YYYY<<16 | MM<<8 | DD
+            MINOLTA_CS_MINOLTA_DATE => {
+                let year = value >> 16;
+                let month = (value >> 8) & 0xff;
+                let day = value & 0xff;
+                if year > 0 {
+                    Some(format!("{:04}:{:02}:{:02}", year, month, day))
+                } else {
+                    None
+                }
+            }
+            // MinoltaTime: packed as HH<<16 | MM<<8 | SS
+            MINOLTA_CS_MINOLTA_TIME => {
+                let hour = value >> 16;
+                let minute = (value >> 8) & 0xff;
+                let second = value & 0xff;
+                if hour > 0 || minute > 0 || second > 0 {
+                    Some(format!("{:02}:{:02}:{:02}", hour, minute, second))
+                } else {
+                    None
+                }
+            }
+            // MaxAperture: 2^((val-8)/16)
+            MINOLTA_CS_MAX_APERTURE => {
+                if value > 0 {
+                    let aperture = 2.0_f64.powf((value as f64 - 8.0) / 16.0);
+                    Some(format!("{:.1}", aperture))
+                } else {
+                    None
+                }
+            }
+            // FocusDistance: val/1000, output as "X.X m" or "inf"
+            MINOLTA_CS_FOCUS_DISTANCE => {
+                if value == 0 {
+                    Some("inf".to_string())
+                } else {
+                    let distance = value as f64 / 1000.0;
+                    Some(format!("{:.1} m", distance))
+                }
+            }
             _ => None,
         };
 
