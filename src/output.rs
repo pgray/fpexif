@@ -1845,6 +1845,33 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
+    // Also try WB_RBLevels format (R B G G) - common in Olympus
+    // RedBalance = R / G1, BlueBalance = B / G2
+    if !output.contains_key("RedBalance") || !output.contains_key("BlueBalance") {
+        if let Some(Value::String(wb_levels)) = output.get("WB_RBLevels") {
+            let parts: Vec<f64> = wb_levels
+                .split_whitespace()
+                .filter_map(|s| s.parse::<f64>().ok())
+                .collect();
+            if parts.len() >= 4 {
+                let r = parts[0];
+                let b = parts[1];
+                let g1 = parts[2];
+                let g2 = parts[3];
+                if !output.contains_key("RedBalance") && g1 != 0.0 {
+                    if let Some(num) = serde_json::Number::from_f64(r / g1) {
+                        output.insert("RedBalance".to_string(), Value::Number(num));
+                    }
+                }
+                if !output.contains_key("BlueBalance") && g2 != 0.0 {
+                    if let Some(num) = serde_json::Number::from_f64(b / g2) {
+                        output.insert("BlueBalance".to_string(), Value::Number(num));
+                    }
+                }
+            }
+        }
+    }
+
     // ImageHeight - alias for ImageLength (TIFF uses ImageLength, ExifTool uses ImageHeight)
     if !output.contains_key("ImageHeight") {
         if let Some(val) = output.get("ImageLength").cloned() {
