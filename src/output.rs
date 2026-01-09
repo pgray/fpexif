@@ -1913,10 +1913,12 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
 
     // Extract all values we need first (before any inserts)
     let focal_length = output.get("FocalLength").and_then(parse_f64_value);
+    // For computed fields (HyperfocalDistance, DOF, LightValue), use FNumber first
+    // to match ExifTool behavior. Aperture is a derived value that may differ slightly.
     let aperture = output
-        .get("Aperture")
+        .get("FNumber")
         .and_then(parse_f64_value)
-        .or_else(|| output.get("FNumber").and_then(parse_f64_value));
+        .or_else(|| output.get("Aperture").and_then(parse_f64_value));
     let exposure_time = output.get("ExposureTime").and_then(parse_f64_value);
     let iso = output
         .get("ISO")
@@ -1928,13 +1930,42 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         .and_then(parse_f64_value);
     let min_fl = output.get("MinFocalLength").and_then(parse_f64_value);
     let max_fl = output.get("MaxFocalLength").and_then(parse_f64_value);
-    // Get focus distance - prefer FocusDistance, then FocusDistanceLower, then Upper
-    // FocusDistanceLower is preferred over Upper for DOF calculations
-    let focus_dist_str = output
+    // Get focus distance - matching ExifTool's priority:
+    // 1. FocusDistance if available
+    // 2. SubjectDistance, ObjectDistance, or ApproximateFocusDistance
+    // 3. Average of FocusDistanceLower and FocusDistanceUpper
+    let focus_dist_str: Option<Value> = output
         .get("FocusDistance")
-        .or_else(|| output.get("FocusDistanceLower"))
-        .or_else(|| output.get("FocusDistanceUpper"))
-        .cloned();
+        .or_else(|| output.get("SubjectDistance"))
+        .or_else(|| output.get("ObjectDistance"))
+        .or_else(|| output.get("ApproximateFocusDistance"))
+        .cloned()
+        .or_else(|| {
+            // If we have both Lower and Upper, compute the average
+            let lower = output.get("FocusDistanceLower").and_then(|v| {
+                if let Value::String(s) = v {
+                    s.trim_end_matches(" m").parse::<f64>().ok()
+                } else {
+                    None
+                }
+            });
+            let upper = output.get("FocusDistanceUpper").and_then(|v| {
+                if let Value::String(s) = v {
+                    s.trim_end_matches(" m").parse::<f64>().ok()
+                } else {
+                    None
+                }
+            });
+            match (lower, upper) {
+                (Some(l), Some(u)) => {
+                    let avg = (l + u) / 2.0;
+                    Some(Value::String(format!("{:.2} m", avg)))
+                }
+                (Some(l), None) => Some(Value::String(format!("{:.2} m", l))),
+                (None, Some(u)) => Some(Value::String(format!("{:.2} m", u))),
+                (None, None) => None,
+            }
+        });
 
     // For ScaleFactor calculation from sensor size
     let image_width = output.get("ExifImageWidth").and_then(parse_f64_value);
@@ -1945,13 +1976,26 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     let focal_plane_y_res = output
         .get("FocalPlaneYResolution")
         .and_then(parse_f64_value);
+    // FocalPlaneResolutionUnit: can be numeric (2=inches, 3=cm) or string ("inches", "cm")
     let focal_plane_res_unit = output
         .get("FocalPlaneResolutionUnit")
-        .and_then(parse_f64_value);
+        .and_then(|v| match v {
+            Value::Number(n) => n.as_f64(),
+            Value::String(s) => match s.to_lowercase().as_str() {
+                "inches" => Some(2.0),
+                "cm" => Some(3.0),
+                "mm" => Some(4.0),
+                _ => s.parse::<f64>().ok(),
+            },
+            _ => None,
+        });
     // MakerNote sensor size tags
     let sensor_width = output.get("SensorWidth").and_then(parse_f64_value);
     let sensor_height = output.get("SensorHeight").and_then(parse_f64_value);
     let focal_plane_diag = output.get("FocalPlaneDiagonal").and_then(parse_f64_value);
+    // FocalPlaneXSize/YSize from Canon CRW/CR2 files (sensor dimensions in mm)
+    let focal_plane_x_size = output.get("FocalPlaneXSize").and_then(parse_f64_value);
+    let focal_plane_y_size = output.get("FocalPlaneYSize").and_then(parse_f64_value);
     // Nikon SensorPixelSize: "7.8 7.8" = width height in micrometers
     let sensor_pixel_size = output.get("SensorPixelSize").and_then(|v| {
         if let Value::String(s) = v {
@@ -2063,6 +2107,14 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         Some(FF_DIAG / diag)
     } else if let Some(diag) = focal_plane_diag {
         // FocalPlaneDiagonal is sensor diagonal in mm
+        if diag > 0.0 {
+            Some(FF_DIAG / diag)
+        } else {
+            None
+        }
+    } else if let (Some(xsize), Some(ysize)) = (focal_plane_x_size, focal_plane_y_size) {
+        // FocalPlaneXSize/YSize are sensor dimensions in mm (Canon CRW/CR2)
+        let diag = (xsize * xsize + ysize * ysize).sqrt();
         if diag > 0.0 {
             Some(FF_DIAG / diag)
         } else {

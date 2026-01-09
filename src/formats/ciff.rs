@@ -840,36 +840,27 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
         ifd_entries.push((0x9209, 3, 1, exif_flash.to_le_bytes().to_vec()));
     }
 
-    // Add FocalPlaneXResolution (tag 0xA20E) and YResolution (tag 0xA20F)
+    // For CRW files, output FocalPlaneXSize/YSize directly (matching ExifTool)
+    // The raw values are in 1/1000 inch, convert to mm
+    // Use private tag IDs 0xC001/0xC002 that will be mapped to FocalPlaneXSize/YSize in output
     if let Some(xsize) = metadata.focal_plane_x_size {
-        if let Some(width) = metadata.image_width {
-            if xsize > 0 {
-                // xsize is in 1/1000 mm, calculate pixels per mm then convert to inches
-                // Resolution = width / (xsize/1000) pixels per mm
-                // For EXIF we want pixels per inch = resolution * 25.4
-                let res_x = ((width as f64) / (xsize as f64 / 1000.0) * 25.4) as u32;
-                let mut rational = Vec::new();
-                rational.extend_from_slice(&res_x.to_le_bytes());
-                rational.extend_from_slice(&1u32.to_le_bytes());
-                ifd_entries.push((0xA20E, 5, 1, rational));
-            }
+        if xsize > 0 {
+            // xsize is in 1/1000 inch, convert to mm: value * 25.4 / 1000
+            let size_mm = xsize as f64 * 25.4 / 1000.0;
+            let size_str = format!("{:.2} mm", size_mm);
+            let mut size_bytes = size_str.as_bytes().to_vec();
+            size_bytes.push(0);
+            ifd_entries.push((0xC001, 2, size_bytes.len() as u32, size_bytes));
         }
     }
     if let Some(ysize) = metadata.focal_plane_y_size {
-        if let Some(height) = metadata.image_height {
-            if ysize > 0 {
-                let res_y = ((height as f64) / (ysize as f64 / 1000.0) * 25.4) as u32;
-                let mut rational = Vec::new();
-                rational.extend_from_slice(&res_y.to_le_bytes());
-                rational.extend_from_slice(&1u32.to_le_bytes());
-                ifd_entries.push((0xA20F, 5, 1, rational));
-            }
+        if ysize > 0 {
+            let size_mm = ysize as f64 * 25.4 / 1000.0;
+            let size_str = format!("{:.2} mm", size_mm);
+            let mut size_bytes = size_str.as_bytes().to_vec();
+            size_bytes.push(0);
+            ifd_entries.push((0xC002, 2, size_bytes.len() as u32, size_bytes));
         }
-    }
-
-    // Add FocalPlaneResolutionUnit (tag 0xA210) - 2 = inches
-    if metadata.focal_plane_x_size.is_some() || metadata.focal_plane_y_size.is_some() {
-        ifd_entries.push((0xA210, 3, 1, 2u16.to_le_bytes().to_vec()));
     }
 
     // Sort entries by tag number (required by TIFF spec)

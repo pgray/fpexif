@@ -4703,9 +4703,360 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
         ExifValue::Ascii(version_str.to_string()),
     );
 
+    // ColorData2 (count == 653) - 1DmkII, 1DSmkII
+    // Detected by array length since older cameras don't use version numbers
+    if data.len() == 653 {
+        // WB_RGGBLevelsAuto at 0x18
+        if data.len() > 0x18 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x18] as i16, data[0x19] as i16, data[0x1a] as i16, data[0x1b] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsAuto".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempAuto at 0x1c
+        if data.len() > 0x1c {
+            decoded.insert(
+                "ColorTempAuto".to_string(),
+                ExifValue::Short(vec![data[0x1c]]),
+            );
+        }
+        // WB_RGGBLevelsAsShot at 0x22
+        if data.len() > 0x22 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x22] as i16, data[0x23] as i16, data[0x24] as i16, data[0x25] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsAsShot".to_string(),
+                ExifValue::Ascii(levels_str.clone()),
+            );
+            decoded.insert("WB_RGGBLevels".to_string(), ExifValue::Ascii(levels_str));
+        }
+        // ColorTempAsShot at 0x26
+        if data.len() > 0x26 {
+            decoded.insert(
+                "ColorTempAsShot".to_string(),
+                ExifValue::Short(vec![data[0x26]]),
+            );
+        }
+        // WB_RGGBLevelsDaylight at 0x27
+        if data.len() > 0x27 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x27] as i16, data[0x28] as i16, data[0x29] as i16, data[0x2a] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsDaylight".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempDaylight at 0x2b
+        if data.len() > 0x2b {
+            decoded.insert(
+                "ColorTempDaylight".to_string(),
+                ExifValue::Short(vec![data[0x2b]]),
+            );
+        }
+        // WB_RGGBLevelsShade at 0x2c
+        if data.len() > 0x2c + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x2c] as i16, data[0x2d] as i16, data[0x2e] as i16, data[0x2f] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsShade".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempShade at 0x30
+        if data.len() > 0x30 {
+            decoded.insert(
+                "ColorTempShade".to_string(),
+                ExifValue::Short(vec![data[0x30]]),
+            );
+        }
+        // WB_RGGBLevelsCloudy at 0x31
+        if data.len() > 0x31 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x31] as i16, data[0x32] as i16, data[0x33] as i16, data[0x34] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsCloudy".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempCloudy at 0x35
+        if data.len() > 0x35 {
+            decoded.insert(
+                "ColorTempCloudy".to_string(),
+                ExifValue::Short(vec![data[0x35]]),
+            );
+        }
+        // WB_RGGBLevelsTungsten at 0x36
+        if data.len() > 0x36 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x36] as i16, data[0x37] as i16, data[0x38] as i16, data[0x39] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsTungsten".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempTungsten at 0x3a
+        if data.len() > 0x3a {
+            decoded.insert(
+                "ColorTempTungsten".to_string(),
+                ExifValue::Short(vec![data[0x3a]]),
+            );
+        }
+        // WB_RGGBLevelsFluorescent at 0x3b
+        if data.len() > 0x3b + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x3b] as i16, data[0x3c] as i16, data[0x3d] as i16, data[0x3e] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsFluorescent".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempFluorescent at 0x3f
+        if data.len() > 0x3f {
+            decoded.insert(
+                "ColorTempFluorescent".to_string(),
+                ExifValue::Short(vec![data[0x3f]]),
+            );
+        }
+        // WB_RGGBLevelsKelvin at 0x40
+        if data.len() > 0x40 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x40] as i16, data[0x41] as i16, data[0x42] as i16, data[0x43] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsKelvin".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempKelvin at 0x44
+        if data.len() > 0x44 {
+            decoded.insert(
+                "ColorTempKelvin".to_string(),
+                ExifValue::Short(vec![data[0x44]]),
+            );
+        }
+        // WB_RGGBLevelsFlash at 0x45
+        if data.len() > 0x45 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x45] as i16, data[0x46] as i16, data[0x47] as i16, data[0x48] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsFlash".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempFlash at 0x49
+        if data.len() > 0x49 {
+            decoded.insert(
+                "ColorTempFlash".to_string(),
+                ExifValue::Short(vec![data[0x49]]),
+            );
+        }
+    }
+    // ColorData3 (count == 796) - 1DmkIIN, 5D, 30D, 400D
+    else if data.len() == 796 {
+        // WB_RGGBLevelsAsShot at 0x3f
+        if data.len() > 0x3f + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x3f] as i16, data[0x40] as i16, data[0x41] as i16, data[0x42] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsAsShot".to_string(),
+                ExifValue::Ascii(levels_str.clone()),
+            );
+            decoded.insert("WB_RGGBLevels".to_string(), ExifValue::Ascii(levels_str));
+        }
+        // ColorTempAsShot at 0x43
+        if data.len() > 0x43 {
+            decoded.insert(
+                "ColorTempAsShot".to_string(),
+                ExifValue::Short(vec![data[0x43]]),
+            );
+        }
+        // WB_RGGBLevelsAuto at 0x44
+        if data.len() > 0x44 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x44] as i16, data[0x45] as i16, data[0x46] as i16, data[0x47] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsAuto".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempAuto at 0x48
+        if data.len() > 0x48 {
+            decoded.insert(
+                "ColorTempAuto".to_string(),
+                ExifValue::Short(vec![data[0x48]]),
+            );
+        }
+        // WB_RGGBLevelsMeasured at 0x49
+        if data.len() > 0x49 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x49] as i16, data[0x4a] as i16, data[0x4b] as i16, data[0x4c] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsMeasured".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempMeasured at 0x4d
+        if data.len() > 0x4d {
+            decoded.insert(
+                "ColorTempMeasured".to_string(),
+                ExifValue::Short(vec![data[0x4d]]),
+            );
+        }
+        // WB_RGGBLevelsDaylight at 0x4e
+        if data.len() > 0x4e + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x4e] as i16, data[0x4f] as i16, data[0x50] as i16, data[0x51] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsDaylight".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempDaylight at 0x52
+        if data.len() > 0x52 {
+            decoded.insert(
+                "ColorTempDaylight".to_string(),
+                ExifValue::Short(vec![data[0x52]]),
+            );
+        }
+        // WB_RGGBLevelsShade at 0x53
+        if data.len() > 0x53 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x53] as i16, data[0x54] as i16, data[0x55] as i16, data[0x56] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsShade".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempShade at 0x57
+        if data.len() > 0x57 {
+            decoded.insert(
+                "ColorTempShade".to_string(),
+                ExifValue::Short(vec![data[0x57]]),
+            );
+        }
+        // WB_RGGBLevelsCloudy at 0x58
+        if data.len() > 0x58 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x58] as i16, data[0x59] as i16, data[0x5a] as i16, data[0x5b] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsCloudy".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempCloudy at 0x5c
+        if data.len() > 0x5c {
+            decoded.insert(
+                "ColorTempCloudy".to_string(),
+                ExifValue::Short(vec![data[0x5c]]),
+            );
+        }
+        // WB_RGGBLevelsTungsten at 0x5d
+        if data.len() > 0x5d + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x5d] as i16, data[0x5e] as i16, data[0x5f] as i16, data[0x60] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsTungsten".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempTungsten at 0x61
+        if data.len() > 0x61 {
+            decoded.insert(
+                "ColorTempTungsten".to_string(),
+                ExifValue::Short(vec![data[0x61]]),
+            );
+        }
+        // WB_RGGBLevelsFluorescent at 0x62
+        if data.len() > 0x62 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x62] as i16, data[0x63] as i16, data[0x64] as i16, data[0x65] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsFluorescent".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempFluorescent at 0x66
+        if data.len() > 0x66 {
+            decoded.insert(
+                "ColorTempFluorescent".to_string(),
+                ExifValue::Short(vec![data[0x66]]),
+            );
+        }
+        // WB_RGGBLevelsKelvin at 0x67
+        if data.len() > 0x67 + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x67] as i16, data[0x68] as i16, data[0x69] as i16, data[0x6a] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsKelvin".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempKelvin at 0x6b
+        if data.len() > 0x6b {
+            decoded.insert(
+                "ColorTempKelvin".to_string(),
+                ExifValue::Short(vec![data[0x6b]]),
+            );
+        }
+        // WB_RGGBLevelsFlash at 0x6c
+        if data.len() > 0x6c + 3 {
+            let levels_str = format!(
+                "{} {} {} {}",
+                data[0x6c] as i16, data[0x6d] as i16, data[0x6e] as i16, data[0x6f] as i16
+            );
+            decoded.insert(
+                "WB_RGGBLevelsFlash".to_string(),
+                ExifValue::Ascii(levels_str),
+            );
+        }
+        // ColorTempFlash at 0x70
+        if data.len() > 0x70 {
+            decoded.insert(
+                "ColorTempFlash".to_string(),
+                ExifValue::Short(vec![data[0x70]]),
+            );
+        }
+    }
     // ColorData4 (versions 2, 3, 4, 5, 6, 7, 9) - 1DmkIII, 40D, 1DSmkIII, 450D, 50D, 5DmkII, 7D, 60D, etc.
     // Has ColorCoefs subdirectory at offset 0x3f
-    if matches!(version, 2 | 3 | 4 | 5 | 6 | 7 | 9) && data.len() > 0x3f + 0x68 {
+    else if matches!(version, 2 | 3 | 4 | 5 | 6 | 7 | 9) && data.len() > 0x3f + 0x68 {
         // ColorCoefs starts at index 0x3f (63)
         let colorcoefs_base = 0x3f;
 

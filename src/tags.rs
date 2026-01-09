@@ -503,6 +503,16 @@ pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 
+// CRW/CIFF FocalPlaneSize tags (private range)
+pub const TAG_FOCAL_PLANE_X_SIZE: ExifTagId = ExifTagId {
+    id: 0xC001,
+    ifd: TagGroup::Main,
+};
+pub const TAG_FOCAL_PLANE_Y_SIZE: ExifTagId = ExifTagId {
+    id: 0xC002,
+    ifd: TagGroup::Main,
+};
+
 // Sony ARW SubIFD tags (0x7030-0x7040 range)
 pub const TAG_SONY_VIGNETTING_CORRECTION: ExifTagId = ExifTagId {
     id: 0x7030,
@@ -1037,6 +1047,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_FOCAL_PLANE_X_RESOLUTION, "FocalPlaneXResolution");
     map.insert(TAG_FOCAL_PLANE_Y_RESOLUTION, "FocalPlaneYResolution");
     map.insert(TAG_FOCAL_PLANE_RESOLUTION_UNIT, "FocalPlaneResolutionUnit");
+    map.insert(TAG_FOCAL_PLANE_X_SIZE, "FocalPlaneXSize");
+    map.insert(TAG_FOCAL_PLANE_Y_SIZE, "FocalPlaneYSize");
     map.insert(TAG_SENSING_METHOD, "SensingMethod");
     map.insert(TAG_FILE_SOURCE, "FileSource");
     map.insert(TAG_SCENE_TYPE, "SceneType");

@@ -31,6 +31,8 @@ pub const OLYMPUS_SCENE_MODE: u16 = 0x0403;
 pub const OLYMPUS_SERIAL_NUMBER: u16 = 0x0404;
 pub const OLYMPUS_FIRMWARE: u16 = 0x0405;
 pub const OLYMPUS_DATA_DUMP: u16 = 0x0E00;
+pub const OLYMPUS_RED_BALANCE: u16 = 0x1017;
+pub const OLYMPUS_BLUE_BALANCE: u16 = 0x1018;
 pub const OLYMPUS_EQUIPMENT_IFD: u16 = 0x2010;
 pub const OLYMPUS_CAMERA_SETTINGS_IFD: u16 = 0x2020;
 pub const OLYMPUS_RAW_DEVELOPMENT_IFD: u16 = 0x2030;
@@ -217,6 +219,8 @@ fn get_main_tag_name(tag_id: u16) -> Option<&'static str> {
         OLYMPUS_PREVIEW_IMAGE => Some("PreviewImage"),
         OLYMPUS_SERIAL_NUMBER => Some("SerialNumber"),
         OLYMPUS_FIRMWARE => Some("Firmware"),
+        OLYMPUS_RED_BALANCE => Some("RedBalance"),
+        OLYMPUS_BLUE_BALANCE => Some("BlueBalance"),
         OLYMPUS_EQUIPMENT_IFD => Some("EquipmentIFD"),
         OLYMPUS_CAMERA_SETTINGS_IFD => Some("CameraSettingsIFD"),
         OLYMPUS_RAW_DEVELOPMENT_IFD => Some("RawDevelopmentIFD"),
@@ -2286,6 +2290,19 @@ fn parse_olympus_ifd(
                                 ExifValue::Ascii(decoded.to_string())
                             } else {
                                 value // Keep original if not in lookup table
+                            }
+                        } else {
+                            value
+                        }
+                    }
+                    OLYMPUS_RED_BALANCE | OLYMPUS_BLUE_BALANCE => {
+                        // RedBalance/BlueBalance: int16u[2], first value / 256
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                let v = vals[0] as f64 / 256.0;
+                                ExifValue::Ascii(format!("{}", v))
+                            } else {
+                                value
                             }
                         } else {
                             value
