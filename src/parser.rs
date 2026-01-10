@@ -70,6 +70,13 @@ where
         exif_data.set_raf_metadata(raf_metadata);
     }
 
+    // Reset reader position for RW2 Compression extraction
+    reader.seek(std::io::SeekFrom::Start(0))?;
+
+    // For Panasonic RW2 files, extract Compression from main IFD0 before EXIF extraction
+    // (RW2 files use embedded JPEG for EXIF which loses the main Compression value)
+    let rw2_compression = formats::tiff::extract_rw2_compression(&mut reader)?;
+
     // Reset reader position for EXIF extraction
     reader.seek(std::io::SeekFrom::Start(0))?;
 
@@ -156,8 +163,91 @@ where
     parse_subifd(0x8825, TagGroup::Gps); // GPS SubIFD
     parse_subifd(0xA005, TagGroup::Interop); // Interoperability SubIFD
 
+    // Follow the entire IFD chain (IFD1 → IFD2 → IFD3 → ...)
+    // This is important for Canon CR2 files where IFD3 contains raw data metadata
+    // Only override specific tags that should come from raw data IFD:
+    // StripOffsets, StripByteCounts, RowsPerStrip, SamplesPerPixel, etc.
+    // Use lenient parsing - some files have corrupt IFD offsets
+    let mut current_ifd_offset = next_ifd_offset;
+    let mut ifd_count = 0;
+    const MAX_IFD_CHAIN: u32 = 10; // Prevent infinite loops
+
+    // Tags that should be taken from the last (raw data) IFD
+    const RAW_DATA_TAGS: [u16; 7] = [
+        0x0111, // StripOffsets
+        0x0117, // StripByteCounts
+        0x0116, // RowsPerStrip
+        0x0115, // SamplesPerPixel
+        0x011C, // PlanarConfiguration
+        0x0106, // PhotometricInterpretation
+        0x0103, // Compression (for raw data IFD)
+    ];
+
+    // Helper to check if a compression value is RAW-specific
+    let is_raw_compression = |v: u16| {
+        matches!(
+            v,
+            34713   // Nikon NEF Compressed
+                | 32767 // Sony ARW Compressed
+                | 34316 // Panasonic RAW 1
+                | 34826 // Panasonic RAW 2
+                | 34828 // Panasonic RAW 3
+                | 34830 // Panasonic RAW 4
+                | 65535 // Pentax PEF Compressed
+                | 65000 // Kodak DCR Compressed
+        )
+    };
+
+    while current_ifd_offset > 0
+        && ifd_count < MAX_IFD_CHAIN
+        && tiff_offset + current_ifd_offset as usize + 2 <= app1_data.len()
+    {
+        if let Ok((ifd_tags, next_offset)) = parse_ifd(
+            &app1_data,
+            tiff_offset + current_ifd_offset as usize,
+            tiff_offset,
+            endian,
+            TagGroup::Main,
+            config,
+        ) {
+            // Only override specific raw-data tags, skip others
+            for (tag_id, value) in ifd_tags {
+                if RAW_DATA_TAGS.contains(&tag_id.id) {
+                    // Special handling for Compression (0x0103):
+                    // IFD0 contains the main image compression. Later IFDs (IFD1, IFD2, etc.)
+                    // typically contain thumbnails with different compression.
+                    // Only allow RAW-specific compression values from later IFDs to override.
+                    if tag_id.id == 0x0103 {
+                        // Check if we already have a compression value from IFD0
+                        let has_existing = exif_data.get_tag_by_id(0x0103).is_some();
+
+                        // Check if new value is RAW-specific (should always override)
+                        let new_is_raw = if let ExifValue::Short(vals) = &value {
+                            !vals.is_empty() && is_raw_compression(vals[0])
+                        } else {
+                            false
+                        };
+
+                        // Only allow override if:
+                        // - we don't have an existing value, OR
+                        // - new value is RAW-specific
+                        if has_existing && !new_is_raw {
+                            continue;
+                        }
+                    }
+                    exif_data.tags.insert(tag_id, value);
+                }
+            }
+            current_ifd_offset = next_offset;
+        } else {
+            break;
+        }
+        ifd_count += 1;
+    }
+
     // Parse SubIFDs pointed to by SubIFDs tag (0x014A)
-    // These contain RAW image data and metadata in some formats (e.g., Nikon TIFF)
+    // These contain RAW image data and metadata in some formats (e.g., Canon CR2, Nikon NEF)
+    // Parse AFTER IFD1 so raw data values override thumbnail values
     let subifd_offsets = exif_data.get_tag_by_id(0x014A).and_then(|v| match v {
         ExifValue::Long(offsets) => Some(offsets.clone()),
         _ => None,
@@ -174,29 +264,52 @@ where
                     TagGroup::Main,
                     config,
                 ) {
+                    // Check if this SubIFD is a main image (SubfileType = 0)
+                    // SubfileType 0 = Full-resolution image, 1 = Reduced-resolution (thumbnail)
+                    let is_main_image = subifd_tags.iter().any(|(tid, val)| {
+                        tid.id == 0x00FE
+                            && matches!(val, ExifValue::Long(v) if !v.is_empty() && v[0] == 0)
+                    });
+
                     // Add the SubIFD tags
                     for (tag_id, value) in subifd_tags {
+                        // Special handling for Compression tag (0x0103):
+                        // Prefer main image (SubfileType=0) Compression over thumbnail
+                        if tag_id.id == 0x0103 {
+                            // Helper to check if a compression value is RAW-specific
+                            let is_raw_compression = |v: u16| {
+                                matches!(
+                                    v,
+                                    34713   // Nikon NEF Compressed
+                                        | 32767 // Sony ARW Compressed
+                                        | 34316 // Panasonic RAW 1
+                                        | 34826 // Panasonic RAW 2
+                                        | 34828 // Panasonic RAW 3
+                                        | 34830 // Panasonic RAW 4
+                                        | 65535 // Pentax PEF Compressed
+                                        | 65000 // Kodak DCR Compressed
+                                )
+                            };
+
+                            // Check if new value is RAW-specific
+                            let new_is_raw = if let ExifValue::Short(vals) = &value {
+                                !vals.is_empty() && is_raw_compression(vals[0])
+                            } else {
+                                false
+                            };
+
+                            // Allow override if: RAW-specific, or this is a main image SubIFD
+                            // Otherwise skip to preserve IFD0's Compression
+                            if !new_is_raw
+                                && !is_main_image
+                                && exif_data.get_tag_by_id(0x0103).is_some()
+                            {
+                                continue;
+                            }
+                        }
                         exif_data.tags.insert(tag_id, value);
                     }
                 }
-            }
-        }
-    }
-
-    // Parse thumbnail IFD (IFD1) if present
-    // Use lenient parsing - some files have corrupt thumbnail IFD offsets
-    if next_ifd_offset > 0 && tiff_offset + next_ifd_offset as usize + 2 <= app1_data.len() {
-        if let Ok((thumbnail_tags, _)) = parse_ifd(
-            &app1_data,
-            tiff_offset + next_ifd_offset as usize,
-            tiff_offset,
-            endian,
-            TagGroup::Thumbnail,
-            config,
-        ) {
-            // Add the thumbnail tags
-            for (tag_id, value) in thumbnail_tags {
-                exif_data.tags.insert(tag_id, value);
             }
         }
     }
@@ -211,11 +324,20 @@ where
                 _ => None,
             });
 
+        // Get the camera model for model-specific formatting (e.g., Canon SerialNumber)
+        let model = exif_data
+            .get_tag_by_id(0x0110) // Model tag
+            .and_then(|v| match v {
+                ExifValue::Ascii(s) => Some(s.as_str()),
+                _ => None,
+            });
+
         // Parse the maker notes
         // Pass the full app1_data and tiff_offset for manufacturers that use TIFF-relative offsets (e.g., Canon)
         if let Ok(parsed_maker_notes) = crate::makernotes::parse_maker_notes_with_tiff_data(
             maker_note_data,
             make,
+            model,
             endian,
             Some(&app1_data),
             tiff_offset,
@@ -224,6 +346,14 @@ where
                 exif_data.maker_notes = Some(parsed_maker_notes);
             }
         }
+    }
+
+    // Override Compression for RW2 files with the value from main IFD0
+    if let Some(compression) = rw2_compression {
+        let tag_id = crate::tags::ExifTagId::new(0x0103, crate::tags::TagGroup::Main);
+        exif_data
+            .tags
+            .insert(tag_id, ExifValue::Short(vec![compression]));
     }
 
     Ok(exif_data)

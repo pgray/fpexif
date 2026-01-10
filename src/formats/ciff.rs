@@ -146,6 +146,8 @@ pub struct CiffMetadata {
     // Shot info (CanonShotInfo)
     pub auto_iso: Option<u16>,
     pub base_iso_value: Option<u16>,
+    // Direct ISO from TAG_BASE_ISO (0x101c) - the actual ISO used
+    pub direct_iso: Option<u32>,
     pub measured_ev: Option<i16>,
     pub target_aperture: Option<u16>,
     pub target_exposure_time: Option<u16>,
@@ -524,8 +526,9 @@ impl<R: Read + Seek> CiffParser<R> {
                 self.parse_shot_info(data, metadata);
             }
             TAG_BASE_ISO => {
+                // TAG_BASE_ISO contains the actual ISO used (32-bit value)
                 if data.len() >= 4 {
-                    metadata.base_iso_value = Some(LittleEndian::read_u32(&data[0..4]) as u16);
+                    metadata.direct_iso = Some(LittleEndian::read_u32(&data[0..4]));
                 }
             }
             _ => {
@@ -730,14 +733,22 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
     }
 
     // Add ISO (tag 0x8827 - ISOSpeedRatings)
-    // Use auto_iso which is stored as: ISO = 100 * 2^(value/32)
-    // A value of 0 means ISO 100
-    if let Some(auto_iso_raw) = metadata.auto_iso {
-        let iso = if auto_iso_raw == 0 {
-            100u16
-        } else {
-            (100.0 * 2.0_f64.powf(auto_iso_raw as f64 / 32.0)).round() as u16
-        };
+    // Calculate from ShotInfo APEX values: ISO = BaseISO * AutoISO / 100
+    // where BaseISO = 2^(val/32) * 100/32 and AutoISO = 2^(val/32) * 100
+    if let (Some(base_iso_raw), Some(auto_iso_raw)) = (metadata.base_iso_value, metadata.auto_iso) {
+        // Convert APEX-encoded values to actual ISO values
+        // AutoISO: 2^(val/32) * 100
+        let auto_iso = 2.0_f64.powf(auto_iso_raw as f64 / 32.0) * 100.0;
+        // BaseISO: 2^(val/32) * 100/32
+        let base_iso = 2.0_f64.powf(base_iso_raw as f64 / 32.0) * 100.0 / 32.0;
+        // Final ISO = BaseISO * AutoISO / 100
+        let iso = (base_iso * auto_iso / 100.0).round() as u16;
+        if iso > 0 {
+            ifd_entries.push((0x8827, 3, 1, iso.to_le_bytes().to_vec()));
+        }
+    } else if let Some(direct_iso) = metadata.direct_iso {
+        // Fallback to TAG_BASE_ISO (0x101c) if ShotInfo not available
+        let iso = direct_iso as u16;
         ifd_entries.push((0x8827, 3, 1, iso.to_le_bytes().to_vec()));
     }
 
@@ -774,24 +785,33 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
         }
     }
 
-    // Add FocalLength (tag 0x920A) - RATIONAL
+    // Add FocalLength (tag 0x920A) - ASCII for CRW files
+    // ExifTool formats CRW FocalLength from MakerNotes:
+    // - Whole numbers without decimal: "400 mm"
+    // - Fractional values with decimals: "7.5 mm" or "7.1875 mm"
     if let Some(fl) = metadata.focal_length {
-        let units = metadata.focal_units.unwrap_or(1) as u32;
+        let units = metadata.focal_units.unwrap_or(1);
         if units > 0 && fl > 0 {
-            let fl_mm = fl as u32;
-            let mut rational = Vec::new();
-            rational.extend_from_slice(&fl_mm.to_le_bytes());
-            rational.extend_from_slice(&units.to_le_bytes());
-            ifd_entries.push((0x920A, 5, 1, rational));
+            let fl_mm = fl as f64 / units as f64;
+            // Format: whole numbers without decimals, fractional with up to 5 decimal places
+            let fl_str = if fl_mm.fract() == 0.0 {
+                format!("{} mm", fl_mm as u32)
+            } else {
+                // ExifTool uses up to 5 decimal places for fractional focal lengths
+                let formatted = format!("{:.5}", fl_mm).trim_end_matches('0').to_string();
+                format!("{} mm", formatted)
+            };
+            let mut fl_bytes = fl_str.as_bytes().to_vec();
+            fl_bytes.push(0); // Null terminator
+            ifd_entries.push((0x920A, 2, fl_bytes.len() as u32, fl_bytes));
         }
     }
 
     // Add ExposureBiasValue (tag 0x9204) - SRATIONAL
     if let Some(ev_comp) = metadata.exposure_compensation {
-        // Canon stores as value * 32 (e.g., -32 = -1 EV)
-        // EXIF wants it as a rational in EV
-        let num = ev_comp as i32;
-        let denom = 32i32;
+        // Canon uses special EV encoding where 12 (0x0c) = 1/3 stop, 20 (0x14) = 2/3 stop
+        // We need to convert to proper EXIF fraction
+        let (num, denom) = canon_ev_to_fraction(ev_comp);
         let mut rational = Vec::new();
         rational.extend_from_slice(&num.to_le_bytes());
         rational.extend_from_slice(&denom.to_le_bytes());
@@ -820,36 +840,27 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
         ifd_entries.push((0x9209, 3, 1, exif_flash.to_le_bytes().to_vec()));
     }
 
-    // Add FocalPlaneXResolution (tag 0xA20E) and YResolution (tag 0xA20F)
+    // For CRW files, output FocalPlaneXSize/YSize directly (matching ExifTool)
+    // The raw values are in 1/1000 inch, convert to mm
+    // Use private tag IDs 0xC001/0xC002 that will be mapped to FocalPlaneXSize/YSize in output
     if let Some(xsize) = metadata.focal_plane_x_size {
-        if let Some(width) = metadata.image_width {
-            if xsize > 0 {
-                // xsize is in 1/1000 mm, calculate pixels per mm then convert to inches
-                // Resolution = width / (xsize/1000) pixels per mm
-                // For EXIF we want pixels per inch = resolution * 25.4
-                let res_x = ((width as f64) / (xsize as f64 / 1000.0) * 25.4) as u32;
-                let mut rational = Vec::new();
-                rational.extend_from_slice(&res_x.to_le_bytes());
-                rational.extend_from_slice(&1u32.to_le_bytes());
-                ifd_entries.push((0xA20E, 5, 1, rational));
-            }
+        if xsize > 0 {
+            // xsize is in 1/1000 inch, convert to mm: value * 25.4 / 1000
+            let size_mm = xsize as f64 * 25.4 / 1000.0;
+            let size_str = format!("{:.2} mm", size_mm);
+            let mut size_bytes = size_str.as_bytes().to_vec();
+            size_bytes.push(0);
+            ifd_entries.push((0xC001, 2, size_bytes.len() as u32, size_bytes));
         }
     }
     if let Some(ysize) = metadata.focal_plane_y_size {
-        if let Some(height) = metadata.image_height {
-            if ysize > 0 {
-                let res_y = ((height as f64) / (ysize as f64 / 1000.0) * 25.4) as u32;
-                let mut rational = Vec::new();
-                rational.extend_from_slice(&res_y.to_le_bytes());
-                rational.extend_from_slice(&1u32.to_le_bytes());
-                ifd_entries.push((0xA20F, 5, 1, rational));
-            }
+        if ysize > 0 {
+            let size_mm = ysize as f64 * 25.4 / 1000.0;
+            let size_str = format!("{:.2} mm", size_mm);
+            let mut size_bytes = size_str.as_bytes().to_vec();
+            size_bytes.push(0);
+            ifd_entries.push((0xC002, 2, size_bytes.len() as u32, size_bytes));
         }
-    }
-
-    // Add FocalPlaneResolutionUnit (tag 0xA210) - 2 = inches
-    if metadata.focal_plane_x_size.is_some() || metadata.focal_plane_y_size.is_some() {
-        ifd_entries.push((0xA210, 3, 1, 2u16.to_le_bytes().to_vec()));
     }
 
     // Sort entries by tag number (required by TIFF spec)
@@ -975,6 +986,35 @@ fn days_to_ymd(days: i64) -> (i32, u32, u32) {
 
 fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+/// Convert Canon EV value to EXIF-compatible signed rational (numerator, denominator)
+/// Canon uses special encoding where lower 5 bits contain fractional part:
+/// - 0x0c (12) = 1/3 stop
+/// - 0x14 (20) = 2/3 stop
+/// - Other values = value/32 stops
+fn canon_ev_to_fraction(val: i16) -> (i32, i32) {
+    if val == 0 {
+        return (0, 1);
+    }
+
+    let sign = if val < 0 { -1 } else { 1 };
+    let abs_val = val.unsigned_abs();
+    let frac = abs_val & 0x1f;
+    let whole = (abs_val >> 5) as i32;
+
+    match frac {
+        0x00 => (sign * whole, 1),           // Whole stop: n EV
+        0x0c => (sign * (whole * 3 + 1), 3), // +1/3 stop
+        0x14 => (sign * (whole * 3 + 2), 3), // +2/3 stop
+        0x10 => (sign * (whole * 2 + 1), 2), // +1/2 stop
+        _ => {
+            // Fallback: approximate to nearest 1/3
+            let ev = (abs_val as f64) / 32.0;
+            let thirds = (ev * 3.0).round() as i32;
+            (sign * thirds, 3)
+        }
+    }
 }
 
 #[cfg(test)]

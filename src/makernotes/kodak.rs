@@ -11,6 +11,7 @@
 // This module focuses on the IFD-based format and common Type 1 tags.
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
@@ -192,70 +193,73 @@ pub fn get_kodak_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
-// ===== ExifTool format decoders =====
+// ===== Tag decoders using the define_tag_decoder! macro =====
+// Note: Kodak has no exiv2 support, so we use 'both:' for identical exiftool/exiv2 output
 
-/// Decode Quality value - ExifTool format
-pub fn decode_quality_exiftool(value: u8) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_quality,
+    type: u8,
+    both: {
         1 => "Fine",
         2 => "Normal",
-        _ => "Unknown",
     }
 }
 
-/// Decode BurstMode value - ExifTool format
-pub fn decode_burst_mode_exiftool(value: u8) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_burst_mode,
+    type: u8,
+    both: {
         0 => "Off",
         1 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode ShutterMode value - ExifTool format
-pub fn decode_shutter_mode_exiftool(value: u8) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_shutter_mode,
+    type: u8,
+    both: {
         0 => "Auto",
         8 => "Aperture Priority",
         32 => "Manual?",
-        _ => "Unknown",
     }
 }
 
-/// Decode MeteringMode value - ExifTool format
-pub fn decode_metering_mode_exiftool(value: u8) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_metering_mode,
+    type: u8,
+    both: {
         0 => "Multi-segment",
         1 => "Center-weighted average",
         2 => "Spot",
-        _ => "Unknown",
     }
 }
 
-/// Decode FocusMode value (binary format) - ExifTool format
-pub fn decode_focus_mode_binary_exiftool(value: u8) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_focus_mode_binary,
+    type: u8,
+    both: {
         0 => "Normal",
         2 => "Macro",
-        _ => "Unknown",
     }
 }
 
-/// Decode WhiteBalance value - ExifTool format
-pub fn decode_white_balance_exiftool(value: u8) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_white_balance,
+    type: u8,
+    both: {
         0 => "Auto",
         1 => "Flash?",
         2 => "Tungsten",
         3 => "Daylight",
-        5 => "Auto", // ProBack 645M
-        _ => "Unknown",
+        5 => "Auto",
+        6 => "Shade",
     }
 }
 
-/// Decode FlashMode value (binary format) - ExifTool format
-pub fn decode_flash_mode_binary_exiftool(value: u8) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_flash_mode_binary,
+    type: u8,
+    both: {
         0x00 => "Auto",
         0x01 => "Fill Flash",
         0x02 => "Off",
@@ -263,22 +267,21 @@ pub fn decode_flash_mode_binary_exiftool(value: u8) -> &'static str {
         0x10 => "Fill Flash",
         0x20 => "Off",
         0x40 => "Red-Eye?",
-        _ => "Unknown",
     }
 }
 
-/// Decode FlashFired value - ExifTool format
-pub fn decode_flash_fired_exiftool(value: u8) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_flash_fired,
+    type: u8,
+    both: {
         0 => "No",
         1 => "Yes",
-        _ => "Unknown",
     }
 }
 
-/// Decode ColorMode value - ExifTool format
-pub fn decode_color_mode_exiftool(value: u16) -> &'static str {
-    match value {
+define_tag_decoder! {
+    kodak_color_mode,
+    both: {
         0x01 => "B&W",
         0x02 => "Sepia",
         0x03 => "B&W Yellow Filter",
@@ -289,8 +292,133 @@ pub fn decode_color_mode_exiftool(value: u16) -> &'static str {
         0x200 => "Neutral Color",
         0x2000 => "B&W",
         0x4000 => "Sepia",
-        _ => "Unknown",
     }
+}
+
+// Additional Kodak tags from Kodak.pm
+
+define_tag_decoder! {
+    kodak_scene_mode,
+    both: {
+        1 => "Sport",
+        3 => "Portrait",
+        4 => "Landscape",
+        6 => "Beach",
+        7 => "Night Portrait",
+        8 => "Night Landscape",
+        9 => "Snow",
+        10 => "Text",
+        11 => "Fireworks",
+        12 => "Macro",
+        13 => "Museum",
+        16 => "Children",
+        17 => "Program",
+        18 => "Aperture Priority",
+        19 => "Shutter Priority",
+        20 => "Manual",
+    }
+}
+
+define_tag_decoder! {
+    kodak_scene_mode_used,
+    both: {
+        0 => "Program",
+        2 => "Aperture Priority",
+        3 => "Shutter Priority",
+        4 => "Manual",
+        5 => "Portrait",
+        6 => "Sport",
+        7 => "Children",
+        8 => "Museum",
+        10 => "High ISO",
+        11 => "Text",
+        12 => "Macro",
+        13 => "Back Light",
+        16 => "Landscape",
+        17 => "Night Landscape",
+        18 => "Night Portrait",
+        19 => "Snow",
+        20 => "Beach",
+        21 => "Fireworks",
+        22 => "Sunset",
+        23 => "Candlelight",
+        28 => "Panorama",
+    }
+}
+
+define_tag_decoder! {
+    kodak_picture_effect,
+    both: {
+        0 => "None",
+        3 => "Monochrome",
+        9 => "Kodachrome",
+    }
+}
+
+define_tag_decoder! {
+    kodak_image_rotated,
+    type: u8,
+    both: {
+        0 => "No",
+        1 => "Yes",
+    }
+}
+
+define_tag_decoder! {
+    kodak_macro,
+    type: u8,
+    both: {
+        0 => "On",
+        1 => "Off",
+    }
+}
+
+define_tag_decoder! {
+    kodak_flash_type5,
+    type: u8,
+    both: {
+        0 => "Auto",
+        1 => "On",
+        2 => "Off",
+        3 => "Red-Eye",
+    }
+}
+
+// Legacy function aliases for backward compatibility
+pub fn decode_quality_exiftool(value: u8) -> &'static str {
+    decode_kodak_quality_exiftool(value)
+}
+
+pub fn decode_burst_mode_exiftool(value: u8) -> &'static str {
+    decode_kodak_burst_mode_exiftool(value)
+}
+
+pub fn decode_shutter_mode_exiftool(value: u8) -> &'static str {
+    decode_kodak_shutter_mode_exiftool(value)
+}
+
+pub fn decode_metering_mode_exiftool(value: u8) -> &'static str {
+    decode_kodak_metering_mode_exiftool(value)
+}
+
+pub fn decode_focus_mode_binary_exiftool(value: u8) -> &'static str {
+    decode_kodak_focus_mode_binary_exiftool(value)
+}
+
+pub fn decode_white_balance_exiftool(value: u8) -> &'static str {
+    decode_kodak_white_balance_exiftool(value)
+}
+
+pub fn decode_flash_mode_binary_exiftool(value: u8) -> &'static str {
+    decode_kodak_flash_mode_binary_exiftool(value)
+}
+
+pub fn decode_flash_fired_exiftool(value: u8) -> &'static str {
+    decode_kodak_flash_fired_exiftool(value)
+}
+
+pub fn decode_color_mode_exiftool(value: u16) -> &'static str {
+    decode_kodak_color_mode_exiftool(value)
 }
 
 /// Parse Kodak maker notes

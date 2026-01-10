@@ -64,6 +64,38 @@ enum Commands {
         #[arg(required = true)]
         files: Vec<PathBuf>,
     },
+
+    /// Extract embedded JPEG preview from RAW file
+    #[command(name = "extract-jpeg")]
+    ExtractJpeg {
+        /// Path to the RAW file (or ignored if --test-dir is used)
+        #[arg(required_unless_present = "test_dir")]
+        file: Option<PathBuf>,
+
+        /// Output file path (default: input_preview.jpg)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Extract thumbnail instead of preview
+        #[arg(short, long)]
+        thumbnail: bool,
+
+        /// List all embedded JPEGs without extracting
+        #[arg(short, long)]
+        list: bool,
+
+        /// Extract all embedded JPEGs (outputs to input_0.jpg, input_1.jpg, etc.)
+        #[arg(short, long)]
+        all: bool,
+
+        /// Test JPEG extraction across all files in a directory
+        #[arg(long)]
+        test_dir: Option<PathBuf>,
+
+        /// Validate extracted JPEGs by parsing their structure
+        #[arg(short, long)]
+        validate: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -175,458 +207,161 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
+        Commands::ExtractJpeg {
+            file,
+            output,
+            thumbnail,
+            list,
+            all,
+            test_dir,
+            validate,
+        } => {
+            use fpexif::extract::{extract_jpegs, validate_jpeg, JpegType};
+            use std::fs::File;
+            use std::io::BufReader;
+
+            // Handle --test-dir mode
+            if let Some(dir) = test_dir {
+                return run_jpeg_extraction_test(dir, *validate);
+            }
+
+            let file = file
+                .as_ref()
+                .expect("file is required when not using --test-dir");
+            let reader = BufReader::new(File::open(file)?);
+
+            let jpeg_type = if *all || *list {
+                JpegType::All
+            } else if *thumbnail {
+                JpegType::Thumbnail
+            } else {
+                JpegType::Preview
+            };
+
+            match extract_jpegs(reader, jpeg_type) {
+                Ok(jpegs) => {
+                    if jpegs.is_empty() {
+                        eprintln!("No embedded JPEGs found in {}", file.display());
+                        std::process::exit(1);
+                    }
+
+                    if *list {
+                        // List mode - just show info
+                        println!("Embedded JPEGs in {}:", file.display());
+                        for (i, (info, jpeg_data)) in jpegs.iter().enumerate() {
+                            let dims = info
+                                .dimensions
+                                .map(|(w, h)| format!(" ({}x{})", w, h))
+                                .unwrap_or_default();
+
+                            if *validate {
+                                let validation = validate_jpeg(jpeg_data);
+                                let status = if validation.valid { "OK" } else { "INVALID" };
+                                let parsed_dims = match (validation.width, validation.height) {
+                                    (Some(w), Some(h)) => format!(" {}x{}", w, h),
+                                    _ => String::new(),
+                                };
+                                let eoi = if validation.has_eoi { "" } else { " [no EOI]" };
+                                println!(
+                                    "  {}: {} - {} bytes at offset {}{} [{}{}{}]",
+                                    i,
+                                    info.description,
+                                    info.length,
+                                    info.offset,
+                                    dims,
+                                    status,
+                                    parsed_dims,
+                                    eoi
+                                );
+                            } else {
+                                println!(
+                                    "  {}: {} - {} bytes at offset {}{}",
+                                    i, info.description, info.length, info.offset, dims
+                                );
+                            }
+                        }
+                    } else {
+                        // Extract mode
+                        let base_name = file
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("output");
+
+                        for (i, (info, data)) in jpegs.iter().enumerate() {
+                            let out_path = if let Some(ref out) = output {
+                                if *all && jpegs.len() > 1 {
+                                    // Multiple files: add index
+                                    let stem = out
+                                        .file_stem()
+                                        .and_then(|s| s.to_str())
+                                        .unwrap_or("output");
+                                    let ext =
+                                        out.extension().and_then(|s| s.to_str()).unwrap_or("jpg");
+                                    PathBuf::from(format!("{}_{}.{}", stem, i, ext))
+                                } else {
+                                    out.clone()
+                                }
+                            } else {
+                                // Default naming
+                                let suffix = if *all && jpegs.len() > 1 {
+                                    format!("_{}", i)
+                                } else if *thumbnail {
+                                    "_thumb".to_string()
+                                } else {
+                                    "_preview".to_string()
+                                };
+                                PathBuf::from(format!("{}{}.jpg", base_name, suffix))
+                            };
+
+                            std::fs::write(&out_path, data)?;
+                            let dims = info
+                                .dimensions
+                                .map(|(w, h)| format!(" ({}x{})", w, h))
+                                .unwrap_or_default();
+                            println!(
+                                "Extracted {} ({} bytes){} -> {}",
+                                info.description,
+                                data.len(),
+                                dims,
+                                out_path.display()
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error extracting JPEG: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            Ok(())
+        }
     }
 }
 
 /// Print all EXIF data in exiftool text format: `Tag Name                        : Value`
 fn print_exif_data_exiftool(exif_data: &ExifData) {
-    // Output RAF-specific metadata first (for Fujifilm RAF files)
-    if let Some(raf_metadata) = exif_data.get_raf_metadata() {
-        // Output in a consistent order
-        let ordered_keys = [
-            "RAFVersion",
-            "RAFCompression",
-            "RawImageFullSize",
-            "RawImageCropTopLeft",
-            "RawImageCroppedSize",
-            "FujiLayout",
-            "XTransLayout",
-            "RawExposureBias",
-            "RawImageWidth",
-            "RawImageHeight",
-            "RawImageFullWidth",
-            "RawImageFullHeight",
-            "BlackLevel",
-            "WB_GRBLevels",
-            "WB_GRBLevelsAuto",
-            "WB_GRBLevelsStandard",
-            "GeometricDistortionParams",
-            "ChromaticAberrationParams",
-            "VignettingParams",
-        ];
-        for key in ordered_keys {
-            if let Some(value) = raf_metadata.tags.get(key) {
-                println!("{:<32}: {}", key, value);
-            }
-        }
-    }
+    // Use to_exiftool_json to get consistent output with JSON mode
+    // This ensures tag filtering (removing duplicates, IFD pointers, raw binary) is applied
+    let json = fpexif::output::to_exiftool_json(exif_data, None);
 
-    for (tag_id, value) in exif_data.iter() {
-        let tag_name = tag_id.name().unwrap_or("Unknown");
-        let display_value = format_exiftool_text_value(value, tag_id.id);
-        println!("{:<32}: {}", tag_name, display_value);
-    }
+    // Extract the object from the array
+    if let serde_json::Value::Array(arr) = json {
+        if let Some(serde_json::Value::Object(obj)) = arr.into_iter().next() {
+            // Sort keys for consistent output
+            let mut keys: Vec<_> = obj.keys().collect();
+            keys.sort();
 
-    // Output maker notes
-    if let Some(maker_notes) = exif_data.get_maker_notes() {
-        for (_, note) in maker_notes.iter() {
-            if let Some(name) = note.tag_name {
-                let display_value = format_exiftool_text_value(&note.value, note.tag_id);
-                println!("{:<32}: {}", name, display_value);
-            }
-        }
-    }
-
-    // Output computed/alias fields
-    print_computed_fields(exif_data);
-}
-
-/// Print computed fields that are aliases or calculated from existing data
-fn print_computed_fields(exif_data: &ExifData) {
-    use fpexif::data_types::ExifValue;
-
-    // ThumbnailOffset - alias for JPEGInterchangeFormat (0x0201)
-    if let Some(ExifValue::Long(v)) = exif_data.get_tag_by_id(0x0201) {
-        if !v.is_empty() {
-            println!("{:<32}: {}", "ThumbnailOffset", v[0]);
-        }
-    }
-
-    // ThumbnailLength - alias for JPEGInterchangeFormatLength (0x0202)
-    if let Some(ExifValue::Long(v)) = exif_data.get_tag_by_id(0x0202) {
-        if !v.is_empty() {
-            println!("{:<32}: {}", "ThumbnailLength", v[0]);
-        }
-    }
-
-    // PreviewImageStart - alias for StripOffsets (0x0111)
-    // PreviewImageLength - alias for StripByteCounts (0x0117)
-    // (These aliases are typically only for Canon RAW files where preview is in IFD0)
-
-    // Aperture - alias for FNumber
-    if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829D) {
-        if !v.is_empty() {
-            let (n, d) = v[0];
-            if d != 0 {
-                let f = n as f64 / d as f64;
-                println!("{:<32}: {}", "Aperture", f);
-            }
-        }
-    }
-
-    // ImageSize - computed from ImageWidth (0x0100) and ImageLength (0x0101)
-    let width = get_dimension(exif_data, 0xA002).or_else(|| get_dimension(exif_data, 0x0100));
-    let height = get_dimension(exif_data, 0xA003).or_else(|| get_dimension(exif_data, 0x0101));
-
-    if let (Some(w), Some(h)) = (width, height) {
-        println!("{:<32}: {}x{}", "ImageSize", w, h);
-
-        // Megapixels
-        let megapixels = (w as f64 * h as f64) / 1_000_000.0;
-        println!("{:<32}: {:.1}", "Megapixels", megapixels);
-    }
-
-    // RedBalance and BlueBalance from WB_RGGBLevelsAsShot
-    if let Some(maker_notes) = exif_data.get_maker_notes() {
-        // Find WB_RGGBLevelsAsShot or WB_RGGBLevels
-        for (_, note) in maker_notes.iter() {
-            if let Some(name) = note.tag_name {
-                if name == "WB_RGGBLevelsAsShot" || name == "WB_RGGBLevels" {
-                    // Can be either Short array or Ascii string "R G G B"
-                    let values: Option<Vec<f64>> = match &note.value {
-                        ExifValue::Short(v) if v.len() >= 4 => {
-                            Some(v.iter().map(|&x| x as f64).collect())
-                        }
-                        ExifValue::Ascii(s) => {
-                            // Parse space-separated values
-                            let parsed: Vec<f64> = s
-                                .split_whitespace()
-                                .filter_map(|x| x.parse().ok())
-                                .collect();
-                            if parsed.len() >= 4 {
-                                Some(parsed)
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None,
+            for key in keys {
+                if let Some(value) = obj.get(key) {
+                    let display_value = match value {
+                        serde_json::Value::String(s) => s.clone(),
+                        serde_json::Value::Number(n) => n.to_string(),
+                        serde_json::Value::Bool(b) => b.to_string(),
+                        serde_json::Value::Null => "".to_string(),
+                        _ => value.to_string(),
                     };
-
-                    if let Some(v) = values {
-                        // RGGB: v[0]=R, v[1]=G1, v[2]=G2, v[3]=B
-                        // Balance is R/G and B/G where G = G1 (first G)
-                        let r = v[0];
-                        let g = v[1]; // Use first G
-                        let b = v[3];
-                        if g > 0.0 {
-                            println!("{:<32}: {:.6}", "RedBalance", r / g);
-                            println!("{:<32}: {:.6}", "BlueBalance", b / g);
-                        }
-                    }
-                    break;
+                    println!("{:<32}: {}", key, display_value);
                 }
-            }
-        }
-    }
-
-    // ScaleFactor35efl for Canon APS-C is 1.6
-    // Check if this is a Canon APS-C camera (not full-frame)
-    if let Some(ExifValue::Ascii(make)) = exif_data.get_tag_by_id(0x010F) {
-        if make.contains("Canon") {
-            // For APS-C Canon cameras, scale factor is 1.6
-            // We'd need to check the model to determine if it's APS-C or full-frame
-            // For now, let's assume 50D is APS-C
-            println!("{:<32}: {}", "ScaleFactor35efl", 1.6);
-        }
-    }
-
-    // ShutterSpeed - alias for ExposureTime
-    if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829A) {
-        if !v.is_empty() {
-            let (n, d) = v[0];
-            if d != 0 {
-                let exposure = n as f64 / d as f64;
-                let denom = (1.0 / exposure).round() as u32;
-                println!("{:<32}: 1/{}", "ShutterSpeed", denom);
-            }
-        }
-    }
-}
-
-/// Get dimension value from a tag (handles Short or Long)
-fn get_dimension(exif_data: &ExifData, tag_id: u16) -> Option<u32> {
-    use fpexif::data_types::ExifValue;
-
-    if let Some(value) = exif_data.get_tag_by_id(tag_id) {
-        match value {
-            ExifValue::Short(v) if !v.is_empty() => Some(v[0] as u32),
-            ExifValue::Long(v) if !v.is_empty() => Some(v[0]),
-            _ => None,
-        }
-    } else {
-        None
-    }
-}
-
-/// Format an ExifValue for exiftool-style text output
-fn format_exiftool_text_value(value: &fpexif::data_types::ExifValue, tag_id: u16) -> String {
-    use fpexif::data_types::ExifValue;
-
-    match value {
-        ExifValue::Ascii(s) => {
-            let cleaned = s.trim_end_matches('\0').trim();
-            // Return empty string if it's all null/whitespace
-            if cleaned.is_empty() {
-                String::new()
-            } else {
-                cleaned.to_string()
-            }
-        }
-        ExifValue::Byte(v) => {
-            // GPSVersionID (0x0000) should be formatted as "2.2.0.0"
-            if tag_id == 0x0000 && v.len() == 4 {
-                format!("{}.{}.{}.{}", v[0], v[1], v[2], v[3])
-            } else {
-                format_values_space(v)
-            }
-        }
-        ExifValue::Short(v) => {
-            // Use tag-specific descriptions for known tags
-            if v.len() == 1 {
-                match tag_id {
-                    0x0112 => tags::get_orientation_description(v[0]).to_string(),
-                    0x0103 => tags::get_compression_description(v[0]).to_string(),
-                    0x0128 => tags::get_resolution_unit_description(v[0]).to_string(),
-                    0x0213 => tags::get_ycbcr_positioning_description(v[0]).to_string(),
-                    0x8822 => tags::get_exposure_program_description(v[0]).to_string(),
-                    0x9207 => tags::get_metering_mode_description(v[0]).to_string(),
-                    0x9208 => tags::get_light_source_description(v[0]).to_string(),
-                    0x9209 => tags::get_flash_description(v[0]).to_string(),
-                    0xA001 => tags::get_color_space_description(v[0]).to_string(),
-                    0xA210 => match v[0] {
-                        2 => "inches".to_string(),
-                        3 => "cm".to_string(),
-                        _ => v[0].to_string(),
-                    },
-                    0xA402 => tags::get_exposure_mode_description(v[0]).to_string(),
-                    0xA403 => tags::get_white_balance_description(v[0]).to_string(),
-                    0xA406 => tags::get_scene_capture_type_description(v[0]).to_string(),
-                    0xA407 => tags::get_gain_control_description(v[0]).to_string(),
-                    // Contrast (0xA408), Saturation (0xA409)
-                    0xA408 | 0xA409 => match v[0] {
-                        0 => "Normal",
-                        1 => "Low",
-                        2 => "High",
-                        _ => "Unknown",
-                    }
-                    .to_string(),
-                    // Sharpness (0xA40A)
-                    0xA40A => match v[0] {
-                        0 => "Normal",
-                        1 => "Soft",
-                        2 => "Hard",
-                        _ => "Unknown",
-                    }
-                    .to_string(),
-                    0xA40C => tags::get_subject_distance_range_description(v[0]).to_string(),
-                    0xA401 => tags::get_custom_rendered_description(v[0]).to_string(),
-                    0x9217 | 0xA217 => tags::get_sensing_method_description(v[0]).to_string(),
-                    0x8830 => tags::get_sensitivity_type_description(v[0]).to_string(),
-                    _ => format_values_space(v),
-                }
-            } else if v.len() == 2 && tag_id == 0x100A {
-                // Fuji WhiteBalanceFineTune - format as "Red +X, Blue +Y"
-                let red = v[0] as i16;
-                let blue = v[1] as i16;
-                let red_str = if red >= 0 {
-                    format!("+{}", red)
-                } else {
-                    format!("{}", red)
-                };
-                let blue_str = if blue >= 0 {
-                    format!("+{}", blue)
-                } else {
-                    format!("{}", blue)
-                };
-                format!("Red {}, Blue {}", red_str, blue_str)
-            } else {
-                format_values_space(v)
-            }
-        }
-        ExifValue::Long(v) => {
-            // Fuji ImageStabilization (0x1422) - format as "Type; Mode; Param"
-            if tag_id == 0x1422 && v.len() >= 3 {
-                let is_type = match v[0] {
-                    0 => "None",
-                    1 => "Optical",
-                    2 => "Sensor-shift",
-                    3 => "OIS/IBIS Combined",
-                    _ => "Unknown",
-                };
-                let is_mode = match v[1] {
-                    0 => "Off",
-                    1 => "On (mode 1, continuous)",
-                    2 => "On (mode 2, shooting only)",
-                    3 => "On (mode 3, panning)",
-                    _ => "Unknown",
-                };
-                format!("{}; {}; {}", is_type, is_mode, v[2])
-            } else {
-                format_values_space(v)
-            }
-        }
-        ExifValue::Rational(v) => {
-            if v.len() == 1 {
-                let (n, d) = v[0];
-                if d != 0 {
-                    match tag_id {
-                        0x829A => {
-                            // ExposureTime - show as 1/n fraction
-                            let exposure_time = n as f64 / d as f64;
-                            let approx_den = (1.0 / exposure_time).round() as u32;
-                            format!("1/{}", approx_den)
-                        }
-                        0x920A => {
-                            // FocalLength - format with decimal and mm unit
-                            let focal_length = n as f64 / d as f64;
-                            format!("{:.1} mm", focal_length)
-                        }
-                        0x9206 => {
-                            // SubjectDistance - format with m unit
-                            let distance = n as f64 / d as f64;
-                            format!("{} m", distance)
-                        }
-                        0x9201 => {
-                            // ShutterSpeedValue (APEX) - convert to shutter speed
-                            // ShutterSpeed = 2^APEX
-                            let apex = n as f64 / d as f64;
-                            let shutter_speed = 2f64.powf(apex);
-                            let denominator = shutter_speed.round() as u32;
-                            format!("1/{}", denominator)
-                        }
-                        0x9202 | 0x9205 => {
-                            // ApertureValue, MaxApertureValue (APEX) - convert to f-number
-                            // F-number = 2^(APEX/2)
-                            let apex = n as f64 / d as f64;
-                            let f_number = 2f64.powf(apex / 2.0);
-                            let rounded = (f_number * 10.0).round() / 10.0;
-                            format!("{}", rounded)
-                        }
-                        _ => {
-                            let val = n as f64 / d as f64;
-                            if val == val.floor() {
-                                format!("{}", val as u32)
-                            } else {
-                                format!("{:.6}", val)
-                                    .trim_end_matches('0')
-                                    .trim_end_matches('.')
-                                    .to_string()
-                            }
-                        }
-                    }
-                } else {
-                    format!("{}/{}", n, d)
-                }
-            } else {
-                v.iter()
-                    .map(|(n, d)| format!("{}/{}", n, d))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            }
-        }
-        ExifValue::SByte(v) => format_values_space(v),
-        ExifValue::SShort(v) => format_values_space(v),
-        ExifValue::SLong(v) => format_values_space(v),
-        ExifValue::SRational(v) => {
-            if v.len() == 1 {
-                let (n, d) = v[0];
-                if d != 0 {
-                    match tag_id {
-                        0x9201 => {
-                            // ShutterSpeedValue (APEX) - convert to shutter speed
-                            let apex = n as f64 / d as f64;
-                            let shutter_speed = 2f64.powf(apex);
-                            let denominator = shutter_speed.round() as i32;
-                            format!("1/{}", denominator)
-                        }
-                        0x9204 => {
-                            // ExposureBiasValue - format as +/- EV
-                            let bias = n as f64 / d as f64;
-                            if bias == 0.0 {
-                                "0".to_string()
-                            } else {
-                                format!("{:.6}", bias)
-                                    .trim_end_matches('0')
-                                    .trim_end_matches('.')
-                                    .to_string()
-                            }
-                        }
-                        _ => format!("{:.6}", n as f64 / d as f64)
-                            .trim_end_matches('0')
-                            .trim_end_matches('.')
-                            .to_string(),
-                    }
-                } else {
-                    format!("{}/{}", n, d)
-                }
-            } else {
-                v.iter()
-                    .map(|(n, d)| format!("{}/{}", n, d))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            }
-        }
-        ExifValue::Float(v) => format_values_space(v),
-        ExifValue::Double(v) => format_values_space(v),
-        ExifValue::Undefined(v) => {
-            // Handle UserComment and other undefined tags
-            match tag_id {
-                0x9000 | 0xA000 => {
-                    // ExifVersion (0x9000), FlashpixVersion (0xA000) - decode as ASCII
-                    // Stored as 4 bytes like "0221" or "0100"
-                    String::from_utf8(v.to_vec())
-                        .ok()
-                        .map(|s| s.trim_end_matches('\0').to_string())
-                        .unwrap_or_else(|| format!("(Binary data {} bytes)", v.len()))
-                }
-                0x9101 => {
-                    // ComponentsConfiguration - decode component IDs
-                    // 0=-, 1=Y, 2=Cb, 3=Cr, 4=R, 5=G, 6=B
-                    let components: Vec<&str> = v
-                        .iter()
-                        .map(|&b| match b {
-                            0 => "-",
-                            1 => "Y",
-                            2 => "Cb",
-                            3 => "Cr",
-                            4 => "R",
-                            5 => "G",
-                            6 => "B",
-                            _ => "?",
-                        })
-                        .collect();
-                    components.join(", ")
-                }
-                0x9286 => {
-                    // UserComment - EXIF spec says first 8 bytes are character code
-                    // followed by the actual comment. Common codes: "ASCII\0\0\0", "UNICODE\0", etc.
-                    if v.len() >= 8 {
-                        // Skip the 8-byte character code
-                        let comment_data = &v[8..];
-                        // Check if the comment is empty (all nulls, spaces, or a repeated fill pattern)
-                        let is_empty = comment_data
-                            .iter()
-                            .all(|&b| b == 0 || b == b' ' || b == b'A');
-                        if is_empty {
-                            String::new()
-                        } else {
-                            // Try to decode as ASCII/UTF-8
-                            let cleaned = comment_data
-                                .iter()
-                                .copied()
-                                .take_while(|&b| b != 0)
-                                .collect::<Vec<u8>>();
-                            String::from_utf8(cleaned)
-                                .ok()
-                                .filter(|s| !s.trim().is_empty())
-                                .unwrap_or_default()
-                        }
-                    } else {
-                        // Malformed UserComment or empty
-                        String::new()
-                    }
-                }
-                _ => format!("(Binary data {} bytes)", v.len()),
             }
         }
     }
@@ -710,6 +445,176 @@ fn print_exif_data_json(exif_data: &ExifData) -> Result<(), Box<dyn std::error::
     let json = fpexif::output::to_exiftool_json(exif_data, source_file.as_deref());
 
     println!("{}", serde_json::to_string_pretty(&json)?);
+    Ok(())
+}
+
+/// Run JPEG extraction test across all files in a directory
+fn run_jpeg_extraction_test(
+    dir: &PathBuf,
+    validate: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use fpexif::extract::{extract_jpegs, validate_jpeg, JpegType};
+    use std::fs::{self, File};
+    use std::io::BufReader;
+
+    let mut total = 0;
+    let mut with_jpegs = 0;
+    let mut failed = 0;
+    let mut no_jpegs = 0;
+    let mut invalid_jpegs = 0;
+    let mut failures: Vec<(PathBuf, String)> = Vec::new();
+    let mut invalid_files: Vec<(PathBuf, String)> = Vec::new();
+
+    // Collect and sort files
+    let mut entries: Vec<_> = fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .collect();
+    entries.sort_by_key(|e| e.path());
+
+    for entry in entries {
+        let path = entry.path();
+
+        // Skip non-image files
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .unwrap_or_default();
+
+        let is_raw = matches!(
+            ext.as_str(),
+            "nef"
+                | "cr2"
+                | "cr3"
+                | "arw"
+                | "orf"
+                | "raf"
+                | "rw2"
+                | "dng"
+                | "pef"
+                | "srw"
+                | "nrw"
+                | "raw"
+                | "mrw"
+                | "3fr"
+                | "mef"
+                | "mos"
+                | "iiq"
+                | "rwl"
+                | "kdc"
+                | "dcr"
+                | "erf"
+                | "sr2"
+                | "srf"
+                | "crw"
+        );
+
+        if !is_raw {
+            continue;
+        }
+
+        total += 1;
+
+        let reader = match File::open(&path) {
+            Ok(f) => BufReader::new(f),
+            Err(e) => {
+                failed += 1;
+                failures.push((path.clone(), format!("open error: {}", e)));
+                continue;
+            }
+        };
+
+        match extract_jpegs(reader, JpegType::All) {
+            Ok(jpegs) => {
+                if jpegs.is_empty() {
+                    no_jpegs += 1;
+                    println!(
+                        "  {} - no JPEGs",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    );
+                } else {
+                    with_jpegs += 1;
+                    let mut all_valid = true;
+                    let sizes: Vec<String> = jpegs
+                        .iter()
+                        .map(|(info, jpeg_data)| {
+                            if validate {
+                                let v = validate_jpeg(jpeg_data);
+                                if !v.valid {
+                                    all_valid = false;
+                                }
+                                match (v.width, v.height) {
+                                    (Some(w), Some(h)) => format!("{}x{}", w, h),
+                                    _ => format!("{}KB INVALID", info.length / 1024),
+                                }
+                            } else if let Some((w, h)) = info.dimensions {
+                                format!("{}x{}", w, h)
+                            } else {
+                                format!("{}KB", info.length / 1024)
+                            }
+                        })
+                        .collect();
+
+                    if validate && !all_valid {
+                        invalid_jpegs += 1;
+                        invalid_files.push((path.clone(), "Contains invalid JPEG".to_string()));
+                    }
+
+                    println!(
+                        "  {} - {} JPEGs: {}",
+                        path.file_name().unwrap_or_default().to_string_lossy(),
+                        jpegs.len(),
+                        sizes.join(", ")
+                    );
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                failures.push((path.clone(), e.to_string()));
+            }
+        }
+    }
+
+    println!("\n=== JPEG Extraction Test Results ===");
+    println!("Total RAW files:    {}", total);
+    println!(
+        "With embedded JPEG: {} ({:.1}%)",
+        with_jpegs,
+        if total > 0 {
+            with_jpegs as f64 / total as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
+    println!("No JPEG found:      {}", no_jpegs);
+    println!("Failed:             {}", failed);
+    if validate {
+        println!("Invalid JPEGs:      {}", invalid_jpegs);
+    }
+
+    if !failures.is_empty() {
+        println!("\nExtraction Failures:");
+        for (path, err) in &failures {
+            println!(
+                "  {} - {}",
+                path.file_name().unwrap_or_default().to_string_lossy(),
+                err
+            );
+        }
+    }
+
+    if validate && !invalid_files.is_empty() {
+        println!("\nInvalid JPEG Files:");
+        for (path, err) in &invalid_files {
+            println!(
+                "  {} - {}",
+                path.file_name().unwrap_or_default().to_string_lossy(),
+                err
+            );
+        }
+    }
+
     Ok(())
 }
 

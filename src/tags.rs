@@ -503,6 +503,30 @@ pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 
+// CRW/CIFF FocalPlaneSize tags (private range)
+pub const TAG_FOCAL_PLANE_X_SIZE: ExifTagId = ExifTagId {
+    id: 0xC001,
+    ifd: TagGroup::Main,
+};
+pub const TAG_FOCAL_PLANE_Y_SIZE: ExifTagId = ExifTagId {
+    id: 0xC002,
+    ifd: TagGroup::Main,
+};
+
+// Sony ARW SubIFD tags (0x7030-0x7040 range)
+pub const TAG_SONY_VIGNETTING_CORRECTION: ExifTagId = ExifTagId {
+    id: 0x7030,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_CHROMATIC_ABERRATION_CORRECTION: ExifTagId = ExifTagId {
+    id: 0x7034,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_DISTORTION_CORRECTION: ExifTagId = ExifTagId {
+    id: 0x7036,
+    ifd: TagGroup::Main,
+};
+
 // EXIF SubIFD tags
 pub const TAG_EXPOSURE_TIME: ExifTagId = ExifTagId {
     id: 0x829A,
@@ -829,6 +853,16 @@ pub const TAG_GPS_SPEED: ExifTagId = ExifTagId {
     ifd: TagGroup::Gps,
 };
 
+// Interoperability IFD tags
+pub const TAG_INTEROP_INDEX: ExifTagId = ExifTagId {
+    id: 0x0001,
+    ifd: TagGroup::Interop,
+};
+pub const TAG_INTEROP_VERSION: ExifTagId = ExifTagId {
+    id: 0x0002,
+    ifd: TagGroup::Interop,
+};
+
 // A static mapping of tag IDs to names
 static TAG_NAMES: OnceLock<HashMap<ExifTagId, &'static str>> = OnceLock::new();
 
@@ -892,7 +926,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_EXPOSURE_TIME_MAIN, "ExposureTime");
     map.insert(TAG_F_NUMBER_MAIN, "FNumber");
     map.insert(TAG_EXPOSURE_PROGRAM_MAIN, "ExposureProgram");
-    map.insert(TAG_EXPOSURE_BIAS_VALUE_MAIN, "ExposureBiasValue");
+    map.insert(TAG_EXPOSURE_BIAS_VALUE_MAIN, "ExposureCompensation");
     map.insert(TAG_MAX_APERTURE_VALUE_MAIN, "MaxApertureValue");
     map.insert(TAG_METERING_MODE_MAIN, "MeteringMode");
     map.insert(TAG_LIGHT_SOURCE_MAIN, "LightSource");
@@ -900,7 +934,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_IMAGE_NUMBER_MAIN, "ImageNumber");
     map.insert(TAG_SENSING_METHOD_MAIN, "SensingMethod");
     map.insert(TAG_DATE_TIME_ORIGINAL_MAIN, "DateTimeOriginal");
-    map.insert(TAG_TIFF_EP_STANDARD_ID_MAIN, "TIFF/EPStandardID");
+    map.insert(TAG_TIFF_EP_STANDARD_ID_MAIN, "TIFF-EPStandardID");
     // Basic TIFF structure tags in EXIF SubIFD (non-standard placement)
     map.insert(TAG_IMAGE_WIDTH_EXIF, "ImageWidth");
     map.insert(TAG_IMAGE_LENGTH_EXIF, "ImageLength");
@@ -920,7 +954,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_GPS_INFO, "GPSInfo");
     // TIFF/EP CFA tags
     map.insert(TAG_CFA_REPEAT_PATTERN_DIM, "CFARepeatPatternDim");
-    map.insert(TAG_CFA_PATTERN_TIFFEP, "CFAPattern");
+    map.insert(TAG_CFA_PATTERN_TIFFEP, "CFAPattern2");
     // JPEG tags in Main IFD
     map.insert(TAG_JPEG_INTERCHANGE_FORMAT_MAIN, "JPEGInterchangeFormat");
     map.insert(
@@ -962,6 +996,14 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_ACTIVE_AREA, "ActiveArea");
     map.insert(TAG_RAW_IMAGE_DIGEST, "RawImageDigest");
 
+    // Sony ARW SubIFD tags
+    map.insert(TAG_SONY_VIGNETTING_CORRECTION, "VignettingCorrection");
+    map.insert(
+        TAG_SONY_CHROMATIC_ABERRATION_CORRECTION,
+        "ChromaticAberrationCorrection",
+    );
+    map.insert(TAG_SONY_DISTORTION_CORRECTION, "DistortionCorrection");
+
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
     map.insert(TAG_F_NUMBER, "FNumber");
@@ -977,7 +1019,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_SHUTTER_SPEED_VALUE, "ShutterSpeedValue");
     map.insert(TAG_APERTURE_VALUE, "ApertureValue");
     map.insert(TAG_BRIGHTNESS_VALUE, "BrightnessValue");
-    map.insert(TAG_EXPOSURE_BIAS_VALUE, "ExposureBiasValue");
+    map.insert(TAG_EXPOSURE_BIAS_VALUE, "ExposureCompensation");
     map.insert(TAG_MAX_APERTURE_VALUE, "MaxApertureValue");
     map.insert(TAG_SUBJECT_DISTANCE, "SubjectDistance");
     map.insert(TAG_METERING_MODE, "MeteringMode");
@@ -987,7 +1029,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_IMAGE_NUMBER, "ImageNumber");
     map.insert(TAG_SUBJECT_AREA, "SubjectArea");
     map.insert(TAG_EXPOSURE_INDEX, "ExposureIndex");
-    map.insert(TAG_TIFF_EP_STANDARD_ID, "TIFF/EPStandardID");
+    map.insert(TAG_TIFF_EP_STANDARD_ID, "TIFF-EPStandardID");
     map.insert(TAG_MAKER_NOTE, "MakerNote");
     map.insert(TAG_USER_COMMENT, "UserComment");
     map.insert(TAG_SUB_SEC_TIME, "SubSecTime");
@@ -1005,6 +1047,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_FOCAL_PLANE_X_RESOLUTION, "FocalPlaneXResolution");
     map.insert(TAG_FOCAL_PLANE_Y_RESOLUTION, "FocalPlaneYResolution");
     map.insert(TAG_FOCAL_PLANE_RESOLUTION_UNIT, "FocalPlaneResolutionUnit");
+    map.insert(TAG_FOCAL_PLANE_X_SIZE, "FocalPlaneXSize");
+    map.insert(TAG_FOCAL_PLANE_Y_SIZE, "FocalPlaneYSize");
     map.insert(TAG_SENSING_METHOD, "SensingMethod");
     map.insert(TAG_FILE_SOURCE, "FileSource");
     map.insert(TAG_SCENE_TYPE, "SceneType");
@@ -1013,7 +1057,7 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_EXPOSURE_MODE, "ExposureMode");
     map.insert(TAG_WHITE_BALANCE, "WhiteBalance");
     map.insert(TAG_DIGITAL_ZOOM_RATIO, "DigitalZoomRatio");
-    map.insert(TAG_FOCAL_LENGTH_IN_35MM_FILM, "FocalLengthIn35mmFilm");
+    map.insert(TAG_FOCAL_LENGTH_IN_35MM_FILM, "FocalLengthIn35mmFormat");
     map.insert(TAG_SCENE_CAPTURE_TYPE, "SceneCaptureType");
     map.insert(TAG_GAIN_CONTROL, "GainControl");
     map.insert(TAG_CONTRAST, "Contrast");
@@ -1044,6 +1088,10 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_GPS_DOP, "GPSDOP");
     map.insert(TAG_GPS_SPEED_REF, "GPSSpeedRef");
     map.insert(TAG_GPS_SPEED, "GPSSpeed");
+
+    // Interoperability tags
+    map.insert(TAG_INTEROP_INDEX, "InteropIndex");
+    map.insert(TAG_INTEROP_VERSION, "InteropVersion");
 
     map
 }
@@ -1121,16 +1169,17 @@ pub fn get_orientation_description(value: u16) -> &'static str {
 /// Human-readable descriptions for various EXIF exposure program values
 pub fn get_exposure_program_description(value: u16) -> &'static str {
     match value {
-        0 => "Not defined",
+        0 => "Not Defined",
         1 => "Manual",
         2 => "Program AE",
         3 => "Aperture-priority AE",
         4 => "Shutter speed priority AE",
-        5 => "Creative program (biased toward depth of field)",
-        6 => "Action program (biased toward fast shutter speed)",
-        7 => "Portrait mode (for closeup photos with the background out of focus)",
-        8 => "Landscape mode (for landscape photos with the background in focus)",
-        _ => "Unknown exposure program",
+        5 => "Creative (Slow speed)",
+        6 => "Action (High speed)",
+        7 => "Portrait",
+        8 => "Landscape",
+        9 => "Bulb",
+        _ => "Unknown",
     }
 }
 
@@ -1256,8 +1305,8 @@ pub fn get_scene_capture_type_description(value: u16) -> &'static str {
 pub fn get_contrast_description(value: u16) -> &'static str {
     match value {
         0 => "Normal",
-        1 => "Soft",
-        2 => "Hard",
+        1 => "Low",
+        2 => "High",
         _ => "Unknown",
     }
 }
@@ -1278,6 +1327,40 @@ pub fn get_sharpness_description(value: u16) -> &'static str {
         0 => "Normal",
         1 => "Soft",
         2 => "Hard",
+        _ => "Unknown",
+    }
+}
+
+/// Sony ARW SubIFD VignettingCorrection (tag 0x7030) values
+/// From ExifTool Exif.pm
+pub fn get_sony_vignetting_correction_description(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        2 => "Auto",
+        0xff => "No correction params available",
+        _ => "Unknown",
+    }
+}
+
+/// Sony ARW SubIFD ChromaticAberrationCorrection (tag 0x7034) values
+/// From ExifTool Exif.pm
+pub fn get_sony_chromatic_aberration_correction_description(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Auto",
+        0xff => "No correction params available",
+        _ => "Unknown",
+    }
+}
+
+/// Sony ARW SubIFD DistortionCorrection (tag 0x7036) values
+/// From ExifTool Exif.pm
+pub fn get_sony_distortion_correction_description(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "Auto",
+        17 => "Auto fixed by lens",
+        0xff => "No correction params available",
         _ => "Unknown",
     }
 }
@@ -1335,8 +1418,12 @@ pub fn get_compression_description(value: u16) -> &'static str {
         34661 => "JBIG",
         34676 => "SGILog",
         34677 => "SGILog24",
+        34316 => "Panasonic RAW 1",
         34712 => "JPEG 2000",
         34713 => "Nikon NEF Compressed",
+        34826 => "Panasonic RAW 2",
+        34828 => "Panasonic RAW 3",
+        34830 => "Panasonic RAW 4",
         34892 => "JPEG XR",
         65000 => "Kodak DCR Compressed",
         65535 => "Pentax PEF Compressed",
@@ -1452,20 +1539,26 @@ pub fn get_planar_configuration_description(value: u16) -> &'static str {
 }
 
 /// Human-readable description for GPSLatitudeRef values
-pub fn get_gps_latitude_ref_description(value: &str) -> &'static str {
-    match value {
-        "N" => "North",
-        "S" => "South",
-        _ => "Unknown",
+pub fn get_gps_latitude_ref_description(value: &str) -> String {
+    // Trim whitespace and null bytes
+    let trimmed = value.trim().trim_matches('\0');
+    match trimmed {
+        "N" => "North".to_string(),
+        "S" => "South".to_string(),
+        "" => "Unknown ()".to_string(),
+        v => format!("Unknown ({})", v),
     }
 }
 
 /// Human-readable description for GPSLongitudeRef values
-pub fn get_gps_longitude_ref_description(value: &str) -> &'static str {
-    match value {
-        "E" => "East",
-        "W" => "West",
-        _ => "Unknown",
+pub fn get_gps_longitude_ref_description(value: &str) -> String {
+    // Trim whitespace and null bytes
+    let trimmed = value.trim().trim_matches('\0');
+    match trimmed {
+        "E" => "East".to_string(),
+        "W" => "West".to_string(),
+        "" => "Unknown ()".to_string(),
+        v => format!("Unknown ({})", v),
     }
 }
 
@@ -1476,4 +1569,37 @@ pub fn get_gps_altitude_ref_description(value: u8) -> &'static str {
         1 => "Below Sea Level",
         _ => "Unknown",
     }
+}
+
+/// Human-readable description for CFALayout values (DNG tag 0xC617)
+pub fn get_cfa_layout_description(value: u16) -> &'static str {
+    match value {
+        1 => "Rectangular",
+        2 => "Even columns offset down 1/2 row",
+        3 => "Even columns offset up 1/2 row",
+        4 => "Even rows offset right 1/2 column",
+        5 => "Even rows offset left 1/2 column",
+        6 => "Even rows offset up by 1/2 row, even columns offset left by 1/2 column",
+        7 => "Even rows offset up by 1/2 row, even columns offset right by 1/2 column",
+        8 => "Even rows offset down by 1/2 row, even columns offset left by 1/2 column",
+        9 => "Even rows offset down by 1/2 row, even columns offset right by 1/2 column",
+        _ => "Unknown",
+    }
+}
+
+/// Human-readable description for CFAPlaneColor values (DNG tag 0xC616)
+/// Converts array of indices to color names: 0=Red, 1=Green, 2=Blue, etc.
+pub fn get_cfa_plane_color_description(values: &[u8]) -> String {
+    let colors = ["Red", "Green", "Blue", "Cyan", "Magenta", "Yellow", "White"];
+    let names: Vec<&str> = values
+        .iter()
+        .map(|&v| {
+            if (v as usize) < colors.len() {
+                colors[v as usize]
+            } else {
+                "Unknown"
+            }
+        })
+        .collect();
+    names.join(",")
 }

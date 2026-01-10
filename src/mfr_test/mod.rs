@@ -22,8 +22,13 @@ pub const MANUFACTURER_FORMATS: &[(&str, &[&str])] = &[
     ("fujifilm", &["RAF"]),
     ("panasonic", &["RW2"]),
     ("olympus", &["ORF"]),
+    ("pentax", &["PEF", "DNG"]),
     ("minolta", &["MRW"]),
     ("kodak", &["DCR", "KDC"]),
+    ("sigma", &["X3F"]),
+    ("samsung", &["SRW"]),
+    ("ricoh", &["DNG"]),
+    ("leica", &["DNG", "RWL"]),
     ("dng", &["DNG"]),
 ];
 

@@ -67,7 +67,7 @@ pub const SONY_FLASH_LEVEL: u16 = 0xB048;
 pub const SONY_RELEASE_MODE: u16 = 0xB049;
 pub const SONY_SEQUENCE_NUMBER: u16 = 0xB04A;
 pub const SONY_ANTI_BLUR: u16 = 0xB04B;
-pub const SONY_LONG_EXPOSURE_NOISE_REDUCTION_2: u16 = 0xB04E;
+pub const SONY_FOCUS_MODE_3: u16 = 0xB04E;
 pub const SONY_DYNAMIC_RANGE_OPTIMIZER_2: u16 = 0xB04F;
 pub const SONY_HIGH_ISO_NOISE_REDUCTION_2: u16 = 0xB050;
 pub const SONY_INTELLIGENT_AUTO: u16 = 0xB052;
@@ -104,6 +104,24 @@ pub const SONY_FOCUS_DISTANCE: u16 = 0x0206;
 pub const SONY_NOISE_REDUCTION_2: u16 = 0x200C;
 pub const SONY_WB_RG_BG_LEVELS: u16 = 0x2024;
 
+// CameraSettings sub-tag storage IDs (A200/A300/A350/A700/A850/A900)
+// These are virtual tag IDs for sub-tags extracted from the CameraSettings binary blob
+// Base offset 0xC000 to avoid collision with real Sony tags
+pub const CS_SHARPNESS: u16 = 0xC01C; // Offset 0x1c in CameraSettings
+pub const CS_CONTRAST: u16 = 0xC01D; // Offset 0x1d in CameraSettings
+pub const CS_SATURATION: u16 = 0xC01E; // Offset 0x1e in CameraSettings
+
+// Encrypted subdirectory tags
+pub const SONY_TAG_2010: u16 = 0x2010;
+pub const SONY_TAG_9050: u16 = 0x9050;
+pub const SONY_TAG_9400: u16 = 0x9400;
+pub const SONY_TAG_9401: u16 = 0x9401;
+pub const SONY_TAG_9402: u16 = 0x9402;
+pub const SONY_TAG_9403: u16 = 0x9403;
+pub const SONY_TAG_9404: u16 = 0x9404;
+pub const SONY_TAG_9405: u16 = 0x9405;
+pub const SONY_TAG_9406: u16 = 0x9406;
+
 /// Get the name of a Sony MakerNote tag
 pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
     match tag_id {
@@ -125,7 +143,7 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         SONY_MULTI_FRAME_NOISE_REDUCTION => Some("MultiFrameNoiseReduction"),
         SONY_PICTURE_EFFECT => Some("PictureEffect"),
         SONY_VIGNETTING_CORRECTION => Some("VignettingCorrection"),
-        SONY_DISTORTION_CORRECTION => Some("DistortionCorrection"),
+        SONY_DISTORTION_CORRECTION => Some("DistortionCorrectionSetting"),
         SONY_FOCUS_MODE => Some("FocusMode"),
         SONY_AF_POINT_SELECTED => Some("AFPointSelected"),
         SONY_SONY_MODEL_ID => Some("SonyModelID"),
@@ -139,7 +157,7 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         SONY_MACRO => Some("Macro"),
         SONY_EXPOSURE_MODE => Some("ExposureMode"),
         SONY_AF_MODE => Some("AFMode"),
-        SONY_QUALITY_2 => Some("Quality"),
+        SONY_QUALITY_2 => Some("JPEGQuality"),
         SONY_FLASH_LEVEL => Some("FlashLevel"),
         SONY_RELEASE_MODE => Some("ReleaseMode"),
         SONY_ANTI_BLUR => Some("AntiBlur"),
@@ -184,13 +202,32 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         SONY_FOCUS_MODE_2 => Some("FocusMode2"),
         SONY_DYNAMIC_RANGE_OPTIMIZER_2 => Some("DynamicRangeOptimizer2"),
         SONY_HIGH_ISO_NOISE_REDUCTION_2 => Some("HighISONoiseReduction2"),
-        SONY_LONG_EXPOSURE_NOISE_REDUCTION_2 => Some("LongExposureNoiseReduction2"),
+        SONY_FOCUS_MODE_3 => Some("FocusMode"),
         SONY_SEQUENCE_NUMBER => Some("SequenceNumber"),
         SONY_FACE_DETECTION => Some("FaceDetection"),
         SONY_SMILE_SHUTTER => Some("SmileShutter"),
         SONY_FOCUS_DISTANCE => Some("FocusDistance"),
         SONY_NOISE_REDUCTION_2 => Some("NoiseReduction2"),
         SONY_WB_RG_BG_LEVELS => Some("WBRGBGLevels"),
+        // Synthetic Tag9050 subdirectory field IDs
+        0x9000 => Some("SonyMaxAperture"),
+        0x9001 => Some("SonyMinAperture"),
+        0x9020 => Some("Shutter"),
+        0x9031 => Some("FlashStatus"),
+        0x9032 => Some("ShutterCount"),
+        0x903A => Some("SonyExposureTime"),
+        0x903C => Some("SonyFNumber"),
+        0x903F => Some("ReleaseMode2"),
+        0x907C => Some("InternalSerialNumber"),
+        0x90F0 => Some("InternalSerialNumber"),
+        0x9105 => Some("LensMount"),
+        0x9106 => Some("LensFormat"),
+        0x9107 => Some("LensType2"),
+        0x9109 => Some("LensType"),
+        // CameraSettings sub-tags (virtual IDs)
+        CS_SHARPNESS => Some("Sharpness"),
+        CS_CONTRAST => Some("Contrast"),
+        CS_SATURATION => Some("Saturation"),
         _ => None,
     }
 }
@@ -241,13 +278,13 @@ pub fn get_sony_model_name(model_id: u16) -> Option<&'static str> {
         283 => Some("DSLR-A580"),
         // SLT-A series
         280 => Some("SLT-A33"),
-        281 => Some("SLT-A55"),
+        281 => Some("SLT-A55 / SLT-A55V"),
         285 => Some("SLT-A35"),
-        286 => Some("SLT-A65"),
-        287 => Some("SLT-A77"),
+        286 => Some("SLT-A65 / SLT-A65V"),
+        287 => Some("SLT-A77 / SLT-A77V"),
         291 => Some("SLT-A37"),
         292 => Some("SLT-A57"),
-        294 => Some("SLT-A99"),
+        294 => Some("SLT-A99 / SLT-A99V"),
         303 => Some("SLT-A58"),
         // NEX series
         278 => Some("NEX-5"),
@@ -387,6 +424,31 @@ pub fn get_sony_lens_name(lens_id: u32) -> Option<&'static str> {
         68 => Some("Sony DT 55-300mm F4.5-5.6 SAM (SAL55300)"),
         69 => Some("Sony 70-400mm F4-5.6 G SSM II (SAL70400G2)"),
         70 => Some("Carl Zeiss Planar T* 50mm F1.4 ZA SSM"),
+        // Third-party and older Minolta lenses (high IDs from %minoltaLensTypes)
+        25601 => Some("Minolta AF 100-200mm F4.5"),
+        25611 => Some("Minolta AF 75-300mm F4.5-5.6 (or Sigma)"),
+        25621 => Some("Minolta AF 50mm F1.4 [New]"),
+        25631 => Some("Minolta AF 300mm F2.8 APO (or Sigma)"),
+        25641 => Some("Minolta AF 50mm F2.8 Macro (or Sigma)"),
+        25651 => Some("Minolta AF 600mm F4 HS-APO G"),
+        25721 => Some("Minolta AF 500mm F8 Reflex"),
+        25781 => Some("Minolta/Sony AF 16mm F2.8 Fisheye"),
+        25811 => Some("Minolta/Sony AF 20mm F2.8"),
+        25851 => Some("Minolta AF 35-105mm F3.5-4.5"),
+        25858 => Some("Tamron SP AF 90mm F2.5 (172E)"),
+        25881 => Some("Minolta AF 70-210mm F3.5-4.5"),
+        25891 => Some("Minolta AF 80-200mm F2.8 APO"),
+        25911 => Some("Minolta AF 35mm F1.4"),
+        25921 => Some("Minolta AF 85mm F1.4 G (D)"),
+        25931 => Some("Minolta AF 200mm F2.8 APO"),
+        26011 => Some("Minolta AF 35-80mm F4-5.6"),
+        26041 => Some("Minolta AF 80-200mm F4.5-5.6"),
+        26051 => Some("Minolta AF 35-80mm F4-5.6"),
+        26061 => Some("Minolta AF 100mm F2"),
+        26071 => Some("Minolta AF 100-300mm F4.5-5.6"),
+        26121 => Some("Minolta AF 200mm F2.8 HS-APO G"),
+        26131 => Some("Minolta AF 50mm F1.7"),
+        26241 => Some("Minolta AF 35-80mm F4-5.6 Power Zoom"),
         // Sony E-mount lenses (use sonyLensTypes2 format with high IDs)
         32784 => Some("Sony E 16mm F2.8 (SEL16F28)"),
         32785 => Some("Sony E 18-55mm F3.5-5.6 OSS (SEL1855)"),
@@ -445,6 +507,8 @@ pub fn get_sony_lens_name(lens_id: u32) -> Option<&'static str> {
         33095 => Some("Sony FE 70-200mm F2.8 GM OSS II (SEL70200GM2)"),
         33096 => Some("Sony FE 24-70mm F2.8 GM II (SEL2470GM2)"),
         33097 => Some("Sony FE 16-35mm F2.8 GM II (SEL1635GM2)"),
+        // 65535 = No lens or E-mount/T-mount/other non-A-mount lens
+        65535 => Some("E-Mount, T-Mount, Other Lens or no lens"),
         _ => None,
     }
 }
@@ -463,6 +527,33 @@ fn read_u32(data: &[u8], endian: Endianness) -> u32 {
         Endianness::Little => u32::from_le_bytes([data[0], data[1], data[2], data[3]]),
         Endianness::Big => u32::from_be_bytes([data[0], data[1], data[2], data[3]]),
     }
+}
+
+/// Read i32 with given endianness
+fn read_i32(data: &[u8], endian: Endianness) -> i32 {
+    match endian {
+        Endianness::Little => i32::from_le_bytes([data[0], data[1], data[2], data[3]]),
+        Endianness::Big => i32::from_be_bytes([data[0], data[1], data[2], data[3]]),
+    }
+}
+
+/// Decipher Sony encrypted data (Tag9050, Tag2010, Tag94xx)
+/// Sony uses a simple substitution cipher based on cubic modular arithmetic
+/// Reference: exiv2/src/sonymn_int.cpp sonyTagCipher()
+fn decipher_sony_data(data: &[u8]) -> Vec<u8> {
+    // Build decryption lookup table: code[(i³) % 249] = i for i in 0..249
+    let mut code = [0u8; 256];
+    for i in 0u32..249 {
+        let idx = ((i * i * i) % 249) as usize;
+        code[idx] = i as u8;
+    }
+    // Values 249-255 stay the same
+    for i in 249u8..=255 {
+        code[i as usize] = i;
+    }
+
+    // Apply substitution to each byte
+    data.iter().map(|&b| code[b as usize]).collect()
 }
 
 /// Decode CreativeStyle value (tag 0xB020) - ExifTool format
@@ -502,30 +593,41 @@ pub fn decode_creative_style_exiftool(value: u16) -> &'static str {
 // decode_creative_style_exiv2 - exiv2 uses string-based lookup (StringTagDetails)
 
 // ExposureMode (tag 0xB041): Sony.pm / sonymn_int.cpp
+// ExifTool tag 0xB041 mapping (NOT SceneMode!)
 define_tag_decoder! {
     exposure_mode,
     exiftool: {
-        0 => "Auto",
+        0 => "Program AE",
         1 => "Portrait",
-        2 => "Landscape",
-        3 => "Macro",
-        4 => "Sports",
-        5 => "Sunset",
-        6 => "Night Scene",
-        7 => "Beach/Snow",
-        8 => "Fireworks",
-        9 => "Anti Motion Blur",
-        10 => "Pet",
-        11 => "Backlight Correction HDR",
-        12 => "Superior Auto",
-        13 => "High Sensitivity",
-        14 => "Night Portrait",
-        15 => "Hand-held Twilight",
-        16 => "Sweep Panorama",
-        17 => "3D Sweep Panorama",
-        18 => "Background Defocus",
-        19 => "Soft Skin",
-        20 => "Portrait (with Smile Shutter)",
+        2 => "Beach",
+        3 => "Sports",
+        4 => "Snow",
+        5 => "Landscape",
+        6 => "Auto",
+        7 => "Aperture-priority AE",
+        8 => "Shutter speed priority AE",
+        9 => "Night Scene / Twilight",
+        10 => "Hi-Speed Shutter",
+        11 => "Twilight Portrait",
+        12 => "Soft Snap/Portrait",
+        13 => "Fireworks",
+        14 => "Smile Shutter",
+        15 => "Manual",
+        18 => "High Sensitivity",
+        19 => "Macro",
+        20 => "Advanced Sports Shooting",
+        29 => "Underwater",
+        33 => "Food",
+        34 => "Sweep Panorama",
+        35 => "Handheld Night Shot",
+        36 => "Anti Motion Blur",
+        37 => "Pet",
+        38 => "Backlight Correction HDR",
+        39 => "Superior Auto",
+        40 => "Background Defocus",
+        41 => "Soft Skin",
+        42 => "3D Image",
+        65535 => "n/a",
     },
     exiv2: {
         0 => "Program AE",
@@ -555,6 +657,8 @@ define_tag_decoder! {
 }
 
 // AFMode (tag 0xB043): Sony.pm / sonymn_int.cpp
+// ExifTool uses different decoding for older vs newer DSC models
+// We use the general mapping that covers most cases
 define_tag_decoder! {
     af_mode,
     exiftool: {
@@ -563,16 +667,12 @@ define_tag_decoder! {
         2 => "Center",
         3 => "Spot",
         4 => "Flexible Spot",
-        5 => "Touch",
-        6 => "Continuous",
-        7 => "Face Detected",
-        8 => "Tracking",
-        9 => "Zone",
-        10 => "Expand Flexible Spot",
-        11 => "Flexible Spot (S)",
-        12 => "Flexible Spot (M)",
-        13 => "Flexible Spot (L)",
-        14 => "Eye AF",
+        6 => "Touch",
+        10 => "Selective (for Miniature effect)",
+        14 => "Tracking",
+        15 => "Face Tracking",
+        255 => "Manual",
+        65535 => "n/a",
     },
     exiv2: {
         0 => "Default",
@@ -637,6 +737,18 @@ define_tag_decoder! {
     }
 }
 
+// FocusMode2 (tag 0xB042): Sony.pm for older DSC models
+define_tag_decoder! {
+    focus_mode2,
+    both: {
+        0 => "Manual",
+        1 => "AF-S",
+        2 => "AF-C",
+        4 => "Permanent-AF",
+        65535 => "n/a",
+    }
+}
+
 // ImageStabilization (tag 0xB026): Sony.pm / sonymn_int.cpp
 define_tag_decoder! {
     image_stabilization,
@@ -653,10 +765,72 @@ define_tag_decoder! {
     }
 }
 
-/// Decode ImageQuality value (tag 0x0102) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
-    match value {
+// ZoneMatching (tag 0xB024): Sony.pm
+define_tag_decoder! {
+    zone_matching,
+    type: u32,
+    both: {
+        0 => "ISO Setting Used",
+        1 => "High Key",
+        2 => "Low Key",
+    }
+}
+
+// ColorMode (tag 0xB029): Sony.pm uses Minolta::sonyColorMode
+define_tag_decoder! {
+    color_mode,
+    type: u32,
+    both: {
+        0 => "Standard",
+        1 => "Vivid",
+        2 => "Portrait",
+        3 => "Landscape",
+        4 => "Sunset",
+        5 => "Night View/Portrait",
+        6 => "B&W",
+        7 => "Adobe RGB",
+        12 => "Neutral",
+        13 => "Clear",
+        14 => "Deep",
+        15 => "Light",
+        16 => "Autumn Leaves",
+        17 => "Sepia",
+        18 => "FL",
+        19 => "Vivid 2",
+        20 => "IN",
+        21 => "SH",
+        22 => "FL2",
+        23 => "FL3",
+    }
+}
+
+/// Decode Sony FileFormat from 4 bytes (tag 0xB000)
+/// Format: [major, minor, patch, 0] -> "ARW major.minor" or "ARW major.minor.patch"
+pub fn decode_file_format(bytes: &[u8]) -> Option<String> {
+    if bytes.len() < 4 {
+        return None;
+    }
+    let key = format!("{} {} {} {}", bytes[0], bytes[1], bytes[2], bytes[3]);
+    match key.as_str() {
+        "0 0 0 2" => Some("JPEG".to_string()),
+        "1 0 0 0" => Some("SR2".to_string()),
+        "2 0 0 0" => Some("ARW 1.0".to_string()),
+        "3 0 0 0" => Some("ARW 2.0".to_string()),
+        "3 1 0 0" => Some("ARW 2.1".to_string()),
+        "3 2 0 0" => Some("ARW 2.2".to_string()),
+        "3 3 0 0" => Some("ARW 2.3".to_string()),
+        "3 3 1 0" => Some("ARW 2.3.1".to_string()),
+        "3 3 2 0" => Some("ARW 2.3.2".to_string()),
+        "3 3 3 0" => Some("ARW 2.3.3".to_string()),
+        "3 3 5 0" => Some("ARW 2.3.5".to_string()),
+        _ => None,
+    }
+}
+
+// ImageQuality (tag 0x0102): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    image_quality,
+    both: {
         0 => "RAW",
         1 => "Super Fine",
         2 => "Fine",
@@ -667,15 +841,13 @@ pub fn decode_image_quality_exiftool(value: u16) -> &'static str {
         7 => "Compressed RAW",
         8 => "Compressed RAW + JPEG",
         9 => "Light",
-        _ => "Unknown",
     }
 }
-// decode_image_quality_exiv2 - same as exiftool, no separate function needed
 
-/// Decode WhiteBalance value (tag 0x0115) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
-    match value {
+// WhiteBalance (tag 0x0115): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    white_balance,
+    both: {
         0x00 => "Auto",
         0x01 => "Color Temperature/Color Filter",
         0x10 => "Daylight",
@@ -686,45 +858,40 @@ pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
         0x60 => "Fluorescent",
         0x70 => "Custom",
         0x80 => "Underwater",
-        _ => "Unknown",
     }
 }
-// decode_white_balance_exiv2 - same as exiftool, no separate function needed
 
-/// Decode LongExposureNoiseReduction value (tag 0x2008) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_long_exposure_noise_reduction_exiftool(value: u32) -> &'static str {
-    match value {
+// LongExposureNoiseReduction (tag 0x2008): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    long_exposure_noise_reduction,
+    type: u32,
+    both: {
         0 => "Off",
         1 => "On (unused)",
         0x10001 => "On (dark subtracted)",
         0xffff0000 => "Off (65535)",
         0xffff0001 => "On (65535)",
         0xffffffff => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_long_exposure_noise_reduction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode HighISONoiseReduction value (tag 0x2009) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_high_iso_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
+// HighISONoiseReduction (tag 0x2009): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    high_iso_noise_reduction,
+    both: {
         0 => "Off",
         1 => "Low",
         2 => "Normal",
         3 => "High",
         256 => "Auto",
         65535 => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_high_iso_noise_reduction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode SceneMode value (tag 0xB023) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_scene_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// SceneMode (tag 0xB023): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    scene_mode,
+    both: {
         0 => "Standard",
         1 => "Portrait",
         2 => "Text",
@@ -750,27 +917,24 @@ pub fn decode_scene_mode_exiftool(value: u16) -> &'static str {
         28 => "Pet",
         33 => "HDR",
         0xffff => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_scene_mode_exiv2 - same as exiftool, no separate function needed
 
-/// Decode Contrast/Saturation/Sharpness adjustment values - ExifTool format
-/// (tags 0x2004/0x2005/0x2006)
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_adjustment_exiftool(value: i32) -> &'static str {
-    match value {
+// Adjustment values (tags 0x2004/0x2005/0x2006): Contrast/Saturation/Sharpness
+// ExifTool PrintConv: '$val > 0 ? "+$val" : $val' (shows raw number, + prefix for positive)
+define_tag_decoder! {
+    adjustment,
+    type: i32,
+    both: {
         -3 => "-3",
         -2 => "-2",
         -1 => "-1",
-        0 => "Normal",
+        0 => "0",
         1 => "+1",
         2 => "+2",
         3 => "+3",
-        _ => "Unknown",
     }
 }
-// decode_adjustment_exiv2 - same as exiftool, no separate function needed
 
 /// Decode ColorTemperature value (tag 0xB021) - ExifTool format
 /// Returns None if value should be displayed as-is (actual temperature)
@@ -783,11 +947,11 @@ pub fn decode_color_temperature_exiftool(value: u32) -> Option<&'static str> {
 }
 // decode_color_temperature_exiv2 - same as exiftool, no separate function needed
 
-/// Decode Teleconverter value (tag 0x0105) - ExifTool format
-/// Based on ExifTool's minoltaTeleconverters
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_teleconverter_exiftool(value: u32) -> &'static str {
-    match value {
+// Teleconverter (tag 0x0105): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    teleconverter,
+    type: u32,
+    both: {
         0x00 => "None",
         0x04 => "Minolta/Sony AF 1.4x APO (D) (0x04)",
         0x05 => "Minolta/Sony AF 2x APO (D) (0x05)",
@@ -797,10 +961,8 @@ pub fn decode_teleconverter_exiftool(value: u32) -> &'static str {
         0x88 => "Minolta/Sony AF 1.4x APO (D)",
         0x90 => "Minolta AF 1.4x APO II",
         0xa0 => "Minolta AF 1.4x APO",
-        _ => "Unknown",
     }
 }
-// decode_teleconverter_exiv2 - same as exiftool, no separate function needed
 
 // PictureEffect (tag 0x200E): Sony.pm / sonymn_int.cpp
 define_tag_decoder! {
@@ -882,44 +1044,40 @@ define_tag_decoder! {
     }
 }
 
-/// Decode VignettingCorrection value (tag 0x2011) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_vignetting_correction_exiftool(value: u32) -> &'static str {
-    match value {
+// VignettingCorrection (tag 0x2011): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    vignetting_correction,
+    type: u32,
+    both: {
         0 => "Off",
         2 => "Auto",
         0xffffffff => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_vignetting_correction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode DistortionCorrection value (tag 0x2013) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_distortion_correction_exiftool(value: u32) -> &'static str {
-    match value {
+// DistortionCorrection (tag 0x2013): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    distortion_correction,
+    type: u32,
+    both: {
         0 => "Off",
         2 => "Auto",
         0xffffffff => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_distortion_correction_exiv2 - same as exiftool, no separate function needed
 
-/// Decode ReleaseMode value (tag 0xB049) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_release_mode_exiftool(value: u16) -> &'static str {
-    match value {
+// ReleaseMode (tag 0xB049): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    release_mode,
+    both: {
         0 => "Normal",
         2 => "Continuous",
         5 => "Exposure Bracketing",
         6 => "White Balance Bracketing",
         8 => "DRO Bracketing",
         65535 => "n/a",
-        _ => "Unknown",
     }
 }
-// decode_release_mode_exiv2 - same as exiftool, no separate function needed
 
 /// Decode MultiFrameNoiseReduction value (tag 0x200B) - ExifTool format
 pub fn decode_multi_frame_noise_reduction_exiftool(value: u32) -> &'static str {
@@ -942,23 +1100,20 @@ pub fn decode_multi_frame_noise_reduction_exiv2(value: u32) -> &'static str {
     }
 }
 
-/// Decode IntelligentAuto value (tag 0xB052) - ExifTool format
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_intelligent_auto_exiftool(value: u16) -> &'static str {
-    match value {
+// IntelligentAuto (tag 0xB052): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    intelligent_auto,
+    both: {
         0 => "Off",
         1 => "On",
         2 => "Advanced",
-        _ => "Unknown",
     }
 }
-// decode_intelligent_auto_exiv2 - same as exiftool, no separate function needed
 
-/// Decode HDR value (tag 0x200A) - ExifTool format
-/// Returns the first element of the HDR pair (level)
-/// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_hdr_exiftool(value: u16) -> &'static str {
-    match value {
+// HDR (tag 0x200A): Sony.pm / sonymn_int.cpp
+define_tag_decoder! {
+    hdr,
+    both: {
         0x0 => "Off",
         0x01 => "Auto",
         0x10 => "1.0 EV",
@@ -972,10 +1127,32 @@ pub fn decode_hdr_exiftool(value: u16) -> &'static str {
         0x18 => "5.0 EV",
         0x19 => "5.5 EV",
         0x1a => "6.0 EV",
+    }
+}
+
+/// Decode HDR image status (second u16 of HDR tag 0x200A)
+/// From Sony.pm line 999-1003
+pub fn decode_hdr_image_status(value: u16) -> &'static str {
+    match value {
+        0 => "Uncorrected image",
+        1 => "HDR image (good)",
+        2 => "HDR image (fail 1)",
+        3 => "HDR image (fail 2)",
         _ => "Unknown",
     }
 }
-// decode_hdr_exiv2 - same as exiftool, no separate function needed
+
+/// Format complete HDR value (tag 0x200A) - stored as int32u, read as two int16u
+/// Output format: "Off; Uncorrected image"
+pub fn format_hdr_value(value: u32) -> String {
+    let low = (value & 0xFFFF) as u16; // HDR level
+    let high = ((value >> 16) & 0xFFFF) as u16; // Image status
+    format!(
+        "{}; {}",
+        decode_hdr_exiftool(low),
+        decode_hdr_image_status(high)
+    )
+}
 
 /// Decode Quality value (tag 0x0102 and 0xB047) - ExifTool format
 /// Note: This overlaps with decode_image_quality but with more values
@@ -1008,6 +1185,18 @@ pub fn decode_quality_exiv2(value: u32) -> &'static str {
     }
 }
 
+/// Decode JPEGQuality value (tag 0xB047) - ExifTool format
+/// This is the same as decode_quality_exiv2, included for clarity
+pub fn decode_jpeg_quality_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Standard",
+        1 => "Fine",
+        2 => "Extra Fine",
+        65535 => "n/a",
+        _ => "Unknown",
+    }
+}
+
 /// Format FlashLevel or FlashExposureComp value as signed rational string
 /// ExifTool formats these as "-2/3", "+1/3", "Normal", etc.
 pub fn format_flash_comp(value: i16) -> String {
@@ -1036,30 +1225,112 @@ pub fn format_flash_comp(value: i16) -> String {
     }
 }
 
-/// Format LensSpec byte array as a readable string
-/// LensSpec is 8 bytes: [flags1, short_focal, long_focal, max_ap_short, max_ap_long, flags2, ?, ?]
+/// Decode a single BCD byte to its decimal value
+/// e.g., 0x55 -> 55 (not 85)
+fn decode_bcd_byte(byte: u8) -> u16 {
+    let high = (byte >> 4) as u16;
+    let low = (byte & 0x0f) as u16;
+    high * 10 + low
+}
+
+/// Decode two BCD bytes to a focal length value
+/// e.g., [0x00, 0x55] -> 55, [0x02, 0x00] -> 200
+fn decode_bcd_focal(high_byte: u8, low_byte: u8) -> u16 {
+    decode_bcd_byte(high_byte) * 100 + decode_bcd_byte(low_byte)
+}
+
+/// Format LensSpec byte array as a readable string matching ExifTool's format
+/// LensSpec is 8 bytes in ExifTool format:
+/// - byte 0: flags1 (lens mount type: DT=0x01, FE=0x02, E=0x03, etc.)
+/// - bytes 1-2: short focal length (as hex digits forming decimal number)
+/// - bytes 3-4: long focal length (as hex digits forming decimal number)
+/// - byte 5: max aperture at short focal (divided by 10)
+/// - byte 6: max aperture at long focal (divided by 10)
+/// - byte 7: flags2 (lens features: SSM=0x01, SAM=0x02, ZA=0x04, G=0x08, etc.)
 pub fn format_lens_spec(bytes: &[u8]) -> String {
     if bytes.len() < 8 {
         return format!("{:?}", bytes);
     }
 
-    // Simple formatting: just show the focal length and aperture info
-    let short_focal = bytes[1];
-    let long_focal = bytes[2];
-    let max_ap_short = bytes[3];
-    let max_ap_long = bytes[4];
+    let flags1 = bytes[0];
+    // Focal lengths are stored as BCD (Binary Coded Decimal)
+    // Each byte's hex representation forms decimal digits
+    // e.g., 0x00 0x55 -> "0055" -> 55mm (not 0x0055 = 85)
+    let short_focal = decode_bcd_focal(bytes[1], bytes[2]);
+    let long_focal = decode_bcd_focal(bytes[3], bytes[4]);
+    // Apertures are also BCD and divided by 10
+    let max_ap_short = decode_bcd_byte(bytes[5]) as f32 / 10.0;
+    let max_ap_long = decode_bcd_byte(bytes[6]) as f32 / 10.0;
+    let flags2 = bytes[7];
 
-    if short_focal == long_focal {
-        format!("{}mm F{}", short_focal, max_ap_short as f32 / 10.0)
-    } else {
-        format!(
-            "{}-{}mm F{}-{}",
-            short_focal,
-            long_focal,
-            max_ap_short as f32 / 10.0,
-            max_ap_long as f32 / 10.0
-        )
+    // Check if all zeros (unknown lens)
+    if short_focal == 0 && long_focal == 0 && bytes[5] == 0 && bytes[6] == 0 {
+        return format!(
+            "Unknown ({:02x} {} {} {} {} {:02x})",
+            flags1, bytes[1], bytes[2], bytes[3], bytes[4], flags2
+        );
     }
+
+    // Build lens type prefix from flags1
+    let mut prefix = String::new();
+    if flags1 & 0x40 != 0 {
+        prefix.push_str("PZ ");
+    }
+    match flags1 & 0x03 {
+        0x01 => prefix.push_str("DT "),
+        0x02 => prefix.push_str("FE "),
+        0x03 => prefix.push_str("E "),
+        _ => {}
+    }
+
+    // Build focal length string
+    let focal_str = if short_focal == long_focal || long_focal == 0 {
+        format!("{}mm", short_focal)
+    } else {
+        format!("{}-{}mm", short_focal, long_focal)
+    };
+
+    // Build aperture string
+    let aperture_str = if max_ap_short == max_ap_long || max_ap_long == 0.0 {
+        if max_ap_short == max_ap_short.floor() {
+            format!("F{}", max_ap_short as u32)
+        } else {
+            format!("F{}", max_ap_short)
+        }
+    } else {
+        let short_str = if max_ap_short == max_ap_short.floor() {
+            format!("{}", max_ap_short as u32)
+        } else {
+            format!("{}", max_ap_short)
+        };
+        let long_str = if max_ap_long == max_ap_long.floor() {
+            format!("{}", max_ap_long as u32)
+        } else {
+            format!("{}", max_ap_long)
+        };
+        format!("F{}-{}", short_str, long_str)
+    };
+
+    // Build suffix from flags2
+    let mut suffix = String::new();
+    match flags2 & 0x0c {
+        0x04 => suffix.push_str(" ZA"),
+        0x08 => suffix.push_str(" G"),
+        _ => {}
+    }
+    match flags2 & 0x03 {
+        0x01 => suffix.push_str(" SSM"),
+        0x02 => suffix.push_str(" SAM"),
+        _ => {}
+    }
+    if flags1 & 0x80 != 0 {
+        suffix.push_str(" OSS");
+    }
+    if flags1 & 0x20 != 0 {
+        suffix.push_str(" LE");
+    }
+
+    format!("{}{} {}{}", prefix, focal_str, aperture_str, suffix)
 }
 
 /// Decode FlashAction value (tag 0x2017) - exiv2 format
@@ -1069,6 +1340,17 @@ pub fn decode_flash_action_exiv2(value: u16) -> &'static str {
         1 => "Flash fired",
         2 => "External flash fired",
         3 => "Wireless controlled flash fired",
+        _ => "Unknown",
+    }
+}
+
+/// Decode FlashAction value (tag 0x2017) - ExifTool format
+pub fn decode_flash_action_exiftool(value: u32) -> &'static str {
+    match value {
+        0 => "Did not fire",
+        1 => "Flash Fired",
+        2 => "External Flash Fired",
+        3 => "Wireless Controlled Flash Fired",
         _ => "Unknown",
     }
 }
@@ -1083,11 +1365,45 @@ pub fn decode_af_tracking_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode AFTracking value (tag 0x2021) - ExifTool format
+pub fn decode_af_tracking_exiftool(value: u16) -> &'static str {
+    decode_af_tracking_exiv2(value) // Same as exiv2
+}
+
 /// Decode MultiFrameNREffect value (tag 0x2023) - exiv2 format
 pub fn decode_multi_frame_nr_effect_exiv2(value: u16) -> &'static str {
     match value {
         0 => "Normal",
         1 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode MultiFrameNREffect value (tag 0x2023) - ExifTool format
+/// Same as exiv2 format
+pub fn decode_multi_frame_nr_effect_exiftool(value: u32) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "High",
+        _ => "Unknown",
+    }
+}
+
+/// Decode SequenceNumber value (tag 0xB04A) - ExifTool format
+/// 0 = Single, other values are passed through as numbers
+pub fn decode_sequence_number_exiftool(value: u16) -> String {
+    match value {
+        0 => "Single".to_string(),
+        65535 => "n/a".to_string(),
+        _ => value.to_string(),
+    }
+}
+
+/// Decode ElectronicFrontCurtainShutter value (tag 0x201A) - ExifTool format
+pub fn decode_efcs_exiftool(value: u32) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On",
         _ => "Unknown",
     }
 }
@@ -1136,6 +1452,19 @@ pub fn decode_jpeg_heif_switch_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode FocusMode3 value (tag 0xB04E) - exiftool format
+/// From Sony.pm: valid for DSC-HX9V generation and newer
+pub fn decode_focus_mode3_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Manual",
+        2 => "AF-S",
+        3 => "AF-C",
+        5 => "Semi-manual",
+        6 => "DMF",
+        _ => "Unknown",
+    }
+}
+
 /// Decode FocusMode3 value (tag 0xB04E) - exiv2 format
 pub fn decode_focus_mode3_exiv2(value: u16) -> &'static str {
     match value {
@@ -1169,8 +1498,14 @@ pub fn decode_auto_portrait_framed_exiv2(value: u16) -> &'static str {
     }
 }
 
-/// Decode AFIlluminator value (tag 0xB044) - exiv2 format
-pub fn decode_af_illuminator_exiv2(value: u16) -> &'static str {
+/// Decode AutoPortraitFramed value (tag 0x2016) - ExifTool format
+/// Same values as exiv2
+pub fn decode_auto_portrait_framed_exiftool(value: u16) -> &'static str {
+    decode_auto_portrait_framed_exiv2(value)
+}
+
+/// Decode AFIlluminator value (tag 0xB044) - exiftool format
+pub fn decode_af_illuminator_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "Auto",
@@ -1179,8 +1514,13 @@ pub fn decode_af_illuminator_exiv2(value: u16) -> &'static str {
     }
 }
 
-/// Decode Macro value (tag 0xB040) - exiv2 format
-pub fn decode_macro_exiv2(value: u16) -> &'static str {
+/// Decode AFIlluminator value (tag 0xB044) - exiv2 format
+pub fn decode_af_illuminator_exiv2(value: u16) -> &'static str {
+    decode_af_illuminator_exiftool(value)
+}
+
+/// Decode Macro value (tag 0xB040) - exiftool format
+pub fn decode_macro_exiftool(value: u16) -> &'static str {
     match value {
         0 => "Off",
         1 => "On",
@@ -1188,6 +1528,11 @@ pub fn decode_macro_exiv2(value: u16) -> &'static str {
         0xffff => "n/a",
         _ => "Unknown",
     }
+}
+
+/// Decode Macro value (tag 0xB040) - exiv2 format
+pub fn decode_macro_exiv2(value: u16) -> &'static str {
+    decode_macro_exiftool(value)
 }
 
 /// Decode DynamicRangeOptimizer2 value (tag 0xB04F) - exiv2 format
@@ -1212,6 +1557,22 @@ pub fn decode_high_iso_noise_reduction2_exiv2(value: u16) -> &'static str {
     }
 }
 
+/// Decode HighISONoiseReduction2 value (tag 0xB050) - ExifTool format
+pub fn decode_high_iso_noise_reduction2_exiftool(value: u16) -> &'static str {
+    // Same as exiv2 format for this tag
+    decode_high_iso_noise_reduction2_exiv2(value)
+}
+
+/// Check if all values in a slice are zero
+fn all_zeros_u8(vals: &[u8]) -> bool {
+    vals.iter().all(|&v| v == 0)
+}
+
+/// Check if all values in a slice are zero
+fn all_zeros_u16(vals: &[u16]) -> bool {
+    vals.iter().all(|&v| v == 0)
+}
+
 /// Decode LateralChromaticAberration value (tag 0x2012) - exiv2 format
 pub fn decode_lateral_chromatic_aberration_exiv2(value: u32) -> &'static str {
     match value {
@@ -1222,6 +1583,12 @@ pub fn decode_lateral_chromatic_aberration_exiv2(value: u32) -> &'static str {
     }
 }
 
+/// Decode LateralChromaticAberration value (tag 0x2012) - ExifTool format
+/// Same as exiv2 format
+pub fn decode_lateral_chromatic_aberration_exiftool(value: u32) -> &'static str {
+    decode_lateral_chromatic_aberration_exiv2(value)
+}
+
 /// Decode AFAreaModeSetting value (tag 0x201C) - exiv2 format Set1
 pub fn decode_af_area_mode_setting_set1_exiv2(value: u16) -> &'static str {
     match value {
@@ -1229,6 +1596,32 @@ pub fn decode_af_area_mode_setting_set1_exiv2(value: u16) -> &'static str {
         4 => "Local",
         8 => "Zone",
         9 => "Spot",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFAreaModeSetting value (tag 0x201C) - ExifTool format
+/// Uses NEX/ILCE mapping as default since most modern Sony cameras use this
+pub fn decode_af_area_mode_setting_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Wide",
+        1 => "Center",
+        3 => "Flexible Spot",
+        4 => "Flexible Spot (LA-EA4)",
+        9 => "Center (LA-EA4)",
+        11 => "Zone",
+        12 => "Expanded Flexible Spot",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AntiBlur value (tag 0xB04B) - ExifTool format
+pub fn decode_anti_blur_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Off",
+        1 => "On (Continuous)",
+        2 => "On (Shooting)",
+        65535 => "n/a",
         _ => "Unknown",
     }
 }
@@ -1254,12 +1647,439 @@ pub fn decode_white_balance2_exiv2(value: u16) -> &'static str {
     }
 }
 
+// ============================================================================
+// Tag9050 subdirectory decoders (encrypted subdirectory at offset 0x9050)
+// Reference: exiftool/lib/Image/ExifTool/Sony.pm Tag9050a/b/c/d tables
+// ============================================================================
+
+/// Decode FlashStatus value (Tag9050 offset 0x0031)
+pub fn decode_flash_status_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "No Flash present",
+        2 => "Flash Inhibited",
+        64 => "Built-in Flash present",
+        65 => "Built-in Flash Fired",
+        66 => "Built-in Flash Inhibited",
+        128 => "External Flash present",
+        129 => "External Flash Fired",
+        _ => "Unknown",
+    }
+}
+
+/// Decode LensMount value (Tag9050 offset 0x0105)
+pub fn decode_lens_mount_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "Unknown",
+        1 => "A-mount",
+        2 => "E-mount",
+        _ => "Unknown",
+    }
+}
+
+/// Decode LensFormat value (Tag9050 offset 0x0106)
+pub fn decode_lens_format_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "Unknown",
+        1 => "APS-C",
+        2 => "Full-frame",
+        _ => "Unknown",
+    }
+}
+
+/// Decode ReleaseMode2 value (Tag9050 offset 0x003f or 0x0067)
+pub fn decode_release_mode2_exiftool(value: u8) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Continuous",
+        2 => "Continuous - Exposure Bracketing",
+        3 => "Continuous - White Balance Bracketing",
+        5 => "Continuous - Burst",
+        6 => "Single Frame - Capture During Movie",
+        9 => "Continuous - HDR",
+        12 => "Continuous - Speed/Advance Priority AE",
+        18 => "Continuous - Soft High-key",
+        19 => "Continuous - Soft Low-key",
+        20 => "Continuous - Toy Camera",
+        21 => "Continuous - Pop Color",
+        23 => "Continuous - High Contrast Mono",
+        27 => "Continuous - Auto HDR",
+        28 => "Single Frame - Focus Stacking",
+        29 => "Continuous - Focus Stacking",
+        30 => "Continuous - Fast Burst",
+        146 => "Single Frame - Movie Capture",
+        _ => "Unknown",
+    }
+}
+
+/// Format adjustment value like ExifTool: positive values get '+' prefix
+/// PrintConv: '$val > 0 ? "+$val" : $val'
+fn format_adjustment_value(val: i32) -> String {
+    if val > 0 {
+        format!("+{}", val)
+    } else {
+        val.to_string()
+    }
+}
+
+/// Parse CameraSettings binary data (tag 0x0114)
+/// Extracts Sharpness/Contrast/Saturation from the binary blob
+///
+/// Supports:
+/// - CameraSettings: 280 bytes (A200/A300/A350/A700) or 364 bytes (A850/A900)
+/// - CameraSettings2: 332 bytes (A230/A290/A330/A380/A390)
+///
+/// CameraSettings3 (1536/2048 bytes) used by A450/A500/A550/A560/A580/A33/A35/A55/NEX
+/// has a completely different format (int8u) and is not supported.
+fn parse_camera_settings(data: &[u8], _endian: Endianness, tags: &mut HashMap<u16, MakerNoteTag>) {
+    // CameraSettings is an array of int16u values (big-endian)
+    // ExifTool conditions use byte count:
+    // CameraSettings: 280 bytes (A200/A300/A350/A700) or 364 bytes (A850/A900)
+    //   Sharpness at offset 0x1c (28), Contrast at 0x1d (29), Saturation at 0x1e (30)
+    //   Byte offsets: Sharpness=56, Contrast=58, Saturation=60
+    // CameraSettings2: 332 bytes (A230/A290/A330/A380/A390)
+    //   Sharpness at offset 0x19 (25), Contrast at 0x1a (26), Saturation at 0x1b (27)
+    //   Byte offsets: Sharpness=50, Contrast=52, Saturation=54
+    // CameraSettings3: 1536 or 2048 bytes (A450/A500/A550/A560/A580/A33/A35/A55/NEX)
+    //   Completely different format (int8u), skip
+
+    let data_len = data.len();
+    let (sharpness_offset, contrast_offset, saturation_offset) =
+        if data_len == 280 || data_len == 364 {
+            // CameraSettings (A200/A300/A350/A700/A850/A900)
+            (56, 58, 60)
+        } else if data_len == 332 {
+            // CameraSettings2 (A230/A290/A330/A380/A390)
+            (50, 52, 54)
+        } else {
+            // Unknown format or CameraSettings3 - skip
+            return;
+        };
+
+    // Need at least saturation_offset + 2 bytes
+    if data.len() < saturation_offset + 2 {
+        return;
+    }
+
+    // CameraSettings data is big-endian
+    // Read Sharpness
+    let sharpness_raw = u16::from_be_bytes([data[sharpness_offset], data[sharpness_offset + 1]]);
+    let sharpness = (sharpness_raw as i32) - 10;
+    tags.insert(
+        CS_SHARPNESS,
+        MakerNoteTag {
+            tag_id: CS_SHARPNESS,
+            tag_name: Some("Sharpness"),
+            value: ExifValue::Ascii(format_adjustment_value(sharpness)),
+        },
+    );
+
+    // Read Contrast
+    let contrast_raw = u16::from_be_bytes([data[contrast_offset], data[contrast_offset + 1]]);
+    let contrast = (contrast_raw as i32) - 10;
+    tags.insert(
+        CS_CONTRAST,
+        MakerNoteTag {
+            tag_id: CS_CONTRAST,
+            tag_name: Some("Contrast"),
+            value: ExifValue::Ascii(format_adjustment_value(contrast)),
+        },
+    );
+
+    // Read Saturation
+    let saturation_raw = u16::from_be_bytes([data[saturation_offset], data[saturation_offset + 1]]);
+    let saturation = (saturation_raw as i32) - 10;
+    tags.insert(
+        CS_SATURATION,
+        MakerNoteTag {
+            tag_id: CS_SATURATION,
+            tag_name: Some("Saturation"),
+            value: ExifValue::Ascii(format_adjustment_value(saturation)),
+        },
+    );
+}
+
+/// Parse Tag9050 encrypted subdirectory
+/// Returns parsed tags with synthetic tag IDs in the 0x9050xxxx range
+fn parse_tag9050(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerNoteTag>) {
+    if data.is_empty() {
+        return;
+    }
+
+    // Decipher the data
+    let decrypted = decipher_sony_data(data);
+
+    // Tag9050 fields (offsets from ExifTool Sony.pm Tag9050a)
+    // Note: Some offsets differ by model, we use common ones
+
+    // 0x0031: FlashStatus (1 byte)
+    if decrypted.len() > 0x31 {
+        let val = decrypted[0x31];
+        let decoded = decode_flash_status_exiftool(val);
+        // Use a synthetic tag ID for Tag9050 fields
+        let synth_id = 0x9031_u16;
+        tags.insert(
+            synth_id,
+            MakerNoteTag {
+                tag_id: synth_id,
+                tag_name: Some("FlashStatus"),
+                value: ExifValue::Ascii(decoded.to_string()),
+            },
+        );
+    }
+
+    // 0x0032: ShutterCount (4 bytes, masked with 0x00ffffff)
+    if decrypted.len() > 0x35 {
+        let count = read_u32(&decrypted[0x32..], endian) & 0x00ffffff;
+        if count > 0 && count < 0x00ffffff {
+            let synth_id = 0x9032_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("ShutterCount"),
+                    value: ExifValue::Long(vec![count]),
+                },
+            );
+        }
+    }
+
+    // 0x003a: SonyExposureTime (2 bytes) - ValueConv: 2^(16 - val/256)
+    if decrypted.len() > 0x3b {
+        let raw = read_u16(&decrypted[0x3a..], endian);
+        if raw > 0 {
+            let exp_time = 2.0_f64.powf(16.0 - (raw as f64) / 256.0);
+            let formatted = if exp_time >= 1.0 {
+                format!("{}", exp_time.round() as u32)
+            } else {
+                format!("1/{}", (1.0 / exp_time).round() as u32)
+            };
+            let synth_id = 0x903A_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("SonyExposureTime"),
+                    value: ExifValue::Ascii(formatted),
+                },
+            );
+        }
+    }
+
+    // 0x003c: SonyFNumber (2 bytes) - ValueConv: 2^((val/256 - 16) / 2)
+    if decrypted.len() > 0x3d {
+        let raw = read_u16(&decrypted[0x3c..], endian);
+        if raw > 0 {
+            let fnum = 2.0_f64.powf(((raw as f64) / 256.0 - 16.0) / 2.0);
+            let formatted = format!("{:.1}", fnum);
+            let synth_id = 0x903C_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("SonyFNumber"),
+                    value: ExifValue::Ascii(formatted),
+                },
+            );
+        }
+    }
+
+    // 0x003f: ReleaseMode2 (1 byte)
+    if decrypted.len() > 0x3f {
+        let val = decrypted[0x3f];
+        let decoded = decode_release_mode2_exiftool(val);
+        if decoded != "Unknown" {
+            let synth_id = 0x903F_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("ReleaseMode2"),
+                    value: ExifValue::Ascii(decoded.to_string()),
+                },
+            );
+        }
+    }
+
+    // 0x0105: LensMount (1 byte)
+    if decrypted.len() > 0x105 {
+        let val = decrypted[0x105];
+        if val > 0 {
+            let decoded = decode_lens_mount_exiftool(val);
+            let synth_id = 0x9105_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("LensMount"),
+                    value: ExifValue::Ascii(decoded.to_string()),
+                },
+            );
+        }
+    }
+
+    // 0x0106: LensFormat (1 byte)
+    if decrypted.len() > 0x106 {
+        let val = decrypted[0x106];
+        if val > 0 {
+            let decoded = decode_lens_format_exiftool(val);
+            let synth_id = 0x9106_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("LensFormat"),
+                    value: ExifValue::Ascii(decoded.to_string()),
+                },
+            );
+        }
+    }
+
+    // 0x0107: LensType2 (2 bytes) - for E-mount lenses
+    if decrypted.len() > 0x108 {
+        let lens_type = read_u16(&decrypted[0x107..], endian);
+        if lens_type > 0 && lens_type != 0xffff {
+            // Try to look up lens name
+            if let Some(name) = get_sony_lens_name(lens_type as u32) {
+                let synth_id = 0x9107_u16;
+                tags.insert(
+                    synth_id,
+                    MakerNoteTag {
+                        tag_id: synth_id,
+                        tag_name: Some("LensType2"),
+                        value: ExifValue::Ascii(name.to_string()),
+                    },
+                );
+            }
+        }
+    }
+
+    // 0x0109: LensType (2 bytes) - for A-mount lenses
+    if decrypted.len() > 0x10a {
+        let lens_type = read_u16(&decrypted[0x109..], endian);
+        if lens_type > 0 && lens_type != 0xffff && (lens_type & 0xff00) != 0x8000 {
+            // Try to look up lens name
+            if let Some(name) = get_sony_lens_name(lens_type as u32) {
+                let synth_id = 0x9109_u16;
+                tags.insert(
+                    synth_id,
+                    MakerNoteTag {
+                        tag_id: synth_id,
+                        tag_name: Some("LensType"),
+                        value: ExifValue::Ascii(name.to_string()),
+                    },
+                );
+            }
+        }
+    }
+
+    // 0x0000: SonyMaxAperture (1 byte) - ValueConv: 2^(($val/8 - 1.06) / 2)
+    // Only for SLT/ILCA models (not NEX/ILCE)
+    if !decrypted.is_empty() {
+        let val = decrypted[0] as f64;
+        if val > 0.0 && val < 200.0 {
+            let aperture = 2.0_f64.powf((val / 8.0 - 1.06) / 2.0);
+            let formatted = format!("{:.1}", aperture);
+            let synth_id = 0x9000_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("SonyMaxAperture"),
+                    value: ExifValue::Ascii(formatted),
+                },
+            );
+        }
+    }
+
+    // 0x0001: SonyMinAperture (1 byte) - ValueConv: 2^(($val/8 - 1.06) / 2)
+    if decrypted.len() > 1 {
+        let val = decrypted[1] as f64;
+        if val > 0.0 && val < 200.0 {
+            let aperture = 2.0_f64.powf((val / 8.0 - 1.06) / 2.0);
+            let formatted = format!("{:.0}", aperture);
+            let synth_id = 0x9001_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("SonyMinAperture"),
+                    value: ExifValue::Ascii(formatted),
+                },
+            );
+        }
+    }
+
+    // 0x007c or 0x00f0: InternalSerialNumber (4-5 bytes as hex)
+    // For ILCE/NEX: 0x007c (4 bytes), for SLT/ILCA: 0x00f0 (5 bytes)
+    // Try 0x00f0 first (SLT/ILCA - 5 bytes)
+    if decrypted.len() > 0xf4 {
+        let serial_bytes = &decrypted[0xf0..0xf5];
+        let serial: String = serial_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        if serial != "0000000000" && serial != "ffffffffff" && !serial.starts_with("0000") {
+            let synth_id = 0x90F0_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("InternalSerialNumber"),
+                    value: ExifValue::Ascii(serial),
+                },
+            );
+        }
+    }
+    // Try 0x007c (ILCE/NEX - 4 bytes) if we didn't get one at 0xf0
+    if !tags.contains_key(&0x90F0) && decrypted.len() > 0x7f {
+        let serial_bytes = &decrypted[0x7c..0x80];
+        let serial: String = serial_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        if serial != "00000000" && serial != "ffffffff" {
+            let synth_id = 0x907C_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("InternalSerialNumber"),
+                    value: ExifValue::Ascii(serial),
+                },
+            );
+        }
+    }
+
+    // 0x0020: Shutter (6 bytes as int16u[3])
+    if decrypted.len() > 0x25 {
+        let v1 = read_u16(&decrypted[0x20..], endian);
+        let v2 = read_u16(&decrypted[0x22..], endian);
+        let v3 = read_u16(&decrypted[0x24..], endian);
+        if v1 == 0 && v2 == 0 && v3 == 0 {
+            let synth_id = 0x9020_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("Shutter"),
+                    value: ExifValue::Ascii("Silent / Electronic (0 0 0)".to_string()),
+                },
+            );
+        } else {
+            let synth_id = 0x9020_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("Shutter"),
+                    value: ExifValue::Ascii(format!("Mechanical ({} {} {})", v1, v2, v3)),
+                },
+            );
+        }
+    }
+}
+
 /// Parse a single IFD entry from Sony maker notes
 fn parse_ifd_entry(
     data: &[u8],
     entry_offset: usize,
     endian: Endianness,
-    base_offset: usize,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Option<(u16, ExifValue)> {
     if entry_offset + 12 > data.len() {
         return None;
@@ -1282,23 +2102,32 @@ fn parse_ifd_entry(
     let total_size = count * type_size;
 
     // Get the actual data location
-    // Sony maker notes use offsets relative to the maker note start
+    // Sony maker notes use offsets relative to the TIFF header (like Canon)
     let value_data: &[u8] = if total_size <= 4 {
         value_offset_bytes
     } else {
         let offset = read_u32(value_offset_bytes, endian) as usize;
-        // Try maker note-relative offset
-        let abs_offset = if offset >= base_offset {
-            offset - base_offset
+
+        // Try to use TIFF data first (Sony uses TIFF-relative offsets)
+        if let Some(tiff) = tiff_data {
+            let abs_offset = tiff_offset + offset;
+            if abs_offset + total_size <= tiff.len() {
+                &tiff[abs_offset..abs_offset + total_size]
+            } else {
+                // Fall back to MakerNote-relative offset
+                if offset + total_size <= data.len() {
+                    &data[offset..offset + total_size]
+                } else {
+                    return None;
+                }
+            }
         } else {
-            offset
-        };
-        if abs_offset + total_size <= data.len() {
-            &data[abs_offset..abs_offset + total_size]
-        } else if offset + total_size <= data.len() {
-            &data[offset..offset + total_size]
-        } else {
-            return None;
+            // No TIFF data, try MakerNote-relative offset
+            if offset + total_size <= data.len() {
+                &data[offset..offset + total_size]
+            } else {
+                return None;
+            }
         }
     };
 
@@ -1313,6 +2142,20 @@ fn parse_ifd_entry(
                 let v = bytes[0] as u16;
                 let decoded = match tag_id {
                     SONY_FOCUS_MODE => Some(decode_focus_mode_exiftool(v).to_string()),
+                    SONY_AF_AREA_MODE_SETTING => {
+                        Some(decode_af_area_mode_setting_exiftool(v).to_string())
+                    }
+                    SONY_AF_TRACKING => Some(decode_af_tracking_exiftool(v).to_string()),
+                    SONY_AF_POINT_SELECTED => {
+                        // For DSC/NEX/ILCE cameras without LA-EA adapters, value 0 = "n/a"
+                        // For SLT cameras with LA-EA, value 0 = "Auto"
+                        // We use "n/a" as default since most cameras output this
+                        if v == 0 {
+                            Some("n/a".to_string())
+                        } else {
+                            None // Leave as raw value for non-zero
+                        }
+                    }
                     _ => None,
                 };
 
@@ -1324,6 +2167,13 @@ fn parse_ifd_entry(
             } else if tag_id == SONY_LENS_SPEC && bytes.len() >= 8 {
                 // Format LensSpec byte array
                 ExifValue::Ascii(format_lens_spec(&bytes))
+            } else if tag_id == SONY_FILE_FORMAT && bytes.len() >= 4 {
+                // Decode Sony FileFormat (ARW version)
+                if let Some(fmt) = decode_file_format(&bytes) {
+                    ExifValue::Ascii(fmt)
+                } else {
+                    ExifValue::Byte(bytes)
+                }
             } else {
                 ExifValue::Byte(bytes)
             }
@@ -1335,7 +2185,17 @@ fn parse_ifd_entry(
                 .take_while(|&&b| b != 0)
                 .map(|&b| b as char)
                 .collect::<String>();
-            ExifValue::Ascii(s)
+            // Transform CreativeStyle ASCII values to match ExifTool naming
+            if tag_id == SONY_CREATIVE_STYLE {
+                let transformed = match s.as_str() {
+                    "Autumnleaves" => "Autumn Leaves".to_string(),
+                    "BW" => "B&W".to_string(),
+                    _ => s,
+                };
+                ExifValue::Ascii(transformed)
+            } else {
+                ExifValue::Ascii(s)
+            }
         }
         3 | 8 => {
             // SHORT or SSHORT
@@ -1361,8 +2221,22 @@ fn parse_ifd_entry(
                     SONY_IMAGE_QUALITY => Some(decode_image_quality_exiftool(v).to_string()),
                     SONY_WHITE_BALANCE => Some(decode_white_balance_exiftool(v).to_string()),
                     SONY_CREATIVE_STYLE => Some(decode_creative_style_exiftool(v).to_string()),
-                    SONY_EXPOSURE_MODE => Some(decode_exposure_mode_exiftool(v).to_string()),
-                    SONY_AF_MODE => Some(decode_af_mode_exiftool(v).to_string()),
+                    SONY_EXPOSURE_MODE => {
+                        // Check for n/a value (65535)
+                        if v == 65535 {
+                            Some("n/a".to_string())
+                        } else {
+                            Some(decode_exposure_mode_exiftool(v).to_string())
+                        }
+                    }
+                    SONY_AF_MODE => {
+                        // Check for n/a value (65535)
+                        if v == 65535 {
+                            Some("n/a".to_string())
+                        } else {
+                            Some(decode_af_mode_exiftool(v).to_string())
+                        }
+                    }
                     SONY_DYNAMIC_RANGE_OPTIMIZER => {
                         Some(decode_dynamic_range_optimizer_exiftool(v).to_string())
                     }
@@ -1378,7 +2252,43 @@ fn parse_ifd_entry(
                     SONY_PICTURE_EFFECT => Some(decode_picture_effect_exiftool(v).to_string()),
                     SONY_RELEASE_MODE => Some(decode_release_mode_exiftool(v).to_string()),
                     SONY_INTELLIGENT_AUTO => Some(decode_intelligent_auto_exiftool(v).to_string()),
-                    SONY_QUALITY_2 => Some(decode_quality_exiftool(v as u32).to_string()),
+                    SONY_QUALITY_2 => {
+                        // Tag 0xB047 is JPEGQuality, not general Quality
+                        if v == 65535 {
+                            Some("n/a".to_string())
+                        } else {
+                            Some(decode_jpeg_quality_exiftool(v).to_string())
+                        }
+                    }
+                    SONY_AUTO_PORTRAIT_FRAMED => {
+                        Some(decode_auto_portrait_framed_exiftool(v).to_string())
+                    }
+                    SONY_FOCUS_MODE_2 => {
+                        // FocusMode2 (0xB042) - check for n/a value
+                        if v == 65535 {
+                            Some("n/a".to_string())
+                        } else {
+                            Some(decode_focus_mode2_exiftool(v).to_string())
+                        }
+                    }
+                    SONY_FOCUS_MODE_3 => {
+                        // FocusMode3 (0xB04E) - valid for DSC-HX9V generation and newer
+                        Some(decode_focus_mode3_exiftool(v).to_string())
+                    }
+                    SONY_AF_AREA_MODE_SETTING => {
+                        Some(decode_af_area_mode_setting_exiftool(v).to_string())
+                    }
+                    SONY_AF_TRACKING => Some(decode_af_tracking_exiftool(v).to_string()),
+                    SONY_ANTI_BLUR => {
+                        if v == 65535 {
+                            Some("n/a".to_string())
+                        } else {
+                            Some(decode_anti_blur_exiftool(v).to_string())
+                        }
+                    }
+                    SONY_SEQUENCE_NUMBER => Some(decode_sequence_number_exiftool(v)),
+                    SONY_MACRO => Some(decode_macro_exiftool(v).to_string()),
+                    SONY_AF_ILLUMINATOR => Some(decode_af_illuminator_exiftool(v).to_string()),
                     _ => None,
                 };
 
@@ -1448,6 +2358,25 @@ fn parse_ifd_entry(
                     ExifValue::Ascii(decode_multi_frame_noise_reduction_exiftool(v).to_string())
                 } else if tag_id == SONY_IMAGE_QUALITY {
                     ExifValue::Ascii(decode_quality_exiftool(v).to_string())
+                } else if tag_id == SONY_ZONE_MATCHING {
+                    ExifValue::Ascii(decode_zone_matching_exiftool(v).to_string())
+                } else if tag_id == SONY_COLOR_MODE {
+                    ExifValue::Ascii(decode_color_mode_exiftool(v).to_string())
+                } else if tag_id == SONY_FLASH_ACTION {
+                    ExifValue::Ascii(decode_flash_action_exiftool(v).to_string())
+                } else if tag_id == SONY_HDR {
+                    // HDR is stored as int32u, but read as two int16u values
+                    // Format: "HDRLevel; ImageStatus"
+                    ExifValue::Ascii(format_hdr_value(v))
+                } else if tag_id == SONY_MULTI_FRAME_NR_EFFECT {
+                    // MultiFrameNREffect: 0=Normal, 1=High
+                    ExifValue::Ascii(decode_multi_frame_nr_effect_exiftool(v).to_string())
+                } else if tag_id == SONY_EFCS {
+                    // ElectronicFrontCurtainShutter: 0=Off, 1=On
+                    ExifValue::Ascii(decode_efcs_exiftool(v).to_string())
+                } else if tag_id == SONY_LATERAL_CHROMATIC_ABERRATION {
+                    // LateralChromaticAberration: 0=Off, 2=Auto
+                    ExifValue::Ascii(decode_lateral_chromatic_aberration_exiftool(v).to_string())
                 } else if v <= u16::MAX as u32 {
                     // Then check tags that fit in u16
                     let v16 = v as u16;
@@ -1475,8 +2404,8 @@ fn parse_ifd_entry(
                 ExifValue::Long(values)
             }
         }
-        5 | 10 => {
-            // RATIONAL or SRATIONAL
+        5 => {
+            // RATIONAL (unsigned)
             let mut values = Vec::with_capacity(count);
             for i in 0..count {
                 if i * 8 + 8 <= value_data.len() {
@@ -1486,6 +2415,18 @@ fn parse_ifd_entry(
                 }
             }
             ExifValue::Rational(values)
+        }
+        10 => {
+            // SRATIONAL (signed)
+            let mut values = Vec::with_capacity(count);
+            for i in 0..count {
+                if i * 8 + 8 <= value_data.len() {
+                    let num = read_i32(&value_data[i * 8..], endian);
+                    let den = read_i32(&value_data[i * 8 + 4..], endian);
+                    values.push((num, den));
+                }
+            }
+            ExifValue::SRational(values)
         }
         7 => {
             // UNDEFINED
@@ -1501,12 +2442,13 @@ fn parse_ifd_entry(
 pub fn parse_sony_maker_notes(
     data: &[u8],
     endian: Endianness,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
     // Sony maker notes can start with "SONY DSC " or be in standard TIFF IFD format
     let mut offset = 0;
-    let base_offset = 0usize;
 
     if data.len() >= 12 && data.starts_with(b"SONY DSC ") {
         offset = 12;
@@ -1527,13 +2469,135 @@ pub fn parse_sony_maker_notes(
             break;
         }
 
-        if let Some((tag_id, value)) = parse_ifd_entry(data, entry_offset, endian, base_offset) {
+        if let Some((tag_id, value)) =
+            parse_ifd_entry(data, entry_offset, endian, tiff_data, tiff_offset)
+        {
+            // Decode certain tag values to human-readable strings for ExifTool compatibility
+            let decoded_value = match tag_id {
+                SONY_SOFT_SKIN_EFFECT => {
+                    if let ExifValue::Long(ref v) = value {
+                        if !v.is_empty() {
+                            ExifValue::Ascii(decode_soft_skin_effect_exiv2(v[0]).to_string())
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                SONY_QUALITY_2 => {
+                    // Tag 0xB047 is JPEGQuality (different from tag 0x0102 ImageQuality)
+                    if let ExifValue::Long(ref v) = value {
+                        if !v.is_empty() {
+                            let val = v[0];
+                            if val == 65535 {
+                                ExifValue::Ascii("n/a".to_string())
+                            } else if val <= u16::MAX as u32 {
+                                ExifValue::Ascii(
+                                    decode_jpeg_quality_exiftool(val as u16).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                SONY_IMAGE_QUALITY => {
+                    if let ExifValue::Long(ref v) = value {
+                        if !v.is_empty() {
+                            ExifValue::Ascii(decode_quality_exiftool(v[0]).to_string())
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                SONY_HIGH_ISO_NOISE_REDUCTION_2 => {
+                    // Tag 0xB050: decode noise reduction level
+                    if let ExifValue::Short(ref v) = value {
+                        if !v.is_empty() {
+                            ExifValue::Ascii(
+                                decode_high_iso_noise_reduction2_exiftool(v[0]).to_string(),
+                            )
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                SONY_AF_POINTS_USED | SONY_FOCAL_PLANE_AF_POINTS_USED => {
+                    // AFPointsUsed/FocalPlaneAFPointsUsed: all zeros => "(none)"
+                    match &value {
+                        ExifValue::Byte(vals) if all_zeros_u8(vals) => {
+                            ExifValue::Ascii("(none)".to_string())
+                        }
+                        ExifValue::Short(vals) if all_zeros_u16(vals) => {
+                            ExifValue::Ascii("(none)".to_string())
+                        }
+                        _ => value,
+                    }
+                }
+                SONY_VARIABLE_LOW_PASS_FILTER => {
+                    // VariableLowPassFilter: int16u[2], "0 0" or "65535 65535" => "n/a"
+                    if let ExifValue::Short(vals) = &value {
+                        if vals.len() >= 2 {
+                            if (vals[0] == 0 && vals[1] == 0)
+                                || (vals[0] == 65535 && vals[1] == 65535)
+                            {
+                                ExifValue::Ascii("n/a".to_string())
+                            } else if vals[0] == 1 && vals[1] == 0 {
+                                ExifValue::Ascii("Off".to_string())
+                            } else if vals[0] == 1 && vals[1] == 1 {
+                                ExifValue::Ascii("Standard".to_string())
+                            } else if vals[0] == 1 && vals[1] == 2 {
+                                ExifValue::Ascii("High".to_string())
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
+                _ => value,
+            };
+
+            // Handle encrypted subdirectories and CameraSettings
+            if tag_id == SONY_TAG_9050 {
+                // Parse Tag9050 encrypted subdirectory
+                if let ExifValue::Undefined(ref raw_data) = decoded_value {
+                    parse_tag9050(raw_data, endian, &mut tags);
+                }
+                // Don't insert the raw encrypted blob
+                continue;
+            }
+
+            // Handle CameraSettings binary blob (tag 0x0114)
+            // Used by A200, A300, A350, A700, A850, A900
+            if tag_id == SONY_CAMERA_SETTINGS {
+                if let ExifValue::Undefined(ref raw_data) = decoded_value {
+                    parse_camera_settings(raw_data, endian, &mut tags);
+                } else if let ExifValue::Byte(ref raw_data) = decoded_value {
+                    parse_camera_settings(raw_data, endian, &mut tags);
+                }
+                // Don't insert the raw binary blob
+                continue;
+            }
+
             tags.insert(
                 tag_id,
                 MakerNoteTag {
                     tag_id,
                     tag_name: get_sony_tag_name(tag_id),
-                    value,
+                    value: decoded_value,
                 },
             );
         }

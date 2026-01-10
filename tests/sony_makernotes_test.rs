@@ -170,7 +170,7 @@ fn test_decode_af_mode_values() {
     assert_eq!(decode_af_mode_exiftool(2), "Center");
     assert_eq!(decode_af_mode_exiftool(3), "Spot");
     assert_eq!(decode_af_mode_exiftool(4), "Flexible Spot");
-    assert_eq!(decode_af_mode_exiftool(14), "Eye AF");
+    assert_eq!(decode_af_mode_exiftool(14), "Tracking");
     assert_eq!(decode_af_mode_exiftool(999), "Unknown");
 }
 
@@ -178,10 +178,11 @@ fn test_decode_af_mode_values() {
 fn test_decode_exposure_mode_values() {
     use fpexif::makernotes::sony::*;
 
-    assert_eq!(decode_exposure_mode_exiftool(0), "Auto");
+    assert_eq!(decode_exposure_mode_exiftool(0), "Program AE");
     assert_eq!(decode_exposure_mode_exiftool(1), "Portrait");
-    assert_eq!(decode_exposure_mode_exiftool(2), "Landscape");
-    assert_eq!(decode_exposure_mode_exiftool(12), "Superior Auto");
+    assert_eq!(decode_exposure_mode_exiftool(2), "Beach");
+    assert_eq!(decode_exposure_mode_exiftool(5), "Landscape");
+    assert_eq!(decode_exposure_mode_exiftool(12), "Soft Snap/Portrait");
     assert_eq!(decode_exposure_mode_exiftool(999), "Unknown");
 }
 

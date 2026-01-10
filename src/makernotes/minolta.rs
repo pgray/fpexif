@@ -9,6 +9,7 @@
 // MakerNote format varies by camera series.
 
 use crate::data_types::{Endianness, ExifValue};
+use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
@@ -73,9 +74,10 @@ pub const MINOLTA_CS_SHARPNESS: u16 = 33;
 pub const MINOLTA_CS_SUBJECT_PROGRAM: u16 = 34;
 pub const MINOLTA_CS_ISO_SETTING: u16 = 36;
 pub const MINOLTA_CS_MODEL_ID: u16 = 37;
-pub const MINOLTA_CS_FOCUS_MODE: u16 = 41;
-pub const MINOLTA_CS_FOCUS_AREA: u16 = 42;
-pub const MINOLTA_CS_COLOR_MODE: u16 = 45;
+pub const MINOLTA_CS_COLOR_MODE: u16 = 40;
+pub const MINOLTA_CS_COLOR_FILTER: u16 = 41;
+pub const MINOLTA_CS_FOCUS_MODE: u16 = 48;
+pub const MINOLTA_CS_FOCUS_AREA: u16 = 49;
 
 /// Get the name of a Minolta maker note tag
 pub fn get_minolta_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -149,34 +151,42 @@ pub fn get_minolta_cs_tag_name(tag_id: u16) -> Option<&'static str> {
     }
 }
 
-// ===== ExifTool format decoders =====
+// ===== Tag decoders using the define_tag_decoder! macro =====
+// Minolta uses u32 type for all tags
 
-/// Decode ExposureMode - ExifTool format
-pub fn decode_exposure_mode_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_exposure_mode,
+    type: u32,
+    exiftool: {
         0 => "Program",
         1 => "Aperture Priority",
         2 => "Shutter Priority",
         3 => "Manual",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Program",
+        1 => "Aperture priority",
+        2 => "Shutter priority",
+        3 => "Manual",
     }
 }
 
-/// Decode FlashMode - ExifTool format
-pub fn decode_flash_mode_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_flash_mode,
+    type: u32,
+    both: {
         0 => "Fill flash",
         1 => "Red-eye reduction",
         2 => "Rear flash sync",
         3 => "Wireless",
         4 => "Off",
-        _ => "Unknown",
     }
 }
 
-/// Decode WhiteBalance - ExifTool format (CameraSettings tag 3)
-pub fn decode_white_balance_cs_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_white_balance_cs,
+    type: u32,
+    both: {
         0 => "Auto",
         1 => "Daylight",
         2 => "Cloudy",
@@ -186,13 +196,13 @@ pub fn decode_white_balance_cs_exiftool(value: u32) -> &'static str {
         8 => "Fluorescent 2",
         11 => "Custom 2",
         12 => "Custom 3",
-        _ => "Unknown",
     }
 }
 
-/// Decode WhiteBalance - ExifTool format (Tag 0x0115)
-pub fn decode_white_balance_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_white_balance,
+    type: u32,
+    both: {
         0x00 => "Auto",
         0x01 => "Color Temperature/Color Filter",
         0x10 => "Daylight",
@@ -202,13 +212,13 @@ pub fn decode_white_balance_exiftool(value: u32) -> &'static str {
         0x50 => "Flash",
         0x60 => "Fluorescent",
         0x70 => "Custom",
-        _ => "Unknown",
     }
 }
 
-/// Decode ImageSize - ExifTool format
-pub fn decode_image_size_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_image_size,
+    type: u32,
+    exiftool: {
         0 => "Full",
         1 => "1600x1200",
         2 => "1280x960",
@@ -216,166 +226,198 @@ pub fn decode_image_size_exiftool(value: u32) -> &'static str {
         6 => "2080x1560",
         7 => "2560x1920",
         8 => "3264x2176",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Full size",
+        1 => "1600x1200",
+        2 => "1280x960",
+        3 => "640x480",
+        6 => "2080x1560",
+        7 => "2560x1920",
+        8 => "3264x2176",
     }
 }
 
-/// Decode Quality - ExifTool format
-pub fn decode_quality_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_quality,
+    type: u32,
+    exiftool: {
         0 => "Raw",
         1 => "Super Fine",
         2 => "Fine",
         3 => "Standard",
         4 => "Economy",
         5 => "Extra Fine",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Raw",
+        1 => "Super fine",
+        2 => "Fine",
+        3 => "Standard",
+        4 => "Economy",
+        5 => "Extra fine",
     }
 }
 
-/// Decode DriveMode - ExifTool format
-pub fn decode_drive_mode_exiftool(value: u32) -> &'static str {
-    match value {
-        0 => "Single Frame",
+define_tag_decoder! {
+    minolta_drive_mode,
+    type: u32,
+    both: {
+        0 => "Single",
         1 => "Continuous",
         2 => "Self-timer",
         4 => "Bracketing",
         5 => "Interval",
         6 => "UHS continuous",
         7 => "HS continuous",
-        _ => "Unknown",
     }
 }
 
-/// Decode MeteringMode - ExifTool format
-pub fn decode_metering_mode_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_metering_mode,
+    type: u32,
+    both: {
         0 => "Multi-segment",
         1 => "Center weighted average",
         2 => "Spot",
-        _ => "Unknown",
     }
 }
 
-/// Decode MacroMode - ExifTool format
-pub fn decode_macro_mode_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_macro_mode,
+    type: u32,
+    both: {
         0 => "Off",
         1 => "On",
         2 => "Super Macro",
-        _ => "Unknown",
     }
 }
 
-/// Decode DigitalZoom - ExifTool format
-pub fn decode_digital_zoom_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_digital_zoom,
+    type: u32,
+    both: {
         0 => "Off",
         1 => "Electronic magnification",
         2 => "2x",
-        _ => "Unknown",
     }
 }
 
-/// Decode BracketStep - ExifTool format
-pub fn decode_bracket_step_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_bracket_step,
+    type: u32,
+    both: {
         0 => "1/3 EV",
         1 => "2/3 EV",
         2 => "1 EV",
-        _ => "Unknown",
     }
 }
 
-/// Decode FlashFired - ExifTool format
-pub fn decode_flash_fired_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_flash_fired,
+    type: u32,
+    exiftool: {
         0 => "No",
         1 => "Yes",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Did not fire",
+        1 => "Fired",
     }
 }
 
-/// Decode Sharpness - ExifTool format
-pub fn decode_sharpness_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_sharpness,
+    type: u32,
+    both: {
         0 => "Hard",
         1 => "Normal",
         2 => "Soft",
-        _ => "Unknown",
     }
 }
 
-/// Decode Contrast - ExifTool format (same mapping as Sharpness)
-pub fn decode_contrast_exiftool(value: u32) -> &'static str {
-    decode_sharpness_exiftool(value)
-}
-
-/// Decode SubjectProgram - ExifTool format
-pub fn decode_subject_program_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_subject_program,
+    type: u32,
+    exiftool: {
         0 => "None",
         1 => "Portrait",
         2 => "Text",
         3 => "Night Portrait",
         4 => "Sunset",
         5 => "Sports",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "None",
+        1 => "Portrait",
+        2 => "Text",
+        3 => "Night portrait",
+        4 => "Sunset",
+        5 => "Sports action",
     }
 }
 
-/// Decode ISOSetting - ExifTool format
-pub fn decode_iso_setting_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_iso_setting,
+    type: u32,
+    both: {
         0 => "100",
         1 => "200",
         2 => "400",
         3 => "800",
         4 => "Auto",
         5 => "64",
-        _ => "Unknown",
     }
 }
 
-/// Decode ModelID - ExifTool format
-pub fn decode_model_id_exiftool(value: u32) -> &'static str {
-    match value {
-        0 => "DiMAGE 7 | X1 | X21 | X31",
+define_tag_decoder! {
+    minolta_model_id,
+    type: u32,
+    both: {
+        0 => "DiMAGE 7, X1, X21 or X31",
         1 => "DiMAGE 5",
         2 => "DiMAGE S304",
         3 => "DiMAGE S404",
         4 => "DiMAGE 7i",
         5 => "DiMAGE 7Hi",
         6 => "DiMAGE A1",
-        7 => "DiMAGE A2 | S414",
-        _ => "Unknown",
+        7 => "DiMAGE A2 or S414",
     }
 }
 
-/// Decode FocusMode - ExifTool format
-pub fn decode_focus_mode_exiftool(value: u32) -> &'static str {
-    match value {
-        0 => "Auto Focus",
-        1 => "Manual Focus",
-        _ => "Unknown",
+define_tag_decoder! {
+    minolta_focus_mode,
+    type: u32,
+    exiftool: {
+        0 => "AF",
+        1 => "MF",
+    },
+    exiv2: {
+        0 => "AF",
+        1 => "MF",
     }
 }
 
-/// Decode FocusArea - ExifTool format
-pub fn decode_focus_area_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_focus_area,
+    type: u32,
+    exiftool: {
         0 => "Wide Focus (normal)",
         1 => "Spot Focus",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Wide focus (normal)",
+        1 => "Spot focus",
     }
 }
 
-/// Decode ColorMode - ExifTool format (main tag 0x0101)
-pub fn decode_color_mode_exiftool(value: u32) -> &'static str {
-    match value {
-        0 => "Natural Color",
+define_tag_decoder! {
+    minolta_color_mode,
+    type: u32,
+    exiftool: {
+        0 => "Natural color",
         1 => "Black & White",
-        2 => "Vivid Color",
+        2 => "Vivid color",
         3 => "Solarization",
         4 => "Adobe RGB",
         5 => "Sepia",
@@ -387,25 +429,48 @@ pub fn decode_color_mode_exiftool(value: u32) -> &'static str {
         16 => "Evening",
         17 => "Night Scene",
         18 => "Night Portrait",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Natural color",
+        1 => "Black & White",
+        2 => "Vivid color",
+        3 => "Solarization",
+        4 => "AdobeRGB",
+        5 => "Sepia",
+        9 => "Natural",
+        12 => "Portrait",
+        13 => "Natural sRGB",
+        14 => "Natural+ sRGB",
+        15 => "Landscape",
+        16 => "Evening",
+        17 => "Night Scene",
+        18 => "Night Portrait",
     }
 }
 
-/// Decode ColorMode - ExifTool format (CameraSettings)
-pub fn decode_color_mode_cs_exiftool(value: u32) -> &'static str {
-    match value {
-        0 => "Natural Color",
+define_tag_decoder! {
+    minolta_color_mode_cs,
+    type: u32,
+    exiftool: {
+        0 => "Natural color",
         1 => "Black & White",
-        2 => "Vivid Color",
+        2 => "Vivid color",
         3 => "Solarization",
         4 => "Adobe RGB",
-        _ => "Unknown",
+    },
+    exiv2: {
+        0 => "Natural color",
+        1 => "Black and white",
+        2 => "Vivid color",
+        3 => "Solarization",
+        4 => "Adobe RGB",
     }
 }
 
-/// Decode SceneMode - ExifTool format
-pub fn decode_scene_mode_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_scene_mode,
+    type: u32,
+    both: {
         0 => "Standard",
         1 => "Portrait",
         2 => "Text",
@@ -418,242 +483,278 @@ pub fn decode_scene_mode_exiftool(value: u32) -> &'static str {
         9 => "Super Macro",
         16 => "Auto",
         17 => "Night View/Portrait",
-        _ => "Unknown",
     }
 }
 
-/// Decode ImageStabilization - ExifTool format
-pub fn decode_image_stabilization_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_image_stabilization,
+    type: u32,
+    both: {
         1 => "Off",
         5 => "On",
-        _ => "Unknown",
     }
 }
 
-/// Decode ZoneMatching - ExifTool format
-pub fn decode_zone_matching_exiftool(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_zone_matching,
+    type: u32,
+    both: {
         0 => "ISO Setting Used",
         1 => "High Key",
         2 => "Low Key",
-        _ => "Unknown",
     }
 }
 
-// ===== Exiv2 format decoders =====
-
-/// Decode ExposureMode - exiv2 format
-pub fn decode_exposure_mode_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Program",
-        1 => "Aperture priority",
-        2 => "Shutter priority",
-        3 => "Manual",
-        _ => "Unknown",
+define_tag_decoder! {
+    minolta_teleconverter,
+    type: u32,
+    both: {
+        0x00 => "None",
+        0x04 => "Minolta/Sony AF 1.4x APO (D) (0x04)",
+        0x05 => "Minolta/Sony AF 2x APO (D) (0x05)",
+        0x48 => "Minolta/Sony AF 2x APO (D)",
+        0x50 => "Minolta AF 2x APO II",
+        0x60 => "Minolta AF 2x APO",
+        0x88 => "Minolta/Sony AF 1.4x APO (D)",
+        0x90 => "Minolta AF 1.4x APO II",
+        0xa0 => "Minolta AF 1.4x APO",
     }
 }
 
-/// Decode FlashMode - exiv2 format
-pub fn decode_flash_mode_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Fill flash",
-        1 => "Red-eye reduction",
-        2 => "Rear flash sync",
-        3 => "Wireless",
-        4 => "Off",
-        _ => "Unknown",
-    }
-}
-
-/// Decode WhiteBalance - exiv2 format (CameraSettings)
-pub fn decode_white_balance_cs_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Auto",
-        1 => "Daylight",
-        2 => "Cloudy",
-        3 => "Tungsten",
-        5 => "Custom",
-        7 => "Fluorescent",
-        8 => "Fluorescent 2",
-        11 => "Custom 2",
-        12 => "Custom 3",
-        _ => "Unknown",
-    }
-}
-
-/// Decode WhiteBalance - exiv2 format (Tag 0x0115)
-pub fn decode_white_balance_exiv2(value: u32) -> &'static str {
-    match value {
-        0x00 => "Auto",
-        0x01 => "Color Temperature/Color Filter",
-        0x10 => "Daylight",
-        0x20 => "Cloudy",
-        0x30 => "Shade",
-        0x40 => "Tungsten",
-        0x50 => "Flash",
-        0x60 => "Fluorescent",
-        0x70 => "Custom",
-        _ => "Unknown",
-    }
-}
-
-/// Decode ImageSize - exiv2 format
-pub fn decode_image_size_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Full size",
-        1 => "1600x1200",
-        2 => "1280x960",
-        3 => "640x480",
-        6 => "2080x1560",
-        7 => "2560x1920",
-        8 => "3264x2176",
-        _ => "Unknown",
-    }
-}
-
-/// Decode Quality - exiv2 format
-pub fn decode_quality_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Raw",
-        1 => "Super fine",
-        2 => "Fine",
-        3 => "Standard",
-        4 => "Economy",
-        5 => "Extra fine",
-        _ => "Unknown",
-    }
-}
-
-/// Decode DriveMode - exiv2 format
-pub fn decode_drive_mode_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Single Frame",
-        1 => "Continuous",
-        2 => "Self-timer",
-        4 => "Bracketing",
-        5 => "Interval",
-        6 => "UHS continuous",
-        7 => "HS continuous",
-        _ => "Unknown",
-    }
-}
-
-/// Decode MeteringMode - exiv2 format
-pub fn decode_metering_mode_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Multi-segment",
-        1 => "Center weighted average",
-        2 => "Spot",
-        _ => "Unknown",
-    }
-}
-
-/// Decode DigitalZoom - exiv2 format
-pub fn decode_digital_zoom_exiv2(value: u32) -> &'static str {
-    match value {
+define_tag_decoder! {
+    minolta_raw_and_jpg,
+    type: u32,
+    both: {
         0 => "Off",
-        1 => "Electronic magnification",
-        2 => "2x",
-        _ => "Unknown",
+        1 => "On",
     }
 }
 
-/// Decode FlashFired - exiv2 format
+/// Get Minolta/Sony A-mount lens name from lens ID
+/// Reference: Minolta.pm %minoltaLensTypes
+pub fn get_minolta_lens_name(lens_id: u32) -> Option<&'static str> {
+    match lens_id {
+        // Low IDs (Sony SAL lenses)
+        0 => Some("Minolta AF 28-85mm F3.5-4.5"),
+        1 => Some("Minolta AF 80-200mm F2.8 HS-APO G"),
+        2 => Some("Minolta AF 28-70mm F2.8 G"),
+        3 => Some("Minolta AF 28-80mm F4-5.6"),
+        4 => Some("Minolta AF 85mm F1.4G"),
+        5 => Some("Minolta AF 35-70mm F3.5-4.5"),
+        6 => Some("Minolta AF 24-85mm F3.5-4.5"),
+        7 => Some("Minolta AF 100-300mm F4.5-5.6 APO"),
+        13 => Some("Minolta AF 75-300mm F4.5-5.6"),
+        16 => Some("Minolta AF 17-35mm F3.5 G"),
+        19 => Some("Minolta AF 35mm F1.4 G"),
+        20 => Some("Minolta/Sony 135mm F2.8 STF"),
+        25 => Some("Minolta AF 100-300mm F4.5-5.6 APO (D)"),
+        27 => Some("Minolta AF 85mm F1.4 G (D)"),
+        28 => Some("Minolta/Sony AF 100mm F2.8 Macro (D)"),
+        29 => Some("Minolta/Sony AF 75-300mm F4.5-5.6 (D)"),
+        31 => Some("Minolta/Sony AF 50mm F2.8 Macro (D)"),
+        32 => Some("Minolta/Sony AF 300mm F2.8 G APO"),
+        33 => Some("Minolta/Sony AF 70-200mm F2.8 G"),
+        38 => Some("Minolta AF 17-35mm F2.8-4 (D)"),
+        39 => Some("Minolta AF 28-75mm F2.8 (D)"),
+        40 => Some("Minolta/Sony AF DT 18-70mm F3.5-5.6 (D)"),
+        41 => Some("Minolta/Sony AF DT 11-18mm F4.5-5.6 (D)"),
+        42 => Some("Minolta/Sony AF DT 18-200mm F3.5-6.3 (D)"),
+        // High IDs from %minoltaLensTypes (older Minolta lenses)
+        25601 => Some("Minolta AF 100-200mm F4.5"),
+        25611 => Some("Minolta AF 75-300mm F4.5-5.6 (or Sigma)"),
+        25621 => Some("Minolta AF 50mm F1.4 [New]"),
+        25631 => Some("Minolta AF 300mm F2.8 APO (or Sigma)"),
+        25641 => Some("Minolta AF 50mm F2.8 Macro (or Sigma)"),
+        25651 => Some("Minolta AF 600mm F4 HS-APO G"),
+        25721 => Some("Minolta AF 500mm F8 Reflex"),
+        25781 => Some("Minolta/Sony AF 16mm F2.8 Fisheye"),
+        25811 => Some("Minolta/Sony AF 20mm F2.8"),
+        25851 => Some("Minolta AF 35-105mm F3.5-4.5"),
+        25858 => Some("Tamron SP AF 90mm F2.5 (172E)"),
+        25881 => Some("Minolta AF 70-210mm F3.5-4.5"),
+        25891 => Some("Minolta AF 80-200mm F2.8 APO"),
+        25911 => Some("Minolta AF 35mm F1.4"),
+        25921 => Some("Minolta AF 85mm F1.4 G (D)"),
+        25931 => Some("Minolta AF 200mm F2.8 APO"),
+        26011 => Some("Minolta AF 35-80mm F4-5.6"),
+        26041 => Some("Minolta AF 80-200mm F4.5-5.6"),
+        26051 => Some("Minolta AF 35-80mm F4-5.6"),
+        26061 => Some("Minolta AF 100mm F2"),
+        26071 => Some("Minolta AF 100-300mm F4.5-5.6"),
+        26121 => Some("Minolta AF 200mm F2.8 HS-APO G"),
+        26131 => Some("Minolta AF 50mm F1.7"),
+        26241 => Some("Minolta AF 35-80mm F4-5.6 Power Zoom"),
+        _ => None,
+    }
+}
+
+// Legacy function aliases for backward compatibility
+pub fn decode_exposure_mode_exiftool(value: u32) -> &'static str {
+    decode_minolta_exposure_mode_exiftool(value)
+}
+
+pub fn decode_exposure_mode_exiv2(value: u32) -> &'static str {
+    decode_minolta_exposure_mode_exiv2(value)
+}
+
+pub fn decode_flash_mode_exiftool(value: u32) -> &'static str {
+    decode_minolta_flash_mode_exiftool(value)
+}
+
+pub fn decode_flash_mode_exiv2(value: u32) -> &'static str {
+    decode_minolta_flash_mode_exiv2(value)
+}
+
+pub fn decode_white_balance_cs_exiftool(value: u32) -> &'static str {
+    decode_minolta_white_balance_cs_exiftool(value)
+}
+
+pub fn decode_white_balance_cs_exiv2(value: u32) -> &'static str {
+    decode_minolta_white_balance_cs_exiv2(value)
+}
+
+pub fn decode_white_balance_exiftool(value: u32) -> &'static str {
+    decode_minolta_white_balance_exiftool(value)
+}
+
+pub fn decode_white_balance_exiv2(value: u32) -> &'static str {
+    decode_minolta_white_balance_exiv2(value)
+}
+
+pub fn decode_image_size_exiftool(value: u32) -> &'static str {
+    decode_minolta_image_size_exiftool(value)
+}
+
+pub fn decode_image_size_exiv2(value: u32) -> &'static str {
+    decode_minolta_image_size_exiv2(value)
+}
+
+pub fn decode_quality_exiftool(value: u32) -> &'static str {
+    decode_minolta_quality_exiftool(value)
+}
+
+pub fn decode_quality_exiv2(value: u32) -> &'static str {
+    decode_minolta_quality_exiv2(value)
+}
+
+pub fn decode_drive_mode_exiftool(value: u32) -> &'static str {
+    decode_minolta_drive_mode_exiftool(value)
+}
+
+pub fn decode_drive_mode_exiv2(value: u32) -> &'static str {
+    decode_minolta_drive_mode_exiv2(value)
+}
+
+pub fn decode_metering_mode_exiftool(value: u32) -> &'static str {
+    decode_minolta_metering_mode_exiftool(value)
+}
+
+pub fn decode_metering_mode_exiv2(value: u32) -> &'static str {
+    decode_minolta_metering_mode_exiv2(value)
+}
+
+pub fn decode_macro_mode_exiftool(value: u32) -> &'static str {
+    decode_minolta_macro_mode_exiftool(value)
+}
+
+pub fn decode_digital_zoom_exiftool(value: u32) -> &'static str {
+    decode_minolta_digital_zoom_exiftool(value)
+}
+
+pub fn decode_digital_zoom_exiv2(value: u32) -> &'static str {
+    decode_minolta_digital_zoom_exiv2(value)
+}
+
+pub fn decode_bracket_step_exiftool(value: u32) -> &'static str {
+    decode_minolta_bracket_step_exiftool(value)
+}
+
+pub fn decode_flash_fired_exiftool(value: u32) -> &'static str {
+    decode_minolta_flash_fired_exiftool(value)
+}
+
 pub fn decode_flash_fired_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Did not fire",
-        1 => "Fired",
-        _ => "Unknown",
-    }
+    decode_minolta_flash_fired_exiv2(value)
 }
 
-/// Decode Sharpness - exiv2 format
+pub fn decode_sharpness_exiftool(value: u32) -> &'static str {
+    decode_minolta_sharpness_exiftool(value)
+}
+
 pub fn decode_sharpness_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Hard",
-        1 => "Normal",
-        2 => "Soft",
-        _ => "Unknown",
-    }
+    decode_minolta_sharpness_exiv2(value)
 }
 
-/// Decode Contrast - exiv2 format
+pub fn decode_contrast_exiftool(value: u32) -> &'static str {
+    decode_minolta_sharpness_exiftool(value)
+}
+
 pub fn decode_contrast_exiv2(value: u32) -> &'static str {
-    decode_sharpness_exiv2(value)
+    decode_minolta_sharpness_exiv2(value)
 }
 
-/// Decode SubjectProgram - exiv2 format
+pub fn decode_subject_program_exiftool(value: u32) -> &'static str {
+    decode_minolta_subject_program_exiftool(value)
+}
+
 pub fn decode_subject_program_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "None",
-        1 => "Portrait",
-        2 => "Text",
-        3 => "Night portrait",
-        4 => "Sunset",
-        5 => "Sports action",
-        _ => "Unknown",
-    }
+    decode_minolta_subject_program_exiv2(value)
 }
 
-/// Decode FocusMode - exiv2 format
+pub fn decode_iso_setting_exiftool(value: u32) -> &'static str {
+    decode_minolta_iso_setting_exiftool(value)
+}
+
+pub fn decode_model_id_exiftool(value: u32) -> &'static str {
+    decode_minolta_model_id_exiftool(value)
+}
+
+pub fn decode_focus_mode_exiftool(value: u32) -> &'static str {
+    decode_minolta_focus_mode_exiftool(value)
+}
+
 pub fn decode_focus_mode_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Auto focus",
-        1 => "Manual focus",
-        _ => "Unknown",
-    }
+    decode_minolta_focus_mode_exiv2(value)
 }
 
-/// Decode FocusArea - exiv2 format
+pub fn decode_focus_area_exiftool(value: u32) -> &'static str {
+    decode_minolta_focus_area_exiftool(value)
+}
+
 pub fn decode_focus_area_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Wide focus (normal)",
-        1 => "Spot focus",
-        _ => "Unknown",
-    }
+    decode_minolta_focus_area_exiv2(value)
 }
 
-/// Decode ColorMode - exiv2 format
+pub fn decode_color_mode_exiftool(value: u32) -> &'static str {
+    decode_minolta_color_mode_exiftool(value)
+}
+
 pub fn decode_color_mode_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Natural Color",
-        1 => "Black & White",
-        2 => "Vivid Color",
-        3 => "Solarization",
-        4 => "AdobeRGB",
-        5 => "Sepia",
-        9 => "Natural",
-        12 => "Portrait",
-        13 => "Natural sRGB",
-        14 => "Natural+ sRGB",
-        15 => "Landscape",
-        16 => "Evening",
-        17 => "Night Scene",
-        18 => "Night Portrait",
-        _ => "Unknown",
-    }
+    decode_minolta_color_mode_exiv2(value)
 }
 
-/// Decode ColorMode - exiv2 format (CameraSettings)
+pub fn decode_color_mode_cs_exiftool(value: u32) -> &'static str {
+    decode_minolta_color_mode_cs_exiftool(value)
+}
+
 pub fn decode_color_mode_cs_exiv2(value: u32) -> &'static str {
-    match value {
-        0 => "Natural color",
-        1 => "Black and white",
-        2 => "Vivid color",
-        3 => "Solarization",
-        4 => "Adobe RGB",
-        _ => "Unknown",
-    }
+    decode_minolta_color_mode_cs_exiv2(value)
 }
 
-/// Decode ImageStabilization - exiv2 format
+pub fn decode_scene_mode_exiftool(value: u32) -> &'static str {
+    decode_minolta_scene_mode_exiftool(value)
+}
+
+pub fn decode_image_stabilization_exiftool(value: u32) -> &'static str {
+    decode_minolta_image_stabilization_exiftool(value)
+}
+
 pub fn decode_image_stabilization_exiv2(value: u32) -> &'static str {
-    match value {
-        1 => "Off",
-        5 => "On",
-        _ => "Unknown",
-    }
+    decode_minolta_image_stabilization_exiv2(value)
+}
+
+pub fn decode_zone_matching_exiftool(value: u32) -> &'static str {
+    decode_minolta_zone_matching_exiftool(value)
 }
 
 /// Parse Minolta CameraSettings sub-IFD (stored in tag 0x0001 or 0x0003)
@@ -698,13 +799,56 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness) -> HashMap<u16, Maker
             MINOLTA_CS_BRACKET_STEP => Some(decode_bracket_step_exiftool(value).to_string()),
             MINOLTA_CS_FLASH_FIRED => Some(decode_flash_fired_exiftool(value).to_string()),
             MINOLTA_CS_SHARPNESS => Some(decode_sharpness_exiftool(value).to_string()),
-            MINOLTA_CS_CONTRAST => Some(decode_contrast_exiftool(value).to_string()),
+            // Saturation and Contrast use ValueConv: $val - 3 (or -5 for A2)
+            // We use -3 as the default since we don't have model info here
+            MINOLTA_CS_SATURATION => Some(format!("{}", value as i32 - 3)),
+            MINOLTA_CS_CONTRAST => Some(format!("{}", value as i32 - 3)),
             MINOLTA_CS_SUBJECT_PROGRAM => Some(decode_subject_program_exiftool(value).to_string()),
             MINOLTA_CS_ISO_SETTING => Some(decode_iso_setting_exiftool(value).to_string()),
             MINOLTA_CS_MODEL_ID => Some(decode_model_id_exiftool(value).to_string()),
             MINOLTA_CS_FOCUS_MODE => Some(decode_focus_mode_exiftool(value).to_string()),
             MINOLTA_CS_FOCUS_AREA => Some(decode_focus_area_exiftool(value).to_string()),
             MINOLTA_CS_COLOR_MODE => Some(decode_color_mode_cs_exiftool(value).to_string()),
+            // MinoltaDate: packed as YYYY<<16 | MM<<8 | DD
+            MINOLTA_CS_MINOLTA_DATE => {
+                let year = value >> 16;
+                let month = (value >> 8) & 0xff;
+                let day = value & 0xff;
+                if year > 0 {
+                    Some(format!("{:04}:{:02}:{:02}", year, month, day))
+                } else {
+                    None
+                }
+            }
+            // MinoltaTime: packed as HH<<16 | MM<<8 | SS
+            MINOLTA_CS_MINOLTA_TIME => {
+                let hour = value >> 16;
+                let minute = (value >> 8) & 0xff;
+                let second = value & 0xff;
+                if hour > 0 || minute > 0 || second > 0 {
+                    Some(format!("{:02}:{:02}:{:02}", hour, minute, second))
+                } else {
+                    None
+                }
+            }
+            // MaxAperture: 2^((val-8)/16)
+            MINOLTA_CS_MAX_APERTURE => {
+                if value > 0 {
+                    let aperture = 2.0_f64.powf((value as f64 - 8.0) / 16.0);
+                    Some(format!("{:.1}", aperture))
+                } else {
+                    None
+                }
+            }
+            // FocusDistance: val/1000, output as "X.X m" or "inf"
+            MINOLTA_CS_FOCUS_DISTANCE => {
+                if value == 0 {
+                    Some("inf".to_string())
+                } else {
+                    let distance = value as f64 / 1000.0;
+                    Some(format!("{:.1} m", distance))
+                }
+            }
             _ => None,
         };
 
@@ -911,6 +1055,13 @@ pub fn parse_minolta_maker_notes(
                             MINOLTA_ZONE_MATCHING => {
                                 Some(decode_zone_matching_exiftool(v).to_string())
                             }
+                            MINOLTA_TELECONVERTER => {
+                                Some(decode_minolta_teleconverter_exiftool(v).to_string())
+                            }
+                            MINOLTA_RAW_AND_JPG_RECORDING => {
+                                Some(decode_minolta_raw_and_jpg_exiftool(v).to_string())
+                            }
+                            MINOLTA_LENS_ID => get_minolta_lens_name(v).map(|s| s.to_string()),
                             _ => None,
                         };
 
@@ -960,6 +1111,12 @@ pub fn parse_minolta_maker_notes(
 
                         // Also store the raw UNDEFINED value
                         ExifValue::Undefined(value_bytes)
+                    } else if tag_id == MINOLTA_VERSION {
+                        // MakerNoteVersion is a string like "MLT0"
+                        let s = String::from_utf8_lossy(&value_bytes)
+                            .trim_end_matches('\0')
+                            .to_string();
+                        ExifValue::Ascii(s)
                     } else {
                         ExifValue::Undefined(value_bytes)
                     }
