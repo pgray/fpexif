@@ -17,6 +17,21 @@ fn gcd(a: u32, b: u32) -> u32 {
     }
 }
 
+/// Convert uppercase string to title case (e.g., "LOW" -> "Low", "WIDE ADAPTER" -> "Wide Adapter")
+/// This matches ExifTool's formatting for certain Nikon MakerNote string values
+fn to_title_case(s: &str) -> String {
+    s.split_whitespace()
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().to_string() + &chars.as_str().to_lowercase(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Round to specified decimal places using banker's rounding (round half to even)
 /// This matches Perl's default rounding behavior used by ExifTool
 fn round_half_even(x: f64, decimals: i32) -> f64 {
@@ -621,6 +636,8 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
                 .collect::<Vec<_>>()
                 .join(" "),
         ),
+        // ContrastCurve (MakerNote 0x008C) - always output as binary data message
+        0x008C => Value::String(format_binary_data(data)),
         // TIFF-EPStandardID (0x9216) - format as version string "1.0.0.0"
         0x9216 if data.len() == 4 => {
             Value::String(format!("{}.{}.{}.{}", data[0], data[1], data[2], data[3]))
@@ -1316,6 +1333,35 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             output.insert("ISO".to_string(), Value::Number(v[0].into()));
         }
     }
+
+    // SubfileType - derived from NewSubfileType (tag 0x00FE)
+    // ExifTool calls this "SubfileType" (not "NewSubfileType")
+    if let Some(ExifValue::Long(v)) = exif_data.get_tag_by_id(0x00FE) {
+        if !v.is_empty() {
+            let subfile_str = match v[0] {
+                0 => "Full-resolution image",
+                1 => "Reduced-resolution image",
+                2 => "Single page of multi-page image",
+                3 => "Single page of multi-page reduced-resolution image",
+                4 => "Transparency mask",
+                5 => "Transparency mask of reduced-resolution image",
+                6 => "Transparency mask of multi-page image",
+                7 => "Transparency mask of reduced-resolution multi-page image",
+                8 => "Depth map",
+                9 => "Depth map of reduced-resolution image",
+                16 => "Enhanced image data",
+                0x10001 => "Alternate reduced-resolution image",
+                0x10004 => "Semantic Mask",
+                _ => "Unknown",
+            };
+            output.insert(
+                "SubfileType".to_string(),
+                Value::String(subfile_str.to_string()),
+            );
+        }
+    }
+    // Also remove NewSubfileType if we have SubfileType
+    output.remove("NewSubfileType");
 
     // CFAPattern composite - generate from CFAPattern2 (0x828E) or fallback to 0xA302
     // ExifTool generates CFAPattern from CFAPattern2 when available
@@ -2053,15 +2099,32 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // Now do all inserts
 
     // ShutterSpeed - from ExposureTime or ShutterSpeedValue
+    // ExifTool formatting:
+    // - < 0.25001s: string as "1/N" fraction
+    // - >= 0.25001s: number (integer if whole, otherwise 1 decimal)
     if !has_shutter_speed {
         if let Some(exp_time) = exposure_time {
             if exp_time > 0.0 {
-                let formatted = if exp_time >= 1.0 {
-                    format!("{}", exp_time.round() as u32)
+                if exp_time < 0.25001 {
+                    // Format as fraction string "1/N"
+                    let formatted = format!("1/{}", (0.5 + 1.0 / exp_time) as u32);
+                    output.insert("ShutterSpeed".to_string(), Value::String(formatted));
                 } else {
-                    format!("1/{}", (1.0 / exp_time).round() as u32)
-                };
-                output.insert("ShutterSpeed".to_string(), Value::String(formatted));
+                    // Output as number - ExifTool outputs integers for whole seconds
+                    let rounded = (exp_time * 10.0).round() / 10.0;
+                    if rounded == rounded.trunc() {
+                        // Whole number - output as integer
+                        output.insert(
+                            "ShutterSpeed".to_string(),
+                            Value::Number(serde_json::Number::from(rounded as i64)),
+                        );
+                    } else {
+                        // Has decimal - output as float
+                        if let Some(n) = serde_json::Number::from_f64(rounded) {
+                            output.insert("ShutterSpeed".to_string(), Value::Number(n));
+                        }
+                    }
+                }
             }
         }
     }
@@ -2275,9 +2338,10 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     }
 
     // CircleOfConfusion - sensor diagonal / 1440
-    // Full frame diagonal = sqrt(24² + 36²) = 43.27mm
-    // CoC = 43.27 / (ScaleFactor × 1440)
-    let coc = scale_factor.map(|sf| 43.27 / (sf * 1440.0));
+    // Full frame diagonal = sqrt(24² + 36²) (matches ExifTool's formula)
+    // CoC = sqrt(24*24 + 36*36) / (ScaleFactor × 1440)
+    let full_frame_diagonal = (24.0_f64 * 24.0 + 36.0 * 36.0).sqrt();
+    let coc = scale_factor.map(|sf| full_frame_diagonal / (sf * 1440.0));
     if let Some(c) = coc {
         if !has_coc {
             let formatted = format!("{:.3} mm", c);
@@ -2325,10 +2389,11 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                     1.0
                 };
 
-                // ExifTool: atan2(36, 2*FocalLength*ScaleFactor*corr) * 360 / PI
-                // This is half FOV angle, multiplied by 360/PI to get full FOV in degrees
+                // ExifTool: atan2(36, 2*FocalLength*ScaleFactor*corr) * 360 / 3.14159
+                // Use ExifTool's approximation of PI for exact match
                 let half_fov = (36.0 / (2.0 * fl * sf * corr)).atan();
-                let fov_deg = half_fov * 360.0 / std::f64::consts::PI;
+                #[allow(clippy::approx_constant)]
+                let fov_deg = half_fov * 360.0 / 3.14159;
 
                 // Calculate FOV width at focus distance if available and reasonable
                 let formatted = if let Some(fd) = focus_m {
@@ -2361,35 +2426,33 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
 
     // DOF (Depth of Field) - requires focus distance
     // Format: "DOF m (near - far m)" or "inf (near m - inf)"
+    // ExifTool formula: t = Aperture × CoC × (d×1000 - f) / f²
+    //                   near = d / (1 + t), far = d / (1 - t)
     if !has_dof {
         if let Some(Value::String(s)) = focus_dist_str {
             if let Ok(focus_m) = s.trim_end_matches(" m").parse::<f64>() {
                 if let (Some(fl), Some(ap), Some(c)) = (focal_length, aperture, coc) {
-                    let focus_mm = focus_m * 1000.0;
-                    if ap > 0.0 && focus_mm > 0.0 && focus_mm.is_finite() {
-                        // Edge case: focus < focal_length (physically impossible but matches ExifTool)
-                        // In this case, near and far both equal focus distance, DOF = 0
-                        if focus_mm <= fl {
-                            let formatted = format!("-0.00 m ({:.2} - {:.2} m)", focus_m, focus_m);
-                            output.insert("DOF".to_string(), Value::String(formatted));
+                    if ap > 0.0 && focus_m > 0.0 && focus_m.is_finite() && c > 0.0 {
+                        // ExifTool formula (from Exif.pm)
+                        let t = ap * c * (focus_m * 1000.0 - fl) / (fl * fl);
+                        let near_m = focus_m / (1.0 + t);
+                        let far_m = focus_m / (1.0 - t);
+
+                        // If far_m is negative or t >= 1, far is infinity
+                        let formatted = if far_m <= 0.0 || t >= 1.0 {
+                            let dof_near = near_m.max(0.0);
+                            format!("inf ({:.2} m - inf)", dof_near)
                         } else {
-                            let hyper = (fl * fl) / (ap * c) + fl;
-                            let near = (hyper * focus_mm) / (hyper + (focus_mm - fl));
-                            let far = if focus_mm < hyper {
-                                (hyper * focus_mm) / (hyper - (focus_mm - fl))
+                            let dof = far_m - near_m;
+                            // Use 3 decimal places for small DOF (< 0.02m), otherwise 2
+                            let fmt = if dof > 0.0 && dof < 0.02 {
+                                format!("{:.3} m ({:.3} - {:.3} m)", dof, near_m, far_m)
                             } else {
-                                f64::INFINITY
+                                format!("{:.2} m ({:.2} - {:.2} m)", dof, near_m, far_m)
                             };
-                            let dof = far - near;
-                            let near_m = near / 1000.0;
-                            let far_m = far / 1000.0;
-                            let formatted = if dof.is_infinite() {
-                                format!("inf ({:.2} m - inf)", near_m)
-                            } else {
-                                format!("{:.2} m ({:.2} - {:.2} m)", dof / 1000.0, near_m, far_m)
-                            };
-                            output.insert("DOF".to_string(), Value::String(formatted));
-                        }
+                            fmt
+                        };
+                        output.insert("DOF".to_string(), Value::String(formatted));
                     }
                 }
             }
@@ -2421,9 +2484,9 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         "RawDevelopmentIFD",
         "RawInfoIFD",
         "SubIFDs",
-        "JPEGInterchangeFormat",       // IFD0/IFD1 thumbnail offset
+        "JPEGInterchangeFormat", // IFD0/IFD1 thumbnail offset
         "JPEGInterchangeFormatLength", // IFD0/IFD1 thumbnail length
-        "NewSubfileType",              // IFD subfile type
+                                 // Note: NewSubfileType is renamed to SubfileType and decoded
     ];
 
     // Raw binary tags (ExifTool processes these instead of outputting raw)
@@ -2467,14 +2530,39 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         output.remove(&tag);
     }
 
+    // Format FocusDistance to 2 decimal places for display (after DOF calculation used full precision)
+    if let Some(Value::String(s)) = output.get("FocusDistance") {
+        if let Some(value) = s.strip_suffix(" m").and_then(|v| v.parse::<f64>().ok()) {
+            output.insert(
+                "FocusDistance".to_string(),
+                Value::String(format!("{:.2} m", value)),
+            );
+        }
+    }
+
+    // Convert uppercase string values to title case for specific Nikon tags
+    // ExifTool normalizes these strings to title case (e.g., "LOW" -> "Low")
+    let title_case_tags = ["ToneComp", "AuxiliaryLens", "ImageAdjustment"];
+    for tag in title_case_tags {
+        if let Some(Value::String(s)) = output.get(tag) {
+            // Only convert if all alphabetic chars are uppercase
+            if s.chars()
+                .filter(|c| c.is_alphabetic())
+                .all(|c| c.is_uppercase())
+            {
+                output.insert(tag.to_string(), Value::String(to_title_case(s)));
+            }
+        }
+    }
+
     // Remove GPS tags with invalid/placeholder values
-    // ExifTool doesn't output GPS tags that have invalid reference values
+    // ExifTool doesn't output GPS tags that have invalid reference values or all-zero coords
     let invalid_gps_tags: Vec<String> = output
         .iter()
         .filter(|(k, v)| {
             k.starts_with("GPS") && {
                 if let Value::String(s) = v {
-                    s.starts_with("Unknown") || s == "n/a"
+                    s.starts_with("Unknown") || s == "n/a" || s.starts_with("0 deg 0' 0")
                 } else {
                     false
                 }
