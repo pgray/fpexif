@@ -1751,54 +1751,47 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             tags.push(("ExternalFlashFlags".to_string(), flag_strs.join(", ")));
         }
 
-        // Offset 0x09.2: FlashCommanderMode (bits)
-        let commander_mode = data[9] & 0x7F;
-        let commander_str = match commander_mode {
-            0 => "Off",
-            1 => "TTL",
-            2 => "Auto Aperture",
-            3 => "Manual",
-            4 => "Repeating Flash",
-            _ => "Unknown",
-        };
+        // Offset 0x09.1: FlashCommanderMode (bit 7, mask 0x80)
+        let commander_mode = (data[9] & 0x80) >> 7;
+        let commander_str = if commander_mode == 0 { "Off" } else { "On" };
         tags.push(("FlashCommanderMode".to_string(), commander_str.to_string()));
 
-        // Offset 0x0F.1: FlashControlMode
-        if data.len() > 0x0F {
-            let control_mode = data[0x0F] & 0x7F;
-            let control_str = match control_mode {
-                0 => "Off",
-                1 => "iTTL-BL",
-                2 => "iTTL",
-                3 => "Auto Aperture",
-                4 => "Automatic",
-                5 => "GN (distance priority)",
-                6 => "Manual",
-                7 => "Repeating Flash",
-                _ => "Unknown",
-            };
-            tags.push(("FlashControlMode".to_string(), control_str.to_string()));
-        }
+        // Offset 0x09.2: FlashControlMode (bits 0-6, mask 0x7F)
+        let control_mode = data[9] & 0x7F;
+        let control_str = match control_mode {
+            0 => "Off",
+            1 => "iTTL-BL",
+            2 => "iTTL",
+            3 => "Auto Aperture",
+            4 => "Automatic",
+            5 => "GN (distance priority)",
+            6 => "Manual",
+            7 => "Repeating Flash",
+            _ => "Unknown",
+        };
+        tags.push(("FlashControlMode".to_string(), control_str.to_string()));
 
-        // Offset 0x11: FlashCompensation (int8s)
-        if data.len() > 0x11 {
-            let comp = data[0x11] as i8;
-            let ev = comp as f64 / 6.0;
+        // Offset 0x0A (10): FlashCompensation (int8s) - when FlashControlMode < 6
+        // Or FlashOutput when FlashControlMode >= 6
+        if data.len() > 10 {
+            let comp = data[10] as i8;
+            // ExifTool uses -$val/6 for compensation
+            let ev = -(comp as f64) / 6.0;
             tags.push((
                 "FlashCompensation".to_string(),
-                format!("{:.1}", ev).trim_end_matches(".0").to_string(),
+                format_flash_compensation(ev),
             ));
         }
 
-        // Offset 0x12: FlashGNDistance (int8u)
-        if data.len() > 0x12 {
-            let gn = data[0x12];
+        // Offset 0x0F (15): FlashGNDistance (int8u)
+        if data.len() > 15 {
+            let gn = data[15];
             tags.push(("FlashGNDistance".to_string(), gn.to_string()));
         }
 
-        // Offset 0x13.1: FlashGroupAControlMode
-        if data.len() > 0x13 {
-            let group_a = data[0x13] & 0x7F;
+        // Offset 0x10 (16): FlashGroupAControlMode (low nibble, mask 0x0F)
+        if data.len() > 16 {
+            let group_a = data[16] & 0x0F;
             let group_a_str = match group_a {
                 0 => "Off",
                 1 => "iTTL-BL",
@@ -1816,9 +1809,10 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             ));
         }
 
-        // Offset 0x14.1: FlashGroupBControlMode
-        if data.len() > 0x14 {
-            let group_b = data[0x14] & 0x7F;
+        // Offset 0x11 (17): FlashGroupBControlMode (high nibble, mask 0xF0)
+        // and FlashGroupCControlMode (low nibble, mask 0x0F)
+        if data.len() > 17 {
+            let group_b = (data[17] & 0xF0) >> 4;
             let group_b_str = match group_b {
                 0 => "Off",
                 1 => "iTTL-BL",
@@ -1834,11 +1828,8 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
                 "FlashGroupBControlMode".to_string(),
                 group_b_str.to_string(),
             ));
-        }
 
-        // Offset 0x15.1: FlashGroupCControlMode
-        if data.len() > 0x15 {
-            let group_c = data[0x15] & 0x7F;
+            let group_c = data[17] & 0x0F;
             let group_c_str = match group_c {
                 0 => "Off",
                 1 => "iTTL-BL",
@@ -1856,33 +1847,33 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             ));
         }
 
-        // Offset 0x16: FlashGroupACompensation (int8s)
-        if data.len() > 0x16 {
-            let comp = data[0x16] as i8;
-            let ev = comp as f64 / 6.0;
+        // Offset 0x12 (18): FlashGroupACompensation (int8s)
+        if data.len() > 18 {
+            let comp = data[18] as i8;
+            let ev = -(comp as f64) / 6.0;
             tags.push((
                 "FlashGroupACompensation".to_string(),
-                format!("{:.1}", ev).trim_end_matches(".0").to_string(),
+                format_flash_compensation(ev),
             ));
         }
 
-        // Offset 0x17: FlashGroupBCompensation (int8s)
-        if data.len() > 0x17 {
-            let comp = data[0x17] as i8;
-            let ev = comp as f64 / 6.0;
+        // Offset 0x13 (19): FlashGroupBCompensation (int8s)
+        if data.len() > 19 {
+            let comp = data[19] as i8;
+            let ev = -(comp as f64) / 6.0;
             tags.push((
                 "FlashGroupBCompensation".to_string(),
-                format!("{:.1}", ev).trim_end_matches(".0").to_string(),
+                format_flash_compensation(ev),
             ));
         }
 
-        // Offset 0x18: FlashGroupCCompensation (int8s)
-        if data.len() > 0x18 {
-            let comp = data[0x18] as i8;
-            let ev = comp as f64 / 6.0;
+        // Offset 0x14 (20): FlashGroupCCompensation (int8s)
+        if data.len() > 20 {
+            let comp = data[20] as i8;
+            let ev = -(comp as f64) / 6.0;
             tags.push((
                 "FlashGroupCCompensation".to_string(),
-                format!("{:.1}", ev).trim_end_matches(".0").to_string(),
+                format_flash_compensation(ev),
             ));
         }
     }
@@ -2950,6 +2941,17 @@ pub fn decode_lens_type_exiv2(value: u8) -> String {
         String::new()
     } else {
         features.join(" ")
+    }
+}
+
+/// Format flash compensation value like ExifTool
+/// - 0 is displayed as just "0"
+/// - Non-zero values are displayed with sign and one decimal (e.g., "+1.0", "-0.7")
+fn format_flash_compensation(ev: f64) -> String {
+    if ev.abs() < 0.001 {
+        "0".to_string()
+    } else {
+        format!("{:+.1}", ev)
     }
 }
 
