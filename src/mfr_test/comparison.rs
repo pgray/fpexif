@@ -231,26 +231,32 @@ fn values_match(a: &serde_json::Value, b: &serde_json::Value) -> bool {
     a == b
 }
 
-/// Find all test files for given formats
+/// Find all test files for given formats (searches recursively)
 fn find_test_files(formats: &[&str]) -> Vec<String> {
     let test_dir = get_test_files_dir();
     let mut files = Vec::new();
 
-    if let Ok(entries) = std::fs::read_dir(&test_dir) {
-        for entry in entries.flatten() {
-            if let Some(ext) = entry.path().extension().and_then(|e| e.to_str()) {
-                for format in formats {
-                    if ext.eq_ignore_ascii_case(format) {
-                        if let Some(path) = entry.path().to_str() {
-                            files.push(path.to_string());
+    fn walk_dir(dir: &Path, formats: &[&str], files: &mut Vec<String>) {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk_dir(&path, formats, files);
+                } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    for format in formats {
+                        if ext.eq_ignore_ascii_case(format) {
+                            if let Some(path_str) = path.to_str() {
+                                files.push(path_str.to_string());
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
             }
         }
     }
 
+    walk_dir(Path::new(&test_dir), formats, &mut files);
     files.sort();
     files
 }
@@ -519,9 +525,10 @@ fn parse_exiv2_line(line: &str) -> Option<(String, String, String, String)> {
 }
 
 /// Get exiv2 output for a file
+/// Uses -Pkycv flags: Key, tYpe, Count, raw Value (untranslated)
 fn get_exiv2_output(path: &str) -> Result<Vec<(String, String, String, String)>, String> {
     let output = Command::new("exiv2")
-        .arg(path)
+        .args(["-Pkycv", path])
         .output()
         .map_err(|e| format!("Failed to run exiv2: {}", e))?;
 

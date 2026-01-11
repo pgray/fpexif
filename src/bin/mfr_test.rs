@@ -72,10 +72,19 @@ struct Cli {
     /// Verbose output (show per-file details)
     #[arg(short, long)]
     verbose: bool,
+
+    /// Use /fpexif/data.lfs directory (large test dataset)
+    #[arg(long)]
+    data_lfs: bool,
 }
 
 fn main() {
     let cli = Cli::parse();
+
+    // Set test directory if --data-lfs flag is used
+    if cli.data_lfs {
+        std::env::set_var("FPEXIF_TEST_FILES", "/fpexif/data.lfs");
+    }
 
     // Handle --list-baselines (no manufacturer required)
     if cli.list_baselines {

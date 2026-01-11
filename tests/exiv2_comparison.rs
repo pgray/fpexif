@@ -40,8 +40,9 @@ fn parse_exiv2_line(line: &str) -> Option<(String, String, String, String)> {
 
 /// Helper function to get exiv2 output
 fn get_exiv2_output(path: &str) -> Result<Vec<(String, String, String, String)>, String> {
+    // Use -Pkycv flags: Key, tYpe, Count, raw Value (untranslated)
     let output = Command::new("exiv2")
-        .arg(path)
+        .args(["-Pkycv", path])
         .output()
         .map_err(|e| format!("Failed to run exiv2: {}", e))?;
 

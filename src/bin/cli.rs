@@ -432,7 +432,14 @@ fn format_exiv2_value(value: &fpexif::data_types::ExifValue) -> (&'static str, u
         ),
         ExifValue::Float(v) => ("Float", v.len(), format_values_space(v)),
         ExifValue::Double(v) => ("Double", v.len(), format_values_space(v)),
-        ExifValue::Undefined(v) => ("Undefined", v.len(), format!("{} bytes", v.len())),
+        ExifValue::Undefined(v) => (
+            "Undefined",
+            v.len(),
+            v.iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
     }
 }
 
