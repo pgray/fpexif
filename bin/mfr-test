@@ -2,11 +2,15 @@
 # Manufacturer-specific EXIF testing tool
 #
 # Usage:
-#   ./bin/mfr-test <manufacturer> --save-baseline  # Save current state before work
-#   ./bin/mfr-test <manufacturer> --check          # Check progress against baseline
-#   ./bin/mfr-test <manufacturer> --vs-exiftool    # Compare against exiftool
-#   ./bin/mfr-test <manufacturer> --full-report    # Full comparison report
-#   ./bin/mfr-test --list-baselines                # List saved baselines
+#   ./bin/mfr-test <manufacturer> --save-baseline       # Save exiftool baseline
+#   ./bin/mfr-test <manufacturer> --check               # Check vs exiftool baseline
+#   ./bin/mfr-test <manufacturer> --vs-exiftool         # Compare against exiftool
+#   ./bin/mfr-test <manufacturer> --save-baseline-exiv2 # Save exiv2 baseline
+#   ./bin/mfr-test <manufacturer> --check-exiv2         # Check vs exiv2 baseline
+#   ./bin/mfr-test <manufacturer> --vs-exiv2            # Compare against exiv2
+#   ./bin/mfr-test <manufacturer> --full-report         # Full comparison report
+#   ./bin/mfr-test --list-baselines                     # List exiftool baselines
+#   ./bin/mfr-test --list-baselines-exiv2               # List exiv2 baselines
 #
 # Supported manufacturers: canon, nikon, sony, fujifilm, panasonic, olympus, dng
 

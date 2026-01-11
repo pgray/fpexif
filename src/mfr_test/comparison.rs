@@ -492,3 +492,319 @@ pub fn compare_with_baseline(
         removed_files,
     }
 }
+
+// =============================================================================
+// exiv2 comparison support
+// =============================================================================
+
+/// Check if exiv2 is available
+pub fn exiv2_available() -> bool {
+    Command::new("exiv2").arg("--version").output().is_ok()
+}
+
+/// Parse exiv2 output line into (key, type, count, value)
+fn parse_exiv2_line(line: &str) -> Option<(String, String, String, String)> {
+    // exiv2 format: "Exif.Image.Make                              Ascii       6  Canon"
+    // The format is: key (variable width), type, count, value
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() >= 4 {
+        let key = parts[0].to_string();
+        let type_name = parts[1].to_string();
+        let count = parts[2].to_string();
+        let value = parts[3..].join(" ");
+        Some((key, type_name, count, value))
+    } else {
+        None
+    }
+}
+
+/// Get exiv2 output for a file
+fn get_exiv2_output(path: &str) -> Result<Vec<(String, String, String, String)>, String> {
+    let output = Command::new("exiv2")
+        .arg(path)
+        .output()
+        .map_err(|e| format!("Failed to run exiv2: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "exiv2 failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.lines().filter_map(parse_exiv2_line).collect())
+}
+
+/// Get fpexif exiv2 output for a file
+fn get_fpexif_exiv2_output(path: &str) -> Result<Vec<(String, String, String, String)>, String> {
+    let output = Command::new("cargo")
+        .args(["run", "--features", "cli", "--bin", "fpexif", "--"])
+        .args(["exiv2", path])
+        .output()
+        .map_err(|e| format!("Failed to run fpexif: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "fpexif failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.lines().filter_map(parse_exiv2_line).collect())
+}
+
+/// Compare exiv2 outputs and return results
+fn compare_exiv2_outputs(
+    exiv2_output: &[(String, String, String, String)],
+    fpexif_output: &[(String, String, String, String)],
+) -> (
+    HashMap<String, TagComparison>,
+    Vec<TestIssue>,
+    usize,
+    usize,
+    usize,
+    usize,
+) {
+    let mut tags = HashMap::new();
+    let mut issues = Vec::new();
+    let mut matching = 0usize;
+    let mut mismatched = 0usize;
+    let mut missing = 0usize;
+    let mut extra = 0usize;
+
+    // Create maps for easier lookup
+    let exiv2_map: HashMap<_, _> = exiv2_output
+        .iter()
+        .map(|(k, t, c, v)| (k.clone(), (t.clone(), c.clone(), v.clone())))
+        .collect();
+
+    let fpexif_map: HashMap<_, _> = fpexif_output
+        .iter()
+        .map(|(k, t, c, v)| (k.clone(), (t.clone(), c.clone(), v.clone())))
+        .collect();
+
+    // Check fields from exiv2
+    for (key, (exiv2_type, exiv2_count, exiv2_value)) in &exiv2_map {
+        match fpexif_map.get(key) {
+            None => {
+                missing += 1;
+                tags.insert(
+                    key.clone(),
+                    TagComparison {
+                        tag_name: key.clone(),
+                        fpexif_value: None,
+                        exiftool_value: Some(exiv2_value.clone()),
+                        matches: false,
+                    },
+                );
+                issues.push(TestIssue {
+                    category: IssueCategory::MissingField,
+                    message: format!("Missing field: {}", key),
+                    field: Some(key.clone()),
+                    expected: Some(exiv2_value.clone()),
+                    actual: None,
+                });
+            }
+            Some((fpexif_type, fpexif_count, fpexif_value)) => {
+                // Check if values match (we don't strictly check type/count for exiv2)
+                let values_match = exiv2_value.trim() == fpexif_value.trim();
+
+                if values_match {
+                    matching += 1;
+                } else {
+                    mismatched += 1;
+                    issues.push(TestIssue {
+                        category: IssueCategory::ValueMismatch,
+                        message: format!("Value mismatch for {}", key),
+                        field: Some(key.clone()),
+                        expected: Some(exiv2_value.clone()),
+                        actual: Some(fpexif_value.clone()),
+                    });
+                }
+
+                // Also check for type mismatches (informational)
+                if exiv2_type != fpexif_type {
+                    issues.push(TestIssue {
+                        category: IssueCategory::TypeMismatch,
+                        message: format!(
+                            "Type mismatch for {}: exiv2={} fpexif={}",
+                            key, exiv2_type, fpexif_type
+                        ),
+                        field: Some(key.clone()),
+                        expected: Some(exiv2_type.clone()),
+                        actual: Some(fpexif_type.clone()),
+                    });
+                }
+
+                // Also check for count mismatches (informational)
+                if exiv2_count != fpexif_count {
+                    issues.push(TestIssue {
+                        category: IssueCategory::ExtraField, // Using ExtraField for count mismatch info
+                        message: format!(
+                            "Count mismatch for {}: exiv2={} fpexif={}",
+                            key, exiv2_count, fpexif_count
+                        ),
+                        field: Some(key.clone()),
+                        expected: Some(exiv2_count.clone()),
+                        actual: Some(fpexif_count.clone()),
+                    });
+                }
+
+                tags.insert(
+                    key.clone(),
+                    TagComparison {
+                        tag_name: key.clone(),
+                        fpexif_value: Some(fpexif_value.clone()),
+                        exiftool_value: Some(exiv2_value.clone()),
+                        matches: values_match,
+                    },
+                );
+            }
+        }
+    }
+
+    // Check for extra fields in fpexif
+    for key in fpexif_map.keys() {
+        if !exiv2_map.contains_key(key) {
+            extra += 1;
+            let fpexif_val = &fpexif_map[key].2;
+            tags.insert(
+                key.clone(),
+                TagComparison {
+                    tag_name: key.clone(),
+                    fpexif_value: Some(fpexif_val.clone()),
+                    exiftool_value: None,
+                    matches: false,
+                },
+            );
+            issues.push(TestIssue {
+                category: IssueCategory::ExtraField,
+                message: format!("Extra field in fpexif: {}", key),
+                field: Some(key.clone()),
+                expected: None,
+                actual: None,
+            });
+        }
+    }
+
+    (tags, issues, matching, mismatched, missing, extra)
+}
+
+/// Run exiv2 comparison for a manufacturer
+pub fn run_exiv2_comparison(
+    manufacturer: &str,
+    formats: &[&str],
+    verbose: bool,
+) -> Result<ManufacturerTestResult, String> {
+    if !test_files_exist() {
+        return Err(format!(
+            "Test files directory '{}' not found. Set FPEXIF_TEST_FILES environment variable.",
+            get_test_files_dir()
+        ));
+    }
+
+    if !exiv2_available() {
+        return Err("exiv2 is not available. Please install exiv2.".to_string());
+    }
+
+    let format_strings: Vec<String> = formats.iter().map(|s| s.to_string()).collect();
+    let mut result = ManufacturerTestResult::new(manufacturer, format_strings);
+
+    let test_files = find_test_files(formats);
+
+    if test_files.is_empty() {
+        return Err(format!("No test files found for formats: {:?}", formats));
+    }
+
+    if verbose {
+        eprintln!(
+            "Found {} files to test for {} (vs exiv2)",
+            test_files.len(),
+            manufacturer
+        );
+    }
+
+    for file_path in test_files {
+        if verbose {
+            eprintln!("Testing: {}", file_path);
+        }
+
+        let file_name = Path::new(&file_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(&file_path)
+            .to_string();
+
+        let format = Path::new(&file_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_uppercase();
+
+        // Get outputs from both tools
+        let exiv2_output = match get_exiv2_output(&file_path) {
+            Ok(o) => o,
+            Err(e) => {
+                if verbose {
+                    eprintln!("  Skipping (exiv2 error): {}", e);
+                }
+                continue;
+            }
+        };
+
+        let fpexif_output = match get_fpexif_exiv2_output(&file_path) {
+            Ok(o) => o,
+            Err(e) => {
+                let file_result = FileTestResult {
+                    file_path: file_path.clone(),
+                    file_name,
+                    format,
+                    success: false,
+                    fpexif_tag_count: 0,
+                    exiftool_tag_count: exiv2_output.len(),
+                    matching_tags: 0,
+                    mismatched_tags: 0,
+                    missing_tags: 0,
+                    extra_tags: 0,
+                    tags: HashMap::new(),
+                    issues: vec![TestIssue {
+                        category: IssueCategory::Critical,
+                        message: format!("fpexif failed: {}", e),
+                        field: None,
+                        expected: None,
+                        actual: None,
+                    }],
+                };
+                result.add_file_result(file_result);
+                continue;
+            }
+        };
+
+        // Compare outputs
+        let (tags, issues, matching, mismatched, missing, extra) =
+            compare_exiv2_outputs(&exiv2_output, &fpexif_output);
+
+        let file_result = FileTestResult {
+            file_path: file_path.clone(),
+            file_name,
+            format,
+            success: issues
+                .iter()
+                .all(|i| !matches!(i.category, IssueCategory::Critical)),
+            fpexif_tag_count: fpexif_output.len(),
+            exiftool_tag_count: exiv2_output.len(),
+            matching_tags: matching,
+            mismatched_tags: mismatched,
+            missing_tags: missing,
+            extra_tags: extra,
+            tags,
+            issues,
+        };
+
+        result.add_file_result(file_result);
+    }
+
+    Ok(result)
+}

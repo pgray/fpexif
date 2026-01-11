@@ -498,6 +498,101 @@ fn test_exiv2_compatibility_jpg() {
     let _result = test_format_exiv2_compatibility("jpg");
 }
 
+#[test]
+fn test_exiv2_compatibility_orf() {
+    let _result = test_format_exiv2_compatibility("orf");
+}
+
+#[test]
+fn test_exiv2_compatibility_rw2() {
+    let _result = test_format_exiv2_compatibility("rw2");
+}
+
+#[test]
+fn test_exiv2_compatibility_3fr() {
+    let _result = test_format_exiv2_compatibility("3fr");
+}
+
+#[test]
+fn test_exiv2_compatibility_crw() {
+    let _result = test_format_exiv2_compatibility("crw");
+}
+
+#[test]
+fn test_exiv2_compatibility_dcr() {
+    let _result = test_format_exiv2_compatibility("dcr");
+}
+
+#[test]
+fn test_exiv2_compatibility_erf() {
+    let _result = test_format_exiv2_compatibility("erf");
+}
+
+#[test]
+fn test_exiv2_compatibility_kdc() {
+    let _result = test_format_exiv2_compatibility("kdc");
+}
+
+#[test]
+fn test_exiv2_compatibility_mdc() {
+    let _result = test_format_exiv2_compatibility("mdc");
+}
+
+#[test]
+fn test_exiv2_compatibility_mef() {
+    let _result = test_format_exiv2_compatibility("mef");
+}
+
+#[test]
+fn test_exiv2_compatibility_mos() {
+    let _result = test_format_exiv2_compatibility("mos");
+}
+
+#[test]
+fn test_exiv2_compatibility_mrw() {
+    let _result = test_format_exiv2_compatibility("mrw");
+}
+
+#[test]
+fn test_exiv2_compatibility_nrw() {
+    let _result = test_format_exiv2_compatibility("nrw");
+}
+
+#[test]
+fn test_exiv2_compatibility_pef() {
+    let _result = test_format_exiv2_compatibility("pef");
+}
+
+#[test]
+fn test_exiv2_compatibility_raw() {
+    let _result = test_format_exiv2_compatibility("raw");
+}
+
+#[test]
+fn test_exiv2_compatibility_sr2() {
+    let _result = test_format_exiv2_compatibility("sr2");
+}
+
+#[test]
+fn test_exiv2_compatibility_srf() {
+    let _result = test_format_exiv2_compatibility("srf");
+}
+
+#[test]
+fn test_exiv2_compatibility_srw() {
+    let _result = test_format_exiv2_compatibility("srw");
+}
+
+#[test]
+fn test_exiv2_compatibility_x3f() {
+    let _result = test_format_exiv2_compatibility("x3f");
+}
+
+#[test]
+fn test_exiv2_compatibility_raf_format() {
+    let _result = test_format_exiv2_compatibility("raf");
+}
+
 // =============================================================================
 // Placeholder tests for flags not yet implemented
 // =============================================================================

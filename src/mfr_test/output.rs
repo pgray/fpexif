@@ -69,6 +69,40 @@ pub fn print_exiftool_summary(result: &ManufacturerTestResult) {
     println!("{}", "=".repeat(LINE_WIDTH));
 }
 
+/// Print a summary of exiv2 comparison results
+pub fn print_exiv2_summary(result: &ManufacturerTestResult) {
+    print_header(&result.manufacturer, None);
+
+    // Format breakdown
+    let mut format_counts: HashMap<&str, usize> = HashMap::new();
+    for file in &result.file_results {
+        *format_counts.entry(&file.format).or_insert(0) += 1;
+    }
+    let format_str: Vec<String> = format_counts
+        .iter()
+        .map(|(f, c)| format!("{} {}", c, f))
+        .collect();
+
+    println!("VS EXIV2 (Secondary Reference)");
+    println!("{}", "-".repeat(40));
+    println!("  Files tested:    {}", format_str.join(", "));
+    println!("  Matching tags:   {}", result.total_matching_tags);
+    println!("  Mismatched:      {}", result.total_mismatched_tags);
+    println!("  Missing:         {}", result.total_missing_tags);
+    println!("  Extra:           {}", result.total_extra_tags);
+
+    let total_compared =
+        result.total_matching_tags + result.total_mismatched_tags + result.total_missing_tags;
+    if total_compared > 0 {
+        let match_rate = (result.total_matching_tags as f64 / total_compared as f64) * 100.0;
+        println!();
+        println!("  Match rate: {:.1}%", match_rate);
+    }
+
+    println!();
+    println!("{}", "=".repeat(LINE_WIDTH));
+}
+
 /// Print a comparison against baseline
 pub fn print_baseline_comparison(
     result: &ManufacturerTestResult,

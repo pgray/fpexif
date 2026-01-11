@@ -233,10 +233,155 @@ jobs:
           CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
 
+      # exiv2 comparison tests
+      - name: Test CR2 format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_cr2 -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test NEF format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_nef -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test ARW format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_arw -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test ORF format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_orf -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test DNG format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_dng -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test RW2 format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_rw2 -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test RAF format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_raf_format -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test 3FR format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_3fr -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test CRW format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_crw -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test DCR format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_dcr -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test ERF format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_erf -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test KDC format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_kdc -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test MDC format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_mdc -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test MEF format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_mef -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test MOS format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_mos -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test MRW format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_mrw -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test NRW format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_nrw -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test PEF format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_pef -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test RAW format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_raw -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test SR2 format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_sr2 -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test SRF format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_srf -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test SRW format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_srw -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test X3F format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_x3f -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
+      - name: Test JPG format (exiv2)
+        run: nice -n 19 cargo test --test exiv2_comparison test_exiv2_compatibility_jpg -- --nocapture
+        env:
+          CI: true
+          FPEXIF_TEST_FILES: /fpexif/raws
+
       - name: Run remaining integration tests
         run: |
           set -eo pipefail
-          nice -n 19 cargo test --verbose -- --nocapture --skip test_exiftool_json_compatibility 2>&1 | tee -a test-output.txt
+          nice -n 19 cargo test --verbose -- --nocapture --skip test_exiftool_json_compatibility --skip test_exiv2_compatibility 2>&1 | tee -a test-output.txt
         env:
           CI: true
           FPEXIF_TEST_FILES: /fpexif/raws
