@@ -194,7 +194,11 @@ fn test_decode_dynamic_range_optimizer_values() {
     assert_eq!(decode_dynamic_range_optimizer_exiftool(1), "Standard");
     assert_eq!(decode_dynamic_range_optimizer_exiftool(2), "Advanced Auto");
     assert_eq!(decode_dynamic_range_optimizer_exiftool(3), "Auto");
-    assert_eq!(decode_dynamic_range_optimizer_exiftool(8), "Advanced Lv5");
+    // Fix #57: Correct mapping is 8-12 for Advanced Lv1-5, 16-20 for Lv1-5
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(8), "Advanced Lv1");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(12), "Advanced Lv5");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(16), "Lv1");
+    assert_eq!(decode_dynamic_range_optimizer_exiftool(20), "Lv5");
     assert_eq!(decode_dynamic_range_optimizer_exiftool(999), "Unknown");
 }
 
