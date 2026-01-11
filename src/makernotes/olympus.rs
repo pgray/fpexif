@@ -537,10 +537,11 @@ pub fn decode_special_mode(values: &[u32]) -> String {
         2 => "Fast",
         3 => "Panorama",
         n => {
+            // When mode is unknown, panorama value should also show the raw value
             return format!(
-                "Unknown ({}), Sequence: {}, Panorama: Unknown",
-                n, values[1]
-            )
+                "Unknown ({}), Sequence: {}, Panorama: Unknown ({})",
+                n, values[1], values[2]
+            );
         }
     };
 
@@ -759,23 +760,30 @@ pub fn decode_scene_mode_exiv2(value: u16) -> &'static str {
 
 /// Decode NoiseReduction value (CS 0x050A) - ExifTool format (bitmask)
 /// Note: exiv2 uses identical values - no separate version needed
-pub fn decode_noise_reduction_exiftool(value: u16) -> &'static str {
-    match value {
-        0 => "(none)",
-        1 => "Noise Reduction",
-        2 => "Noise Filter",
-        3 => "Noise Reduction, Noise Filter",
-        4 => "Noise Filter (ISO Boost)",
-        8 => "Auto",
-        _ => {
-            if value & 8 != 0 {
-                "Auto"
-            } else if value != 0 {
-                "On"
-            } else {
-                "Unknown"
-            }
-        }
+/// BITMASK: bit0=Noise Reduction, bit1=Noise Filter, bit2=Noise Filter (ISO Boost), bit3=Auto
+pub fn decode_noise_reduction_exiftool(value: u16) -> String {
+    if value == 0 {
+        return "(none)".to_string();
+    }
+
+    let mut parts = Vec::new();
+    if value & 0x01 != 0 {
+        parts.push("Noise Reduction");
+    }
+    if value & 0x02 != 0 {
+        parts.push("Noise Filter");
+    }
+    if value & 0x04 != 0 {
+        parts.push("Noise Filter (ISO Boost)");
+    }
+    if value & 0x08 != 0 {
+        parts.push("Auto");
+    }
+
+    if parts.is_empty() {
+        format!("Unknown ({})", value)
+    } else {
+        parts.join(", ")
     }
 }
 // decode_noise_reduction_exiv2 - same as exiftool, no separate function needed
@@ -1270,7 +1278,117 @@ pub fn decode_noise_reduction2_exiftool(value: u16) -> String {
     }
 }
 
-// AFPoint (FI 0x0308): Olympus.pm - for non E-M/OM- models
+// AFPoint (FI 0x0308): Olympus.pm - model-dependent decoding
+
+/// Decode AFPoint for E-3/E-5/E-30 (11-point AF with split encoding)
+/// Lower 5 bits = AF point, Upper bits = target selection mode
+fn decode_af_point_e3_e5_e30(value: u16) -> String {
+    let point = value & 0x1f;
+    let mode = value & 0xffe0;
+
+    let point_str = match point {
+        0x00 => "(none)",
+        0x01 => "Top-left (horizontal)",
+        0x02 => "Top-center (horizontal)",
+        0x03 => "Top-right (horizontal)",
+        0x04 => "Left (horizontal)",
+        0x05 => "Mid-left (horizontal)",
+        0x06 => "Center (horizontal)",
+        0x07 => "Mid-right (horizontal)",
+        0x08 => "Right (horizontal)",
+        0x09 => "Bottom-left (horizontal)",
+        0x0a => "Bottom-center (horizontal)",
+        0x0b => "Bottom-right (horizontal)",
+        0x0c => "Top-left (vertical)",
+        0x0d => "Top-center (vertical)",
+        0x0e => "Top-right (vertical)",
+        0x0f => "Left (vertical)",
+        0x10 => "Mid-left (vertical)",
+        0x11 => "Center (vertical)",
+        0x12 => "Mid-right (vertical)",
+        0x13 => "Right (vertical)",
+        0x14 => "Bottom-left (vertical)",
+        0x15 => "Bottom-center (vertical)",
+        0x16 => "Bottom-right (vertical)",
+        0x1f => "n/a",
+        _ => return format!("Unknown (0x{:x})", value),
+    };
+
+    let mode_str = match mode {
+        0x00 => "Single Target",
+        0x40 => "All Target",
+        0x80 => "Dynamic Single Target",
+        0xe0 => "n/a",
+        _ => return format!("{}; Unknown (0x{:x})", point_str, mode),
+    };
+
+    format!("{}; {}", point_str, mode_str)
+}
+
+/// Decode AFPoint for E-520/E-600/E-620 (7-point AF with split encoding)
+fn decode_af_point_7point(value: u16) -> String {
+    let point = value & 0x1f;
+    let mode = value & 0xffe0;
+
+    let point_str: String = match point {
+        0x00 => "(none)".to_string(),
+        0x02 => "Top-center (horizontal)".to_string(),
+        0x04 => "Right (horizontal)".to_string(),
+        0x05 => "Mid-right (horizontal)".to_string(),
+        0x06 => "Center (horizontal)".to_string(),
+        0x07 => "Mid-left (horizontal)".to_string(),
+        0x08 => "Left (horizontal)".to_string(),
+        0x0a => "Bottom-center (horizontal)".to_string(),
+        0x0c => "Top-center (vertical)".to_string(),
+        0x0f => "Right (vertical)".to_string(),
+        0x10 => "Mid-right (vertical)".to_string(),
+        0x11 => "Center (vertical)".to_string(),
+        0x12 => "Mid-left (vertical)".to_string(),
+        0x13 => "Left (vertical)".to_string(),
+        0x15 => "Bottom-center (vertical)".to_string(),
+        _ => format!("Unknown (0x{:x})", value),
+    };
+
+    let mode_str = match mode {
+        0x00 => "Single Target",
+        0x40 => "All Target",
+        _ => return format!("{}; Unknown (0x{:x})", point_str, mode),
+    };
+
+    format!("{}; {}", point_str, mode_str)
+}
+
+/// Decode AFPoint based on camera model
+pub fn decode_af_point_by_model(value: u16, model: Option<&str>) -> String {
+    if let Some(m) = model {
+        // E-M* and OM-* models: don't decode (ExifTool returns raw value)
+        if m.starts_with("E-M") || m.starts_with("OM-") {
+            return value.to_string();
+        }
+
+        // E-3, E-5, E-30: 11-point AF with split encoding
+        // Match exact model names (from decode_camera_type): "E-3", "E-5", "E-30"
+        if m == "E-3" || m == "E-5" || m == "E-30" {
+            return decode_af_point_e3_e5_e30(value);
+        }
+
+        // E-520, E-600, E-620: 7-point AF
+        if m == "E-520" || m == "E-600" || m == "E-620" {
+            return decode_af_point_7point(value);
+        }
+    }
+
+    // Default for other models (E-P1, E-510, etc.): basic 4-point AF
+    let decoded = decode_af_point_exiftool(value);
+    if decoded == "Unknown" {
+        // Show raw value for unknown AF points
+        format!("Unknown ({})", value)
+    } else {
+        decoded.to_string()
+    }
+}
+
+// Simple AFPoint decoder for basic models (E-P1, E-510, etc.)
 define_tag_decoder! {
     af_point,
     both: {
@@ -1479,6 +1597,39 @@ fn decode_drive_mode(values: &[u16]) -> String {
         return format!("{}{}{}", mode_str, shot_num, shutter);
     }
 
+    // Mode 5 with mode bits (3rd value) = bracketing type
+    if mode == 5 && values.len() >= 3 {
+        let mode_bits = values[2];
+        let mut bracket_types = Vec::new();
+        if mode_bits & 0x01 != 0 {
+            bracket_types.push("AE");
+        }
+        if mode_bits & 0x02 != 0 {
+            bracket_types.push("WB");
+        }
+        if mode_bits & 0x04 != 0 {
+            bracket_types.push("FL");
+        }
+        if mode_bits & 0x08 != 0 {
+            bracket_types.push("MF");
+        }
+        if mode_bits & 0x10 != 0 {
+            bracket_types.push("ISO");
+        }
+        if mode_bits & 0x20 != 0 {
+            bracket_types.push("AE Auto");
+        }
+        if mode_bits & 0x40 != 0 {
+            bracket_types.push("Focus");
+        }
+        let bracket_str = if bracket_types.is_empty() {
+            "Bracketing".to_string()
+        } else {
+            format!("{} Bracketing", bracket_types.join("+"))
+        };
+        return format!("{}{}{}", bracket_str, shot_num, shutter);
+    }
+
     // Basic mode decoding
     let mode_str = match mode {
         0 => "Single Shot",
@@ -1486,6 +1637,7 @@ fn decode_drive_mode(values: &[u16]) -> String {
         2 => "Exposure Bracketing",
         3 => "White Balance Bracketing",
         4 => "Exposure+WB Bracketing",
+        5 => "Bracketing", // Fallback if no mode bits
         _ => return format!("Unknown ({})", mode),
     };
 
@@ -1497,6 +1649,24 @@ fn decode_drive_mode(values: &[u16]) -> String {
 fn format_min_max_array(values: &[i16]) -> String {
     if values.len() >= 3 {
         format!("{} (min {}, max {})", values[0], values[1], values[2])
+    } else if !values.is_empty() {
+        values
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        String::new()
+    }
+}
+
+/// Format CustomSaturation for E-1 model (CS-style labels)
+/// E-1 uses: a-=b; c-=b; return "CS$a (min CS0, max CS$c)"
+fn format_custom_saturation_e1(values: &[i16]) -> String {
+    if values.len() >= 3 {
+        let a = values[0] - values[1];
+        let c = values[2] - values[1];
+        format!("CS{} (min CS0, max CS{})", a, c)
     } else if !values.is_empty() {
         values
             .iter()
@@ -1859,13 +2029,15 @@ fn decode_flash_model(val: u16) -> &'static str {
 /// Format firmware version from u32
 /// ExifTool: '$val=sprintf("%x",$val);$val=~s/(.{3})$/\.$1/;$val'
 /// e.g., 4100 (0x1004) -> "1.004", 4357 (0x1105) -> "1.105"
+/// For short hex strings (< 4 chars): just use hex without decimal point
 fn format_firmware_version(val: u32) -> String {
     let hex = format!("{:x}", val);
     if hex.len() >= 4 {
         let (major, minor) = hex.split_at(hex.len() - 3);
         format!("{}.{}", major, minor)
     } else {
-        format!("0.{:03}", val)
+        // Short hex string - no decimal point (e.g., 121 -> "79")
+        hex
     }
 }
 
@@ -1888,6 +2060,8 @@ fn decode_picture_mode(val: u16) -> &'static str {
         14 => "Monochrome Profile 3",
         17 => "Art Mode",
         18 => "Monochrome Profile 4",
+        256 => "Monotone",
+        512 => "Sepia",
         _ => "Unknown",
     }
 }
@@ -2119,15 +2293,23 @@ fn parse_ifd_entry(
 }
 
 /// Parse an embedded sub-IFD (old Olympus format where sub-IFD data is stored directly)
+///
+/// For most embedded IFDs, value offsets are within the embedded data itself.
+/// However, some (like FocusInfo in old format) have value offsets relative to TIFF header,
+/// so we accept optional value_data and value_base_offset for external value resolution.
+#[allow(clippy::too_many_arguments)]
 fn parse_embedded_sub_ifd(
     sub_data: &[u8],
     endian: Endianness,
     ifd_type: OlympusIfdType,
     tags: &mut HashMap<u16, MakerNoteTag>,
     prefix: &str,
-    is_em_camera: &mut bool,
+    camera_model: &mut Option<String>,
+    preview_offset_adjust: usize,
+    value_data: Option<&[u8]>,
+    value_base_offset: usize,
 ) {
-    // Embedded sub-IFDs have self-contained data, no need for TIFF data
+    // Parse embedded sub-IFD, optionally using external data for value resolution
     parse_olympus_ifd(
         sub_data,
         0,
@@ -2136,9 +2318,10 @@ fn parse_embedded_sub_ifd(
         ifd_type,
         tags,
         prefix,
-        None,
-        0,
-        is_em_camera,
+        value_data,
+        value_base_offset,
+        camera_model,
+        preview_offset_adjust,
     );
 }
 
@@ -2154,6 +2337,7 @@ fn parse_embedded_sub_ifd(
 /// * `prefix` - Tag name prefix
 /// * `value_data` - Optional alternate data source for value offsets (for old format)
 /// * `value_base_offset` - Base offset when using value_data
+/// * `preview_offset_adjust` - Offset to add to PreviewImageStart for file-absolute offset
 #[allow(clippy::too_many_arguments)]
 fn parse_olympus_ifd(
     data: &[u8],
@@ -2165,7 +2349,8 @@ fn parse_olympus_ifd(
     prefix: &str,
     value_data: Option<&[u8]>,
     value_base_offset: usize,
-    is_em_camera: &mut bool,
+    camera_model: &mut Option<String>,
+    preview_offset_adjust: usize,
 ) {
     if ifd_offset + 2 > data.len() {
         return;
@@ -2239,13 +2424,14 @@ fn parse_olympus_ifd(
                     }
                     OLYMPUS_FOCAL_PLANE_DIAGONAL => {
                         // FocalPlaneDiagonal: add " mm" suffix
+                        // ExifTool outputs raw rational value with trailing zeros trimmed
                         match &value {
                             ExifValue::Rational(vals) if !vals.is_empty() => {
                                 let (num, denom) = vals[0];
                                 if denom != 0 {
                                     let v = num as f64 / denom as f64;
-                                    // Format without trailing zeros (ExifTool style)
-                                    let formatted = format!("{:.2}", v);
+                                    // Format with 3 decimals, trim trailing zeros
+                                    let formatted = format!("{:.3}", v);
                                     let formatted =
                                         formatted.trim_end_matches('0').trim_end_matches('.');
                                     ExifValue::Ascii(format!("{} mm", formatted))
@@ -2283,10 +2469,8 @@ fn parse_olympus_ifd(
                         if let ExifValue::Ascii(s) = &value {
                             let trimmed = s.trim();
                             if let Some(decoded) = decode_camera_type(trimmed) {
-                                // Check if this is an E-M or OM- model for AFPoint decoding
-                                if decoded.starts_with("E-M") || decoded.starts_with("OM-") {
-                                    *is_em_camera = true;
-                                }
+                                // Store model for AFPoint model-specific decoding
+                                *camera_model = Some(decoded.to_string());
                                 ExifValue::Ascii(decoded.to_string())
                             } else {
                                 value // Keep original if not in lookup table
@@ -2351,13 +2535,14 @@ fn parse_olympus_ifd(
                     }
                     EQUIP_FOCAL_PLANE_DIAGONAL => {
                         // FocalPlaneDiagonal: add " mm" suffix
+                        // ExifTool outputs raw rational value with trailing zeros trimmed
                         match &value {
                             ExifValue::Rational(vals) if !vals.is_empty() => {
                                 let (num, denom) = vals[0];
                                 if denom != 0 {
                                     let v = num as f64 / denom as f64;
-                                    // Format without trailing zeros (ExifTool style)
-                                    let formatted = format!("{:.2}", v);
+                                    // Format with 3 decimals, trim trailing zeros
+                                    let formatted = format!("{:.3}", v);
                                     let formatted =
                                         formatted.trim_end_matches('0').trim_end_matches('.');
                                     ExifValue::Ascii(format!("{} mm", formatted))
@@ -2480,20 +2665,16 @@ fn parse_olympus_ifd(
                         }
                     }
                     EQUIP_CAMERA_TYPE => {
-                        // CameraType2: decode internal code and check for E-M/OM- model
+                        // CameraType2: decode internal code and store model for AFPoint
                         if let ExifValue::Ascii(s) = &value {
                             let trimmed = s.trim();
                             if let Some(decoded) = decode_camera_type(trimmed) {
-                                // Check if this is an E-M or OM- model for AFPoint decoding
-                                if decoded.starts_with("E-M") || decoded.starts_with("OM-") {
-                                    *is_em_camera = true;
-                                }
+                                // Store model for AFPoint model-specific decoding
+                                *camera_model = Some(decoded.to_string());
                                 ExifValue::Ascii(decoded.to_string())
                             } else {
-                                // Direct check if raw value starts with E-M or OM-
-                                if trimmed.starts_with("E-M") || trimmed.starts_with("OM-") {
-                                    *is_em_camera = true;
-                                }
+                                // Use raw value as model if not in lookup table
+                                *camera_model = Some(trimmed.to_string());
                                 value
                             }
                         } else {
@@ -2724,10 +2905,27 @@ fn parse_olympus_ifd(
                     }
                     CS_CUSTOM_SATURATION => {
                         // CustomSaturation: 3 values - current, min, max
+                        // E-1 uses CS-style labels, other models use numeric
+                        // Match E-1 but not E-10, E-100, E-1 Mark II, etc.
+                        let is_e1 = camera_model.as_ref().is_some_and(|m| {
+                            m == "E-1"
+                                || m.starts_with("E-1 ")
+                                || m.ends_with(" E-1")
+                                || m.contains(" E-1 ")
+                        });
                         if let ExifValue::SShort(vals) = &value {
-                            ExifValue::Ascii(format_min_max_array(vals))
+                            if is_e1 {
+                                ExifValue::Ascii(format_custom_saturation_e1(vals))
+                            } else {
+                                ExifValue::Ascii(format_min_max_array(vals))
+                            }
                         } else if let ExifValue::Short(vals) = &value {
-                            ExifValue::Ascii(format_min_max_array_u16(vals))
+                            if is_e1 {
+                                let signed: Vec<i16> = vals.iter().map(|&v| v as i16).collect();
+                                ExifValue::Ascii(format_custom_saturation_e1(&signed))
+                            } else {
+                                ExifValue::Ascii(format_min_max_array_u16(vals))
+                            }
                         } else {
                             value
                         }
@@ -2867,9 +3065,7 @@ fn parse_olympus_ifd(
                     CS_NOISE_REDUCTION => {
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                ExifValue::Ascii(
-                                    decode_noise_reduction_exiftool(vals[0]).to_string(),
-                                )
+                                ExifValue::Ascii(decode_noise_reduction_exiftool(vals[0]))
                             } else {
                                 value
                             }
@@ -3088,6 +3284,17 @@ fn parse_olympus_ifd(
                             _ => value,
                         }
                     }
+                    CS_PREVIEW_IMAGE_START => {
+                        // PreviewImageStart: int32u - convert to file-absolute offset
+                        // ExifTool outputs file-absolute offset, so add the MakerNote base offset
+                        match &value {
+                            ExifValue::Long(vals) if !vals.is_empty() => {
+                                let adjusted = vals[0] as usize + preview_offset_adjust;
+                                ExifValue::Long(vec![adjusted as u32])
+                            }
+                            _ => value,
+                        }
+                    }
                     _ => value,
                 },
                 OlympusIfdType::RawDevelopment => match tag_id {
@@ -3210,8 +3417,41 @@ fn parse_olympus_ifd(
                         }
                     }
                     IP_ASPECT_RATIO => {
+                        // AspectRatio: 2 bytes - first is aspect type, second indicates RAW/non-RAW
+                        // ExifTool: '2 1' => "3:2 (RAW)", '2 2' => "3:2", '1 4' => "1:1"
+                        // Second byte: 1 = RAW, same as first = non-RAW, 4 with first=1 = special "1:1"
                         if let ExifValue::Byte(vals) = &value {
-                            if !vals.is_empty() {
+                            if vals.len() >= 2 {
+                                // Special case: '1 4' = "1:1"
+                                if vals[0] == 1 && vals[1] == 4 {
+                                    ExifValue::Ascii("1:1".to_string())
+                                } else {
+                                    let aspect: &str = match vals[0] {
+                                        1 => "4:3",
+                                        2 => "3:2",
+                                        3 => "16:9",
+                                        4 => "6:6",
+                                        5 => "5:4",
+                                        6 => "7:6",
+                                        7 => "6:5",
+                                        8 => "7:5",
+                                        9 => "3:4",
+                                        _ => "",
+                                    };
+                                    if aspect.is_empty() {
+                                        // Unknown aspect ratio, output raw values
+                                        ExifValue::Ascii(format!("{} {}", vals[0], vals[1]))
+                                    } else {
+                                        // Second byte: 1 = RAW (when first != 1), otherwise just output aspect
+                                        let suffix = if vals[1] == 1 && vals[0] != 1 {
+                                            " (RAW)"
+                                        } else {
+                                            ""
+                                        };
+                                        ExifValue::Ascii(format!("{}{}", aspect, suffix))
+                                    }
+                                }
+                            } else if !vals.is_empty() {
                                 ExifValue::Ascii(
                                     decode_aspect_ratio_exiftool(vals[0] as u16).to_string(),
                                 )
@@ -3362,19 +3602,16 @@ fn parse_olympus_ifd(
                         }
                     }
                     FI_AF_POINT => {
-                        // ExifTool only decodes AFPoint for non-E-M/OM models
-                        // Condition: '$self{Model} !~ /^(E-M|OM-)/'
-                        if *is_em_camera {
-                            value // Leave as raw value for E-M/OM cameras
-                        } else if let ExifValue::Short(vals) = &value {
+                        // Model-specific AFPoint decoding:
+                        // - E-3/E-5/E-30: 11-point AF with split encoding (lower 5 bits = point, upper = mode)
+                        // - E-520/E-600/E-620: 7-point AF
+                        // - E-M*/OM-*: don't decode (raw value)
+                        // - Others: basic 4-point decoding
+                        if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
-                                let decoded = decode_af_point_exiftool(vals[0]);
-                                if decoded == "Unknown" {
-                                    // Show raw value for unknown AF points
-                                    ExifValue::Ascii(format!("Unknown ({})", vals[0]))
-                                } else {
-                                    ExifValue::Ascii(decoded.to_string())
-                                }
+                                let decoded =
+                                    decode_af_point_by_model(vals[0], camera_model.as_deref());
+                                ExifValue::Ascii(decoded)
                             } else {
                                 value
                             }
@@ -3423,14 +3660,22 @@ fn parse_olympus_ifd(
                     }
                     FI_SENSOR_TEMPERATURE => {
                         // SensorTemperature: int16s
-                        // For E-1/E-M5 or count > 1: raw value with " C" suffix
+                        // For E-1/E-M* or count > 1: raw value with " C" suffix
                         // For others: apply formula 84 - 3 * val / 26, format as "%.1f C"
+                        // Check if model is E-1 or E-M5 specifically (not E-M1, E-M10, etc.)
+                        let is_e1_or_em5 = camera_model
+                            .as_ref()
+                            .is_some_and(|m| m == "E-1" || m == "E-M5");
                         match &value {
-                            ExifValue::SShort(vals) if vals.len() == 1 => {
-                                // Single value - apply temperature formula
+                            ExifValue::SShort(vals) if vals.len() == 1 && !is_e1_or_em5 => {
+                                // Single value on non-E-M camera - apply temperature formula
                                 let raw = vals[0] as f64;
                                 let temp = 84.0 - 3.0 * raw / 26.0;
                                 ExifValue::Ascii(format!("{:.1} C", temp))
+                            }
+                            ExifValue::SShort(vals) if vals.len() == 1 => {
+                                // E-M or E-1 camera - output raw value
+                                ExifValue::Ascii(format!("{} C", vals[0]))
                             }
                             ExifValue::SShort(vals) => {
                                 // Multiple values - raw format with " 0 0" stripped
@@ -3442,11 +3687,15 @@ fn parse_olympus_ifd(
                                 }
                                 ExifValue::Ascii(format!("{} C", result))
                             }
-                            ExifValue::Short(vals) if vals.len() == 1 => {
-                                // Single value - apply temperature formula
+                            ExifValue::Short(vals) if vals.len() == 1 && !is_e1_or_em5 => {
+                                // Single value on non-E-M camera - apply temperature formula
                                 let raw = vals[0] as i16 as f64;
                                 let temp = 84.0 - 3.0 * raw / 26.0;
                                 ExifValue::Ascii(format!("{:.1} C", temp))
+                            }
+                            ExifValue::Short(vals) if vals.len() == 1 => {
+                                // E-M or E-1 camera - output raw value
+                                ExifValue::Ascii(format!("{} C", vals[0] as i16))
                             }
                             ExifValue::Short(vals) => {
                                 let vals_str: Vec<String> =
@@ -3508,7 +3757,8 @@ fn parse_olympus_ifd(
                                     &format!("{}Equipment.", prefix),
                                     value_data,
                                     value_base_offset,
-                                    is_em_camera,
+                                    camera_model,
+                                    preview_offset_adjust,
                                 );
                             } else if let Some(sub_data) = sub_data_opt {
                                 parse_embedded_sub_ifd(
@@ -3517,7 +3767,10 @@ fn parse_olympus_ifd(
                                     OlympusIfdType::Equipment,
                                     tags,
                                     &format!("{}Equipment.", prefix),
-                                    is_em_camera,
+                                    camera_model,
+                                    preview_offset_adjust,
+                                    value_data,
+                                    value_base_offset,
                                 );
                             }
                         }
@@ -3544,7 +3797,8 @@ fn parse_olympus_ifd(
                                     &format!("{}CameraSettings.", prefix),
                                     value_data,
                                     value_base_offset,
-                                    is_em_camera,
+                                    camera_model,
+                                    preview_offset_adjust,
                                 );
                             } else if let Some(sub_data) = sub_data_opt {
                                 parse_embedded_sub_ifd(
@@ -3553,7 +3807,10 @@ fn parse_olympus_ifd(
                                     OlympusIfdType::CameraSettings,
                                     tags,
                                     &format!("{}CameraSettings.", prefix),
-                                    is_em_camera,
+                                    camera_model,
+                                    preview_offset_adjust,
+                                    value_data,
+                                    value_base_offset,
                                 );
                             }
                         }
@@ -3574,7 +3831,8 @@ fn parse_olympus_ifd(
                                     &format!("{}RawDev.", prefix),
                                     value_data,
                                     value_base_offset,
-                                    is_em_camera,
+                                    camera_model,
+                                    preview_offset_adjust,
                                 );
                             }
                         }
@@ -3595,17 +3853,25 @@ fn parse_olympus_ifd(
                                     &format!("{}ImageProc.", prefix),
                                     value_data,
                                     value_base_offset,
-                                    is_em_camera,
+                                    camera_model,
+                                    preview_offset_adjust,
                                 );
                             }
                         }
                     }
                     OLYMPUS_FOCUS_INFO_IFD => {
-                        if let ExifValue::Long(offsets) =
-                            tags.get(&storage_id).map(|t| &t.value).unwrap()
-                        {
-                            if !offsets.is_empty() {
-                                let sub_offset = offsets[0] as usize + base_offset;
+                        // Handle both offset-based sub-IFD and embedded IFD data
+                        let sub_ifd_info = tags.get(&storage_id).and_then(|tag| match &tag.value {
+                            ExifValue::Long(offsets) if !offsets.is_empty() => {
+                                Some((Some(offsets[0] as usize + base_offset), None))
+                            }
+                            ExifValue::Undefined(sub_data) if sub_data.len() > 2 => {
+                                Some((None, Some(sub_data.clone())))
+                            }
+                            _ => None,
+                        });
+                        if let Some((sub_offset_opt, sub_data_opt)) = sub_ifd_info {
+                            if let Some(sub_offset) = sub_offset_opt {
                                 parse_olympus_ifd(
                                     data,
                                     sub_offset,
@@ -3616,7 +3882,20 @@ fn parse_olympus_ifd(
                                     &format!("{}FocusInfo.", prefix),
                                     value_data,
                                     value_base_offset,
-                                    is_em_camera,
+                                    camera_model,
+                                    preview_offset_adjust,
+                                );
+                            } else if let Some(sub_data) = sub_data_opt {
+                                parse_embedded_sub_ifd(
+                                    &sub_data,
+                                    endian,
+                                    OlympusIfdType::FocusInfo,
+                                    tags,
+                                    &format!("{}FocusInfo.", prefix),
+                                    camera_model,
+                                    preview_offset_adjust,
+                                    value_data,
+                                    value_base_offset,
                                 );
                             }
                         }
@@ -3631,9 +3910,10 @@ fn parse_olympus_ifd(
 /// Parse Olympus maker notes
 pub fn parse_olympus_maker_notes(
     data: &[u8],
-    _endian: Endianness,
+    tiff_endian: Endianness,
     tiff_data: Option<&[u8]>,
     tiff_offset: usize,
+    makernote_file_offset: Option<usize>,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -3662,8 +3942,8 @@ pub fn parse_olympus_maker_notes(
         (endian, 12, false)
     } else if data.starts_with(b"OLYMP\0") {
         // Old format: 6-byte header + 2-byte version, IFD at byte 8
-        // Always little-endian based on observed files
-        (Endianness::Little, 8, true)
+        // Inherit endianness from TIFF header (E20 uses big-endian, most others little-endian)
+        (tiff_endian, 8, true)
     } else {
         return Ok(tags);
     };
@@ -3673,9 +3953,23 @@ pub fn parse_olympus_maker_notes(
     let value_data = if is_old_format { tiff_data } else { None };
     let value_base_offset = if is_old_format { tiff_offset } else { 0 };
 
-    // Track if this is an E-M or OM- camera for AFPoint decoding
-    // ExifTool only decodes AFPoint for non-E-M/OM models
-    let mut is_em_camera = false;
+    // Calculate offset adjustment for PreviewImageStart to get TIFF-relative offsets
+    // ExifTool outputs offsets relative to TIFF header start
+    // For new format: MakerNote-relative -> TIFF-relative = makernote_offset_in_TIFF + raw_value
+    //   where makernote_offset_in_TIFF = makernote_file_offset - tiff_offset
+    // For old format: values are already TIFF-relative, no adjustment needed
+    let preview_offset_adjust = if is_old_format {
+        0 // Old format values are already TIFF-relative
+    } else {
+        // New format: convert from MakerNote-relative to TIFF-relative
+        makernote_file_offset
+            .map(|mn_off| mn_off.saturating_sub(tiff_offset))
+            .unwrap_or(0)
+    };
+
+    // Track camera model for model-specific AFPoint decoding
+    // E-3/E-5/E-30 use 11-point AF, E-520/E-600/E-620 use 7-point AF, E-M/OM- don't decode
+    let mut camera_model: Option<String> = None;
 
     // Parse the main IFD from maker note data
     parse_olympus_ifd(
@@ -3688,7 +3982,8 @@ pub fn parse_olympus_maker_notes(
         "Olympus.",
         value_data,
         value_base_offset,
-        &mut is_em_camera,
+        &mut camera_model,
+        preview_offset_adjust,
     );
 
     Ok(tags)

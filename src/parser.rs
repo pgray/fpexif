@@ -70,6 +70,14 @@ where
         exif_data.set_raf_metadata(raf_metadata);
     }
 
+    // Reset reader position for MRW metadata extraction
+    reader.seek(std::io::SeekFrom::Start(0))?;
+
+    // Check for MRW-specific metadata (RIF block for Minolta RAW files)
+    if let Ok(Some(mrw_metadata)) = formats::extract_mrw_metadata_if_mrw(&mut reader) {
+        exif_data.set_mrw_metadata(mrw_metadata);
+    }
+
     // Reset reader position for RW2 Compression extraction
     reader.seek(std::io::SeekFrom::Start(0))?;
 
@@ -298,15 +306,50 @@ where
                                 false
                             };
 
+                            // Check if IFD0 already has JPEG compression (7)
+                            // JPEG in IFD0 is typically the preview that ExifTool reports
+                            let existing_is_jpeg = if let Some(ExifValue::Short(vals)) =
+                                exif_data.get_tag_by_id(0x0103)
+                            {
+                                !vals.is_empty() && vals[0] == 7
+                            } else {
+                                false
+                            };
+
                             // Allow override if: RAW-specific, or this is a main image SubIFD
-                            // Otherwise skip to preserve IFD0's Compression
+                            // BUT: don't overwrite JPEG with Uncompressed (ExifTool prefers JPEG)
                             if !new_is_raw
                                 && !is_main_image
                                 && exif_data.get_tag_by_id(0x0103).is_some()
                             {
                                 continue;
                             }
+
+                            // Don't overwrite JPEG (7) with Uncompressed (1) - ExifTool prefers JPEG
+                            if existing_is_jpeg && !new_is_raw {
+                                continue;
+                            }
                         }
+
+                        // For non-main SubIFDs (SubfileType != 0), skip dimension-related tags
+                        // to prevent thumbnail/preview dimensions from overwriting main image
+                        if !is_main_image {
+                            let is_dimension_tag = matches!(
+                                tag_id.id,
+                                0x0100  // ImageWidth
+                                    | 0x0101 // ImageHeight
+                                    | 0x0102 // BitsPerSample
+                                    | 0x0106 // PhotometricInterpretation
+                                    | 0x0111 // StripOffsets
+                                    | 0x0115 // SamplesPerPixel
+                                    | 0x0116 // RowsPerStrip
+                                    | 0x0117 // StripByteCounts
+                            );
+                            if is_dimension_tag && exif_data.get_tag_by_id(tag_id.id).is_some() {
+                                continue;
+                            }
+                        }
+
                         exif_data.tags.insert(tag_id, value);
                     }
                 }
@@ -314,36 +357,119 @@ where
         }
     }
 
-    // Parse maker notes if present (tag 0x927C)
-    if let Some(ExifValue::Undefined(maker_note_data)) = exif_data.get_tag_by_id(0x927C) {
-        // Get the camera make to determine which parser to use
-        let make = exif_data
-            .get_tag_by_id(0x010F) // Make tag
-            .and_then(|v| match v {
-                ExifValue::Ascii(s) => Some(s.as_str()),
-                _ => None,
-            });
+    // Get the camera make to determine which parser to use
+    // Clone to avoid borrowing exif_data while we modify it
+    let make: Option<String> = exif_data
+        .get_tag_by_id(0x010F) // Make tag
+        .and_then(|v| match v {
+            ExifValue::Ascii(s) => Some(s.clone()),
+            _ => None,
+        });
 
-        // Get the camera model for model-specific formatting (e.g., Canon SerialNumber)
-        let model = exif_data
-            .get_tag_by_id(0x0110) // Model tag
-            .and_then(|v| match v {
-                ExifValue::Ascii(s) => Some(s.as_str()),
-                _ => None,
-            });
+    // Get the camera model for model-specific formatting (e.g., Canon SerialNumber)
+    let model: Option<String> = exif_data
+        .get_tag_by_id(0x0110) // Model tag
+        .and_then(|v| match v {
+            ExifValue::Ascii(s) => Some(s.clone()),
+            _ => None,
+        });
+
+    // Parse maker notes if present (tag 0x927C - standard EXIF MakerNote)
+    if let Some(ExifValue::Undefined(maker_note_data)) = exif_data.get_tag_by_id(0x927C) {
+        // Find the MakerNote's file offset for manufacturers that need it (e.g., Olympus PreviewImageStart)
+        let makernote_file_offset =
+            if let Some(ExifValue::Long(exif_offsets)) = exif_data.get_tag_by_id(0x8769) {
+                // Get the EXIF SubIFD offset
+                if !exif_offsets.is_empty() {
+                    let exif_ifd_offset = tiff_offset + exif_offsets[0] as usize;
+                    // Find MakerNote (0x927C) data offset within EXIF SubIFD
+                    find_tag_data_offset(&app1_data, exif_ifd_offset, tiff_offset, 0x927C, endian)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
 
         // Parse the maker notes
         // Pass the full app1_data and tiff_offset for manufacturers that use TIFF-relative offsets (e.g., Canon)
         if let Ok(parsed_maker_notes) = crate::makernotes::parse_maker_notes_with_tiff_data(
             maker_note_data,
-            make,
-            model,
+            make.as_deref(),
+            model.as_deref(),
             endian,
             Some(&app1_data),
             tiff_offset,
+            makernote_file_offset,
         ) {
             if !parsed_maker_notes.is_empty() {
                 exif_data.maker_notes = Some(parsed_maker_notes);
+            }
+        }
+    }
+
+    // Also check for DNG's DNGPrivateData tag (0xC634) which can contain MakerNotes
+    // This is used by Pentax/Samsung/Ricoh DNG files to store original MakerNotes
+    if exif_data.maker_notes.is_none() {
+        if let Some(private_data) = exif_data.get_tag_by_id(0xC634) {
+            let private_bytes = match private_data {
+                ExifValue::Undefined(b) => Some(b.as_slice()),
+                ExifValue::Byte(b) => Some(b.as_slice()),
+                _ => None,
+            };
+
+            if let Some(data) = private_bytes {
+                // Check for Pentax/Samsung format: "PENTAX \0" or "SAMSUNG\0" at start
+                if data.len() > 10
+                    && (data.starts_with(b"PENTAX \0") || data.starts_with(b"SAMSUNG\0"))
+                {
+                    // Byte order at offset 8-9: "MM" or "II"
+                    let mn_endian = if &data[8..10] == b"MM" {
+                        Endianness::Big
+                    } else {
+                        Endianness::Little
+                    };
+
+                    // MakerNote IFD starts at offset 10
+                    let mn_data = &data[10..];
+                    if let Ok(parsed) = crate::makernotes::parse_maker_notes_with_tiff_data(
+                        mn_data,
+                        make.as_deref(),
+                        model.as_deref(),
+                        mn_endian,
+                        Some(data), // Use the private data as the base for relative offsets
+                        10,         // Offset to IFD within the private data
+                        None,       // DNG doesn't need makernote_file_offset
+                    ) {
+                        if !parsed.is_empty() {
+                            exif_data.maker_notes = Some(parsed);
+                        }
+                    }
+                }
+                // Check for Ricoh format: "RICOH\0II" or "RICOH\0MM"
+                else if data.len() > 8 && data.starts_with(b"RICOH\0") {
+                    let mn_endian = if &data[6..8] == b"MM" {
+                        Endianness::Big
+                    } else {
+                        Endianness::Little
+                    };
+
+                    // MakerNote IFD starts at offset 8
+                    let mn_data = &data[8..];
+                    if let Ok(parsed) = crate::makernotes::parse_maker_notes_with_tiff_data(
+                        mn_data,
+                        make.as_deref(),
+                        model.as_deref(),
+                        mn_endian,
+                        Some(data),
+                        8,
+                        None, // DNG doesn't need makernote_file_offset
+                    ) {
+                        if !parsed.is_empty() {
+                            exif_data.maker_notes = Some(parsed);
+                        }
+                    }
+                }
             }
         }
     }
@@ -918,4 +1044,60 @@ fn parse_double_array(
     }
 
     Ok(ExifValue::Double(values))
+}
+
+/// Find a tag's data offset within an IFD
+/// Returns the absolute offset (from data start) where the tag's data is located
+fn find_tag_data_offset(
+    data: &[u8],
+    ifd_offset: usize,
+    base_offset: usize,
+    tag_id: u16,
+    endian: Endianness,
+) -> Option<usize> {
+    if ifd_offset + 2 > data.len() {
+        return None;
+    }
+
+    let entry_count = read_u16(&data[ifd_offset..ifd_offset + 2], endian) as usize;
+    if entry_count > 1000 {
+        return None;
+    }
+
+    for i in 0..entry_count {
+        let entry_offset = ifd_offset + 2 + i * 12;
+        if entry_offset + 12 > data.len() {
+            return None;
+        }
+
+        let entry_tag = read_u16(&data[entry_offset..entry_offset + 2], endian);
+        if entry_tag == tag_id {
+            let tag_type = read_u16(&data[entry_offset + 2..entry_offset + 4], endian);
+            let count = read_u32(&data[entry_offset + 4..entry_offset + 8], endian) as usize;
+            let value_bytes = &data[entry_offset + 8..entry_offset + 12];
+
+            // Calculate the size of the value based on type
+            let type_size = match tag_type {
+                1 | 2 | 6 | 7 => 1, // BYTE, ASCII, SBYTE, UNDEFINED
+                3 | 8 => 2,         // SHORT, SSHORT
+                4 | 9 | 13 => 4,    // LONG, SLONG, IFD
+                5 | 10 => 8,        // RATIONAL, SRATIONAL
+                11 => 4,            // FLOAT
+                12 => 8,            // DOUBLE
+                _ => 1,             // Unknown, assume 1
+            };
+
+            let total_size = count * type_size;
+            if total_size <= 4 {
+                // Value is inline - return the entry offset + 8 (where value starts)
+                return Some(entry_offset + 8);
+            } else {
+                // Value is at offset
+                let data_offset = read_u32(value_bytes, endian) as usize + base_offset;
+                return Some(data_offset);
+            }
+        }
+    }
+
+    None
 }

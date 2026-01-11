@@ -471,7 +471,7 @@ pub const TAG_LENS_INFO: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 pub const TAG_RAW_DATA_UNIQUE_ID: ExifTagId = ExifTagId {
-    id: 0xC65C,
+    id: 0xC65D,
     ifd: TagGroup::Main,
 };
 pub const TAG_MASKED_AREAS: ExifTagId = ExifTagId {
@@ -491,7 +491,7 @@ pub const TAG_CALIBRATION_ILLUMINANT2: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 pub const TAG_BEST_QUALITY_SCALE: ExifTagId = ExifTagId {
-    id: 0xC65D,
+    id: 0xC65C,
     ifd: TagGroup::Main,
 };
 pub const TAG_ACTIVE_AREA: ExifTagId = ExifTagId {
@@ -986,7 +986,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_PREVIEW_COLOR_SPACE, "PreviewColorSpace");
     map.insert(TAG_LINEAR_RESPONSE_LIMIT, "LinearResponseLimit");
     map.insert(TAG_CAMERA_SERIAL_NUMBER, "CameraSerialNumber");
-    map.insert(TAG_LENS_INFO, "LensInfo");
+    // ExifTool calls DNG tag 0xC630 "DNGLensInfo" to distinguish from EXIF LensInfo (0xA432)
+    map.insert(TAG_LENS_INFO, "DNGLensInfo");
     map.insert(TAG_RAW_DATA_UNIQUE_ID, "RawDataUniqueID");
     map.insert(TAG_MASKED_AREAS, "MaskedAreas");
     map.insert(TAG_SHADOW_SCALE, "ShadowScale");
@@ -1068,7 +1069,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_IMAGE_UNIQUE_ID, "ImageUniqueID");
     map.insert(TAG_CAMERA_OWNER_NAME, "CameraOwnerName");
     map.insert(TAG_BODY_SERIAL_NUMBER, "BodySerialNumber");
-    map.insert(TAG_LENS_SPECIFICATION, "LensSpecification");
+    // ExifTool calls this "LensInfo" (official EXIF name is LensSpecification)
+    map.insert(TAG_LENS_SPECIFICATION, "LensInfo");
     map.insert(TAG_LENS_MAKE, "LensMake");
     map.insert(TAG_LENS_MODEL, "LensModel");
     map.insert(TAG_LENS_SERIAL_NUMBER, "LensSerialNumber");
@@ -1461,20 +1463,22 @@ pub fn get_sensitivity_type_description(value: u16) -> &'static str {
 }
 
 /// Human-readable descriptions for FileSource values
-pub fn get_file_source_description(value: u8) -> &'static str {
+/// Returns "Unknown (N)" for unknown values to match ExifTool format
+pub fn get_file_source_description(value: u8) -> String {
     match value {
-        1 => "Film Scanner",
-        2 => "Reflection Print Scanner",
-        3 => "Digital Camera",
-        _ => "Unknown",
+        1 => "Film Scanner".to_string(),
+        2 => "Reflection Print Scanner".to_string(),
+        3 => "Digital Camera".to_string(),
+        _ => format!("Unknown ({})", value),
     }
 }
 
 /// Human-readable descriptions for SceneType values
-pub fn get_scene_type_description(value: u8) -> &'static str {
+/// Returns "Unknown (N)" for unknown values to match ExifTool format
+pub fn get_scene_type_description(value: u8) -> String {
     match value {
-        1 => "Directly photographed",
-        _ => "Unknown",
+        1 => "Directly photographed".to_string(),
+        _ => format!("Unknown ({})", value),
     }
 }
 

@@ -1490,7 +1490,8 @@ pub fn decode_af_point_selected_multi(data: &[u16]) -> String {
     };
 
     // If there's a second value, it's the AF area mode
-    if data.len() > 1 && data[1] != 0 {
+    // Value 0 is "Single Point", 1 is "Expanded Area"
+    if data.len() > 1 {
         let area = match data[1] {
             0 => "Single Point",
             1 => "Expanded Area",

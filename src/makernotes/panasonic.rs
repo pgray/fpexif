@@ -433,13 +433,33 @@ define_tag_decoder! {
 }
 
 /// Decode ContrastMode with model-specific handling
+/// Based on ExifTool Panasonic.pm - some models output raw value, others decode
 pub fn decode_contrast_mode_with_model(value: u16, model: Option<&str>) -> String {
-    // Check if this is a GF/G2 series camera
-    let is_gf_model = model
-        .map(|m| m.contains("DMC-GF") || m.contains("DMC-G2"))
-        .unwrap_or(false);
+    // ExifTool uses different handling based on model:
+    // 1. GF series + G2: Uses -2,-1,Normal,... mapping
+    // 2. G1, L1, L10, LC80, FX10, TZ10, ZS7, DC-*: Output raw value (no decoding)
+    // 3. Other models: Use Normal,Low,High,... mapping
 
-    if is_gf_model {
+    let model_str = model.unwrap_or("");
+    let model_upper = model_str.to_uppercase();
+
+    // Check if this is a model that outputs raw values (no decoding)
+    let is_raw_output_model = model_upper.contains("DMC-G1")
+        || model_upper.contains("DMC-L1")
+        || model_upper.contains("DMC-L10")
+        || model_upper.contains("DMC-LC80")
+        || model_upper.contains("DMC-FX10")
+        || model_upper.contains("DMC-TZ10")
+        || model_upper.contains("DMC-ZS7")
+        || model_upper.starts_with("DC-");
+
+    // Check if this is a GF/G2 series camera
+    let is_gf_model = model_upper.contains("DMC-GF") || model_upper.contains("DMC-G2");
+
+    if is_raw_output_model {
+        // Output raw value like ExifTool
+        value.to_string()
+    } else if is_gf_model {
         decode_contrast_mode_gf_exiftool(value).to_string()
     } else {
         decode_contrast_mode_exiftool(value).to_string()
@@ -1078,9 +1098,26 @@ pub fn parse_panasonic_maker_notes(
                             ExifValue::Ascii(s)
                         }
                     } else {
-                        let offset = value_offset as usize;
-                        if offset + count as usize <= data.len() {
-                            let s = String::from_utf8_lossy(&data[offset..offset + count as usize])
+                        // Panasonic uses offsets relative to TIFF header
+                        let abs_offset = tiff_offset + value_offset as usize;
+                        let string_data = if let Some(tiff) = tiff_data {
+                            if abs_offset + count as usize <= tiff.len() {
+                                Some(&tiff[abs_offset..abs_offset + count as usize])
+                            } else {
+                                None
+                            }
+                        } else {
+                            // Fallback to maker note data
+                            let offset = value_offset as usize;
+                            if offset + count as usize <= data.len() {
+                                Some(&data[offset..offset + count as usize])
+                            } else {
+                                None
+                            }
+                        };
+
+                        if let Some(bytes) = string_data {
+                            let s = String::from_utf8_lossy(bytes)
                                 .trim_end_matches('\0')
                                 .to_string();
 
@@ -1572,8 +1609,13 @@ pub fn parse_panasonic_maker_notes(
                             } else if tag_id == PANA_INTERNAL_SERIAL_NUMBER {
                                 // InternalSerialNumber: decode factory code, date, and serial number
                                 // Format: XYZ14100603820 -> "(XYZ) 2014:10:06 no. 0382"
-                                if let Ok(s) = std::str::from_utf8(value_bytes) {
-                                    let s = s.trim_end_matches('\0');
+                                // Data may have trailing garbage after null byte, so extract before null
+                                let null_pos = value_bytes.iter().position(|&b| b == 0);
+                                let serial_bytes = match null_pos {
+                                    Some(pos) => &value_bytes[..pos],
+                                    None => value_bytes,
+                                };
+                                if let Ok(s) = std::str::from_utf8(serial_bytes) {
                                     // Pattern: [A-Z][0-9A-Z]{2}(\d{2})(\d{2})(\d{2})(\d{4})
                                     if s.len() >= 13 {
                                         let factory = &s[0..3];

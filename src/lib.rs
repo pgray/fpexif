@@ -84,6 +84,8 @@ pub struct ExifData {
     maker_notes: Option<std::collections::HashMap<u16, makernotes::MakerNoteTag>>,
     // RAF-specific metadata (for Fujifilm RAF files)
     pub raf_metadata: Option<formats::RafMetadata>,
+    // MRW-specific metadata (for Minolta RAW files)
+    pub mrw_metadata: Option<formats::MrwMetadata>,
 }
 
 impl ExifData {
@@ -94,6 +96,7 @@ impl ExifData {
             endian: data_types::Endianness::Little,
             maker_notes: None,
             raf_metadata: None,
+            mrw_metadata: None,
         }
     }
 
@@ -105,6 +108,16 @@ impl ExifData {
     /// Get RAF-specific metadata
     pub fn get_raf_metadata(&self) -> Option<&formats::RafMetadata> {
         self.raf_metadata.as_ref()
+    }
+
+    /// Set MRW-specific metadata (RIF block data)
+    pub fn set_mrw_metadata(&mut self, metadata: formats::MrwMetadata) {
+        self.mrw_metadata = Some(metadata);
+    }
+
+    /// Get MRW-specific metadata
+    pub fn get_mrw_metadata(&self) -> Option<&formats::MrwMetadata> {
+        self.mrw_metadata.as_ref()
     }
 
     /// Get a tag value by its numeric ID

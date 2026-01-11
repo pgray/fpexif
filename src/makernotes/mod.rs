@@ -33,7 +33,7 @@ pub fn parse_maker_notes(
     make: Option<&str>,
     endian: Endianness,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
-    parse_maker_notes_with_tiff_data(data, make, None, endian, None, 0)
+    parse_maker_notes_with_tiff_data(data, make, None, endian, None, 0, None)
 }
 
 /// Parse maker notes with access to the full TIFF data
@@ -48,6 +48,7 @@ pub fn parse_maker_notes(
 /// * `endian` - Byte order
 /// * `tiff_data` - Optional full TIFF/EXIF data for resolving absolute offsets
 /// * `tiff_offset` - Offset of TIFF header within the full data
+/// * `makernote_file_offset` - Optional file offset where MakerNote data starts (for Olympus PreviewImageStart)
 pub fn parse_maker_notes_with_tiff_data(
     data: &[u8],
     make: Option<&str>,
@@ -55,6 +56,7 @@ pub fn parse_maker_notes_with_tiff_data(
     endian: Endianness,
     tiff_data: Option<&[u8]>,
     tiff_offset: usize,
+    makernote_file_offset: Option<usize>,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let make_lower = make.map(|s| s.to_lowercase());
     let make_str = make_lower.as_deref().unwrap_or("");
@@ -68,13 +70,19 @@ pub fn parse_maker_notes_with_tiff_data(
     } else if make_str.contains("fuji") {
         fuji::parse_fuji_maker_notes(data, endian)
     } else if make_str.contains("olympus") {
-        olympus::parse_olympus_maker_notes(data, endian, tiff_data, tiff_offset)
+        olympus::parse_olympus_maker_notes(
+            data,
+            endian,
+            tiff_data,
+            tiff_offset,
+            makernote_file_offset,
+        )
     } else if make_str.contains("panasonic") {
         panasonic::parse_panasonic_maker_notes(data, endian, model, tiff_data, tiff_offset)
     } else if make_str.contains("pentax") || make_str.contains("ricoh") {
         pentax::parse_pentax_maker_notes(data, endian, tiff_data, tiff_offset)
     } else if make_str.contains("minolta") || make_str.contains("konica") {
-        minolta::parse_minolta_maker_notes(data, endian)
+        minolta::parse_minolta_maker_notes(data, endian, tiff_data, tiff_offset)
     } else if make_str.contains("kodak") || make_str.contains("eastman") {
         kodak::parse_kodak_maker_notes(data, endian)
     } else {

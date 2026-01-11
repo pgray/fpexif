@@ -79,6 +79,15 @@ pub const MINOLTA_CS_COLOR_FILTER: u16 = 41;
 pub const MINOLTA_CS_FOCUS_MODE: u16 = 48;
 pub const MINOLTA_CS_FOCUS_AREA: u16 = 49;
 
+// CameraInfoA100 sub-tag offsets (binary structure at tag 0x0010)
+pub const MINOLTA_A100_AF_SENSOR_ACTIVE: u16 = 0x01;
+pub const MINOLTA_A100_AF_POINT: u16 = 0x15;
+pub const MINOLTA_A100_AF_MODE: u16 = 0x16;
+pub const MINOLTA_A100_AF_AREA_MODE: u16 = 0x33;
+
+// CameraSettingsA100 sub-tag offsets (tag 0x0114, FORMAT int16u BigEndian)
+pub const MINOLTA_CSA100_FOCUS_MODE: u16 = 0x0c;
+
 /// Get the name of a Minolta maker note tag
 pub fn get_minolta_tag_name(tag_id: u16) -> Option<&'static str> {
     match tag_id {
@@ -96,7 +105,7 @@ pub fn get_minolta_tag_name(tag_id: u16) -> Option<&'static str> {
         MINOLTA_SCENE_MODE => Some("SceneMode"),
         MINOLTA_COLOR_MODE => Some("ColorMode"),
         MINOLTA_QUALITY => Some("Quality"),
-        MINOLTA_IMAGE_SIZE => Some("ImageSize"),
+        MINOLTA_IMAGE_SIZE => Some("MinoltaImageSize"),
         MINOLTA_FLASH_EXPOSURE_COMP => Some("FlashExposureComp"),
         MINOLTA_TELECONVERTER => Some("Teleconverter"),
         MINOLTA_IMAGE_STABILIZATION => Some("ImageStabilization"),
@@ -196,6 +205,17 @@ define_tag_decoder! {
         8 => "Fluorescent 2",
         11 => "Custom 2",
         12 => "Custom 3",
+        // DiMAGE A1/A2 large values (from ExifTool Minolta.pm)
+        0x0800000 => "Auto",
+        0x1800000 => "Daylight",
+        0x2800000 => "Cloudy",
+        0x3800000 => "Tungsten",
+        0x4800000 => "Flash",
+        0x5800000 => "Fluorescent",
+        0x6800000 => "Shade",
+        0x7800000 => "Custom1",
+        0x8800000 => "Custom2",
+        0x9800000 => "Custom3",
     }
 }
 
@@ -530,6 +550,56 @@ define_tag_decoder! {
     }
 }
 
+// CameraInfoA100 sub-tag decoders
+
+define_tag_decoder! {
+    minolta_a100_af_mode,
+    both: {
+        0 => "DMF",
+        1 => "AF-S",
+        2 => "AF-C",
+        3 => "AF-A",
+    }
+}
+
+define_tag_decoder! {
+    minolta_a100_af_point,
+    both: {
+        0 => "Auto",
+        1 => "Center",
+        2 => "Top",
+        3 => "Top-right",
+        4 => "Right",
+        5 => "Bottom-right",
+        6 => "Bottom",
+        7 => "Bottom-left",
+        8 => "Left",
+        9 => "Top-left",
+    }
+}
+
+define_tag_decoder! {
+    minolta_a100_af_area_mode,
+    both: {
+        0 => "Wide",
+        1 => "Local",
+        2 => "Spot",
+    }
+}
+
+// CameraSettingsA100 FocusMode decoder (tag 0x0114 offset 0x0c)
+// Different encoding from CameraInfoA100 AFMode
+define_tag_decoder! {
+    minolta_csa100_focus_mode,
+    both: {
+        0 => "AF-S",
+        1 => "AF-C",
+        4 => "AF-A",
+        5 => "Manual",
+        6 => "DMF",
+    }
+}
+
 /// Get Minolta/Sony A-mount lens name from lens ID
 /// Reference: Minolta.pm %minoltaLensTypes
 pub fn get_minolta_lens_name(lens_id: u32) -> Option<&'static str> {
@@ -783,6 +853,7 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness) -> HashMap<u16, Maker
             data[offset + 3],
         ]);
 
+        // Tag ID equals the entry index (tag N is at byte offset N*4)
         let tag_id = i as u16;
 
         // Decode specific tags
@@ -871,10 +942,92 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness) -> HashMap<u16, Maker
     tags
 }
 
+/// Parse CameraInfoA100 binary structure (tag 0x0010)
+/// Contains AFMode, AFPoint, AFAreaMode at specific byte offsets
+fn parse_camera_info_a100(data: &[u8]) -> HashMap<u16, MakerNoteTag> {
+    let mut tags = HashMap::new();
+
+    // AFPoint at offset 0x15
+    if data.len() > 0x15 {
+        let value = data[0x15] as u16;
+        let decoded = decode_minolta_a100_af_point_exiftool(value);
+        tags.insert(
+            MINOLTA_A100_AF_POINT,
+            MakerNoteTag {
+                tag_id: MINOLTA_A100_AF_POINT,
+                tag_name: Some("AFPoint"),
+                value: ExifValue::Ascii(decoded.to_string()),
+            },
+        );
+    }
+
+    // AFMode at offset 0x16
+    if data.len() > 0x16 {
+        let value = data[0x16] as u16;
+        let decoded = decode_minolta_a100_af_mode_exiftool(value);
+        tags.insert(
+            MINOLTA_A100_AF_MODE,
+            MakerNoteTag {
+                tag_id: MINOLTA_A100_AF_MODE,
+                tag_name: Some("AFMode"),
+                value: ExifValue::Ascii(decoded.to_string()),
+            },
+        );
+    }
+
+    // AFAreaMode at offset 0x33
+    if data.len() > 0x33 {
+        let value = data[0x33] as u16;
+        let decoded = decode_minolta_a100_af_area_mode_exiftool(value);
+        tags.insert(
+            MINOLTA_A100_AF_AREA_MODE,
+            MakerNoteTag {
+                tag_id: MINOLTA_A100_AF_AREA_MODE,
+                tag_name: Some("AFAreaMode"),
+                value: ExifValue::Ascii(decoded.to_string()),
+            },
+        );
+    }
+
+    tags
+}
+
+/// Parse CameraSettingsA100 binary structure (tag 0x0114)
+/// FORMAT int16u BigEndian - contains FocusMode at offset 0x0c
+fn parse_camera_settings_a100(data: &[u8]) -> HashMap<u16, MakerNoteTag> {
+    let mut tags = HashMap::new();
+
+    // FocusMode at offset 0x0c (12) - each entry is 2 bytes, BigEndian
+    let byte_offset = MINOLTA_CSA100_FOCUS_MODE as usize * 2;
+    if data.len() > byte_offset + 1 {
+        // BigEndian read
+        let value = ((data[byte_offset] as u16) << 8) | (data[byte_offset + 1] as u16);
+        let decoded = decode_minolta_csa100_focus_mode_exiftool(value);
+        tags.insert(
+            MINOLTA_CSA100_FOCUS_MODE,
+            MakerNoteTag {
+                tag_id: MINOLTA_CSA100_FOCUS_MODE,
+                tag_name: Some("FocusMode"),
+                value: ExifValue::Ascii(decoded.to_string()),
+            },
+        );
+    }
+
+    tags
+}
+
 /// Parse Minolta maker notes
+///
+/// # Arguments
+/// * `data` - The MakerNote data
+/// * `endian` - Byte order from EXIF
+/// * `tiff_data` - Optional TIFF data for resolving TIFF-relative offsets
+/// * `tiff_offset` - Offset of TIFF header within tiff_data (typically 6 for "Exif\0\0" prefix)
 pub fn parse_minolta_maker_notes(
     data: &[u8],
     endian: Endianness,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -883,10 +1036,11 @@ pub fn parse_minolta_maker_notes(
     }
 
     // Determine offset based on header type
-    // Some Minolta files have no header, some have various headers
+    // Minolta MakerNote offsets are ALWAYS TIFF-relative (like Canon, Olympus, etc.)
+    // This is consistent across all MRW/MNT files regardless of header type
     let ifd_offset = if data.len() >= 8 && data.starts_with(b"MLT0") {
         // MakerNote version header "MLT0" (4 bytes, not null-terminated)
-        // IFD starts right after
+        // IFD starts right after header
         4
     } else if data.len() >= 10 && data.starts_with(b"MINOLTA\0") {
         // Some cameras use "MINOLTA\0" header (8 bytes)
@@ -915,6 +1069,9 @@ pub fn parse_minolta_maker_notes(
         // No header, IFD starts at beginning
         0
     };
+
+    // Minolta MakerNote offsets are always TIFF-relative
+    let use_tiff_offsets = true;
 
     if ifd_offset >= data.len() {
         return Ok(tags);
@@ -983,8 +1140,21 @@ pub fn parse_minolta_maker_notes(
                     Endianness::Little => value_offset.to_le_bytes().to_vec(),
                     Endianness::Big => value_offset.to_be_bytes().to_vec(),
                 }
+            } else if use_tiff_offsets {
+                // Offsets are TIFF-relative, must use TIFF data
+                // The value_offset is relative to TIFF header, so add tiff_offset to get absolute position in tiff_data
+                let abs_offset = tiff_offset + value_offset as usize;
+                if let Some(tiff) = tiff_data {
+                    if abs_offset + value_size <= tiff.len() {
+                        tiff[abs_offset..abs_offset + value_size].to_vec()
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
             } else {
-                // Value at offset (relative to beginning of maker note data)
+                // Offsets are MakerNote-relative
                 let abs_offset = value_offset as usize;
                 if abs_offset + value_size <= data.len() {
                     data[abs_offset..abs_offset + value_size].to_vec()
@@ -1046,6 +1216,7 @@ pub fn parse_minolta_maker_notes(
                             MINOLTA_SCENE_MODE => Some(decode_scene_mode_exiftool(v).to_string()),
                             MINOLTA_COLOR_MODE => Some(decode_color_mode_exiftool(v).to_string()),
                             MINOLTA_QUALITY => Some(decode_quality_exiftool(v).to_string()),
+                            MINOLTA_IMAGE_SIZE => Some(decode_image_size_exiftool(v).to_string()),
                             MINOLTA_WHITE_BALANCE => {
                                 Some(decode_white_balance_exiftool(v).to_string())
                             }
@@ -1110,6 +1281,26 @@ pub fn parse_minolta_maker_notes(
                         }
 
                         // Also store the raw UNDEFINED value
+                        ExifValue::Undefined(value_bytes)
+                    } else if tag_id == MINOLTA_CAMERA_INFO_A100 {
+                        // Parse CameraInfoA100 binary structure
+                        // Contains AFMode, AFPoint, AFAreaMode at specific offsets
+                        let a100_tags = parse_camera_info_a100(&value_bytes);
+                        for (a100_tag_id, a100_tag) in a100_tags {
+                            // Use tag_id in the 0x2000-0x2FFF range to avoid conflicts
+                            let composite_tag_id = 0x2000 + a100_tag_id;
+                            tags.insert(composite_tag_id, a100_tag);
+                        }
+                        ExifValue::Undefined(value_bytes)
+                    } else if tag_id == MINOLTA_CAMERA_SETTINGS_5D {
+                        // Parse CameraSettingsA100/CameraSettings5D binary structure
+                        // Contains FocusMode (offset 0x0c) and other settings
+                        let csa100_tags = parse_camera_settings_a100(&value_bytes);
+                        for (csa100_tag_id, csa100_tag) in csa100_tags {
+                            // Use tag_id in the 0x3000-0x3FFF range to avoid conflicts
+                            let composite_tag_id = 0x3000 + csa100_tag_id;
+                            tags.insert(composite_tag_id, csa100_tag);
+                        }
                         ExifValue::Undefined(value_bytes)
                     } else if tag_id == MINOLTA_VERSION {
                         // MakerNoteVersion is a string like "MLT0"

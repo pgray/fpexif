@@ -73,6 +73,95 @@ fn format_float_10_sig(val: f64) -> String {
     trimmed.to_string()
 }
 
+/// Format LensInfo (EXIF 0xA432 LensSpecification) in ExifTool format
+/// Takes 4 rational values: (min_focal, max_focal, min_aperture, max_aperture)
+/// Outputs format like "24-105mm f/0" or "50mm f/1.4" or "18-55mm f/?"
+#[cfg(feature = "serde")]
+fn format_lens_info(rationals: &[(u32, u32)]) -> Option<String> {
+    if rationals.len() != 4 {
+        return None;
+    }
+
+    // Convert rationals to f64, handling 0/0 as undefined
+    let values: Vec<Option<f64>> = rationals
+        .iter()
+        .map(|(num, den)| {
+            if *den == 0 {
+                None // undefined
+            } else {
+                Some(*num as f64 / *den as f64)
+            }
+        })
+        .collect();
+
+    // Format focal length part
+    // 0/0 = undefined = "?", 0/1 = 0 means explicitly zero = "0"
+    let (min_focal, max_focal) = match (values[0], values[1]) {
+        (Some(min), Some(max)) if min > 0.0 => {
+            // Format as integers if they are whole numbers
+            let min_str = if min.fract() == 0.0 {
+                format!("{:.0}", min)
+            } else {
+                format!("{}", min)
+            };
+            if max > 0.0 && (max - min).abs() > 0.01 {
+                let max_str = if max.fract() == 0.0 {
+                    format!("{:.0}", max)
+                } else {
+                    format!("{}", max)
+                };
+                (min_str, Some(max_str))
+            } else {
+                (min_str, None)
+            }
+        }
+        (Some(0.0), _) | (_, Some(0.0)) => {
+            // Explicitly zero focal length - output "0"
+            ("0".to_string(), None)
+        }
+        // Undefined (0/0) - output "?"
+        _ => ("?".to_string(), None),
+    };
+
+    // Format aperture part
+    let aperture_str = match (values[2], values[3]) {
+        (None, _) | (_, None) => "?".to_string(), // undefined aperture
+        (Some(min), Some(max)) => {
+            if min == 0.0 {
+                "0".to_string() // 0 means unknown
+            } else if max > 0.0 && (max - min).abs() > 0.01 {
+                // Range of apertures
+                let min_str = if min.fract() == 0.0 {
+                    format!("{:.0}", min)
+                } else {
+                    format!("{:.1}", min)
+                };
+                let max_str = if max.fract() == 0.0 {
+                    format!("{:.0}", max)
+                } else {
+                    format!("{:.1}", max)
+                };
+                format!("{}-{}", min_str, max_str)
+            } else {
+                // Single aperture
+                if min.fract() == 0.0 {
+                    format!("{:.0}", min)
+                } else {
+                    format!("{:.1}", min)
+                }
+            }
+        }
+    };
+
+    // Combine
+    let focal_str = match max_focal {
+        Some(max) => format!("{}-{}", min_focal, max),
+        None => min_focal,
+    };
+
+    Some(format!("{}mm f/{}", focal_str, aperture_str))
+}
+
 /// Format EXIF MeteringMode - use manufacturer-specific naming where appropriate
 #[cfg(feature = "serde")]
 fn format_metering_mode(value: u16, make: Option<&str>) -> String {
@@ -170,8 +259,11 @@ fn format_short_value_with_make(value: u16, tag_id: u16, make: Option<&str>) -> 
 fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
     if den == 0 {
         // Match ExifTool: 0/0 = "undef", n/0 (n!=0) = "inf"
+        // ApertureValue and MaxApertureValue use uppercase "Inf"
         return if num == 0 {
             Value::String("undef".to_string())
+        } else if tag_id == 0x9202 || tag_id == 0x9205 {
+            Value::String("Inf".to_string())
         } else {
             Value::String("inf".to_string())
         };
@@ -180,65 +272,100 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
     match tag_id {
         0x829A => {
             // ExposureTime - ExifTool outputs:
-            // - Integer for whole seconds (25 -> 25)
-            // - Decimal for non-standard times (0.625 -> 0.6, 4.8 -> 4.8)
-            // - Fraction 1/n for standard shutter speeds
+            // - Decimal for times >= 0.25s (0.3, 0.5, 1, 2, 4.8, etc.)
+            // - Fraction 1/n for fast shutter speeds < 0.25s
             let exposure_time = num as f64 / den as f64;
-            if exposure_time >= 1.0 {
-                // For exposures >= 1 second
-                if (exposure_time - exposure_time.round()).abs() < 0.01 {
-                    // Whole second - output as integer
-                    Value::Number((exposure_time.round() as u32).into())
+            if exposure_time >= 0.25001 {
+                // For exposures >= ~1/4 second, use decimal format
+                let rounded = (exposure_time * 10.0).round() / 10.0;
+                if rounded == rounded.trunc() {
+                    // Whole number - output as integer
+                    Value::Number((rounded as i64).into())
                 } else {
-                    // Fractional seconds - output as decimal with 1 decimal place
-                    let rounded = (exposure_time * 10.0).round() / 10.0;
                     serde_json::Number::from_f64(rounded)
                         .map(Value::Number)
-                        .unwrap_or_else(|| Value::Number((exposure_time.round() as u32).into()))
+                        .unwrap_or_else(|| Value::Number((exposure_time.round() as i64).into()))
                 }
             } else if exposure_time > 0.0 {
-                // For sub-second exposures
+                // For sub-1/4 second exposures, use fraction format
                 let approx_den = (1.0 / exposure_time).round() as u32;
-                // Check if 1/n is a good approximation (within 10% to match ExifTool's rounding)
-                let approx_time = 1.0 / approx_den as f64;
-                if approx_den > 1 && (approx_time - exposure_time).abs() / exposure_time < 0.10 {
-                    Value::String(format!("1/{}", approx_den))
-                } else {
-                    // Use decimal for non-standard times
-                    let rounded = (exposure_time * 10.0).round() / 10.0;
-                    serde_json::Number::from_f64(rounded)
-                        .map(Value::Number)
-                        .unwrap_or_else(|| Value::Number(0.into()))
-                }
+                Value::String(format!("1/{}", approx_den))
             } else {
                 Value::Number(0.into())
             }
         }
         0x9201 => {
-            // ShutterSpeedValue (APEX) - convert to shutter speed fraction
+            // ShutterSpeedValue (APEX) - convert to shutter speed
+            // APEX: Tv = log2(1/t) where t is exposure time in seconds
+            // So: t = 1/2^Tv = 2^(-Tv)
+            // When Tv is positive, t < 1s (fast shutter, show as 1/N)
+            // When Tv is negative, t > 1s (slow shutter, show as decimal)
             let apex_value = num as f64 / den as f64;
-            let shutter_speed = 2f64.powf(apex_value);
-            let denominator = shutter_speed.round() as u32;
-            Value::String(format!("1/{}", denominator))
+            let exposure_time = 2f64.powf(-apex_value);
+
+            if exposure_time >= 0.25001 {
+                // Slow shutter - output as decimal like ExifTool
+                let rounded = (exposure_time * 10.0).round() / 10.0;
+                if rounded == rounded.trunc() {
+                    // Whole number
+                    Value::Number((rounded as i64).into())
+                } else {
+                    serde_json::Number::from_f64(rounded)
+                        .map(Value::Number)
+                        .unwrap_or_else(|| Value::Number((rounded as i64).into()))
+                }
+            } else {
+                // Fast shutter - output as fraction 1/N
+                let denominator = (1.0 / exposure_time).round() as u32;
+                Value::String(format!("1/{}", denominator))
+            }
         }
         0x9202 | 0x9205 => {
             // ApertureValue, MaxApertureValue (APEX) - convert to f-number
             let apex_value = num as f64 / den as f64;
             let f_number = 2f64.powf(apex_value / 2.0);
-            let rounded = (f_number * 10.0).round() / 10.0;
-            serde_json::Number::from_f64(rounded)
-                .map(Value::Number)
-                .unwrap_or_else(|| Value::String(rounded.to_string()))
+            // ExifTool uses uppercase "Inf" for infinity
+            if f_number.is_infinite() {
+                Value::String("Inf".to_string())
+            } else {
+                let rounded = (f_number * 10.0).round() / 10.0;
+                serde_json::Number::from_f64(rounded)
+                    .map(Value::Number)
+                    .unwrap_or_else(|| Value::String(rounded.to_string()))
+            }
         }
         0x829D => {
-            // FNumber - format with at least one decimal place for ExifTool compatibility
+            // FNumber - format depends on source
             let f_number = num as f64 / den as f64;
-            let rounded = (f_number * 10.0).round() / 10.0;
-            // ExifTool always shows one decimal place (e.g., 8.0, not 8)
-            Value::Number(
-                serde_json::Number::from_f64(rounded)
-                    .unwrap_or_else(|| serde_json::Number::from(0)),
-            )
+            // CRW files store FNumber with denominator 1000 (high precision from APEX value)
+            // ExifTool uses %.2g format for Canon ShotInfo FNumber
+            // CR2/standard EXIF uses %.1f format via PrintFNumber
+            if den == 1000 {
+                // CRW source - use %.2g equivalent (2 significant figures)
+                // Values >= 10: round to integer (10.37 -> 10)
+                // Values < 10: keep 1 decimal (5.6 -> 5.6)
+                if f_number >= 10.0 {
+                    Value::Number(serde_json::Number::from(f_number.round() as i64))
+                } else {
+                    let rounded = (f_number * 10.0).round() / 10.0;
+                    Value::Number(
+                        serde_json::Number::from_f64(rounded)
+                            .unwrap_or_else(|| serde_json::Number::from(0)),
+                    )
+                }
+            } else {
+                // Standard EXIF - use %.1f format
+                let rounded = (f_number * 10.0).round() / 10.0;
+                // Output integer when whole number (8 not 8.0), decimal otherwise
+                if rounded.fract() == 0.0 {
+                    Value::Number(serde_json::Number::from(rounded as i64))
+                } else {
+                    Value::Number(
+                        serde_json::Number::from_f64(rounded)
+                            .unwrap_or_else(|| serde_json::Number::from(0)),
+                    )
+                }
+            }
         }
         0x920A => {
             // FocalLength - add mm unit with decimal formatting
@@ -336,8 +463,11 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
 fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
     if den == 0 {
         // Match ExifTool: 0/0 = "undef", n/0 (n!=0) = "inf"
+        // ApertureValue and MaxApertureValue use uppercase "Inf"
         return if num == 0 {
             Value::String("undef".to_string())
+        } else if tag_id == 0x9202 || tag_id == 0x9205 {
+            Value::String("Inf".to_string())
         } else {
             Value::String("inf".to_string())
         };
@@ -345,11 +475,30 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
 
     match tag_id {
         0x9201 => {
-            // ShutterSpeedValue (APEX) - convert to shutter speed fraction
+            // ShutterSpeedValue (APEX) - convert to shutter speed
+            // APEX: Tv = log2(1/t) where t is exposure time in seconds
+            // So: t = 1/2^Tv = 2^(-Tv)
+            // When Tv is positive, t < 1s (fast shutter, show as 1/N)
+            // When Tv is negative, t > 1s (slow shutter, show as decimal)
             let apex_value = num as f64 / den as f64;
-            let shutter_speed = 2f64.powf(apex_value);
-            let denominator = shutter_speed.round() as i32;
-            Value::String(format!("1/{}", denominator))
+            let exposure_time = 2f64.powf(-apex_value);
+
+            if exposure_time >= 0.25001 {
+                // Slow shutter - output as decimal like ExifTool
+                let rounded = (exposure_time * 10.0).round() / 10.0;
+                if rounded == rounded.trunc() {
+                    // Whole number
+                    Value::Number((rounded as i64).into())
+                } else {
+                    serde_json::Number::from_f64(rounded)
+                        .map(Value::Number)
+                        .unwrap_or_else(|| Value::Number((rounded as i64).into()))
+                }
+            } else {
+                // Fast shutter - output as fraction 1/N
+                let denominator = (1.0 / exposure_time).round() as i32;
+                Value::String(format!("1/{}", denominator))
+            }
         }
         0x9204 => {
             // ExposureBiasValue/ExposureCompensation
@@ -563,9 +712,24 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
                     // Try to decode as UTF-16
                     if content.len() >= 2 {
                         // Check for BOM
-                        let is_le = content.len() >= 2 && content[0] == 0xFF && content[1] == 0xFE;
-                        let is_be = content.len() >= 2 && content[0] == 0xFE && content[1] == 0xFF;
-                        let start = if is_le || is_be { 2 } else { 0 };
+                        let has_le_bom =
+                            content.len() >= 2 && content[0] == 0xFF && content[1] == 0xFE;
+                        let has_be_bom =
+                            content.len() >= 2 && content[0] == 0xFE && content[1] == 0xFF;
+                        let start = if has_le_bom || has_be_bom { 2 } else { 0 };
+
+                        // Detect endianness: if no BOM, check if data looks like BE
+                        // (first byte null, second byte ASCII) or LE (first byte ASCII, second null)
+                        let is_be = if has_be_bom {
+                            true
+                        } else if has_le_bom {
+                            false
+                        } else if content.len() >= 2 {
+                            // Heuristic: if first byte is 0 and second is ASCII, it's BE
+                            content[0] == 0 && content[1] > 0 && content[1] < 128
+                        } else {
+                            false // default to LE
+                        };
 
                         if content.len() > start {
                             let u16_values: Vec<u16> = content[start..]
@@ -615,11 +779,11 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
         }
         0xA300 if data.len() == 1 => {
             // FileSource
-            Value::String(crate::tags::get_file_source_description(data[0]).to_string())
+            Value::String(crate::tags::get_file_source_description(data[0]))
         }
         0xA301 if data.len() == 1 => {
             // SceneType
-            Value::String(crate::tags::get_scene_type_description(data[0]).to_string())
+            Value::String(crate::tags::get_scene_type_description(data[0]))
         }
         // CFAPattern (0xA302 EXIF SubIFD) as Undefined type - format as [Red,Green][Green,Blue]
         0xA302 if data.len() >= 4 => {
@@ -912,15 +1076,22 @@ pub fn format_exif_value_for_json_with_make_and_name(
                     .map(|m| m.to_uppercase().contains("OLYMPUS"))
                     .unwrap_or(false);
 
-            let cleaned = if is_olympus_internal_serial {
+            let cleaned: std::borrow::Cow<str> = if is_olympus_internal_serial {
                 // Only trim null bytes, keep trailing spaces
-                s.trim_end_matches('\0')
+                std::borrow::Cow::Borrowed(s.trim_end_matches('\0'))
             } else {
-                s.trim_end_matches('\0').trim()
+                // Remove ALL null bytes (not just ends), then trim whitespace
+                // This handles EXIF Copyright format "Artist\0Editor\0" where both may be empty
+                let without_nulls: String = s.chars().filter(|&c| c != '\0').collect();
+                std::borrow::Cow::Owned(without_nulls.trim().to_string())
             };
+            // If string is empty after trimming, return empty string
+            if cleaned.is_empty() {
+                return Value::String(String::new());
+            }
             // ExifTool outputs pure numeric strings (like SerialNumber, SubSecTime)
             // as JSON numbers, so we do the same
-            if is_numeric_string(cleaned) {
+            if is_numeric_string(&cleaned) {
                 // Try parsing as unsigned integer first
                 if let Ok(n) = cleaned.parse::<u64>() {
                     return Value::Number(n.into());
@@ -941,8 +1112,8 @@ pub fn format_exif_value_for_json_with_make_and_name(
 
         // Single-value Byte
         ExifValue::Byte(v) if v.len() == 1 => match tag_id {
-            0xA300 => Value::String(crate::tags::get_file_source_description(v[0]).to_string()),
-            0xA301 => Value::String(crate::tags::get_scene_type_description(v[0]).to_string()),
+            0xA300 => Value::String(crate::tags::get_file_source_description(v[0])),
+            0xA301 => Value::String(crate::tags::get_scene_type_description(v[0])),
             // GPSAltitudeRef (0x0005 in GPS IFD)
             0x0005 => {
                 Value::String(crate::tags::get_gps_altitude_ref_description(v[0]).to_string())
@@ -951,7 +1122,13 @@ pub fn format_exif_value_for_json_with_make_and_name(
         },
 
         // Single-value Short - use helper function with make for manufacturer-specific decoding
-        ExifValue::Short(v) if v.len() == 1 => format_short_value_with_make(v[0], tag_id, make),
+        ExifValue::Short(v) if v.len() == 1 => {
+            // Fujifilm AutoDynamicRange: format as "value%"
+            if tag_name == Some("AutoDynamicRange") {
+                return Value::String(format!("{}%", v[0]));
+            }
+            format_short_value_with_make(v[0], tag_id, make)
+        }
 
         // Single-value other numeric types
         ExifValue::Long(v) if v.len() == 1 => Value::Number(v[0].into()),
@@ -989,6 +1166,26 @@ pub fn format_exif_value_for_json_with_make_and_name(
                 serde_json::Number::from_f64(val)
                     .map(Value::Number)
                     .unwrap_or_else(|| Value::String(val.to_string()))
+            }
+        }
+
+        // LensInfo/LensSpecification (0xA432) and DNGLensInfo (0xC630) - format as "24-105mm f/0"
+        ExifValue::Rational(v) if (tag_id == 0xA432 || tag_id == 0xC630) && v.len() == 4 => {
+            if let Some(formatted) = format_lens_info(v) {
+                Value::String(formatted)
+            } else {
+                // Fallback to raw values if formatting fails
+                let decimals: Vec<String> = v
+                    .iter()
+                    .map(|&(num, den)| {
+                        if den == 0 {
+                            "0".to_string()
+                        } else {
+                            format_float_10_sig(num as f64 / den as f64)
+                        }
+                    })
+                    .collect();
+                Value::String(decimals.join(" "))
             }
         }
 
@@ -1030,6 +1227,12 @@ pub fn format_exif_value_for_json_with_make_and_name(
             // CFAPlaneColor (0xC616 DNG) - convert indices to color names
             } else if tag_id == 0xC616 {
                 Value::String(crate::tags::get_cfa_plane_color_description(v))
+            // RawImageDigest (0xC71C) - format as lowercase hex string
+            } else if tag_id == 0xC71C {
+                Value::String(v.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+            // RawDataUniqueID (0xC65D) - format as uppercase hex string
+            } else if tag_id == 0xC65D {
+                Value::String(v.iter().map(|b| format!("{:02X}", b)).collect::<String>())
             } else {
                 // Default to space-separated strings (ExifTool behavior)
                 Value::String(
@@ -1186,8 +1389,11 @@ pub fn format_exif_value_for_json_with_make_and_name(
                 .map(|&(num, den)| {
                     if den == 0 {
                         // Match ExifTool: 0/0 = "undef", n/0 (n!=0) = "inf"
+                        // ApertureValue and MaxApertureValue use uppercase "Inf"
                         if num == 0 {
                             "undef".to_string()
+                        } else if tag_id == 0x9202 || tag_id == 0x9205 {
+                            "Inf".to_string()
                         } else {
                             "inf".to_string()
                         }
@@ -1205,8 +1411,11 @@ pub fn format_exif_value_for_json_with_make_and_name(
                 .map(|&(num, den)| {
                     if den == 0 {
                         // Match ExifTool: 0/0 = "undef", n/0 (n!=0) = "inf"
+                        // ApertureValue and MaxApertureValue use uppercase "Inf"
                         if num == 0 {
                             "undef".to_string()
+                        } else if tag_id == 0x9202 || tag_id == 0x9205 {
+                            "Inf".to_string()
                         } else {
                             "inf".to_string()
                         }
@@ -1222,36 +1431,6 @@ pub fn format_exif_value_for_json_with_make_and_name(
         // Undefined - use helper function
         ExifValue::Undefined(v) => format_undefined_value(v, tag_id),
     }
-}
-
-/// Get image dimensions from EXIF data, prioritizing IFD0 tags
-/// Returns (width, height) as Options
-/// Priority: IFD0 ImageWidth/Length (0x0100/0x0101) > ExifImageWidth/Height (0xa002/0xa003)
-#[cfg(feature = "serde")]
-fn get_image_dimensions(exif_data: &ExifData) -> (Option<u64>, Option<u64>) {
-    // Helper to extract dimension value
-    fn extract_dimension(value: Option<&ExifValue>) -> Option<u64> {
-        match value {
-            Some(ExifValue::Long(v)) if !v.is_empty() => Some(v[0] as u64),
-            Some(ExifValue::Short(v)) if !v.is_empty() => Some(v[0] as u64),
-            _ => None,
-        }
-    }
-
-    // Try IFD0 ImageWidth (0x0100) and ImageLength (0x0101) first
-    // These are the actual raw image dimensions for most cameras
-    let ifd0_width = extract_dimension(exif_data.get_tag_by_id(0x0100));
-    let ifd0_height = extract_dimension(exif_data.get_tag_by_id(0x0101));
-
-    if ifd0_width.is_some() && ifd0_height.is_some() {
-        return (ifd0_width, ifd0_height);
-    }
-
-    // Fall back to ExifImageWidth/Height (0xa002/0xa003)
-    let exif_width = extract_dimension(exif_data.get_tag_by_id(0xa002));
-    let exif_height = extract_dimension(exif_data.get_tag_by_id(0xa003));
-
-    (exif_width.or(ifd0_width), exif_height.or(ifd0_height))
 }
 
 /// Convert ExifData to exiftool-compatible JSON
@@ -1270,6 +1449,13 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         _ => None,
     });
     let make_ref = make.as_deref();
+
+    // Extract Model for model-specific formatting (tag 0x0110)
+    let model: Option<String> = exif_data.get_tag_by_id(0x0110).and_then(|v| match v {
+        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        _ => None,
+    });
+    let model_ref = model.as_deref();
 
     // Convert each tag to a key-value pair
     // Process Main IFD first to give it priority, then other IFDs only if tag not already present
@@ -1317,12 +1503,19 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     }
 
     // Add derived fields for exiftool compatibility
-    // Aperture is derived from FNumber
+    // Aperture is derived from FNumber, rounded to 1 decimal place (%.1f equivalent)
     if let Some(ExifValue::Rational(v)) = exif_data.get_tag_by_id(0x829D) {
-        if !v.is_empty() && v[0].1 != 0 {
-            let aperture = v[0].0 as f64 / v[0].1 as f64;
-            if let Some(num) = serde_json::Number::from_f64(aperture) {
-                output.insert("Aperture".to_string(), Value::Number(num));
+        if !v.is_empty() {
+            // FNumber 0 means Inf (undefined aperture)
+            if v[0].0 == 0 || v[0].1 == 0 {
+                output.insert("Aperture".to_string(), Value::String("Inf".to_string()));
+            } else {
+                let aperture = v[0].0 as f64 / v[0].1 as f64;
+                // ExifTool's PrintFNumber uses %.1f format
+                let rounded = (aperture * 10.0).round() / 10.0;
+                if let Some(num) = serde_json::Number::from_f64(rounded) {
+                    output.insert("Aperture".to_string(), Value::Number(num));
+                }
             }
         }
     }
@@ -1408,26 +1601,8 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     }
 
     // ImageSize and Megapixels - computed from image dimensions
-    // For Sony: Use IFD0 ImageWidth/Length (0x0100/0x0101) which matches ExifTool
-    // For other brands: Let the later code handle MakerNote-specific dimensions
-    let is_sony = make_ref
-        .map(|m| m.to_uppercase().contains("SONY"))
-        .unwrap_or(false);
-    if is_sony {
-        let (width, height) = get_image_dimensions(exif_data);
-        if let (Some(w), Some(h)) = (width, height) {
-            output.insert(
-                "ImageSize".to_string(),
-                Value::String(format!("{}x{}", w, h)),
-            );
-            let megapixels = (w as f64 * h as f64) / 1_000_000.0;
-            // Round to 1 decimal place
-            let rounded = (megapixels * 10.0).round() / 10.0;
-            if let Some(num) = serde_json::Number::from_f64(rounded) {
-                output.insert("Megapixels".to_string(), Value::Number(num));
-            }
-        }
-    }
+    // For Sony: Only compute early for newer cameras (A6000+, A7+) that have SonyImageWidthMax
+    // Older cameras (A100-A900) will have ImageSize computed later from FullImageSize
 
     // Format GPS coordinates with DMS (degrees, minutes, seconds) and direction
     // GPSLatitude (0x0002) with GPSLatitudeRef (0x0001)
@@ -1454,11 +1629,29 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
-    // GPSTimeStamp (0x0007) - format as HH:MM:SS
-    if let Some(ExifValue::Rational(time)) = exif_data.get_tag_by_id(0x0007) {
-        if time.len() >= 3 {
-            let formatted = format_gps_timestamp(time);
-            output.insert("GPSTimeStamp".to_string(), Value::String(formatted));
+    // GPSTimeStamp (0x0007 in GPS IFD) - format as HH:MM:SS
+    // Find GPSTimeStamp tag (id 0x0007 with 3 rationals) and format properly
+    // Some cameras store this as SRational instead of Rational
+    for (tag_id, value) in exif_data.iter() {
+        if tag_id.id == 0x0007 {
+            match value {
+                ExifValue::Rational(time) if time.len() >= 3 => {
+                    let formatted = format_gps_timestamp(time);
+                    output.insert("GPSTimeStamp".to_string(), Value::String(formatted));
+                    break;
+                }
+                ExifValue::SRational(time) if time.len() >= 3 => {
+                    // Convert signed to unsigned for formatting
+                    let unsigned: Vec<(u32, u32)> = time
+                        .iter()
+                        .map(|&(n, d)| (n.unsigned_abs(), d.unsigned_abs()))
+                        .collect();
+                    let formatted = format_gps_timestamp(&unsigned);
+                    output.insert("GPSTimeStamp".to_string(), Value::String(formatted));
+                    break;
+                }
+                _ => {}
+            }
         }
     }
 
@@ -1472,11 +1665,12 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 }
                 _ => None,
             });
-            // ExifTool uses integer for whole numbers, 1 decimal otherwise
-            let alt_str = if altitude.fract() == 0.0 {
-                format!("{:.0}", altitude)
+            // ExifTool rounds to 1 decimal, then uses integer if whole number
+            let rounded = (altitude * 10.0).round() / 10.0;
+            let alt_str = if rounded.fract() == 0.0 {
+                format!("{:.0}", rounded)
             } else {
-                format!("{:.1}", altitude)
+                format!("{:.1}", rounded)
             };
             let formatted = if let Some(ref_str) = ref_desc {
                 format!("{} m {}", alt_str, ref_str)
@@ -1513,6 +1707,105 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             other => other,
         };
         output.insert("GPSStatus".to_string(), Value::String(expanded.to_string()));
+    }
+
+    // GPSMeasureMode (0x000A) - expand to human-readable description
+    if let Some(ExifValue::Ascii(mode)) = exif_data.get_tag_by_id(0x000A) {
+        let expanded = match mode.trim() {
+            "2" => "2-Dimensional Measurement",
+            "3" => "3-Dimensional Measurement",
+            other => other,
+        };
+        output.insert(
+            "GPSMeasureMode".to_string(),
+            Value::String(expanded.to_string()),
+        );
+    }
+
+    // GPSSpeedRef (0x000C) - expand to human-readable units
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x000C) {
+        let trimmed = ref_val.trim();
+        let expanded = match trimmed {
+            "K" => "km/h".to_string(),
+            "M" => "mph".to_string(),
+            "N" => "knots".to_string(),
+            "" => "Unknown ()".to_string(),
+            other => format!("Unknown ({})", other),
+        };
+        output.insert("GPSSpeedRef".to_string(), Value::String(expanded));
+    }
+
+    // GPSTrackRef (0x000E) - expand to North reference type
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x000E) {
+        let trimmed = ref_val.trim();
+        let expanded = match trimmed {
+            "M" => "Magnetic North".to_string(),
+            "T" => "True North".to_string(),
+            "" => "Unknown ()".to_string(),
+            other => format!("Unknown ({})", other),
+        };
+        output.insert("GPSTrackRef".to_string(), Value::String(expanded));
+    }
+
+    // GPSImgDirectionRef (0x0010) - expand to North reference type
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x0010) {
+        let trimmed = ref_val.trim();
+        let expanded = match trimmed {
+            "M" => "Magnetic North".to_string(),
+            "T" => "True North".to_string(),
+            "" => "Unknown ()".to_string(),
+            other => format!("Unknown ({})", other),
+        };
+        output.insert("GPSImgDirectionRef".to_string(), Value::String(expanded));
+    }
+
+    // GPSDestLatitudeRef (0x0013) - expand N/S to North/South
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x0013) {
+        let trimmed = ref_val.trim();
+        if !trimmed.is_empty() {
+            let expanded = crate::tags::get_gps_latitude_ref_description(trimmed);
+            output.insert(
+                "GPSDestLatitudeRef".to_string(),
+                Value::String(expanded.to_string()),
+            );
+        }
+    }
+
+    // GPSDestLongitudeRef (0x0015) - expand E/W to East/West
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x0015) {
+        let trimmed = ref_val.trim();
+        if !trimmed.is_empty() {
+            let expanded = crate::tags::get_gps_longitude_ref_description(trimmed);
+            output.insert(
+                "GPSDestLongitudeRef".to_string(),
+                Value::String(expanded.to_string()),
+            );
+        }
+    }
+
+    // GPSDestBearingRef (0x0017) - expand to North reference type
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x0017) {
+        let trimmed = ref_val.trim();
+        let expanded = match trimmed {
+            "M" => "Magnetic North".to_string(),
+            "T" => "True North".to_string(),
+            "" => "Unknown ()".to_string(),
+            other => format!("Unknown ({})", other),
+        };
+        output.insert("GPSDestBearingRef".to_string(), Value::String(expanded));
+    }
+
+    // GPSDestDistanceRef (0x0019) - expand to distance units
+    if let Some(ExifValue::Ascii(ref_val)) = exif_data.get_tag_by_id(0x0019) {
+        let trimmed = ref_val.trim();
+        let expanded = match trimmed {
+            "K" => "Kilometers".to_string(),
+            "M" => "Miles".to_string(),
+            "N" => "Nautical Miles".to_string(),
+            "" => "Unknown ()".to_string(),
+            other => format!("Unknown ({})", other),
+        };
+        output.insert("GPSDestDistanceRef".to_string(), Value::String(expanded));
     }
 
     // Add derived date fields for ExifTool compatibility
@@ -1583,8 +1876,8 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         // Tags where MakerNote should override EXIF (ExifTool behavior)
         // FocusMode added: Sony has multiple FocusMode tags (0x201B, 0xB042, 0xB04E) where
         // higher IDs are used for newer cameras and should take precedence
-        // Note: Saturation/Contrast/Sharpness NOT included - only CameraSettings sub-tags
-        // (for A200/A300/A350/A700/A850/A900) should override EXIF
+        // Note: Saturation/Contrast/Sharpness handled separately below for Pentax/Samsung
+        // where MakerNote format differs (e.g., "0 (normal)" vs standard "Normal")
         const MAKERNOTE_PRIORITY_TAGS: &[&str] =
             &["MeteringMode", "WhiteBalance", "LightSource", "FocusMode"];
 
@@ -1602,15 +1895,67 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             // Allow MakerNote to override EXIF for priority tags
             // Also allow Sony CameraSettings sub-tags (0xC01C-0xC01E) to override EXIF
             // These are extracted from the CameraSettings blob for A200/A300/A350/A700/A850/A900
-            let is_sony_camera_settings_subtag = *tag_id >= 0xC01C
-                && *tag_id <= 0xC01E
-                && make_ref.is_some_and(|m| m.contains("SONY"));
-            let should_insert =
-                if MAKERNOTE_PRIORITY_TAGS.contains(&tag_name) || is_sony_camera_settings_subtag {
-                    true // Always use MakerNote value
-                } else {
-                    !output.contains_key(tag_name) // Only add if not already present
-                };
+            // Also allow Sony RIF sub-tags (0xD001-0xD003) from MRWInfo for A100
+            let is_sony_camera_settings_subtag = (*tag_id >= 0xC01C && *tag_id <= 0xC01E)
+                || (*tag_id >= 0xD001 && *tag_id <= 0xD003);
+            let is_sony_subtag =
+                is_sony_camera_settings_subtag && make_ref.is_some_and(|m| m.contains("SONY"));
+
+            // For Pentax/Samsung cameras in native formats (PEF, SRW), Saturation/Contrast/
+            // Sharpness should use standard EXIF values (0xA408/0xA409/0xA40A). ExifTool
+            // outputs "Normal", "Hard", "Soft" from EXIF, not Pentax format like "+1 (medium hard)"
+            // However, for DNG files with Pentax MakerNotes, ExifTool uses MakerNote values.
+            let is_pentax_or_samsung = make_ref.is_some_and(|m| {
+                let upper = m.to_uppercase();
+                upper.contains("PENTAX") || upper.contains("SAMSUNG") || upper.contains("RICOH")
+            });
+            let is_dng_file = source_file
+                .map(|f| f.to_uppercase().ends_with(".DNG"))
+                .unwrap_or(false);
+            let is_scs_tag =
+                tag_name == "Saturation" || tag_name == "Contrast" || tag_name == "Sharpness";
+            let is_pentax_skip_tag = is_pentax_or_samsung && !is_dng_file && is_scs_tag;
+
+            // Skip Pentax/Samsung Saturation/Contrast/Sharpness in non-DNG files
+            if is_pentax_skip_tag {
+                continue;
+            }
+
+            // For DNG files with Pentax MakerNotes, these tags should override EXIF
+            let is_pentax_dng_override = is_pentax_or_samsung && is_dng_file && is_scs_tag;
+
+            // For Minolta cameras, MeteringMode should NOT override EXIF - ExifTool uses
+            // the standard EXIF MeteringMode (0x9207) not the CameraSettings one
+            let is_minolta = make_ref.is_some_and(|m| {
+                let upper = m.to_uppercase();
+                upper.contains("MINOLTA") || upper.contains("KONICA")
+            });
+            let is_minolta_metering_skip = is_minolta && tag_name == "MeteringMode";
+
+            // For Kodak cameras, MeteringMode should NOT override EXIF - ExifTool uses
+            // the standard EXIF MeteringMode (0x9207) not the MakerNote one
+            let is_kodak = make_ref.is_some_and(|m| m.to_uppercase().contains("KODAK"));
+            let is_kodak_metering_skip = is_kodak && tag_name == "MeteringMode";
+
+            // For Nikon, SerialNumber tag 0x00A0 should override 0x001D because
+            // 0x001D often contains model name on older cameras, not serial number
+            let is_nikon = make_ref.is_some_and(|m| m.to_uppercase().contains("NIKON"));
+            let is_nikon_serial_override =
+                is_nikon && tag_name == "SerialNumber" && *tag_id == 0x00A0;
+
+            let should_insert = if is_minolta_metering_skip || is_kodak_metering_skip {
+                false // Skip MakerNote MeteringMode, use EXIF instead
+            } else if is_nikon_serial_override
+                || MAKERNOTE_PRIORITY_TAGS.contains(&tag_name)
+                || is_sony_subtag
+                || is_pentax_dng_override
+            {
+                // Nikon SerialNumber 0x00A0 always overrides 0x001D
+                // Priority tags always use MakerNote value
+                true
+            } else {
+                !output.contains_key(tag_name) // Only add if not already present
+            };
 
             if should_insert {
                 let json_value = format_exif_value_for_json_with_make_and_name(
@@ -1668,9 +2013,54 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     } else if !output.contains_key("LensID") {
         if is_canon || is_olympus {
-            // Canon/Olympus: LensID should come from LensType (the decoded lens type value)
-            if let Some(lens_type) = output.get("LensType").cloned() {
-                output.insert("LensID".to_string(), lens_type);
+            // Canon/Olympus: LensID should come from LensType, but disambiguated using LensModel
+            // If LensType has "or ..." suffix and LensModel matches the Canon lens, remove the suffix
+            if let Some(Value::String(lens_type)) = output.get("LensType") {
+                let lens_id = if lens_type.contains(" or ") {
+                    // Try to disambiguate using LensModel
+                    if let Some(Value::String(lens_model)) = output.get("LensModel") {
+                        // LensModel has format like "EF17-40mm f/4L USM" - normalize and compare
+                        let model_normalized = lens_model
+                            .replace("EF-S", "EF-S ")
+                            .replace("EF", "EF ")
+                            .replace("  ", " ")
+                            .trim()
+                            .to_string();
+
+                        // Extract Canon lens name (before " or ")
+                        let canon_part = lens_type.split(" or ").next().unwrap_or(lens_type);
+
+                        // Check if the model matches the Canon lens (focal lengths and aperture)
+                        let model_matches = {
+                            // Extract key parts: focal length and aperture
+                            let model_has_match =
+                                model_normalized.contains("f/") || lens_model.contains("f/");
+                            let type_has_match = canon_part.contains("f/");
+
+                            // If both have aperture info, they should match
+                            if model_has_match && type_has_match {
+                                // Simple check: if LensModel starts with EF/EF-S and
+                                // contains similar focal length info, it's likely a Canon lens
+                                lens_model.starts_with("EF")
+                            } else {
+                                // Fall back to checking if it looks like a Canon lens
+                                lens_model.starts_with("EF")
+                            }
+                        };
+
+                        if model_matches {
+                            // Use Canon part only (without " or ..." suffix)
+                            Value::String(canon_part.to_string())
+                        } else {
+                            Value::String(lens_type.clone())
+                        }
+                    } else {
+                        Value::String(lens_type.clone())
+                    }
+                } else {
+                    Value::String(lens_type.clone())
+                };
+                output.insert("LensID".to_string(), lens_id);
             }
         } else {
             // Nikon and others: Use LensModel if available
@@ -1692,7 +2082,25 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 };
                 output.insert("LensID".to_string(), lens_id);
             } else if let Some(lens_type) = output.get("LensType").cloned() {
-                output.insert("LensID".to_string(), lens_type);
+                // Panasonic/Leica: Format lens name by adding "mm" before /F
+                // e.g., "LUMIX G VARIO 14-45/F3.5-5.6" -> "LUMIX G VARIO 14-45mm F3.5-5.6"
+                let is_panasonic = make_ref
+                    .map(|m| {
+                        let upper = m.to_uppercase();
+                        upper.contains("PANASONIC") || upper.contains("LEICA")
+                    })
+                    .unwrap_or(false);
+                let lens_id = if is_panasonic {
+                    if let Value::String(s) = &lens_type {
+                        // Replace "/F" with "mm F" (e.g., "14-45/F3.5-5.6" -> "14-45mm F3.5-5.6")
+                        Value::String(s.replace("/F", "mm F"))
+                    } else {
+                        lens_type
+                    }
+                } else {
+                    lens_type
+                };
+                output.insert("LensID".to_string(), lens_id);
             }
         }
     }
@@ -1750,6 +2158,103 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         output.insert("ExifImageHeight".to_string(), pyd);
     }
 
+    // Ensure ImageWidth/ImageHeight are populated (ExifTool composite behavior)
+    // Priority: manufacturer-specific (always override) > existing > ExifImageWidth/Height
+    // Note: SonyImageWidth/Height are NOT used here - they're standalone tags, not replacements
+    // for ImageWidth/Height (ExifTool uses different logic for Sony)
+
+    // For Sony: Process FullImageSize (tag 0xb02b) which is stored as "height width"
+    // Reformat as "widthxheight" like ExifTool does
+    // Note: Only older Sony cameras (A100-A900) use FullImageSize for ImageWidth/Height/ImageSize
+    // Newer cameras (A6000+, A7+) use IFD0 ImageWidth/ImageLength instead
+    let is_sony_camera = make_ref
+        .map(|m| m.to_uppercase().contains("SONY"))
+        .unwrap_or(false);
+    if is_sony_camera {
+        if let Some(Value::String(full_size)) = output.get("FullImageSize").cloned() {
+            let parts: Vec<&str> = full_size.split_whitespace().collect();
+            if parts.len() == 2 {
+                if let (Ok(height), Ok(width)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>())
+                {
+                    // Reformat FullImageSize as "widthxheight"
+                    output.insert(
+                        "FullImageSize".to_string(),
+                        Value::String(format!("{}x{}", width, height)),
+                    );
+
+                    // Determine whether to use FullImageSize for ImageWidth/Height
+                    // Early DSLR-A models (A100-A350, A700, A850, A900) use FullImageSize
+                    // Later models (A550+, SLT, NEX, ILCE, DSC) use IFD0 dimensions
+                    let model = output.get("Model").and_then(|v| match v {
+                        Value::String(s) => Some(s.as_str()),
+                        _ => None,
+                    });
+                    let has_sony_image_width = output.contains_key("SonyImageWidth");
+
+                    // Use FullImageSize for specific early DSLR-A models
+                    // These models have sensor overscan that needs cropping
+                    let is_early_dslr = model.is_some_and(|m| {
+                        m.starts_with("DSLR-A")
+                            && (m.contains("A100")
+                                || m.contains("A200")
+                                || m.contains("A230")
+                                || m.contains("A300")
+                                || m.contains("A330")
+                                || m.contains("A350")
+                                || m.contains("A380")
+                                || m.contains("A390")
+                                || m.contains("A700")
+                                || m.contains("A850")
+                                || m.contains("A900"))
+                    });
+                    let use_full_image_size = !has_sony_image_width && is_early_dslr;
+
+                    if use_full_image_size {
+                        output.insert("ImageWidth".to_string(), Value::Number(width.into()));
+                        output.insert("ImageHeight".to_string(), Value::Number(height.into()));
+                        output.insert(
+                            "ImageSize".to_string(),
+                            Value::String(format!("{}x{}", width, height)),
+                        );
+                        let mp = (width as f64 * height as f64) / 1_000_000.0;
+                        let rounded = (mp * 10.0).round() / 10.0;
+                        if let Some(num) = serde_json::Number::from_f64(rounded) {
+                            output.insert("Megapixels".to_string(), Value::Number(num));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Check for manufacturer-specific width tags that OVERRIDE existing values
+    let mfr_width = output
+        .get("RawImageCroppedWidth")
+        .or_else(|| output.get("PanasonicImageWidth"))
+        .cloned();
+    if let Some(w) = mfr_width {
+        output.insert("ImageWidth".to_string(), w);
+    } else if !output.contains_key("ImageWidth") {
+        // Only fall back to ExifImageWidth if no ImageWidth exists
+        if let Some(eiw) = output.get("ExifImageWidth").cloned() {
+            output.insert("ImageWidth".to_string(), eiw);
+        }
+    }
+
+    // Check for manufacturer-specific height tags that OVERRIDE existing values
+    let mfr_height = output
+        .get("RawImageCroppedHeight")
+        .or_else(|| output.get("PanasonicImageHeight"))
+        .cloned();
+    if let Some(h) = mfr_height {
+        output.insert("ImageHeight".to_string(), h);
+    } else if !output.contains_key("ImageHeight") && !output.contains_key("ImageLength") {
+        // Only fall back to ExifImageHeight if no ImageHeight exists
+        if let Some(eih) = output.get("ExifImageHeight").cloned() {
+            output.insert("ImageHeight".to_string(), eih);
+        }
+    }
+
     // Add RAF-specific metadata if present (for Fujifilm RAF files)
     // This must come before ImageSize calculation so we can use RawImageCroppedWidth/Height
     if let Some(raf_metadata) = exif_data.get_raf_metadata() {
@@ -1784,17 +2289,78 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
+    // Add MRW-specific metadata if present (RIF block for Minolta RAW files)
+    // ExifTool behavior varies by model:
+    // - DiMAGE cameras: ExifTool outputs raw numeric values from RIF block
+    // - DYNAX/Alpha cameras: ExifTool uses EXIF IFD values with text descriptions
+    let is_dimage = model_ref
+        .map(|m| m.to_uppercase().contains("DIMAGE"))
+        .unwrap_or(false);
+    if let Some(mrw_metadata) = exif_data.get_mrw_metadata() {
+        for (key, value) in &mrw_metadata.tags {
+            // For Saturation, Contrast, Sharpness:
+            // - DiMAGE: override with RIF block numeric values
+            // - DYNAX/Alpha: keep EXIF values if present (already decoded)
+            if key == "Saturation" || key == "Contrast" || key == "Sharpness" {
+                if !is_dimage && output.contains_key(key) {
+                    continue;
+                }
+                if let Ok(n) = value.parse::<i64>() {
+                    output.insert(key.clone(), Value::Number(n.into()));
+                } else {
+                    output.insert(key.clone(), Value::String(value.clone()));
+                }
+            } else {
+                output.insert(key.clone(), Value::String(value.clone()));
+            }
+        }
+    }
+
+    // Sony A100 Saturation/Contrast/Sharpness fix
+    // ExifTool outputs raw numeric values (from MakerNotes) for the A100 instead of decoded text
+    // A100 was the first Sony DSLR after acquiring Konica Minolta, shares similar behavior
+    let is_sony_a100 = model_ref.map(|m| m.contains("DSLR-A100")).unwrap_or(false);
+    if is_sony_a100 {
+        // Check if we have the standard EXIF Saturation/Sharpness/Contrast decoded to "Normal"
+        // and convert back to raw 0 to match ExifTool
+        for key in ["Saturation", "Sharpness", "Contrast"] {
+            if let Some(Value::String(s)) = output.get(key) {
+                if s == "Normal" {
+                    output.insert(key.to_string(), Value::Number(0.into()));
+                }
+            }
+        }
+    }
+
     // ImageSize - compute from actual image dimensions
-    // Priority order:
-    // 1. RawImageCroppedWidth/Height - RAF metadata for Fuji (actual cropped image size)
-    // 2. PanasonicImageWidth/Height - MakerNote values for actual image dimensions
-    // 3. PixelXDimension/PixelYDimension (EXIF tags 0xA002/0xA003) - may be thumbnail in RAW
-    // 4. ImageWidth/ImageLength - TIFF tags, often thumbnail dimensions in raw files
+    // Priority order varies by manufacturer:
+    // - Fuji: RawImageCroppedWidth/Height from RAF metadata
+    // - Panasonic: PanasonicImageWidth/Height from MakerNote
+    // - Canon: ExifImageWidth/Height (IFD0 has thumbnail dimensions in CR2)
+    // - Sony: ImageWidth/ImageLength from IFD0 (as fixed above)
+    // - Others: ImageWidth/ImageLength, then ExifImageWidth/Height
+    let is_canon = make_ref
+        .map(|m| m.to_uppercase().contains("CANON"))
+        .unwrap_or(false);
+
     let width = output
         .get("RawImageCroppedWidth")
         .or_else(|| output.get("PanasonicImageWidth"))
-        .or_else(|| output.get("PixelXDimension"))
-        .or_else(|| output.get("ImageWidth"))
+        .or_else(|| {
+            // Canon CR2: Use ExifImageWidth (actual size) over IFD0 ImageWidth (thumbnail)
+            if is_canon {
+                output.get("ExifImageWidth")
+            } else {
+                output.get("ImageWidth")
+            }
+        })
+        .or_else(|| {
+            if is_canon {
+                output.get("ImageWidth")
+            } else {
+                output.get("ExifImageWidth")
+            }
+        })
         .and_then(|v| match v {
             Value::Number(n) => n.as_u64(),
             _ => None,
@@ -1802,9 +2368,22 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     let height = output
         .get("RawImageCroppedHeight")
         .or_else(|| output.get("PanasonicImageHeight"))
-        .or_else(|| output.get("PixelYDimension"))
-        .or_else(|| output.get("ImageHeight"))
+        .or_else(|| {
+            if is_canon {
+                output.get("ExifImageHeight")
+            } else {
+                output.get("ImageHeight")
+            }
+        })
+        .or_else(|| {
+            if is_canon {
+                output.get("ImageHeight")
+            } else {
+                output.get("ImageLength")
+            }
+        })
         .or_else(|| output.get("ImageLength"))
+        .or_else(|| output.get("ExifImageHeight"))
         .and_then(|v| match v {
             Value::Number(n) => n.as_u64(),
             _ => None,
@@ -1891,26 +2470,28 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
-    // Also try WB_RBLevels format (R B G G) - common in Olympus
-    // RedBalance = R / G1, BlueBalance = B / G2
+    // Also try WB_RBLevels format (R B G1 G2) - common in Olympus
+    // ExifTool uses fixed divisor of 256 for WB_RBLevels (see Exif.pm rggbLookup index 8)
+    // RedBalance = R / 256, BlueBalance = B / 256
     if !output.contains_key("RedBalance") || !output.contains_key("BlueBalance") {
         if let Some(Value::String(wb_levels)) = output.get("WB_RBLevels") {
             let parts: Vec<f64> = wb_levels
                 .split_whitespace()
                 .filter_map(|s| s.parse::<f64>().ok())
                 .collect();
-            if parts.len() >= 4 {
+            if parts.len() >= 2 {
                 let r = parts[0];
                 let b = parts[1];
-                let g1 = parts[2];
-                let g2 = parts[3];
-                if !output.contains_key("RedBalance") && g1 != 0.0 {
-                    if let Some(num) = serde_json::Number::from_f64(r / g1) {
+                // ExifTool uses fixed 256 as divisor for RB format
+                // (from rggbLookup index 8: [0, 256, 256, 1])
+                let divisor = 256.0;
+                if !output.contains_key("RedBalance") {
+                    if let Some(num) = serde_json::Number::from_f64(r / divisor) {
                         output.insert("RedBalance".to_string(), Value::Number(num));
                     }
                 }
-                if !output.contains_key("BlueBalance") && g2 != 0.0 {
-                    if let Some(num) = serde_json::Number::from_f64(b / g2) {
+                if !output.contains_key("BlueBalance") {
+                    if let Some(num) = serde_json::Number::from_f64(b / divisor) {
                         output.insert("BlueBalance".to_string(), Value::Number(num));
                     }
                 }
@@ -1986,13 +2567,29 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
 
     // Extract all values we need first (before any inserts)
     let focal_length = output.get("FocalLength").and_then(parse_f64_value);
-    // For computed fields (HyperfocalDistance, DOF, LightValue), use FNumber first
-    // to match ExifTool behavior. Aperture is a derived value that may differ slightly.
-    let aperture = output
-        .get("FNumber")
-        .and_then(parse_f64_value)
+    // For computed fields (HyperfocalDistance, DOF, LightValue), use raw FNumber rational
+    // to maintain precision. The formatted FNumber may have reduced precision (e.g., %.2g for CRW).
+    let aperture = exif_data
+        .get_tag_by_id(0x829D)
+        .and_then(|v| match v {
+            ExifValue::Rational(r) if !r.is_empty() && r[0].1 != 0 => {
+                Some(r[0].0 as f64 / r[0].1 as f64)
+            }
+            _ => None,
+        })
+        .or_else(|| output.get("FNumber").and_then(parse_f64_value))
         .or_else(|| output.get("Aperture").and_then(parse_f64_value));
-    let exposure_time = output.get("ExposureTime").and_then(parse_f64_value);
+    // For LightValue calculation, use raw rational for precision
+    // Tag 0x829A (ExposureTime) is a rational, use raw value to avoid rounding
+    let exposure_time = exif_data
+        .get_tag_by_id(0x829A)
+        .and_then(|v| match v {
+            ExifValue::Rational(r) if !r.is_empty() && r[0].1 != 0 => {
+                Some(r[0].0 as f64 / r[0].1 as f64)
+            }
+            _ => None,
+        })
+        .or_else(|| output.get("ExposureTime").and_then(parse_f64_value));
     let iso = output
         .get("ISO")
         .and_then(parse_f64_value)
@@ -2530,13 +3127,43 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         output.remove(&tag);
     }
 
-    // Format FocusDistance to 2 decimal places for display (after DOF calculation used full precision)
+    // FocusDistance precision is manufacturer-specific:
+    // - Nikon: %.2f (2 decimal places)
+    // - Olympus: raw value with trailing zeros trimmed (3 decimal places max)
+    // - Minolta: trailing zeros trimmed (e.g., "0.9 m" not "0.90 m")
+    // - Others: %.2f (default)
+    // The makernote stores high precision; we reformat here after computed fields use it.
     if let Some(Value::String(s)) = output.get("FocusDistance") {
         if let Some(value) = s.strip_suffix(" m").and_then(|v| v.parse::<f64>().ok()) {
-            output.insert(
-                "FocusDistance".to_string(),
-                Value::String(format!("{:.2} m", value)),
-            );
+            let is_olympus = make_ref.is_some_and(|m| {
+                m.contains("OLYMPUS") || m.contains("OM Digital") || m.contains("OM System")
+            });
+            let is_minolta = make_ref.is_some_and(|m| {
+                m.to_uppercase().contains("MINOLTA") || m.to_uppercase().contains("KONICA")
+            });
+            if is_olympus {
+                // Olympus: use 3 decimal places with trailing zeros trimmed
+                let formatted = format!("{:.3}", value);
+                let formatted = formatted.trim_end_matches('0').trim_end_matches('.');
+                output.insert(
+                    "FocusDistance".to_string(),
+                    Value::String(format!("{} m", formatted)),
+                );
+            } else if is_minolta {
+                // Minolta: use 2 decimal places with trailing zeros trimmed
+                let formatted = format!("{:.2}", value);
+                let formatted = formatted.trim_end_matches('0').trim_end_matches('.');
+                output.insert(
+                    "FocusDistance".to_string(),
+                    Value::String(format!("{} m", formatted)),
+                );
+            } else {
+                // Nikon and others: use 2 decimal places
+                output.insert(
+                    "FocusDistance".to_string(),
+                    Value::String(format!("{:.2} m", value)),
+                );
+            }
         }
     }
 

@@ -15,7 +15,8 @@ pub mod tiff;
 pub mod webp;
 pub mod x3f;
 
-// Re-export RAF metadata type
+// Re-export metadata types
+pub use mrw::MrwMetadata;
 pub use raf::RafMetadata;
 
 use crate::errors::ExifResult;
@@ -35,6 +36,26 @@ pub fn extract_raf_metadata_if_raf<R: Read + Seek>(
     // Check for RAF signature
     if signature.starts_with(b"FUJIFILMCCD-RAW") {
         Ok(Some(raf::extract_raf_metadata(reader)?))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Check if a reader contains a MRW file and extract MRW-specific metadata if so
+pub fn extract_mrw_metadata_if_mrw<R: Read + Seek>(
+    mut reader: R,
+) -> ExifResult<Option<MrwMetadata>> {
+    // Read first 4 bytes to check signature
+    let mut signature = [0u8; 4];
+    reader.read_exact(&mut signature)?;
+
+    // Reset to beginning
+    reader.seek(std::io::SeekFrom::Start(0))?;
+
+    // Check for MRW signature (0x00 0x4D 0x52 0x4D = "\0MRM")
+    if signature[0] == 0x00 && signature[1] == 0x4D && signature[2] == 0x52 && signature[3] == 0x4D
+    {
+        Ok(Some(mrw::extract_mrw_metadata(reader)?))
     } else {
         Ok(None)
     }

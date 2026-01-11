@@ -14,20 +14,38 @@ fn format_float_exiftool(val: f64) -> String {
 
     // ExifTool uses scientific notation for small values
     if rounded.abs() > 0.0 && rounded.abs() < 0.0001 {
-        // Format as scientific notation (e.g., 1.6e-05 with 2-digit exponent)
-        // Rust's default is single digit, so we format manually
-        let s = format!("{:.1e}", rounded);
-        // Convert e-5 to e-05 (2-digit exponent)
-        if let Some(pos) = s.find("e-") {
-            let exp_part = &s[pos + 2..];
-            if exp_part.len() == 1 {
-                return format!("{}e-0{}", &s[..pos], exp_part);
-            }
-        } else if let Some(pos) = s.find("e") {
-            let exp_part = &s[pos + 1..];
-            if exp_part.len() == 1 {
-                return format!("{}e0{}", &s[..pos], exp_part);
-            }
+        // Format as scientific notation with 2-digit exponent
+        // ExifTool outputs e.g., "7e-05" not "7.0e-05"
+        let s = format!("{:.6e}", rounded);
+
+        // Find the 'e' position and split
+        if let Some(e_pos) = s.find('e') {
+            let mantissa_part = &s[..e_pos];
+            let exp_part = &s[e_pos..];
+
+            // Trim trailing zeros and decimal point from mantissa
+            let trimmed_mantissa = mantissa_part.trim_end_matches('0').trim_end_matches('.');
+
+            // Format exponent with 2 digits
+            let formatted_exp = if let Some(neg_pos) = exp_part.find("e-") {
+                let exp_digits = &exp_part[neg_pos + 2..];
+                if exp_digits.len() == 1 {
+                    format!("e-0{}", exp_digits)
+                } else {
+                    exp_part.to_string()
+                }
+            } else if let Some(pos_pos) = exp_part.find("e+") {
+                let exp_digits = &exp_part[pos_pos + 2..];
+                if exp_digits.len() == 1 {
+                    format!("e+0{}", exp_digits)
+                } else {
+                    exp_part.to_string()
+                }
+            } else {
+                exp_part.to_string()
+            };
+
+            return format!("{}{}", trimmed_mantissa, formatted_exp);
         }
         s
     } else {

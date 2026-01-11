@@ -1708,6 +1708,33 @@ fn decode_flash_control_mode(value: u8) -> &'static str {
     }
 }
 
+/// Format ExternalFlashFirmware with model name lookup
+/// From ExifTool Nikon.pm %flashFirmware hash
+fn format_flash_firmware(major: u8, minor: u8) -> String {
+    let model = match (major, minor) {
+        (1, 1) => Some("SB-800 or Metz 58 AF-1"),
+        (1, 3) => Some("SB-800"),
+        (2, 1) => Some("SB-800"),
+        (2, 4) => Some("SB-600"),
+        (2, 5) => Some("SB-600"),
+        (3, 1) => Some("SU-800 Remote Commander"),
+        (4, 1) => Some("SB-400"),
+        (4, 2) => Some("SB-400"),
+        (4, 4) => Some("SB-400"),
+        (5, 1) => Some("SB-900"),
+        (5, 2) => Some("SB-900"),
+        (6, 1) => Some("SB-700"),
+        (7, 1) => Some("SB-910"),
+        (14, 3) => Some("SB-5000"),
+        _ => None,
+    };
+
+    match model {
+        Some(name) => format!("{}.{:02} ({})", major, minor, name),
+        None => format!("{}.{:02} (Unknown model)", major, minor),
+    }
+}
+
 /// Parse FlashInfo tag data (tag 0x00A8)
 /// Version-dependent structure - supports versions 0100-0108, 0200
 fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
@@ -1750,29 +1777,43 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             } else {
                 tags.push((
                     "ExternalFlashFirmware".to_string(),
-                    format!("{}.{:02}", data[6], data[7]),
+                    format_flash_firmware(data[6], data[7]),
                 ));
             }
         }
 
         // Offset 0x08: ExternalFlashFlags (int8u)
+        // BITMASK: bit0=Fired, bit2=Bounce Flash, bit4=Wide Flash Adapter, bit5=Dome Diffuser
+        // Unknown bits are output as [N] to match ExifTool behavior
         if data.len() >= 9 {
             let flags = data[8];
             if flags == 0 {
                 tags.push(("ExternalFlashFlags".to_string(), "(none)".to_string()));
             } else {
-                let mut flag_strs = Vec::new();
+                let mut flag_strs: Vec<String> = Vec::new();
+                let mut known_bits: u8 = 0;
                 if flags & 0x01 != 0 {
-                    flag_strs.push("Fired");
+                    flag_strs.push("Fired".to_string());
+                    known_bits |= 0x01;
                 }
                 if flags & 0x04 != 0 {
-                    flag_strs.push("Bounce Flash");
+                    flag_strs.push("Bounce Flash".to_string());
+                    known_bits |= 0x04;
                 }
                 if flags & 0x10 != 0 {
-                    flag_strs.push("Wide Flash Adapter");
+                    flag_strs.push("Wide Flash Adapter".to_string());
+                    known_bits |= 0x10;
                 }
                 if flags & 0x20 != 0 {
-                    flag_strs.push("Dome Diffuser");
+                    flag_strs.push("Dome Diffuser".to_string());
+                    known_bits |= 0x20;
+                }
+                // Add unknown bits as [N]
+                let unknown_bits = flags & !known_bits;
+                for bit in 0..8 {
+                    if unknown_bits & (1 << bit) != 0 {
+                        flag_strs.push(format!("[{}]", bit));
+                    }
                 }
                 tags.push(("ExternalFlashFlags".to_string(), flag_strs.join(", ")));
             }
@@ -2234,6 +2275,7 @@ fn parse_lens_data(
         // Offset 0x09: FocusDistance
         // Formula: 0.01 * 10^(val/40) meters
         // ExifTool: raw=0 gives 0.01m, not infinity
+        // Store with high precision; reformatting to %.2f for display is done in output.rs
         let focus_dist_raw = data[9];
         let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
         tags.push(("FocusDistance".to_string(), format!("{:.6} m", focus_dist)));
@@ -2329,6 +2371,7 @@ fn parse_lens_data(
 
             // Offset 0x09: FocusDistance
             // Formula: 0.01 * 10^(val/40) meters
+            // Store with high precision; reformatting to %.2f for display is done in output.rs
             let focus_dist_raw = decrypted[9];
             let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
             tags.push(("FocusDistance".to_string(), format!("{:.6} m", focus_dist)));
@@ -2424,6 +2467,7 @@ fn parse_lens_data(
 
             // Offset 0x0a (10): FocusDistance (extra byte at 0x09 in this version)
             // Formula: 0.01 * 10^(val/40) meters
+            // Store with high precision; reformatting to %.2f for display is done in output.rs
             let focus_dist_raw = decrypted[10];
             let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
             tags.push(("FocusDistance".to_string(), format!("{:.6} m", focus_dist)));
@@ -2581,7 +2625,7 @@ fn parse_af_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
             if points.is_empty() {
                 tags.push(("AFPointsInFocus".to_string(), "(none)".to_string()));
             } else {
-                tags.push(("AFPointsInFocus".to_string(), points.join(", ")));
+                tags.push(("AFPointsInFocus".to_string(), points.join(",")));
             }
         }
     }
@@ -2928,6 +2972,29 @@ fn decode_primary_af_point(point: u8, schema: u8) -> String {
             };
             name.to_string()
         }
+        5 => {
+            // Nikon 1 S2 and newer with 135-point grid, 15 columns
+            // 9 rows (B-J) and 15 columns (1-15), F8 is center
+            if point == 0 {
+                return "(none)".to_string();
+            }
+            if point == 82 {
+                return "F8 (Center)".to_string();
+            }
+            // Grid calculation: row = int((val + 0.5) / ncol), col = val - ncol * row + 1
+            get_af_point_grid(point, 15)
+        }
+        6 => {
+            // Nikon 1 J4/V3 with 171-point AF, 105-point phase-detect, 21 columns
+            // 9 rows (B-J) and 19 columns (2-20), F11 is center
+            if point == 0 {
+                return "(none)".to_string();
+            }
+            if point == 115 {
+                return "F11 (Center)".to_string();
+            }
+            get_af_point_grid(point, 21)
+        }
         7 => {
             // 153-point (D5, D500, D850), center is E9
             let name = match point {
@@ -2939,6 +3006,17 @@ fn decode_primary_af_point(point: u8, schema: u8) -> String {
         }
         _ => format!("{}", point),
     }
+}
+
+/// Get AF point name using grid calculation (for Nikon 1 cameras)
+/// Uses same algorithm as ExifTool's GetAFPointGrid
+fn get_af_point_grid(point: u8, ncol: u8) -> String {
+    let val = point as f32;
+    let ncol_f = ncol as f32;
+    let row = ((val + 0.5) / ncol_f) as u8;
+    let col = point - ncol * row + 1;
+    let row_char = (b'A' + row) as char;
+    format!("{}{}", row_char, col)
 }
 
 /// Get AF point name for 135-point grid (Nikon 1)
@@ -3297,6 +3375,22 @@ fn decode_af_points_used(data: &[u8], schema: u8) -> String {
             }
             decode_af_points_135(data)
         }
+        5 => {
+            // Nikon 1 S2 with 135-point grid, 15 columns
+            // 21 bytes bitmask
+            if data.len() < 21 {
+                return "(none)".to_string();
+            }
+            decode_af_points_grid(data, 15, 21)
+        }
+        6 => {
+            // Nikon 1 J4/V3 with 171-point grid, 21 columns
+            // 29 bytes bitmask
+            if data.len() < 29 {
+                return "(none)".to_string();
+            }
+            decode_af_points_grid(data, 21, 29)
+        }
         7 => {
             // 153-point: 20 bytes bitmask
             if data.len() < 20 {
@@ -3351,17 +3445,20 @@ fn decode_af_points_51(data: &[u8]) -> String {
 
 /// Decode 11-point AF bitmask
 fn decode_af_points_11(bits: u16) -> String {
+    // ExifTool bit mapping from Nikon.pm:
+    // 0=Center, 1=Top, 2=Bottom, 3=Mid-left, 4=Upper-left, 5=Lower-left,
+    // 6=Far Left, 7=Mid-right, 8=Upper-right, 9=Lower-right, 10=Far Right
     let point_names: &[&str] = &[
         "Center",
         "Top",
         "Bottom",
         "Mid-left",
-        "Mid-right",
         "Upper-left",
-        "Upper-right",
         "Lower-left",
-        "Lower-right",
         "Far Left",
+        "Mid-right",
+        "Upper-right",
+        "Lower-right",
         "Far Right",
     ];
 
@@ -3375,7 +3472,8 @@ fn decode_af_points_11(bits: u16) -> String {
     if points.is_empty() {
         "(none)".to_string()
     } else {
-        points.join(",")
+        // ExifTool uses comma-space for 11-point text labels
+        points.join(", ")
     }
 }
 
@@ -3563,6 +3661,31 @@ fn decode_af_points_135(data: &[u8]) -> String {
         "(none)".to_string()
     } else {
         sort_af_points(&mut points);
+        points.join(",")
+    }
+}
+
+/// Decode AF points using grid calculation (for Nikon 1 cameras with newer firmware)
+/// Uses the same algorithm as ExifTool's PrintAFPointsGrid
+fn decode_af_points_grid(data: &[u8], ncol: u8, size: usize) -> String {
+    let mut points = Vec::new();
+
+    for (byte_idx, &byte) in data.iter().take(size).enumerate() {
+        if byte == 0 {
+            continue;
+        }
+        for bit in 0..8 {
+            if (byte & (1 << bit)) != 0 {
+                let point_num = byte_idx * 8 + bit;
+                let point_name = get_af_point_grid(point_num as u8, ncol);
+                points.push(point_name);
+            }
+        }
+    }
+
+    if points.is_empty() {
+        "(none)".to_string()
+    } else {
         points.join(",")
     }
 }

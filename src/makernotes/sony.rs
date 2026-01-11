@@ -3,6 +3,7 @@
 use crate::data_types::{Endianness, ExifValue};
 use crate::define_tag_decoder;
 use crate::errors::ExifError;
+use crate::makernotes::minolta;
 use crate::makernotes::MakerNoteTag;
 use std::collections::HashMap;
 
@@ -111,6 +112,14 @@ pub const CS_SHARPNESS: u16 = 0xC01C; // Offset 0x1c in CameraSettings
 pub const CS_CONTRAST: u16 = 0xC01D; // Offset 0x1d in CameraSettings
 pub const CS_SATURATION: u16 = 0xC01E; // Offset 0x1e in CameraSettings
 
+// MRWInfo tag for A100 and older cameras - contains MinoltaRaw RIF structure
+pub const SONY_MRW_INFO: u16 = 0x7250;
+
+// RIF (Requested Image Format) sub-tags - extracted from MRWInfo binary blob
+pub const RIF_SATURATION: u16 = 0xD001; // Offset 1 in RIF structure
+pub const RIF_CONTRAST: u16 = 0xD002; // Offset 2 in RIF structure
+pub const RIF_SHARPNESS: u16 = 0xD003; // Offset 3 in RIF structure
+
 // Encrypted subdirectory tags
 pub const SONY_TAG_2010: u16 = 0x2010;
 pub const SONY_TAG_9050: u16 = 0x9050;
@@ -197,9 +206,10 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         SONY_COLOR_COMPENSATION_FILTER => Some("ColorCompensationFilter"),
         SONY_ZONE_MATCHING => Some("ZoneMatching"),
         SONY_COLOR_MODE => Some("ColorMode"),
+        SONY_FULL_IMAGE_SIZE => Some("FullImageSize"),
         SONY_FILE_FORMAT => Some("FileFormat"),
         SONY_AF_ILLUMINATOR => Some("AFIlluminator"),
-        SONY_FOCUS_MODE_2 => Some("FocusMode2"),
+        SONY_FOCUS_MODE_2 => Some("FocusMode"),
         SONY_DYNAMIC_RANGE_OPTIMIZER_2 => Some("DynamicRangeOptimizer2"),
         SONY_HIGH_ISO_NOISE_REDUCTION_2 => Some("HighISONoiseReduction2"),
         SONY_FOCUS_MODE_3 => Some("FocusMode"),
@@ -228,6 +238,12 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         CS_SHARPNESS => Some("Sharpness"),
         CS_CONTRAST => Some("Contrast"),
         CS_SATURATION => Some("Saturation"),
+        // MRWInfo tag
+        SONY_MRW_INFO => Some("MRWInfo"),
+        // RIF sub-tags (from MRWInfo binary blob)
+        RIF_SATURATION => Some("Saturation"),
+        RIF_CONTRAST => Some("Contrast"),
+        RIF_SHARPNESS => Some("Sharpness"),
         _ => None,
     }
 }
@@ -398,22 +414,22 @@ pub fn get_sony_lens_name(lens_id: u32) -> Option<&'static str> {
         42 => Some("Minolta/Sony AF DT 18-200mm F3.5-6.3 (D)"),
         43 => Some("Sony 35mm F1.4 G (SAL35F14G)"),
         44 => Some("Sony 50mm F1.4 (SAL50F14)"),
-        45 => Some("Carl Zeiss Planar T* 85mm F1.4 ZA"),
-        46 => Some("Carl Zeiss Vario-Sonnar T* DT 16-80mm F3.5-4.5 ZA"),
-        47 => Some("Carl Zeiss Sonnar T* 135mm F1.8 ZA"),
-        48 => Some("Carl Zeiss Vario-Sonnar T* 24-70mm F2.8 ZA SSM"),
+        45 => Some("Carl Zeiss Planar T* 85mm F1.4 ZA (SAL85F14Z)"),
+        46 => Some("Carl Zeiss Vario-Sonnar T* DT 16-80mm F3.5-4.5 ZA (SAL1680Z)"),
+        47 => Some("Carl Zeiss Sonnar T* 135mm F1.8 ZA (SAL135F18Z)"),
+        48 => Some("Carl Zeiss Vario-Sonnar T* 24-70mm F2.8 ZA SSM (SAL2470Z)"),
         49 => Some("Sony DT 55-200mm F4-5.6 (SAL55200)"),
         50 => Some("Sony DT 18-250mm F3.5-6.3 (SAL18250)"),
         51 => Some("Sony DT 16-105mm F3.5-5.6 (SAL16105)"),
         52 => Some("Sony 70-300mm F4.5-5.6 G SSM (SAL70300G)"),
         53 => Some("Sony 70-400mm F4-5.6 G SSM (SAL70400G)"),
-        54 => Some("Carl Zeiss Vario-Sonnar T* 16-35mm F2.8 ZA SSM"),
+        54 => Some("Carl Zeiss Vario-Sonnar T* 16-35mm F2.8 ZA SSM (SAL1635Z)"),
         55 => Some("Sony DT 18-55mm F3.5-5.6 SAM (SAL1855)"),
         56 => Some("Sony DT 55-200mm F4-5.6 SAM (SAL55200-2)"),
         57 => Some("Sony DT 50mm F1.8 SAM (SAL50F18)"),
         58 => Some("Sony DT 30mm F2.8 Macro SAM (SAL30M28)"),
         59 => Some("Sony 28-75mm F2.8 SAM (SAL2875)"),
-        60 => Some("Carl Zeiss Distagon T* 24mm F2 ZA SSM"),
+        60 => Some("Carl Zeiss Distagon T* 24mm F2 ZA SSM (SAL24F20Z)"),
         61 => Some("Sony 85mm F2.8 SAM (SAL85F28)"),
         62 => Some("Sony DT 35mm F1.8 SAM (SAL35F18)"),
         63 => Some("Sony DT 16-50mm F2.8 SSM (SAL1650)"),
@@ -423,7 +439,7 @@ pub fn get_sony_lens_name(lens_id: u32) -> Option<&'static str> {
         67 => Some("Sony 70-200mm F2.8 G SSM II (SAL70200G2)"),
         68 => Some("Sony DT 55-300mm F4.5-5.6 SAM (SAL55300)"),
         69 => Some("Sony 70-400mm F4-5.6 G SSM II (SAL70400G2)"),
-        70 => Some("Carl Zeiss Planar T* 50mm F1.4 ZA SSM"),
+        70 => Some("Carl Zeiss Planar T* 50mm F1.4 ZA SSM (SAL50F14Z)"),
         // Third-party and older Minolta lenses (high IDs from %minoltaLensTypes)
         25601 => Some("Minolta AF 100-200mm F4.5"),
         25611 => Some("Minolta AF 75-300mm F4.5-5.6 (or Sigma)"),
@@ -450,63 +466,64 @@ pub fn get_sony_lens_name(lens_id: u32) -> Option<&'static str> {
         26131 => Some("Minolta AF 50mm F1.7"),
         26241 => Some("Minolta AF 35-80mm F4-5.6 Power Zoom"),
         // Sony E-mount lenses (use sonyLensTypes2 format with high IDs)
-        32784 => Some("Sony E 16mm F2.8 (SEL16F28)"),
-        32785 => Some("Sony E 18-55mm F3.5-5.6 OSS (SEL1855)"),
-        32786 => Some("Sony E 55-210mm F4.5-6.3 OSS (SEL55210)"),
-        32787 => Some("Sony E 18-200mm F3.5-6.3 OSS (SEL18200)"),
-        32788 => Some("Sony E 30mm F3.5 Macro (SEL30M35)"),
-        32789 => Some("Sony E 24mm F1.8 ZA (SEL24F18Z)"),
-        32790 => Some("Sony E 50mm F1.8 OSS (SEL50F18)"),
-        32791 => Some("Sony E 16-50mm F3.5-5.6 PZ OSS (SELP1650)"),
-        32792 => Some("Sony E 10-18mm F4 OSS (SEL1018)"),
-        32793 => Some("Sony E PZ 18-105mm F4 G OSS (SELP18105G)"),
-        32794 => Some("Sony E 20mm F2.8 (SEL20F28)"),
-        32795 => Some("Sony E 35mm F1.8 OSS (SEL35F18)"),
-        32796 => Some("Sony E PZ 18-200mm F3.5-6.3 OSS (SELP18200)"),
-        32797 => Some("Sony FE 35mm F2.8 ZA (SEL35F28Z)"),
-        32798 => Some("Sony FE 24-70mm F4 ZA OSS (SEL2470Z)"),
-        32799 => Some("Sony FE 55mm F1.8 ZA (SEL55F18Z)"),
-        32800 => Some("Sony FE 70-200mm F4 G OSS (SEL70200G)"),
-        32801 => Some("Sony FE 28-70mm F3.5-5.6 OSS (SEL2870)"),
-        32802 => Some("Sony FE 16-35mm F4 ZA OSS (SEL1635Z)"),
-        32803 => Some("Sony FE 90mm F2.8 Macro G OSS (SEL90M28G)"),
-        32807 => Some("Sony E 18-200mm F3.5-6.3 OSS LE (SEL18200LE)"),
-        32808 => Some("Sony E 50mm F1.8 OSS (SEL50F18)"),
-        32813 => Some("Sony FE 28mm F2 (SEL28F20)"),
-        32814 => Some("Sony FE 35mm F1.4 ZA (SEL35F14Z)"),
-        32815 => Some("Sony FE 24-240mm F3.5-6.3 OSS (SEL24240)"),
-        32816 => Some("Sony FE 28-135mm F4 G PZ OSS (SELP28135G)"),
-        32817 => Some("Sony FE PZ 28-135mm F4 G OSS (SELP28135G)"),
-        32820 => Some("Sony FE 21mm F2.8 (SEL21F28)"),
-        32821 => Some("Sony FE 16mm F3.5 Fisheye (SEL16F35)"),
-        32826 => Some("Sony FE 85mm F1.4 GM (SEL85F14GM)"),
-        32827 => Some("Sony FE 50mm F1.4 ZA (SEL50F14Z)"),
-        32829 => Some("Sony FE 70-300mm F4.5-5.6 G OSS (SEL70300G)"),
-        32830 => Some("Sony FE 100mm F2.8 STF GM OSS (SEL100F28GM)"),
-        32831 => Some("Sony FE 50mm F2.8 Macro (SEL50M28)"),
-        32832 => Some("Sony FE 85mm F1.8 (SEL85F18)"),
-        33072 => Some("Sony FE 70-200mm F2.8 GM OSS (SEL70200GM)"),
-        33073 => Some("Sony FE 24-70mm F2.8 GM (SEL2470GM)"),
-        33076 => Some("Sony FE 100-400mm F4.5-5.6 GM OSS (SEL100400GM)"),
-        33077 => Some("Sony FE 12-24mm F4 G (SEL1224G)"),
-        33079 => Some("Sony FE 16-35mm F2.8 GM (SEL1635GM)"),
-        33080 => Some("Sony FE 400mm F2.8 GM OSS (SEL400F28GM)"),
-        33081 => Some("Sony FE 24mm F1.4 GM (SEL24F14GM)"),
-        33082 => Some("Sony FE 135mm F1.8 GM (SEL135F18GM)"),
-        33083 => Some("Sony FE 200-600mm F5.6-6.3 G OSS (SEL200600G)"),
-        33084 => Some("Sony FE 600mm F4 GM OSS (SEL600F40GM)"),
-        33085 => Some("Sony FE 20mm F1.8 G (SEL20F18G)"),
-        33086 => Some("Sony FE 35mm F1.8 (SEL35F18F)"),
-        33088 => Some("Sony FE 12-24mm F2.8 GM (SEL1224GM)"),
-        33089 => Some("Sony FE 50mm F1.2 GM (SEL50F12GM)"),
-        33090 => Some("Sony FE 14mm F1.8 GM (SEL14F18GM)"),
-        33091 => Some("Sony FE 35mm F1.4 GM (SEL35F14GM)"),
-        33092 => Some("Sony FE 24mm F2.8 G (SEL24F28G)"),
-        33093 => Some("Sony FE 40mm F2.5 G (SEL40F25G)"),
-        33094 => Some("Sony FE 50mm F2.5 G (SEL50F25G)"),
-        33095 => Some("Sony FE 70-200mm F2.8 GM OSS II (SEL70200GM2)"),
-        33096 => Some("Sony FE 24-70mm F2.8 GM II (SEL2470GM2)"),
-        33097 => Some("Sony FE 16-35mm F2.8 GM II (SEL1635GM2)"),
+        // Note: ExifTool outputs lens names without (SELxxxx) suffixes
+        32784 => Some("Sony E 16mm F2.8"),
+        32785 => Some("Sony E 18-55mm F3.5-5.6 OSS"),
+        32786 => Some("Sony E 55-210mm F4.5-6.3 OSS"),
+        32787 => Some("Sony E 18-200mm F3.5-6.3 OSS"),
+        32788 => Some("Sony E 30mm F3.5 Macro"),
+        32789 => Some("Sony E 24mm F1.8 ZA"),
+        32790 => Some("Sony E 50mm F1.8 OSS"),
+        32791 => Some("Sony E 16-50mm F3.5-5.6 PZ OSS"),
+        32792 => Some("Sony E 10-18mm F4 OSS"),
+        32793 => Some("Sony E PZ 18-105mm F4 G OSS"),
+        32794 => Some("Sony E 20mm F2.8"),
+        32795 => Some("Sony E 35mm F1.8 OSS"),
+        32796 => Some("Sony E PZ 18-200mm F3.5-6.3 OSS"),
+        32797 => Some("Sony FE 35mm F2.8 ZA"),
+        32798 => Some("Sony FE 24-70mm F4 ZA OSS"),
+        32799 => Some("Sony FE 55mm F1.8 ZA"),
+        32800 => Some("Sony FE 70-200mm F4 G OSS"),
+        32801 => Some("Sony FE 28-70mm F3.5-5.6 OSS"),
+        32802 => Some("Sony FE 16-35mm F4 ZA OSS"),
+        32803 => Some("Sony FE 90mm F2.8 Macro G OSS"),
+        32807 => Some("Sony E 18-200mm F3.5-6.3 OSS LE"),
+        32808 => Some("Sony E 50mm F1.8 OSS"),
+        32813 => Some("Sony FE 28mm F2"),
+        32814 => Some("Sony FE 35mm F1.4 ZA"),
+        32815 => Some("Sony FE 24-240mm F3.5-6.3 OSS"),
+        32816 => Some("Sony FE 28-135mm F4 G PZ OSS"),
+        32817 => Some("Sony FE PZ 28-135mm F4 G OSS"),
+        32820 => Some("Sony FE 21mm F2.8"),
+        32821 => Some("Sony FE 16mm F3.5 Fisheye"),
+        32826 => Some("Sony FE 85mm F1.4 GM"),
+        32827 => Some("Sony FE 50mm F1.4 ZA"),
+        32829 => Some("Sony FE 70-300mm F4.5-5.6 G OSS"),
+        32830 => Some("Sony FE 100mm F2.8 STF GM OSS"),
+        32831 => Some("Sony FE 50mm F2.8 Macro"),
+        32832 => Some("Sony FE 85mm F1.8"),
+        33072 => Some("Sony FE 70-200mm F2.8 GM OSS"),
+        33073 => Some("Sony FE 24-70mm F2.8 GM"),
+        33076 => Some("Sony FE 100-400mm F4.5-5.6 GM OSS"),
+        33077 => Some("Sony FE 12-24mm F4 G"),
+        33079 => Some("Sony FE 16-35mm F2.8 GM"),
+        33080 => Some("Sony FE 400mm F2.8 GM OSS"),
+        33081 => Some("Sony FE 24mm F1.4 GM"),
+        33082 => Some("Sony FE 135mm F1.8 GM"),
+        33083 => Some("Sony FE 200-600mm F5.6-6.3 G OSS"),
+        33084 => Some("Sony FE 600mm F4 GM OSS"),
+        33085 => Some("Sony FE 20mm F1.8 G"),
+        33086 => Some("Sony FE 35mm F1.8"),
+        33088 => Some("Sony FE 12-24mm F2.8 GM"),
+        33089 => Some("Sony FE 50mm F1.2 GM"),
+        33090 => Some("Sony FE 14mm F1.8 GM"),
+        33091 => Some("Sony FE 35mm F1.4 GM"),
+        33092 => Some("Sony FE 24mm F2.8 G"),
+        33093 => Some("Sony FE 40mm F2.5 G"),
+        33094 => Some("Sony FE 50mm F2.5 G"),
+        33095 => Some("Sony FE 70-200mm F2.8 GM OSS II"),
+        33096 => Some("Sony FE 24-70mm F2.8 GM II"),
+        33097 => Some("Sony FE 16-35mm F2.8 GM II"),
         // 65535 = No lens or E-mount/T-mount/other non-A-mount lens
         65535 => Some("E-Mount, T-Mount, Other Lens or no lens"),
         _ => None,
@@ -690,23 +707,7 @@ define_tag_decoder! {
 // DynamicRangeOptimizer (tag 0xB025): Sony.pm / sonymn_int.cpp
 define_tag_decoder! {
     dynamic_range_optimizer,
-    exiftool: {
-        0 => "Off",
-        1 => "Standard",
-        2 => "Advanced Auto",
-        3 => "Auto",
-        4 => "Advanced Lv1",
-        5 => "Advanced Lv2",
-        6 => "Advanced Lv3",
-        7 => "Advanced Lv4",
-        8 => "Advanced Lv5",
-        9 => "Lv1",
-        10 => "Lv2",
-        11 => "Lv3",
-        12 => "Lv4",
-        13 => "Lv5",
-    },
-    exiv2: {
+    both: {
         0 => "Off",
         1 => "Standard",
         2 => "Advanced Auto",
@@ -1272,15 +1273,16 @@ pub fn format_lens_spec(bytes: &[u8]) -> String {
     }
 
     // Build lens type prefix from flags1
+    // ExifTool order: DT/FE/E comes before PZ (e.g., "E PZ" not "PZ E")
     let mut prefix = String::new();
-    if flags1 & 0x40 != 0 {
-        prefix.push_str("PZ ");
-    }
     match flags1 & 0x03 {
         0x01 => prefix.push_str("DT "),
         0x02 => prefix.push_str("FE "),
         0x03 => prefix.push_str("E "),
         _ => {}
+    }
+    if flags1 & 0x40 != 0 {
+        prefix.push_str("PZ ");
     }
 
     // Build focal length string
@@ -1849,7 +1851,13 @@ fn parse_tag9050(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerN
         if raw > 0 {
             let exp_time = 2.0_f64.powf(16.0 - (raw as f64) / 256.0);
             let formatted = if exp_time >= 1.0 {
-                format!("{}", exp_time.round() as u32)
+                // ExifTool outputs with one decimal place for values >= 1
+                let rounded = (exp_time * 10.0).round() / 10.0;
+                if rounded == rounded.floor() {
+                    format!("{}", rounded as u32)
+                } else {
+                    format!("{:.1}", rounded)
+                }
             } else {
                 format!("1/{}", (1.0 / exp_time).round() as u32)
             };
@@ -2073,6 +2081,184 @@ fn parse_tag9050(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerN
     }
 }
 
+/// Parse ShotInfo binary structure (tag 0x3000)
+/// Contains SonyImageWidth/Height and other shot-specific info
+fn parse_shot_info(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerNoteTag>) {
+    if data.len() < 0x1e {
+        return;
+    }
+
+    // ShotInfo structure offsets (from ExifTool Sony.pm):
+    // 0x1a: SonyImageHeight (int16u)
+    // 0x1c: SonyImageWidth (int16u)
+
+    // SonyImageHeight at offset 0x1a
+    let height = read_u16(&data[0x1a..], endian);
+    if height > 0 && height < 10000 {
+        let synth_id = 0x301A_u16;
+        tags.insert(
+            synth_id,
+            MakerNoteTag {
+                tag_id: synth_id,
+                tag_name: Some("SonyImageHeight"),
+                value: ExifValue::Short(vec![height]),
+            },
+        );
+    }
+
+    // SonyImageWidth at offset 0x1c
+    let width = read_u16(&data[0x1c..], endian);
+    if width > 0 && width < 15000 {
+        let synth_id = 0x301C_u16;
+        tags.insert(
+            synth_id,
+            MakerNoteTag {
+                tag_id: synth_id,
+                tag_name: Some("SonyImageWidth"),
+                value: ExifValue::Short(vec![width]),
+            },
+        );
+    }
+
+    // FaceInfoOffset at 0x02 (int16u)
+    if data.len() > 0x04 {
+        let offset = read_u16(&data[0x02..], endian);
+        if offset > 0 {
+            let synth_id = 0x3002_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("FaceInfoOffset"),
+                    value: ExifValue::Short(vec![offset]),
+                },
+            );
+        }
+    }
+
+    // SonyDateTime at 0x06 (string[20])
+    if data.len() > 0x1a {
+        let date_str: String = data[0x06..0x1a]
+            .iter()
+            .take_while(|&&b| b != 0)
+            .map(|&b| b as char)
+            .collect();
+        if !date_str.is_empty() && date_str.starts_with("20") {
+            let synth_id = 0x3006_u16;
+            tags.insert(
+                synth_id,
+                MakerNoteTag {
+                    tag_id: synth_id,
+                    tag_name: Some("SonyDateTime"),
+                    value: ExifValue::Ascii(date_str),
+                },
+            );
+        }
+    }
+}
+
+/// Parse MRWInfo binary structure (tag 0x7250)
+/// Contains MinoltaRaw RIF (Requested Image Format) data for A100 and older cameras
+/// RIF structure has Saturation at offset 1, Contrast at offset 2, Sharpness at offset 3 (int8s)
+fn parse_mrw_info(data: &[u8], tags: &mut HashMap<u16, MakerNoteTag>) {
+    // MRW data starts with "\0MRM" header (4 bytes), followed by MRW segments
+    // We need to find the RIF segment which starts with "\0RIF"
+    // The MRWInfo tag in ARW files contains the raw MRW header data
+
+    if data.len() < 8 {
+        return;
+    }
+
+    // Look for RIF segment in the MRW data
+    // MRW format: each segment is [4-byte tag][4-byte length][data...]
+    // Tag "\0PRD" = Picture Raw Dimensions
+    // Tag "\0WBG" = White Balance Gains
+    // Tag "\0RIF" = Requested Image Format (contains Saturation/Contrast/Sharpness)
+
+    let mut offset = 0;
+
+    // Skip initial MRM header if present
+    if data.len() > 4 && &data[0..4] == b"\0MRM" {
+        // Read offset to first segment (stored at offset 4 as big-endian u32)
+        if data.len() > 8 {
+            let mrw_offset = u32::from_be_bytes([data[4], data[5], data[6], data[7]]) as usize;
+            offset = 8; // Skip past the 8-byte MRM header
+                        // The mrw_offset points to the RAW data, segments are between header and RAW data
+            let _ = mrw_offset; // We scan through segments anyway
+        }
+    }
+
+    // Scan for segments
+    while offset + 8 <= data.len() {
+        let segment_tag = &data[offset..offset + 4];
+        let segment_len = if offset + 8 <= data.len() {
+            u32::from_be_bytes([
+                data[offset + 4],
+                data[offset + 5],
+                data[offset + 6],
+                data[offset + 7],
+            ]) as usize
+        } else {
+            break;
+        };
+
+        if segment_tag == b"\0RIF" {
+            // Found RIF segment!
+            let rif_data_offset = offset + 8;
+            if rif_data_offset + 4 <= data.len() && segment_len >= 4 {
+                // RIF structure:
+                // Offset 0: int8u - unknown
+                // Offset 1: int8s - Saturation
+                // Offset 2: int8s - Contrast
+                // Offset 3: int8s - Sharpness
+
+                let saturation = data[rif_data_offset + 1] as i8;
+                let contrast = data[rif_data_offset + 2] as i8;
+                let sharpness = data[rif_data_offset + 3] as i8;
+
+                // Insert Saturation
+                tags.insert(
+                    RIF_SATURATION,
+                    MakerNoteTag {
+                        tag_id: RIF_SATURATION,
+                        tag_name: Some("Saturation"),
+                        value: ExifValue::Ascii(saturation.to_string()),
+                    },
+                );
+
+                // Insert Contrast
+                tags.insert(
+                    RIF_CONTRAST,
+                    MakerNoteTag {
+                        tag_id: RIF_CONTRAST,
+                        tag_name: Some("Contrast"),
+                        value: ExifValue::Ascii(contrast.to_string()),
+                    },
+                );
+
+                // Insert Sharpness
+                tags.insert(
+                    RIF_SHARPNESS,
+                    MakerNoteTag {
+                        tag_id: RIF_SHARPNESS,
+                        tag_name: Some("Sharpness"),
+                        value: ExifValue::Ascii(sharpness.to_string()),
+                    },
+                );
+            }
+            break;
+        }
+
+        // Move to next segment
+        offset += 8 + segment_len;
+
+        // Safety check to avoid infinite loops
+        if segment_len == 0 {
+            break;
+        }
+    }
+}
+
 /// Parse a single IFD entry from Sony maker notes
 fn parse_ifd_entry(
     data: &[u8],
@@ -2141,7 +2327,15 @@ fn parse_ifd_entry(
             if bytes.len() == 1 {
                 let v = bytes[0] as u16;
                 let decoded = match tag_id {
-                    SONY_FOCUS_MODE => Some(decode_focus_mode_exiftool(v).to_string()),
+                    SONY_FOCUS_MODE => {
+                        // Skip if Unknown - let other FocusMode tags take precedence
+                        let decoded = decode_focus_mode_exiftool(v);
+                        if decoded == "Unknown" {
+                            None
+                        } else {
+                            Some(decoded.to_string())
+                        }
+                    }
                     SONY_AF_AREA_MODE_SETTING => {
                         Some(decode_af_area_mode_setting_exiftool(v).to_string())
                     }
@@ -2161,6 +2355,9 @@ fn parse_ifd_entry(
 
                 if let Some(s) = decoded {
                     ExifValue::Ascii(s)
+                } else if tag_id == SONY_FOCUS_MODE {
+                    // Skip FocusMode entirely when Unknown to avoid overwriting valid values
+                    return None;
                 } else {
                     ExifValue::Byte(bytes)
                 }
@@ -2240,7 +2437,15 @@ fn parse_ifd_entry(
                     SONY_DYNAMIC_RANGE_OPTIMIZER => {
                         Some(decode_dynamic_range_optimizer_exiftool(v).to_string())
                     }
-                    SONY_FOCUS_MODE => Some(decode_focus_mode_exiftool(v).to_string()),
+                    SONY_FOCUS_MODE => {
+                        // Skip if Unknown - let other FocusMode tags take precedence
+                        let decoded = decode_focus_mode_exiftool(v);
+                        if decoded == "Unknown" {
+                            None
+                        } else {
+                            Some(decoded.to_string())
+                        }
+                    }
                     SONY_IMAGE_STABILIZATION => {
                         Some(decode_image_stabilization_exiftool(v).to_string())
                     }
@@ -2265,15 +2470,27 @@ fn parse_ifd_entry(
                     }
                     SONY_FOCUS_MODE_2 => {
                         // FocusMode2 (0xB042) - check for n/a value
+                        // Skip if n/a (65535) or Unknown - let other FocusMode tags take precedence
                         if v == 65535 {
-                            Some("n/a".to_string())
+                            None // Skip instead of outputting "n/a"
                         } else {
-                            Some(decode_focus_mode2_exiftool(v).to_string())
+                            let decoded = decode_focus_mode2_exiftool(v);
+                            if decoded == "Unknown" {
+                                None
+                            } else {
+                                Some(decoded.to_string())
+                            }
                         }
                     }
                     SONY_FOCUS_MODE_3 => {
                         // FocusMode3 (0xB04E) - valid for DSC-HX9V generation and newer
-                        Some(decode_focus_mode3_exiftool(v).to_string())
+                        // Skip if Unknown - let other FocusMode tags take precedence
+                        let decoded = decode_focus_mode3_exiftool(v);
+                        if decoded == "Unknown" {
+                            None
+                        } else {
+                            Some(decoded.to_string())
+                        }
                     }
                     SONY_AF_AREA_MODE_SETTING => {
                         Some(decode_af_area_mode_setting_exiftool(v).to_string())
@@ -2294,6 +2511,12 @@ fn parse_ifd_entry(
 
                 if let Some(s) = decoded {
                     ExifValue::Ascii(s)
+                } else if matches!(
+                    tag_id,
+                    SONY_FOCUS_MODE | SONY_FOCUS_MODE_2 | SONY_FOCUS_MODE_3
+                ) {
+                    // Skip FocusMode tags entirely when Unknown to avoid overwriting valid values
+                    return None;
                 } else {
                     ExifValue::Short(values)
                 }
@@ -2592,6 +2815,77 @@ pub fn parse_sony_maker_notes(
                 continue;
             }
 
+            // Handle ShotInfo binary blob (tag 0x3000)
+            // Contains SonyImageWidth/Height and other info
+            if tag_id == SONY_SHOT_INFO {
+                if let ExifValue::Undefined(ref raw_data) = decoded_value {
+                    parse_shot_info(raw_data, endian, &mut tags);
+                } else if let ExifValue::Byte(ref raw_data) = decoded_value {
+                    parse_shot_info(raw_data, endian, &mut tags);
+                }
+                // Don't insert the raw binary blob
+                continue;
+            }
+
+            // Handle MRWInfo binary blob (tag 0x7250)
+            // Contains MinoltaRaw RIF structure with Saturation/Contrast/Sharpness for A100
+            if tag_id == SONY_MRW_INFO {
+                if let ExifValue::Undefined(ref raw_data) = decoded_value {
+                    parse_mrw_info(raw_data, &mut tags);
+                } else if let ExifValue::Byte(ref raw_data) = decoded_value {
+                    parse_mrw_info(raw_data, &mut tags);
+                }
+                // Don't insert the raw binary blob
+                continue;
+            }
+
+            // Handle MinoltaMakerNote subdirectory (tag 0xB028)
+            // Used by Sony A100 - contains CameraInfoA100 with AFMode etc
+            if tag_id == SONY_MINOLTA_MAKER_NOTE {
+                if let ExifValue::Long(ref v) = decoded_value {
+                    if !v.is_empty() {
+                        // The value is an offset pointer to the MinoltaMakerNote IFD
+                        let minolta_offset = v[0] as usize;
+                        if let Some(tiff) = tiff_data {
+                            let abs_offset = tiff_offset + minolta_offset;
+                            if abs_offset < tiff.len() {
+                                // Parse the MinoltaMakerNote starting at this offset
+                                let minolta_data = &tiff[abs_offset..];
+                                if let Ok(minolta_tags) = minolta::parse_minolta_maker_notes(
+                                    minolta_data,
+                                    endian,
+                                    Some(tiff),
+                                    tiff_offset,
+                                ) {
+                                    // Merge Minolta MakerNote tags for A100
+                                    // - WhiteBalance (0x0115): should override Sony MakerNote WhiteBalance
+                                    // - CameraInfoA100 sub-tags (0x2000-0x2FFF): AFMode, AFPoint, AFAreaMode
+                                    // - CameraSettingsA100 sub-tags (0x3000-0x3FFF): FocusMode (tag 0x0c)
+                                    for (minolta_tag_id, minolta_tag) in minolta_tags {
+                                        // Include Minolta WhiteBalance - it overrides Sony MakerNote value
+                                        if minolta_tag_id == minolta::MINOLTA_WHITE_BALANCE {
+                                            tags.insert(SONY_WHITE_BALANCE, minolta_tag);
+                                        }
+                                        // Include CameraInfoA100 sub-tags (0x2000-0x2FFF)
+                                        else if (0x2000..0x3000).contains(&minolta_tag_id) {
+                                            let composite_id = 0x4000 + (minolta_tag_id - 0x2000);
+                                            tags.insert(composite_id, minolta_tag);
+                                        }
+                                        // Include CameraSettingsA100 sub-tags (0x3000-0x3FFF)
+                                        else if (0x3000..0x4000).contains(&minolta_tag_id) {
+                                            let composite_id = 0x5000 + (minolta_tag_id - 0x3000);
+                                            tags.insert(composite_id, minolta_tag);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Don't insert the raw offset pointer
+                continue;
+            }
+
             tags.insert(
                 tag_id,
                 MakerNoteTag {
@@ -2600,6 +2894,28 @@ pub fn parse_sony_maker_notes(
                     value: decoded_value,
                 },
             );
+        }
+    }
+
+    // Post-processing: Fix AFPointSelected for SLT/ILCA models
+    // SLT and ILCA models map value 0 to "Auto", while NEX/ILCE/DSC map to "n/a"
+    // Check if we have a SonyModelID that indicates SLT/ILCA model
+    if let Some(model_tag) = tags.get(&SONY_SONY_MODEL_ID) {
+        if let ExifValue::Ascii(model_name) = &model_tag.value {
+            // SLT-*, HV, and ILCA-* models use "Auto" for AFPointSelected value 0
+            let is_slt_or_ilca = model_name.starts_with("SLT-")
+                || model_name.starts_with("ILCA-")
+                || model_name == "HV";
+
+            if is_slt_or_ilca {
+                if let Some(af_tag) = tags.get_mut(&SONY_AF_POINT_SELECTED) {
+                    if let ExifValue::Ascii(s) = &af_tag.value {
+                        if s == "n/a" {
+                            af_tag.value = ExifValue::Ascii("Auto".to_string());
+                        }
+                    }
+                }
+            }
         }
     }
 

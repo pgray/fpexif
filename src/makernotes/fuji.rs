@@ -42,6 +42,7 @@ pub const FUJI_MIN_FOCAL_LENGTH: u16 = 0x1404;
 pub const FUJI_MAX_FOCAL_LENGTH: u16 = 0x1405;
 pub const FUJI_MAX_APERTURE_AT_MIN_FOCAL: u16 = 0x1406;
 pub const FUJI_MAX_APERTURE_AT_MAX_FOCAL: u16 = 0x1407;
+pub const FUJI_AUTO_DYNAMIC_RANGE: u16 = 0x140b;
 pub const FUJI_FILE_SOURCE: u16 = 0x8000;
 pub const FUJI_ORDER_NUMBER: u16 = 0x8002;
 pub const FUJI_FRAME_NUMBER: u16 = 0x8003;
@@ -124,8 +125,11 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_GRAIN_EFFECT_ROUGHNESS => Some("GrainEffectRoughness"),
         FUJI_WHITE_BALANCE_FINE_TUNE => Some("WhiteBalanceFineTune"),
         FUJI_FLASH_FIRING => Some("FlashFiring"),
-        FUJI_IMAGE_HEIGHT => Some("ImageHeight"),
-        FUJI_IMAGE_WIDTH => Some("ImageWidth"),
+        // These are undocumented Fuji MakerNote tags, not standard TIFF ImageWidth/Height
+        // ExifTool outputs them as FujiFilm_0x1007 and FujiFilm_0x1009
+        // We skip naming them to avoid collision with standard tags
+        // FUJI_IMAGE_HEIGHT => Some("FujiImageHeight"),
+        // FUJI_IMAGE_WIDTH => Some("FujiImageWidth"),
         FUJI_OUTPUT_IMAGE_SIZE => Some("OutputImageSize"),
         FUJI_CONTINUOUS_DRIVE => Some("ContinuousDrive"),
         FUJI_VIDEO_MODE => Some("VideoMode"),
@@ -145,6 +149,7 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_MAX_FOCAL_LENGTH => Some("MaxFocalLength"),
         FUJI_MAX_APERTURE_AT_MIN_FOCAL => Some("MaxApertureAtMinFocal"),
         FUJI_MAX_APERTURE_AT_MAX_FOCAL => Some("MaxApertureAtMaxFocal"),
+        FUJI_AUTO_DYNAMIC_RANGE => Some("AutoDynamicRange"),
         FUJI_IMAGE_STABILIZATION => Some("ImageStabilization"),
         FUJI_SCENE_RECOGNITION => Some("SceneRecognition"),
         FUJI_IMAGE_GENERATION => Some("ImageGeneration"),
