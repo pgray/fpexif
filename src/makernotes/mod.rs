@@ -79,7 +79,11 @@ pub fn parse_maker_notes_with_tiff_data(
         )
     } else if make_str.contains("panasonic") {
         panasonic::parse_panasonic_maker_notes(data, endian, model, tiff_data, tiff_offset)
-    } else if make_str.contains("pentax") || make_str.contains("ricoh") {
+    } else if make_str.contains("pentax")
+        || make_str.contains("ricoh")
+        || make_str.contains("samsung")
+    {
+        // Samsung cameras (GX-1S, GX-1L, GX10, GX20) use Pentax MakerNote format
         pentax::parse_pentax_maker_notes(data, endian, tiff_data, tiff_offset)
     } else if make_str.contains("minolta") || make_str.contains("konica") {
         minolta::parse_minolta_maker_notes(data, endian, tiff_data, tiff_offset)

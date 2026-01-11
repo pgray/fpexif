@@ -180,7 +180,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 for file in files {
                     match parser.parse_file(file) {
                         Ok(exif_data) => {
-                            print_exif_data_exiftool(&exif_data);
+                            let source = file.to_str();
+                            print_exif_data_exiftool(&exif_data, source);
                         }
                         Err(err) => {
                             eprintln!("Error parsing {}: {}", file.display(), err);
@@ -339,10 +340,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Print all EXIF data in exiftool text format: `Tag Name                        : Value`
-fn print_exif_data_exiftool(exif_data: &ExifData) {
+fn print_exif_data_exiftool(exif_data: &ExifData, source_file: Option<&str>) {
     // Use to_exiftool_json to get consistent output with JSON mode
     // This ensures tag filtering (removing duplicates, IFD pointers, raw binary) is applied
-    let json = fpexif::output::to_exiftool_json(exif_data, None);
+    // source_file is needed for format-specific overrides (e.g., Pentax DNG vs PEF)
+    let json = fpexif::output::to_exiftool_json(exif_data, source_file);
 
     // Extract the object from the array
     if let serde_json::Value::Array(arr) = json {

@@ -479,7 +479,7 @@ pub const TAG_MASKED_AREAS: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 pub const TAG_SHADOW_SCALE: ExifTagId = ExifTagId {
-    id: 0xC634,
+    id: 0xC633,
     ifd: TagGroup::Main,
 };
 pub const TAG_CALIBRATION_ILLUMINANT1: ExifTagId = ExifTagId {
