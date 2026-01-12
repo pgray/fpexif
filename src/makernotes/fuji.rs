@@ -235,8 +235,8 @@ define_tag_decoder! {
     white_balance,
     exiftool: {
         0 => "Auto",
-        1 => "Auto (White Priority)",
-        2 => "Auto (Ambience Priority)",
+        1 => "Auto (white priority)",
+        2 => "Auto (ambiance priority)",
         256 => "Daylight",
         512 => "Cloudy",
         768 => "Daylight Fluorescent",
@@ -252,7 +252,7 @@ define_tag_decoder! {
         3842 => "Custom3",
         3843 => "Custom4",
         3844 => "Custom5",
-        6144 => "Kelvin",
+        4080 => "Kelvin",
     },
     exiv2: {
         0 => "Auto",

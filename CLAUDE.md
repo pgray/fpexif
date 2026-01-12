@@ -215,7 +215,29 @@ Use `./bin/mfr-test` to track progress and prevent regressions when working on M
 ./bin/mfr-test --list-baselines
 ```
 
-Supported manufacturers: `canon`, `nikon`, `sony`, `fujifilm`, `panasonic`, `olympus`, `minolta`, `kodak`, `dng`
+Supported manufacturers: `canon`, `nikon`, `sony`, `fujifilm`, `panasonic`, `olympus`, `pentax`, `minolta`, `kodak`, `sigma`, `samsung`, `ricoh`, `leica`, `dng`
+
+### Test Data Directories
+
+There are two test data directories:
+
+| Directory | Flag | Description |
+|-----------|------|-------------|
+| `/fpexif/raws/` | (default) | Small curated set of RAW files for quick testing |
+| `/fpexif/data.lfs/` | `--data-lfs` | Large dataset with more camera models and edge cases |
+
+```bash
+# Test against default /fpexif/raws directory
+./bin/mfr-test fujifilm
+
+# Test against larger /fpexif/data.lfs directory
+./bin/mfr-test fujifilm --data-lfs
+
+# Verbose output shows per-file details and specific mismatches
+./bin/mfr-test fujifilm --data-lfs --verbose
+```
+
+Always test against both directories when making significant changes. The `data.lfs` directory often reveals edge cases not present in the smaller `raws` set.
 
 The `--check` flag shows:
 - **Matching/Mismatched/Missing/Extra** counts with delta from baseline
@@ -226,5 +248,6 @@ The `--check` flag shows:
 1. Save baseline before starting: `./bin/mfr-test olympus --save-baseline`
 2. Make changes to the makernote parser
 3. Check for regressions: `./bin/mfr-test olympus --check`
-4. If regressions appear, investigate and fix before committing
-5. Run `./bin/ccc` before pushing
+4. Test against larger dataset: `./bin/mfr-test olympus --data-lfs`
+5. If regressions appear, investigate and fix before committing
+6. Run `./bin/ccc` before pushing
