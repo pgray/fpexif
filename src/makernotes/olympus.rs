@@ -6,6 +6,18 @@ use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use std::collections::HashMap;
 
+// exiv2 group names for Olympus sub-IFDs
+// Note: exiv2 uses "Olympus" for older cameras (C/E-series before E-1) and "Olympus2" for newer
+pub const EXIV2_GROUP_OLYMPUS: &str = "Olympus";
+pub const EXIV2_GROUP_OLYMPUS2: &str = "Olympus2";
+pub const EXIV2_GROUP_OLYMPUS_CS: &str = "OlympusCs";
+pub const EXIV2_GROUP_OLYMPUS_EQ: &str = "OlympusEq";
+pub const EXIV2_GROUP_OLYMPUS_RD: &str = "OlympusRd";
+pub const EXIV2_GROUP_OLYMPUS_RD2: &str = "OlympusRd2";
+pub const EXIV2_GROUP_OLYMPUS_IP: &str = "OlympusIp";
+pub const EXIV2_GROUP_OLYMPUS_FI: &str = "OlympusFi";
+pub const EXIV2_GROUP_OLYMPUS_RI: &str = "OlympusRi";
+
 // Olympus MakerNote main IFD tag IDs
 pub const OLYMPUS_THUMBNAIL_IMAGE: u16 = 0x0100;
 pub const OLYMPUS_SPECIAL_MODE: u16 = 0x0200;
@@ -203,6 +215,19 @@ pub enum OlympusIfdType {
     RawDevelopment,
     ImageProcessing,
     FocusInfo,
+}
+
+/// Get the exiv2 group name for a given Olympus IFD type
+/// Note: Uses "Olympus2" for main IFD since most test cameras are newer models
+pub fn get_exiv2_group_for_ifd(ifd_type: OlympusIfdType) -> &'static str {
+    match ifd_type {
+        OlympusIfdType::Main => EXIV2_GROUP_OLYMPUS2,
+        OlympusIfdType::Equipment => EXIV2_GROUP_OLYMPUS_EQ,
+        OlympusIfdType::CameraSettings => EXIV2_GROUP_OLYMPUS_CS,
+        OlympusIfdType::RawDevelopment => EXIV2_GROUP_OLYMPUS_RD,
+        OlympusIfdType::ImageProcessing => EXIV2_GROUP_OLYMPUS_IP,
+        OlympusIfdType::FocusInfo => EXIV2_GROUP_OLYMPUS_FI,
+    }
 }
 
 fn get_main_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -3722,14 +3747,19 @@ fn parse_olympus_ifd(
                 },
             };
 
-            tags.insert(
-                storage_id,
-                MakerNoteTag {
-                    tag_id,
-                    tag_name,
-                    value,
-                },
-            );
+            // Create tag with exiv2 group for proper exiv2-format output
+            let exiv2_group = get_exiv2_group_for_ifd(ifd_type);
+            // For exiv2, use the raw tag name without prefix
+            let exiv2_name = tag_name.map(|n| {
+                // Strip any prefix (e.g., "Equipment." or "CameraSettings.")
+                n.rfind('.').map(|pos| &n[pos + 1..]).unwrap_or(n)
+            });
+            let tag = if let Some(name) = exiv2_name {
+                MakerNoteTag::with_exiv2(tag_id, tag_name, value.clone(), value, exiv2_group, name)
+            } else {
+                MakerNoteTag::new(tag_id, tag_name, value)
+            };
+            tags.insert(storage_id, tag);
 
             // Handle sub-IFDs
             if ifd_type == OlympusIfdType::Main {

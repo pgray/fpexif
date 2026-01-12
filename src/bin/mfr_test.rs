@@ -13,7 +13,7 @@
 
 use clap::Parser;
 use fpexif::mfr_test::{
-    baseline::{self, BaselineType},
+    baseline::{self, BaselineType, DataSet},
     comparison, get_formats_for_manufacturer, get_supported_manufacturers, output,
 };
 
@@ -81,6 +81,13 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
+    // Determine dataset based on --data-lfs flag
+    let dataset = if cli.data_lfs {
+        DataSet::DataLfs
+    } else {
+        DataSet::Raws
+    };
+
     // Set test directory if --data-lfs flag is used
     if cli.data_lfs {
         std::env::set_var("FPEXIF_TEST_FILES", "/fpexif/data.lfs");
@@ -88,19 +95,29 @@ fn main() {
 
     // Handle --list-baselines (no manufacturer required)
     if cli.list_baselines {
-        let baselines = baseline::list_baselines();
-        output::print_baselines_list(&baselines);
+        let baselines = baseline::list_baselines_full(BaselineType::Exiftool, dataset);
+        if baselines.is_empty() && dataset == DataSet::DataLfs {
+            println!("No data.lfs baselines saved.");
+            println!("Run: ./bin/mfr-test <manufacturer> --data-lfs --save-baseline");
+        } else {
+            output::print_baselines_list(&baselines);
+        }
         return;
     }
 
     // Handle --list-baselines-exiv2 (no manufacturer required)
     if cli.list_baselines_exiv2 {
-        let baselines = baseline::list_baselines_typed(BaselineType::Exiv2);
+        let baselines = baseline::list_baselines_full(BaselineType::Exiv2, dataset);
         if baselines.is_empty() {
-            println!("No exiv2 baselines saved.");
-            println!("Run: ./bin/mfr-test <manufacturer> --save-baseline-exiv2");
+            if dataset == DataSet::DataLfs {
+                println!("No data.lfs exiv2 baselines saved.");
+                println!("Run: ./bin/mfr-test <manufacturer> --data-lfs --save-baseline-exiv2");
+            } else {
+                println!("No exiv2 baselines saved.");
+                println!("Run: ./bin/mfr-test <manufacturer> --save-baseline-exiv2");
+            }
         } else {
-            println!("Saved Exiv2 Baselines:");
+            println!("Saved Exiv2 Baselines ({}):", dataset.display_name());
             println!("{}", "-".repeat(60));
             for (mfr, meta) in &baselines {
                 println!(
@@ -148,7 +165,7 @@ fn main() {
 
     // Handle --show-baseline
     if cli.show_baseline {
-        match baseline::load_baseline(&manufacturer) {
+        match baseline::load_baseline_full(&manufacturer, BaselineType::Exiftool, dataset) {
             Ok(b) => {
                 output::print_baseline_details(&b.metadata, &b.result);
             }
@@ -162,7 +179,7 @@ fn main() {
 
     // Handle --show-baseline-exiv2
     if cli.show_baseline_exiv2 {
-        match baseline::load_baseline_typed(&manufacturer, BaselineType::Exiv2) {
+        match baseline::load_baseline_full(&manufacturer, BaselineType::Exiv2, dataset) {
             Ok(b) => {
                 println!(
                     "Exiv2 Baseline for: {}",
@@ -204,11 +221,12 @@ fn main() {
 
         // Handle --save-baseline-exiv2
         if cli.save_baseline_exiv2 {
-            match baseline::save_baseline_typed(
+            match baseline::save_baseline_full(
                 &manufacturer,
                 current_result.clone(),
                 None,
                 BaselineType::Exiv2,
+                dataset,
             ) {
                 Ok(path) => {
                     println!("Exiv2 baseline saved to: {}", path.display());
@@ -225,7 +243,7 @@ fn main() {
 
         // Handle --check-exiv2 (compare against exiv2 baseline)
         if cli.check_exiv2 {
-            match baseline::load_baseline_typed(&manufacturer, BaselineType::Exiv2) {
+            match baseline::load_baseline_full(&manufacturer, BaselineType::Exiv2, dataset) {
                 Ok(b) => {
                     let diff = comparison::compare_with_baseline(&current_result, &b);
                     output::print_baseline_comparison(&current_result, &b.metadata, &diff);
@@ -259,7 +277,13 @@ fn main() {
 
     // Handle --save-baseline
     if cli.save_baseline {
-        match baseline::save_baseline(&manufacturer, current_result.clone(), None) {
+        match baseline::save_baseline_full(
+            &manufacturer,
+            current_result.clone(),
+            None,
+            BaselineType::Exiftool,
+            dataset,
+        ) {
             Ok(path) => {
                 println!("Baseline saved to: {}", path.display());
                 println!();
@@ -275,7 +299,7 @@ fn main() {
 
     // Handle --check (compare against baseline)
     if cli.check {
-        match baseline::load_baseline(&manufacturer) {
+        match baseline::load_baseline_full(&manufacturer, BaselineType::Exiftool, dataset) {
             Ok(b) => {
                 let diff = comparison::compare_with_baseline(&current_result, &b);
                 output::print_baseline_comparison(&current_result, &b.metadata, &diff);
@@ -295,7 +319,8 @@ fn main() {
 
     // Handle --full-report
     if cli.full_report {
-        let baseline_data = baseline::load_baseline(&manufacturer).ok();
+        let baseline_data =
+            baseline::load_baseline_full(&manufacturer, BaselineType::Exiftool, dataset).ok();
         let diff = baseline_data
             .as_ref()
             .map(|b| comparison::compare_with_baseline(&current_result, b));

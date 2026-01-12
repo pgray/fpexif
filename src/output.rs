@@ -182,8 +182,6 @@ fn format_metering_mode(value: u16, make: Option<&str>) -> String {
             }
             .to_string();
         }
-        // Note: Olympus uses "ESP" in MakerNotes but ExifTool uses standard "Multi-segment"
-        // for the EXIF MeteringMode tag (0x9207), so we don't apply special handling here.
     }
     crate::tags::get_metering_mode_description(value).to_string()
 }

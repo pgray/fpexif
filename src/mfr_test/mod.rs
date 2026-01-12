@@ -12,7 +12,7 @@ pub mod comparison;
 pub mod output;
 
 // Re-export commonly used types
-pub use baseline::BaselineType;
+pub use baseline::{BaselineType, DataSet};
 pub use comparison::{exiv2_available, run_exiv2_comparison};
 
 use serde::{Deserialize, Serialize};

@@ -8,6 +8,119 @@ use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
+// exiv2 group names for Nikon sub-IFDs
+pub const EXIV2_GROUP_NIKON3: &str = "Nikon3";
+pub const EXIV2_GROUP_NIKON_PC: &str = "NikonPc";
+pub const EXIV2_GROUP_NIKON_LD: &str = "NikonLd3"; // Most common lens data version
+pub const EXIV2_GROUP_NIKON_VR: &str = "NikonVr";
+pub const EXIV2_GROUP_NIKON_WT: &str = "NikonWt";
+pub const EXIV2_GROUP_NIKON_II: &str = "NikonIi";
+pub const EXIV2_GROUP_NIKON_AF: &str = "NikonAf";
+pub const EXIV2_GROUP_NIKON_AF2: &str = "NikonAf2";
+pub const EXIV2_GROUP_NIKON_FI: &str = "NikonFi";
+pub const EXIV2_GROUP_NIKON_FL: &str = "NikonFl3"; // Most common flash version
+pub const EXIV2_GROUP_NIKON_ME: &str = "NikonMe";
+
+/// Map Nikon sub-IFD field names to exiv2 group and tag name
+/// Returns (exiv2_group, exiv2_name) for the given field name and parent tag
+pub fn get_exiv2_nikon_subfield(
+    parent_tag: u16,
+    field_name: &str,
+) -> Option<(&'static str, &'static str)> {
+    match parent_tag {
+        NIKON_PICTURE_CONTROL_DATA => match field_name {
+            "PictureControlVersion" => Some((EXIV2_GROUP_NIKON_PC, "Version")),
+            "PictureControlName" => Some((EXIV2_GROUP_NIKON_PC, "Name")),
+            "PictureControlBase" => Some((EXIV2_GROUP_NIKON_PC, "Base")),
+            "PictureControlAdjust" => Some((EXIV2_GROUP_NIKON_PC, "Adjust")),
+            "PictureControlQuickAdjust" => Some((EXIV2_GROUP_NIKON_PC, "QuickAdjust")),
+            "Sharpness" => Some((EXIV2_GROUP_NIKON_PC, "Sharpness")),
+            "Contrast" => Some((EXIV2_GROUP_NIKON_PC, "Contrast")),
+            "Brightness" => Some((EXIV2_GROUP_NIKON_PC, "Brightness")),
+            "Saturation" => Some((EXIV2_GROUP_NIKON_PC, "Saturation")),
+            "HueAdjustment" => Some((EXIV2_GROUP_NIKON_PC, "HueAdjustment")),
+            "FilterEffect" => Some((EXIV2_GROUP_NIKON_PC, "FilterEffect")),
+            "ToningEffect" => Some((EXIV2_GROUP_NIKON_PC, "ToningEffect")),
+            "ToningSaturation" => Some((EXIV2_GROUP_NIKON_PC, "ToningSaturation")),
+            _ => None,
+        },
+        NIKON_LENS_DATA => match field_name {
+            "LensDataVersion" => Some((EXIV2_GROUP_NIKON_LD, "Version")),
+            "LensIDNumber" => Some((EXIV2_GROUP_NIKON_LD, "LensIDNumber")),
+            "LensFStops" => Some((EXIV2_GROUP_NIKON_LD, "LensFStops")),
+            "MinFocalLength" => Some((EXIV2_GROUP_NIKON_LD, "MinFocalLength")),
+            "MaxFocalLength" => Some((EXIV2_GROUP_NIKON_LD, "MaxFocalLength")),
+            "MaxApertureAtMinFocal" => Some((EXIV2_GROUP_NIKON_LD, "MaxApertureAtMinFocal")),
+            "MaxApertureAtMaxFocal" => Some((EXIV2_GROUP_NIKON_LD, "MaxApertureAtMaxFocal")),
+            "MCUVersion" => Some((EXIV2_GROUP_NIKON_LD, "MCUVersion")),
+            "EffectiveMaxAperture" => Some((EXIV2_GROUP_NIKON_LD, "EffectiveMaxAperture")),
+            "FocalLength" => Some((EXIV2_GROUP_NIKON_LD, "FocalLength")),
+            "FocusDistance" => Some((EXIV2_GROUP_NIKON_LD, "FocusDistance")),
+            "AFAperture" => Some((EXIV2_GROUP_NIKON_LD, "AFAperture")),
+            _ => None,
+        },
+        NIKON_VR_INFO => match field_name {
+            "VRInfoVersion" => Some((EXIV2_GROUP_NIKON_VR, "Version")),
+            "VibrationReduction" => Some((EXIV2_GROUP_NIKON_VR, "VibrationReduction")),
+            "VRMode" => Some((EXIV2_GROUP_NIKON_VR, "VRMode")),
+            _ => None,
+        },
+        NIKON_WORLD_TIME => match field_name {
+            "Timezone" => Some((EXIV2_GROUP_NIKON_WT, "Timezone")),
+            "DaylightSavings" => Some((EXIV2_GROUP_NIKON_WT, "DaylightSavings")),
+            "DateDisplayFormat" => Some((EXIV2_GROUP_NIKON_WT, "DateDisplayFormat")),
+            _ => None,
+        },
+        NIKON_ISO_INFO => match field_name {
+            "ISO" => Some((EXIV2_GROUP_NIKON_II, "ISO")),
+            "ISOExpansion" => Some((EXIV2_GROUP_NIKON_II, "ISOExpansion")),
+            "ISO2" => Some((EXIV2_GROUP_NIKON_II, "ISO2")),
+            "ISOExpansion2" => Some((EXIV2_GROUP_NIKON_II, "ISOExpansion2")),
+            _ => None,
+        },
+        NIKON_AF_INFO => match field_name {
+            "AFAreaMode" => Some((EXIV2_GROUP_NIKON_AF, "AFAreaMode")),
+            "AFPoint" => Some((EXIV2_GROUP_NIKON_AF, "AFPoint")),
+            "AFPointsInFocus" => Some((EXIV2_GROUP_NIKON_AF, "AFPointsInFocus")),
+            _ => None,
+        },
+        NIKON_AF_INFO_2 => match field_name {
+            "Version" | "AFInfo2Version" => Some((EXIV2_GROUP_NIKON_AF2, "Version")),
+            "ContrastDetectAF" => Some((EXIV2_GROUP_NIKON_AF2, "ContrastDetectAF")),
+            "AFAreaMode" => Some((EXIV2_GROUP_NIKON_AF2, "AFAreaMode")),
+            "PhaseDetectAF" => Some((EXIV2_GROUP_NIKON_AF2, "PhaseDetectAF")),
+            "PrimaryAFPoint" => Some((EXIV2_GROUP_NIKON_AF2, "PrimaryAFPoint")),
+            "AFPointsUsed" => Some((EXIV2_GROUP_NIKON_AF2, "AFPointsUsed")),
+            _ => None,
+        },
+        NIKON_FLASH_INFO | NIKON_FLASH_INFO_2 => match field_name {
+            "FlashInfoVersion" => Some((EXIV2_GROUP_NIKON_FL, "Version")),
+            "FlashSource" => Some((EXIV2_GROUP_NIKON_FL, "FlashSource")),
+            "ExternalFlashFirmware" => Some((EXIV2_GROUP_NIKON_FL, "ExternalFlashFirmware")),
+            "ExternalFlashFlags" => Some((EXIV2_GROUP_NIKON_FL, "ExternalFlashFlags")),
+            "FlashCommanderMode" => Some((EXIV2_GROUP_NIKON_FL, "FlashCommanderMode")),
+            "FlashControlMode" => Some((EXIV2_GROUP_NIKON_FL, "FlashControlMode")),
+            "FlashGNDistance" => Some((EXIV2_GROUP_NIKON_FL, "FlashGNDistance")),
+            "FlashColorFilter" => Some((EXIV2_GROUP_NIKON_FL, "FlashColorFilter")),
+            _ => None,
+        },
+        NIKON_FILE_INFO => match field_name {
+            "FileInfoVersion" => Some((EXIV2_GROUP_NIKON_FI, "Version")),
+            "DirectoryNumber" => Some((EXIV2_GROUP_NIKON_FI, "DirectoryNumber")),
+            "FileNumber" => Some((EXIV2_GROUP_NIKON_FI, "FileNumber")),
+            _ => None,
+        },
+        NIKON_MULTI_EXPOSURE => match field_name {
+            "MultiExposureVersion" => Some((EXIV2_GROUP_NIKON_ME, "Version")),
+            "MultiExposureMode" => Some((EXIV2_GROUP_NIKON_ME, "MultiExposureMode")),
+            "MultiExposureShots" => Some((EXIV2_GROUP_NIKON_ME, "MultiExposureShots")),
+            "MultiExposureAutoGain" => Some((EXIV2_GROUP_NIKON_ME, "MultiExposureAutoGain")),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 // Common Nikon MakerNote tag IDs
 pub const NIKON_VERSION: u16 = 0x0001;
 pub const NIKON_ISO_SETTING: u16 = 0x0002;
@@ -1458,8 +1571,35 @@ fn parse_iso_info(data: &[u8]) -> Vec<(String, String)> {
     tags
 }
 
+/// Check if model is a Nikon Z-series camera
+/// Based on ExifTool's %infoZSeries condition
+fn is_nikon_z_series(model: Option<&str>) -> bool {
+    match model {
+        Some(m) => {
+            let upper = m.to_uppercase();
+            // Pattern: "NIKON Z " followed by model number (with space)
+            // or "NIKON Z" directly followed by model (no space, Oct 2023+)
+            upper.contains("NIKON Z 30")
+                || upper.contains("NIKON Z 5")
+                || upper.contains("NIKON Z 50")
+                || upper.contains("NIKON Z 6")
+                || upper.contains("NIKON Z 7")
+                || upper.contains("NIKON Z 8")
+                || upper.contains("NIKON Z 9")
+                || upper.contains("NIKON Z F")
+                || upper.contains("NIKON Z FC")
+                || upper.contains("NIKON Z5_2")
+                || upper.contains("NIKON Z50_2")
+                || upper.contains("NIKON Z6_2")
+                || upper.contains("NIKON Z6_3")
+                || upper.contains("NIKON Z7_2")
+        }
+        None => false,
+    }
+}
+
 /// Parse VRInfo tag data (tag 0x001F)
-fn parse_vr_info(data: &[u8], _endian: Endianness) -> Vec<(String, String)> {
+fn parse_vr_info(data: &[u8], _endian: Endianness, model: Option<&str>) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
     if data.len() < 8 {
@@ -1483,13 +1623,26 @@ fn parse_vr_info(data: &[u8], _endian: Endianness) -> Vec<(String, String)> {
     }
 
     // Offset 0x06: VRMode (int8u)
+    // Z-series cameras use different mapping than older cameras
     let vr_mode = data[6];
-    let vr_mode_str = match vr_mode {
-        0 => "Normal",
-        1 => "On (1)",
-        2 => "Active",
-        3 => "Sport",
-        _ => "Unknown",
+    let is_z_series = is_nikon_z_series(model);
+    let vr_mode_str = if is_z_series {
+        // Z-series mapping (vRModeZ9 in ExifTool)
+        match vr_mode {
+            0 => "Off",
+            1 => "Normal",
+            2 => "Sport",
+            _ => "Unknown",
+        }
+    } else {
+        // Non-Z-series mapping
+        match vr_mode {
+            0 => "Normal",
+            1 => "On (1)",
+            2 => "Active",
+            3 => "Sport",
+            _ => "Unknown",
+        }
     };
     tags.push(("VRMode".to_string(), vr_mode_str.to_string()));
 
@@ -2661,11 +2814,13 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     ));
 
     // ContrastDetectAF - derived from AFDetectionMethod
+    // ExifTool composite tag: On only if FocusMode is not Manual AND AFDetectionMethod == 1
+    // For AFDetectionMethod == 2 (Hybrid), ExifTool returns "Off"
     let contrast_detect_str = match af_detection {
-        0 => "Off",
-        1 => "On",
-        2 => "On (2)",
-        _ => "Unknown",
+        0 => "Off", // Phase Detect
+        1 => "On",  // Contrast Detect
+        2 => "Off", // Hybrid - treated as Off by ExifTool
+        _ => "Off",
     };
     tags.push((
         "ContrastDetectAF".to_string(),
@@ -4663,20 +4818,20 @@ pub fn parse_nikon_maker_notes(
                         let blue = values[1] as f64 / 256.0;
                         // Add RedBalance and BlueBalance as separate tags
                         tags.insert(
-                            0xFE00, // Pseudo tag ID for RedBalance
-                            MakerNoteTag {
-                                tag_id: 0xFE00,
-                                value: ExifValue::Ascii(format!("{:.6}", red)),
-                                tag_name: Some("RedBalance"),
-                            },
+                            0xFE00,
+                            MakerNoteTag::new(
+                                0xFE00,
+                                Some("RedBalance"),
+                                ExifValue::Ascii(format!("{:.6}", red)),
+                            ),
                         );
                         tags.insert(
-                            0xFE01, // Pseudo tag ID for BlueBalance
-                            MakerNoteTag {
-                                tag_id: 0xFE01,
-                                value: ExifValue::Ascii(format!("{:.6}", blue)),
-                                tag_name: Some("BlueBalance"),
-                            },
+                            0xFE01,
+                            MakerNoteTag::new(
+                                0xFE01,
+                                Some("BlueBalance"),
+                                ExifValue::Ascii(format!("{:.6}", blue)),
+                            ),
                         );
                         // Return WB_RBLevels as space-separated values
                         ExifValue::Ascii(
@@ -4776,20 +4931,20 @@ pub fn parse_nikon_maker_notes(
                         };
                         // Add RedBalance and BlueBalance as separate tags
                         tags.insert(
-                            0xFE00, // Pseudo tag ID for RedBalance
-                            MakerNoteTag {
-                                tag_id: 0xFE00,
-                                value: ExifValue::Ascii(format!("{:.6}", red)),
-                                tag_name: Some("RedBalance"),
-                            },
+                            0xFE00,
+                            MakerNoteTag::new(
+                                0xFE00,
+                                Some("RedBalance"),
+                                ExifValue::Ascii(format!("{:.6}", red)),
+                            ),
                         );
                         tags.insert(
-                            0xFE01, // Pseudo tag ID for BlueBalance
-                            MakerNoteTag {
-                                tag_id: 0xFE01,
-                                value: ExifValue::Ascii(format!("{:.6}", blue)),
-                                tag_name: Some("BlueBalance"),
-                            },
+                            0xFE01,
+                            MakerNoteTag::new(
+                                0xFE01,
+                                Some("BlueBalance"),
+                                ExifValue::Ascii(format!("{:.6}", blue)),
+                            ),
                         );
                         // Also return the WB_RBLevels as formatted string
                         let formatted: Vec<String> = values
@@ -4961,11 +5116,11 @@ pub fn parse_nikon_maker_notes(
                     if vals.len() >= 2 && vals[1] != 0 {
                         tags.insert(
                             tag_id,
-                            MakerNoteTag {
+                            MakerNoteTag::new(
                                 tag_id,
-                                tag_name: get_nikon_tag_name(tag_id),
-                                value: ExifValue::Short(vec![vals[1]]),
-                            },
+                                get_nikon_tag_name(tag_id),
+                                ExifValue::Short(vec![vals[1]]),
+                            ),
                         );
                     }
                     // Skip if values are 0 0 (ExifTool outputs empty string)
@@ -4979,11 +5134,7 @@ pub fn parse_nikon_maker_notes(
 
             tags.insert(
                 tag_id,
-                MakerNoteTag {
-                    tag_id,
-                    tag_name: get_nikon_tag_name(tag_id),
-                    value: value.clone(),
-                },
+                MakerNoteTag::new(tag_id, get_nikon_tag_name(tag_id), value.clone()),
             );
 
             // Parse sub-structures and insert extracted fields as separate tags
@@ -4991,98 +5142,170 @@ pub fn parse_nikon_maker_notes(
                 NIKON_ISO_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_iso_info(bytes) {
-                            tags.insert(
-                                0x9000 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9000 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9000 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_ISO_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_VR_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_vr_info(bytes, maker_endian) {
-                            tags.insert(
-                                0x9100 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9100 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                        for (name, val) in parse_vr_info(bytes, maker_endian, model) {
+                            let tag_id = 0x9100 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_VR_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_PICTURE_CONTROL_DATA => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_picture_control(bytes) {
-                            tags.insert(
-                                0x9200 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9200 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9200 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_PICTURE_CONTROL_DATA, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_FLASH_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_flash_info(bytes) {
-                            tags.insert(
-                                0x9300 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9300 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9300 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_FLASH_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_MULTI_EXPOSURE => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_multi_exposure(bytes) {
-                            tags.insert(
-                                0x9350 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9350 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9350 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_MULTI_EXPOSURE, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_SHOT_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_shot_info_basic(bytes) {
-                            tags.insert(
-                                0x9380 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9380 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                            let tag_id = 0x9380 + tags.len() as u16;
+                            // Note: NIKON_SHOT_INFO is not mapped to exiv2 groups currently
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some(Box::leak(name.into_boxed_str())),
+                                ExifValue::Ascii(val),
                             );
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_FILE_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_file_info(bytes) {
-                            tags.insert(
-                                0x9390 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9390 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9390 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_FILE_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
@@ -5091,11 +5314,11 @@ pub fn parse_nikon_maker_notes(
                         for (name, val) in parse_retouch_info(bytes) {
                             tags.insert(
                                 0x93A0 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x93A0 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                                MakerNoteTag::new(
+                                    0x93A0 + tags.len() as u16,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                ),
                             );
                         }
                     }
@@ -5109,42 +5332,78 @@ pub fn parse_nikon_maker_notes(
                 NIKON_AF_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_af_info(bytes, model) {
-                            tags.insert(
-                                0x9500 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9500 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9500 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_AF_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_AF_INFO_2 => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_af_info2(bytes) {
-                            tags.insert(
-                                0x9600 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9600 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9600 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_AF_INFO_2, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_WORLD_TIME => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_world_time(bytes, maker_endian) {
-                            tags.insert(
-                                0x9700 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9700 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9700 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_WORLD_TIME, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
@@ -5153,11 +5412,11 @@ pub fn parse_nikon_maker_notes(
                         for (name, val) in parse_color_balance(bytes, maker_endian) {
                             tags.insert(
                                 0x9800 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9800 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                                MakerNoteTag::new(
+                                    0x9800 + tags.len() as u16,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                ),
                             );
                         }
                     }
@@ -5170,11 +5429,11 @@ pub fn parse_nikon_maker_notes(
                         for (name, val) in parse_crop_hi_speed(&bytes, maker_endian) {
                             tags.insert(
                                 0x9900 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9900 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                                MakerNoteTag::new(
+                                    0x9900 + tags.len() as u16,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                ),
                             );
                         }
                     }
@@ -5190,14 +5449,26 @@ pub fn parse_nikon_maker_notes(
         let (parsed_tags, id_bytes) = parse_lens_data(&data, serial_number, shutter_count_val);
         lens_id_bytes = id_bytes;
         for (name, val) in parsed_tags {
-            tags.insert(
-                0x9400 + tags.len() as u16,
-                MakerNoteTag {
-                    tag_id: 0x9400 + tags.len() as u16,
-                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                    value: ExifValue::Ascii(val),
-                },
-            );
+            let tag_id = 0x9400 + tags.len() as u16;
+            let tag = if let Some((exiv2_group, exiv2_name)) =
+                get_exiv2_nikon_subfield(NIKON_LENS_DATA, &name)
+            {
+                MakerNoteTag::with_exiv2(
+                    tag_id,
+                    Some(Box::leak(name.into_boxed_str())),
+                    ExifValue::Ascii(val.clone()),
+                    ExifValue::Ascii(val),
+                    exiv2_group,
+                    exiv2_name,
+                )
+            } else {
+                MakerNoteTag::new(
+                    tag_id,
+                    Some(Box::leak(name.into_boxed_str())),
+                    ExifValue::Ascii(val),
+                )
+            };
+            tags.insert(tag_id, tag);
         }
     }
 
@@ -5212,11 +5483,11 @@ pub fn parse_nikon_maker_notes(
             };
             tags.insert(
                 0xA000, // Pseudo tag ID for AutoFocus
-                MakerNoteTag {
-                    tag_id: 0xA000,
-                    tag_name: Some("AutoFocus"),
-                    value: ExifValue::Ascii(auto_focus.to_string()),
-                },
+                MakerNoteTag::new(
+                    0xA000,
+                    Some("AutoFocus"),
+                    ExifValue::Ascii(auto_focus.to_string()),
+                ),
             );
         }
     }
@@ -5242,21 +5513,21 @@ pub fn parse_nikon_maker_notes(
         if let Some(lens_name) = lookup_result {
             tags.insert(
                 0xA003, // Pseudo tag ID for LensID (avoiding 0xA001 ColorSpace conflict)
-                MakerNoteTag {
-                    tag_id: 0xA003,
-                    tag_name: Some("LensID"),
-                    value: ExifValue::Ascii(lens_name.to_string()),
-                },
+                MakerNoteTag::new(
+                    0xA003,
+                    Some("LensID"),
+                    ExifValue::Ascii(lens_name.to_string()),
+                ),
             );
         } else {
             // If not found in database, output as "Unknown (hex)" to match ExifTool
             tags.insert(
                 0xA003,
-                MakerNoteTag {
-                    tag_id: 0xA003,
-                    tag_name: Some("LensID"),
-                    value: ExifValue::Ascii(format!("Unknown ({})", lens_id)),
-                },
+                MakerNoteTag::new(
+                    0xA003,
+                    Some("LensID"),
+                    ExifValue::Ascii(format!("Unknown ({})", lens_id)),
+                ),
             );
         }
     }

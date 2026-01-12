@@ -8,6 +8,9 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
+// exiv2 group name
+pub const EXIV2_GROUP_FUJIFILM: &str = "Fujifilm";
+
 // Fujifilm MakerNote tag IDs
 pub const FUJI_VERSION: u16 = 0x0000;
 pub const FUJI_SERIAL_NUMBER: u16 = 0x0010;
@@ -771,10 +774,17 @@ define_tag_decoder! {
     }
 }
 
-// CropMode (tag 0x104D): fujimn_int.cpp
+// CropMode (tag 0x104D): FujiFilm.pm / fujimn_int.cpp
 define_tag_decoder! {
     crop_mode,
-    both: {
+    exiftool: {
+        0 => "n/a",
+        1 => "Full-frame on GFX",
+        2 => "Sports Finder Mode",
+        4 => "Electronic Shutter 1.25x Crop",
+        8 => "Digital Tele-Conv",
+    },
+    exiv2: {
         0 => "None",
         1 => "Full frame",
         2 => "Sports Finder Mode",
@@ -883,12 +893,15 @@ pub fn decode_image_stabilization_exiftool(values: &[u32]) -> String {
             .join(" ");
     }
 
+    // First value: stabilization type
     let is_type = match values[0] {
-        0 => "None",
-        1 => "Optical",
-        2 => "Sensor-shift",
-        3 => "OIS/IBIS Combined",
-        _ => "Unknown",
+        0 => "None".to_string(),
+        1 => "Optical".to_string(),
+        2 => "Sensor-shift".to_string(),
+        3 => "OIS Lens".to_string(),
+        258 => "IBIS/OIS + DIS".to_string(),
+        512 => "Digital".to_string(),
+        v => format!("Unknown ({})", v),
     };
 
     let is_mode = match values[1] {
@@ -1094,6 +1107,16 @@ pub fn parse_fuji_maker_notes(
                                 // Tag 0x100E - newer cameras use this, value 0 = "0 (normal)"
                                 Some(decode_noise_reduction_full_exiftool(v).to_string())
                             }
+                            FUJI_COLOR_CHROME_EFFECT => {
+                                Some(decode_off_weak_strong_exiftool(v).to_string())
+                            }
+                            FUJI_GRAIN_EFFECT_SIZE => {
+                                Some(decode_off_weak_strong_exiftool(v).to_string())
+                            }
+                            FUJI_COLOR_CHROME_FX_BLUE => {
+                                Some(decode_off_weak_strong_exiftool(v).to_string())
+                            }
+                            FUJI_CROP_MODE => Some(decode_crop_mode_exiftool(v).to_string()),
                             _ => None,
                         };
 
@@ -1149,6 +1172,10 @@ pub fn parse_fuji_maker_notes(
                             // DigitalZoom = value / 8
                             let zoom = raw_value as f64 / 8.0;
                             Some(format!("{}", zoom))
+                        }
+                        FUJI_COLOR_CHROME_EFFECT | FUJI_COLOR_CHROME_FX_BLUE => {
+                            // These can be LONG (int32s) on some cameras - use same decoder as SHORT
+                            Some(decode_off_weak_strong_exiftool(raw_value as u16).to_string())
                         }
                         _ => None,
                     };
@@ -1260,14 +1287,20 @@ pub fn parse_fuji_maker_notes(
                 }
             };
 
-            tags.insert(
-                tag_id,
-                MakerNoteTag {
+            let tag_name = get_fuji_tag_name(tag_id);
+            let tag = if let Some(name) = tag_name {
+                MakerNoteTag::with_exiv2(
                     tag_id,
-                    tag_name: get_fuji_tag_name(tag_id),
+                    tag_name,
+                    value.clone(),
                     value,
-                },
-            );
+                    EXIV2_GROUP_FUJIFILM,
+                    name,
+                )
+            } else {
+                MakerNoteTag::new(tag_id, tag_name, value)
+            };
+            tags.insert(tag_id, tag);
         }
     }
 

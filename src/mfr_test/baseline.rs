@@ -8,6 +8,8 @@ use std::process::Command;
 
 const BASELINES_DIR: &str = ".mfr-baselines";
 const BASELINES_DIR_EXIV2: &str = ".mfr-baselines-exiv2";
+const BASELINES_DIR_LFS: &str = ".mfr-baselines-lfs";
+const BASELINES_DIR_LFS_EXIV2: &str = ".mfr-baselines-lfs-exiv2";
 
 /// Type of baseline (exiftool or exiv2 reference)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,13 +18,46 @@ pub enum BaselineType {
     Exiv2,
 }
 
-impl BaselineType {
-    /// Get the directory name for this baseline type
-    pub fn dir_name(&self) -> &'static str {
+/// Dataset type (raws or data.lfs)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DataSet {
+    #[default]
+    Raws,
+    DataLfs,
+}
+
+impl DataSet {
+    /// Get the directory suffix for this dataset
+    pub fn dir_suffix(&self) -> &'static str {
         match self {
-            BaselineType::Exiftool => BASELINES_DIR,
-            BaselineType::Exiv2 => BASELINES_DIR_EXIV2,
+            DataSet::Raws => "",
+            DataSet::DataLfs => "-lfs",
         }
+    }
+
+    /// Get display name for this dataset
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            DataSet::Raws => "raws",
+            DataSet::DataLfs => "data.lfs",
+        }
+    }
+}
+
+impl BaselineType {
+    /// Get the directory name for this baseline type and dataset
+    pub fn dir_name_for_dataset(&self, dataset: DataSet) -> &'static str {
+        match (self, dataset) {
+            (BaselineType::Exiftool, DataSet::Raws) => BASELINES_DIR,
+            (BaselineType::Exiv2, DataSet::Raws) => BASELINES_DIR_EXIV2,
+            (BaselineType::Exiftool, DataSet::DataLfs) => BASELINES_DIR_LFS,
+            (BaselineType::Exiv2, DataSet::DataLfs) => BASELINES_DIR_LFS_EXIV2,
+        }
+    }
+
+    /// Get the directory name for this baseline type (default dataset)
+    pub fn dir_name(&self) -> &'static str {
+        self.dir_name_for_dataset(DataSet::Raws)
     }
 
     /// Get the flag name for CLI messages
@@ -51,14 +86,22 @@ pub struct Baseline {
     pub result: ManufacturerTestResult,
 }
 
-/// Get the baseline directory path for a manufacturer
-fn get_baseline_dir(manufacturer: &str, baseline_type: BaselineType) -> PathBuf {
-    PathBuf::from(baseline_type.dir_name()).join(manufacturer.to_lowercase())
+/// Get the baseline directory path for a manufacturer (with dataset support)
+fn get_baseline_dir_with_dataset(
+    manufacturer: &str,
+    baseline_type: BaselineType,
+    dataset: DataSet,
+) -> PathBuf {
+    PathBuf::from(baseline_type.dir_name_for_dataset(dataset)).join(manufacturer.to_lowercase())
 }
 
-/// Get the baseline file path for a manufacturer
-fn get_baseline_path(manufacturer: &str, baseline_type: BaselineType) -> PathBuf {
-    get_baseline_dir(manufacturer, baseline_type).join("baseline.json")
+/// Get the baseline file path for a manufacturer (with dataset support)
+fn get_baseline_path_with_dataset(
+    manufacturer: &str,
+    baseline_type: BaselineType,
+    dataset: DataSet,
+) -> PathBuf {
+    get_baseline_dir_with_dataset(manufacturer, baseline_type, dataset).join("baseline.json")
 }
 
 /// Get current git commit hash (short)
@@ -95,14 +138,15 @@ fn get_timestamp() -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Save a baseline for a manufacturer (typed version)
-pub fn save_baseline_typed(
+/// Save a baseline for a manufacturer (with full options)
+pub fn save_baseline_full(
     manufacturer: &str,
     result: ManufacturerTestResult,
     description: Option<&str>,
     baseline_type: BaselineType,
+    dataset: DataSet,
 ) -> Result<PathBuf, String> {
-    let baseline_dir = get_baseline_dir(manufacturer, baseline_type);
+    let baseline_dir = get_baseline_dir_with_dataset(manufacturer, baseline_type, dataset);
     fs::create_dir_all(&baseline_dir)
         .map_err(|e| format!("Failed to create baseline directory: {}", e))?;
 
@@ -116,13 +160,29 @@ pub fn save_baseline_typed(
 
     let baseline = Baseline { metadata, result };
 
-    let baseline_path = get_baseline_path(manufacturer, baseline_type);
+    let baseline_path = get_baseline_path_with_dataset(manufacturer, baseline_type, dataset);
     let json = serde_json::to_string_pretty(&baseline)
         .map_err(|e| format!("Failed to serialize baseline: {}", e))?;
 
     fs::write(&baseline_path, json).map_err(|e| format!("Failed to write baseline file: {}", e))?;
 
     Ok(baseline_path)
+}
+
+/// Save a baseline for a manufacturer (typed version - backward compatible)
+pub fn save_baseline_typed(
+    manufacturer: &str,
+    result: ManufacturerTestResult,
+    description: Option<&str>,
+    baseline_type: BaselineType,
+) -> Result<PathBuf, String> {
+    save_baseline_full(
+        manufacturer,
+        result,
+        description,
+        baseline_type,
+        DataSet::Raws,
+    )
 }
 
 /// Save a baseline for a manufacturer (exiftool - backward compatible)
@@ -134,17 +194,19 @@ pub fn save_baseline(
     save_baseline_typed(manufacturer, result, description, BaselineType::Exiftool)
 }
 
-/// Load a baseline for a manufacturer (typed version)
-pub fn load_baseline_typed(
+/// Load a baseline for a manufacturer (with full options)
+pub fn load_baseline_full(
     manufacturer: &str,
     baseline_type: BaselineType,
+    dataset: DataSet,
 ) -> Result<Baseline, String> {
-    let baseline_path = get_baseline_path(manufacturer, baseline_type);
+    let baseline_path = get_baseline_path_with_dataset(manufacturer, baseline_type, dataset);
 
     if !baseline_path.exists() {
         return Err(format!(
-            "No baseline found for '{}'. Run with {} first.",
+            "No baseline found for '{}' ({} dataset). Run with {} first.",
             manufacturer,
+            dataset.display_name(),
             baseline_type.flag_name()
         ));
     }
@@ -155,14 +217,31 @@ pub fn load_baseline_typed(
     serde_json::from_str(&json).map_err(|e| format!("Failed to parse baseline: {}", e))
 }
 
+/// Load a baseline for a manufacturer (typed version - backward compatible)
+pub fn load_baseline_typed(
+    manufacturer: &str,
+    baseline_type: BaselineType,
+) -> Result<Baseline, String> {
+    load_baseline_full(manufacturer, baseline_type, DataSet::Raws)
+}
+
 /// Load a baseline for a manufacturer (exiftool - backward compatible)
 pub fn load_baseline(manufacturer: &str) -> Result<Baseline, String> {
     load_baseline_typed(manufacturer, BaselineType::Exiftool)
 }
 
-/// Check if a baseline exists for a manufacturer (typed version)
+/// Check if a baseline exists for a manufacturer (with full options)
+pub fn baseline_exists_full(
+    manufacturer: &str,
+    baseline_type: BaselineType,
+    dataset: DataSet,
+) -> bool {
+    get_baseline_path_with_dataset(manufacturer, baseline_type, dataset).exists()
+}
+
+/// Check if a baseline exists for a manufacturer (typed version - backward compatible)
 pub fn baseline_exists_typed(manufacturer: &str, baseline_type: BaselineType) -> bool {
-    get_baseline_path(manufacturer, baseline_type).exists()
+    baseline_exists_full(manufacturer, baseline_type, DataSet::Raws)
 }
 
 /// Check if a baseline exists for a manufacturer (exiftool - backward compatible)
@@ -170,9 +249,12 @@ pub fn baseline_exists(manufacturer: &str) -> bool {
     baseline_exists_typed(manufacturer, BaselineType::Exiftool)
 }
 
-/// List all manufacturers with saved baselines (typed version)
-pub fn list_baselines_typed(baseline_type: BaselineType) -> Vec<(String, BaselineMetadata)> {
-    let baselines_dir = PathBuf::from(baseline_type.dir_name());
+/// List all manufacturers with saved baselines (with full options)
+pub fn list_baselines_full(
+    baseline_type: BaselineType,
+    dataset: DataSet,
+) -> Vec<(String, BaselineMetadata)> {
+    let baselines_dir = PathBuf::from(baseline_type.dir_name_for_dataset(dataset));
     if !baselines_dir.exists() {
         return Vec::new();
     }
@@ -183,7 +265,7 @@ pub fn list_baselines_typed(baseline_type: BaselineType) -> Vec<(String, Baselin
         for entry in entries.flatten() {
             if entry.path().is_dir() {
                 if let Some(mfr) = entry.file_name().to_str() {
-                    if let Ok(baseline) = load_baseline_typed(mfr, baseline_type) {
+                    if let Ok(baseline) = load_baseline_full(mfr, baseline_type, dataset) {
                         results.push((mfr.to_string(), baseline.metadata));
                     }
                 }
@@ -192,6 +274,11 @@ pub fn list_baselines_typed(baseline_type: BaselineType) -> Vec<(String, Baselin
     }
 
     results
+}
+
+/// List all manufacturers with saved baselines (typed version - backward compatible)
+pub fn list_baselines_typed(baseline_type: BaselineType) -> Vec<(String, BaselineMetadata)> {
+    list_baselines_full(baseline_type, DataSet::Raws)
 }
 
 /// List all manufacturers with saved baselines (exiftool - backward compatible)

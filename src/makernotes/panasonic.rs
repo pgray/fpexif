@@ -8,6 +8,10 @@ use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
+// exiv2 group names
+pub const EXIV2_GROUP_PANASONIC: &str = "Panasonic";
+pub const EXIV2_GROUP_PANASONIC_RAW: &str = "PanasonicRaw";
+
 // Panasonic MakerNote tag IDs
 pub const PANA_IMAGE_QUALITY: u16 = 0x0001;
 pub const PANA_FIRMWARE_VERSION: u16 = 0x0002;
@@ -871,9 +875,30 @@ define_tag_decoder! {
         44 => "Film Grain",
         45 => "My Color",
         46 => "Photo Frame",
+        48 => "Movie",
         51 => "HDR",
+        52 => "Peripheral Defocus",
         55 => "Handheld Night Shot",
         57 => "3D",
+        59 => "Creative Control",
+        60 => "Intelligent Auto Plus",
+        62 => "Panorama",
+        63 => "Glass Through",
+        64 => "HDR",
+        66 => "Digital Filter",
+        67 => "Clear Portrait",
+        68 => "Silky Skin",
+        69 => "Backlit Softness",
+        70 => "Clear in Backlight",
+        71 => "Relaxing Tone",
+        72 => "Sweet Child's Face",
+        73 => "Distinct Scenery",
+        74 => "Bright Blue Sky",
+        75 => "Romantic Sunset Glow",
+        76 => "Vivid Sunset Glow",
+        77 => "Glistening Water",
+        78 => "Clear Nightscape",
+        79 => "Cool Night Sky",
     },
     exiv2: {
         0 => "Off",
@@ -1744,14 +1769,20 @@ pub fn parse_panasonic_maker_notes(
                 }
             };
 
-            tags.insert(
-                tag_id,
-                MakerNoteTag {
+            let tag_name = get_panasonic_tag_name(tag_id);
+            let tag = if let Some(name) = tag_name {
+                MakerNoteTag::with_exiv2(
                     tag_id,
-                    tag_name: get_panasonic_tag_name(tag_id),
+                    tag_name,
+                    value.clone(),
                     value,
-                },
-            );
+                    EXIV2_GROUP_PANASONIC,
+                    name,
+                )
+            } else {
+                MakerNoteTag::new(tag_id, tag_name, value)
+            };
+            tags.insert(tag_id, tag);
         }
     }
 
@@ -1830,13 +1861,17 @@ pub fn parse_panasonic_maker_notes(
         if let (Some(scene), Some(adv_type)) = (scene_mode_val, adv_type_val) {
             let composite_value = compute_advanced_scene_mode(scene, adv_type);
             // Update the AdvancedSceneMode tag with the computed composite value
+            let value = ExifValue::Ascii(composite_value);
             tags.insert(
                 PANA_ADVANCED_SCENE_MODE,
-                MakerNoteTag {
-                    tag_id: PANA_ADVANCED_SCENE_MODE,
-                    tag_name: Some("AdvancedSceneMode"),
-                    value: ExifValue::Ascii(composite_value),
-                },
+                MakerNoteTag::with_exiv2(
+                    PANA_ADVANCED_SCENE_MODE,
+                    Some("AdvancedSceneMode"),
+                    value.clone(),
+                    value,
+                    EXIV2_GROUP_PANASONIC,
+                    "AdvancedSceneMode",
+                ),
             );
         }
     }

@@ -6,6 +6,142 @@ use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use std::collections::HashMap;
 
+// exiv2 group names for Canon sub-IFDs
+pub const EXIV2_GROUP_CANON: &str = "Canon";
+pub const EXIV2_GROUP_CANON_CS: &str = "CanonCs";
+pub const EXIV2_GROUP_CANON_SI: &str = "CanonSi";
+pub const EXIV2_GROUP_CANON_FI: &str = "CanonFi";
+pub const EXIV2_GROUP_CANON_PI: &str = "CanonPi";
+pub const EXIV2_GROUP_CANON_PA: &str = "CanonPa";
+pub const EXIV2_GROUP_CANON_CF: &str = "CanonCf";
+pub const EXIV2_GROUP_CANON_FL: &str = "CanonFl";
+pub const EXIV2_GROUP_CANON_AF: &str = "CanonAf";
+pub const EXIV2_GROUP_CANON_SE: &str = "CanonSe";
+pub const EXIV2_GROUP_CANON_VC: &str = "CanonVc";
+pub const EXIV2_GROUP_CANON_AF_MI_ADJ: &str = "CanonAfMiAdj";
+
+/// Map Canon sub-IFD field names to exiv2 group and tag name
+/// Returns (exiv2_group, exiv2_name) for the given field name and parent tag
+pub fn get_exiv2_canon_subfield(
+    parent_tag: u16,
+    field_name: &str,
+) -> Option<(&'static str, &'static str)> {
+    match parent_tag {
+        CANON_CAMERA_SETTINGS => match field_name {
+            "MacroMode" => Some((EXIV2_GROUP_CANON_CS, "Macro")),
+            "SelfTimer" => Some((EXIV2_GROUP_CANON_CS, "Selftimer")),
+            "Quality" => Some((EXIV2_GROUP_CANON_CS, "Quality")),
+            "CanonFlashMode" => Some((EXIV2_GROUP_CANON_CS, "FlashMode")),
+            "ContinuousDrive" => Some((EXIV2_GROUP_CANON_CS, "DriveMode")),
+            "FocusMode" => Some((EXIV2_GROUP_CANON_CS, "FocusMode")),
+            "RecordMode" => Some((EXIV2_GROUP_CANON_CS, "RecordMode")),
+            "CanonImageSize" => Some((EXIV2_GROUP_CANON_CS, "ImageSize")),
+            "EasyMode" => Some((EXIV2_GROUP_CANON_CS, "EasyMode")),
+            "DigitalZoom" => Some((EXIV2_GROUP_CANON_CS, "DigitalZoom")),
+            "Contrast" => Some((EXIV2_GROUP_CANON_CS, "Contrast")),
+            "Saturation" => Some((EXIV2_GROUP_CANON_CS, "Saturation")),
+            "Sharpness" => Some((EXIV2_GROUP_CANON_CS, "Sharpness")),
+            "ISOSpeed" | "CameraISO" => Some((EXIV2_GROUP_CANON_CS, "ISOSpeed")),
+            "MeteringMode" => Some((EXIV2_GROUP_CANON_CS, "MeteringMode")),
+            "FocusRange" | "FocusType" => Some((EXIV2_GROUP_CANON_CS, "FocusType")),
+            "AFPoint" => Some((EXIV2_GROUP_CANON_CS, "AFPoint")),
+            "CanonExposureMode" | "ExposureProgram" => {
+                Some((EXIV2_GROUP_CANON_CS, "ExposureProgram"))
+            }
+            "LensType" => Some((EXIV2_GROUP_CANON_CS, "LensType")),
+            "MaxFocalLength" | "MinFocalLength" | "FocalUnits" => None, // Part of Lens array
+            "MaxAperture" => Some((EXIV2_GROUP_CANON_CS, "MaxAperture")),
+            "MinAperture" => Some((EXIV2_GROUP_CANON_CS, "MinAperture")),
+            "FlashActivity" => Some((EXIV2_GROUP_CANON_CS, "FlashActivity")),
+            "FlashBits" | "FlashDetails" => Some((EXIV2_GROUP_CANON_CS, "FlashDetails")),
+            "FocusContinuous" => Some((EXIV2_GROUP_CANON_CS, "FocusContinuous")),
+            "AESetting" => Some((EXIV2_GROUP_CANON_CS, "AESetting")),
+            "ImageStabilization" => Some((EXIV2_GROUP_CANON_CS, "ImageStabilization")),
+            "DisplayAperture" => Some((EXIV2_GROUP_CANON_CS, "DisplayAperture")),
+            "ZoomSourceWidth" => Some((EXIV2_GROUP_CANON_CS, "ZoomSourceWidth")),
+            "ZoomTargetWidth" => Some((EXIV2_GROUP_CANON_CS, "ZoomTargetWidth")),
+            "SpotMeteringMode" => Some((EXIV2_GROUP_CANON_CS, "SpotMeteringMode")),
+            "PhotoEffect" => Some((EXIV2_GROUP_CANON_CS, "PhotoEffect")),
+            "ManualFlashOutput" => Some((EXIV2_GROUP_CANON_CS, "ManualFlashOutput")),
+            "ColorTone" => Some((EXIV2_GROUP_CANON_CS, "ColorTone")),
+            "SRAWQuality" => Some((EXIV2_GROUP_CANON_CS, "SRAWQuality")),
+            _ => None,
+        },
+        CANON_SHOT_INFO => match field_name {
+            "AutoISO" => Some((EXIV2_GROUP_CANON_SI, "AutoISO")),
+            "BaseISO" | "ISOSpeed" => Some((EXIV2_GROUP_CANON_SI, "ISOSpeed")),
+            "MeasuredEV" => Some((EXIV2_GROUP_CANON_SI, "MeasuredEV")),
+            "TargetAperture" => Some((EXIV2_GROUP_CANON_SI, "TargetAperture")),
+            "TargetExposureTime" => Some((EXIV2_GROUP_CANON_SI, "TargetExposureTime")),
+            "ExposureCompensation" => Some((EXIV2_GROUP_CANON_SI, "ExposureCompensation")),
+            "WhiteBalance" => Some((EXIV2_GROUP_CANON_SI, "WhiteBalance")),
+            "SlowShutter" => Some((EXIV2_GROUP_CANON_SI, "SlowShutter")),
+            "SequenceNumber" | "OpticalZoomCode" => Some((EXIV2_GROUP_CANON_SI, "SequenceNumber")),
+            "CameraTemperature" => Some((EXIV2_GROUP_CANON_SI, "CameraTemperature")),
+            "FlashGuideNumber" => Some((EXIV2_GROUP_CANON_SI, "FlashGuideNumber")),
+            "AFPointsInFocus" => Some((EXIV2_GROUP_CANON_SI, "AFPointsInFocus")),
+            "FlashExposureComp" | "FlashExposureLock" => {
+                Some((EXIV2_GROUP_CANON_SI, "FlashExposureLock"))
+            }
+            "AutoExposureBracketing" => Some((EXIV2_GROUP_CANON_SI, "AutoExposureBracketing")),
+            "AEBBracketValue" => Some((EXIV2_GROUP_CANON_SI, "AEBBracketValue")),
+            "ControlMode" => Some((EXIV2_GROUP_CANON_SI, "ControlMode")),
+            "FocusDistanceUpper" => Some((EXIV2_GROUP_CANON_SI, "FocusDistanceUpper")),
+            "FocusDistanceLower" => Some((EXIV2_GROUP_CANON_SI, "FocusDistanceLower")),
+            "FNumber" => Some((EXIV2_GROUP_CANON_SI, "FNumber")),
+            "ExposureTime" => Some((EXIV2_GROUP_CANON_SI, "ExposureTime")),
+            "MeasuredEV2" => Some((EXIV2_GROUP_CANON_SI, "MeasuredEV2")),
+            "BulbDuration" => Some((EXIV2_GROUP_CANON_SI, "BulbDuration")),
+            "CameraType" => Some((EXIV2_GROUP_CANON_SI, "CameraType")),
+            "AutoRotate" => Some((EXIV2_GROUP_CANON_SI, "AutoRotate")),
+            "NDFilter" => Some((EXIV2_GROUP_CANON_SI, "NDFilter")),
+            "SelfTimer2" => Some((EXIV2_GROUP_CANON_SI, "SelfTimer2")),
+            _ => None,
+        },
+        CANON_AF_MICRO_ADJ => match field_name {
+            "AFMicroAdjMode" => Some((EXIV2_GROUP_CANON_AF_MI_ADJ, "AFMicroAdjMode")),
+            "AFMicroAdjValue" => Some((EXIV2_GROUP_CANON_AF_MI_ADJ, "AFMicroAdjValue")),
+            _ => None,
+        },
+        CANON_FILE_INFO => match field_name {
+            "FileNumber" => Some((EXIV2_GROUP_CANON_FI, "FileNumber")),
+            "BracketMode" => Some((EXIV2_GROUP_CANON_FI, "BracketMode")),
+            "BracketValue" => Some((EXIV2_GROUP_CANON_FI, "BracketValue")),
+            "BracketShotNumber" => Some((EXIV2_GROUP_CANON_FI, "BracketShotNumber")),
+            "RawJpgQuality" => Some((EXIV2_GROUP_CANON_FI, "RawJpgQuality")),
+            "RawJpgSize" => Some((EXIV2_GROUP_CANON_FI, "RawJpgSize")),
+            "NoiseReduction" => Some((EXIV2_GROUP_CANON_FI, "NoiseReduction")),
+            "WBBracketMode" => Some((EXIV2_GROUP_CANON_FI, "WBBracketMode")),
+            "WBBracketValueAB" => Some((EXIV2_GROUP_CANON_FI, "WBBracketValueAB")),
+            "WBBracketValueGM" => Some((EXIV2_GROUP_CANON_FI, "WBBracketValueGM")),
+            "FilterEffect" => Some((EXIV2_GROUP_CANON_FI, "FilterEffect")),
+            "ToningEffect" => Some((EXIV2_GROUP_CANON_FI, "ToningEffect")),
+            "MacroMagnification" => Some((EXIV2_GROUP_CANON_FI, "MacroMagnification")),
+            "LiveViewShooting" => Some((EXIV2_GROUP_CANON_FI, "LiveViewShooting")),
+            "FocusDistanceUpper" => Some((EXIV2_GROUP_CANON_FI, "FocusDistanceUpper")),
+            "FocusDistanceLower" => Some((EXIV2_GROUP_CANON_FI, "FocusDistanceLower")),
+            _ => None,
+        },
+        CANON_PROCESSING_INFO => match field_name {
+            "ToneCurve" => Some((EXIV2_GROUP_CANON_PI, "ToneCurve")),
+            "Sharpness" => Some((EXIV2_GROUP_CANON_PI, "Sharpness")),
+            "SharpnessFrequency" => Some((EXIV2_GROUP_CANON_PI, "SharpnessFrequency")),
+            "SensorRedLevel" => Some((EXIV2_GROUP_CANON_PI, "SensorRedLevel")),
+            "SensorBlueLevel" => Some((EXIV2_GROUP_CANON_PI, "SensorBlueLevel")),
+            "WhiteBalanceRed" => Some((EXIV2_GROUP_CANON_PI, "WhiteBalanceRed")),
+            "WhiteBalanceBlue" => Some((EXIV2_GROUP_CANON_PI, "WhiteBalanceBlue")),
+            "WhiteBalance" => Some((EXIV2_GROUP_CANON_PI, "WhiteBalance")),
+            "ColorTemperature" => Some((EXIV2_GROUP_CANON_PI, "ColorTemperature")),
+            "PictureStyle" => Some((EXIV2_GROUP_CANON_PI, "PictureStyle")),
+            "DigitalGain" => Some((EXIV2_GROUP_CANON_PI, "DigitalGain")),
+            "WBShiftAB" => Some((EXIV2_GROUP_CANON_PI, "WBShiftAB")),
+            "WBShiftGM" => Some((EXIV2_GROUP_CANON_PI, "WBShiftGM")),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 // Canon MakerNote tag IDs
 pub const CANON_CAMERA_SETTINGS: u16 = 0x0001;
 pub const CANON_FOCAL_LENGTH: u16 = 0x0002;
@@ -6982,11 +7118,11 @@ pub fn parse_canon_maker_notes(
                             for (field_name, field_value) in decoded {
                                 tags.insert(
                                     synthetic_tag_id,
-                                    MakerNoteTag {
-                                        tag_id: synthetic_tag_id,
-                                        tag_name: Some(Box::leak(field_name.into_boxed_str())),
-                                        value: field_value,
-                                    },
+                                    MakerNoteTag::new(
+                                        synthetic_tag_id,
+                                        Some(Box::leak(field_name.into_boxed_str())),
+                                        field_value,
+                                    ),
                                 );
                                 synthetic_tag_id += 1;
                             }
@@ -7041,14 +7177,25 @@ pub fn parse_canon_maker_notes(
 
                         // Insert each decoded sub-field as a separate tag
                         for (field_name, field_value) in decoded {
-                            tags.insert(
-                                synthetic_tag_id,
-                                MakerNoteTag {
-                                    tag_id: synthetic_tag_id,
-                                    tag_name: Some(Box::leak(field_name.into_boxed_str())),
-                                    value: field_value,
-                                },
-                            );
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_canon_subfield(tag_id, &field_name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    synthetic_tag_id,
+                                    Some(Box::leak(field_name.into_boxed_str())),
+                                    field_value.clone(),
+                                    field_value,
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    synthetic_tag_id,
+                                    Some(Box::leak(field_name.into_boxed_str())),
+                                    field_value,
+                                )
+                            };
+                            tags.insert(synthetic_tag_id, tag);
                             synthetic_tag_id = synthetic_tag_id.wrapping_add(1);
                         }
                         // Skip inserting the raw array
@@ -7091,14 +7238,25 @@ pub fn parse_canon_maker_notes(
 
                     // Insert each decoded sub-field as a separate tag
                     for (field_name, field_value) in decoded {
-                        tags.insert(
-                            synthetic_tag_id,
-                            MakerNoteTag {
-                                tag_id: synthetic_tag_id,
-                                tag_name: Some(Box::leak(field_name.into_boxed_str())),
-                                value: field_value,
-                            },
-                        );
+                        let tag = if let Some((exiv2_group, exiv2_name)) =
+                            get_exiv2_canon_subfield(tag_id, &field_name)
+                        {
+                            MakerNoteTag::with_exiv2(
+                                synthetic_tag_id,
+                                Some(Box::leak(field_name.into_boxed_str())),
+                                field_value.clone(),
+                                field_value, // Use same value as raw_value
+                                exiv2_group,
+                                exiv2_name,
+                            )
+                        } else {
+                            MakerNoteTag::new(
+                                synthetic_tag_id,
+                                Some(Box::leak(field_name.into_boxed_str())),
+                                field_value,
+                            )
+                        };
+                        tags.insert(synthetic_tag_id, tag);
                         synthetic_tag_id = synthetic_tag_id.wrapping_add(1);
                     }
                     // Skip inserting the raw array
@@ -7391,11 +7549,7 @@ pub fn parse_canon_maker_notes(
 
             tags.insert(
                 tag_id,
-                MakerNoteTag {
-                    tag_id,
-                    tag_name: get_canon_tag_name(tag_id),
-                    value: final_value,
-                },
+                MakerNoteTag::new(tag_id, get_canon_tag_name(tag_id), final_value),
             );
         }
     }

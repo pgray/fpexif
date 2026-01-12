@@ -931,11 +931,7 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness) -> HashMap<u16, Maker
 
         tags.insert(
             tag_id,
-            MakerNoteTag {
-                tag_id,
-                tag_name: get_minolta_cs_tag_name(tag_id),
-                value: exif_value,
-            },
+            MakerNoteTag::new(tag_id, get_minolta_cs_tag_name(tag_id), exif_value),
         );
     }
 
@@ -953,11 +949,11 @@ fn parse_camera_info_a100(data: &[u8]) -> HashMap<u16, MakerNoteTag> {
         let decoded = decode_minolta_a100_af_point_exiftool(value);
         tags.insert(
             MINOLTA_A100_AF_POINT,
-            MakerNoteTag {
-                tag_id: MINOLTA_A100_AF_POINT,
-                tag_name: Some("AFPoint"),
-                value: ExifValue::Ascii(decoded.to_string()),
-            },
+            MakerNoteTag::new(
+                MINOLTA_A100_AF_POINT,
+                Some("AFPoint"),
+                ExifValue::Ascii(decoded.to_string()),
+            ),
         );
     }
 
@@ -967,11 +963,11 @@ fn parse_camera_info_a100(data: &[u8]) -> HashMap<u16, MakerNoteTag> {
         let decoded = decode_minolta_a100_af_mode_exiftool(value);
         tags.insert(
             MINOLTA_A100_AF_MODE,
-            MakerNoteTag {
-                tag_id: MINOLTA_A100_AF_MODE,
-                tag_name: Some("AFMode"),
-                value: ExifValue::Ascii(decoded.to_string()),
-            },
+            MakerNoteTag::new(
+                MINOLTA_A100_AF_MODE,
+                Some("AFMode"),
+                ExifValue::Ascii(decoded.to_string()),
+            ),
         );
     }
 
@@ -981,11 +977,11 @@ fn parse_camera_info_a100(data: &[u8]) -> HashMap<u16, MakerNoteTag> {
         let decoded = decode_minolta_a100_af_area_mode_exiftool(value);
         tags.insert(
             MINOLTA_A100_AF_AREA_MODE,
-            MakerNoteTag {
-                tag_id: MINOLTA_A100_AF_AREA_MODE,
-                tag_name: Some("AFAreaMode"),
-                value: ExifValue::Ascii(decoded.to_string()),
-            },
+            MakerNoteTag::new(
+                MINOLTA_A100_AF_AREA_MODE,
+                Some("AFAreaMode"),
+                ExifValue::Ascii(decoded.to_string()),
+            ),
         );
     }
 
@@ -1005,11 +1001,11 @@ fn parse_camera_settings_a100(data: &[u8]) -> HashMap<u16, MakerNoteTag> {
         let decoded = decode_minolta_csa100_focus_mode_exiftool(value);
         tags.insert(
             MINOLTA_CSA100_FOCUS_MODE,
-            MakerNoteTag {
-                tag_id: MINOLTA_CSA100_FOCUS_MODE,
-                tag_name: Some("FocusMode"),
-                value: ExifValue::Ascii(decoded.to_string()),
-            },
+            MakerNoteTag::new(
+                MINOLTA_CSA100_FOCUS_MODE,
+                Some("FocusMode"),
+                ExifValue::Ascii(decoded.to_string()),
+            ),
         );
     }
 
@@ -1320,11 +1316,7 @@ pub fn parse_minolta_maker_notes(
 
             tags.insert(
                 tag_id,
-                MakerNoteTag {
-                    tag_id,
-                    tag_name: get_minolta_tag_name(tag_id),
-                    value,
-                },
+                MakerNoteTag::new(tag_id, get_minolta_tag_name(tag_id), value),
             );
         }
     }

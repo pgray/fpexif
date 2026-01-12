@@ -379,6 +379,7 @@ fn format_values_space<T: std::fmt::Display>(values: &[T]) -> String {
 
 /// Print all EXIF data in exiv2 format: `Exif.Image.Make  Ascii  6  Canon`
 fn print_exif_data_exiv2(exif_data: &ExifData) {
+    // First output standard EXIF tags
     for (tag_id, value) in exif_data.iter() {
         let group = match tag_id.ifd {
             tags::TagGroup::Main => "Exif.Image",
@@ -396,6 +397,70 @@ fn print_exif_data_exiv2(exif_data: &ExifData) {
             "{:<44} {:12} {:>4}  {}",
             key, type_name, count, display_value
         );
+    }
+
+    // Then output MakerNote tags
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        // Detect manufacturer from Make tag
+        let make = exif_data
+            .get_tag_by_name("Make")
+            .and_then(|v| match v {
+                fpexif::data_types::ExifValue::Ascii(s) => Some(s.as_str()),
+                _ => None,
+            })
+            .unwrap_or("");
+        let manufacturer_prefix = get_exiv2_manufacturer_prefix(make);
+
+        let mut sorted_tags: Vec<_> = maker_notes.iter().collect();
+        sorted_tags.sort_by_key(|(id, _)| *id);
+
+        for (_tag_id, tag) in sorted_tags {
+            let tag_name = tag.tag_name.unwrap_or("Unknown");
+
+            // Use exiv2 group/name if available, otherwise generate from manufacturer
+            let key = if let (Some(group), Some(name)) = (tag.exiv2_group, tag.exiv2_name) {
+                format!("Exif.{}.{}", group, name)
+            } else {
+                format!("Exif.{}.{}", manufacturer_prefix, tag_name)
+            };
+
+            // Use raw value if available, otherwise use decoded value
+            let value_to_format = tag.raw_value.as_ref().unwrap_or(&tag.value);
+            let (type_name, count, display_value) = format_exiv2_value(value_to_format);
+
+            println!(
+                "{:<44} {:12} {:>4}  {}",
+                key, type_name, count, display_value
+            );
+        }
+    }
+}
+
+/// Get the exiv2 manufacturer prefix from the Make string
+fn get_exiv2_manufacturer_prefix(make: &str) -> &'static str {
+    let make_lower = make.to_lowercase();
+    if make_lower.contains("canon") {
+        "Canon"
+    } else if make_lower.contains("nikon") {
+        "Nikon3"
+    } else if make_lower.contains("sony") {
+        "Sony1"
+    } else if make_lower.contains("fuji") {
+        "Fujifilm"
+    } else if make_lower.contains("panasonic") {
+        "Panasonic"
+    } else if make_lower.contains("olympus") || make_lower.contains("om digital") {
+        "Olympus"
+    } else if make_lower.contains("pentax") {
+        "Pentax"
+    } else if make_lower.contains("minolta") {
+        "Minolta"
+    } else if make_lower.contains("kodak") {
+        "Kodak"
+    } else if make_lower.contains("samsung") {
+        "Samsung2"
+    } else {
+        "MakerNote"
     }
 }
 

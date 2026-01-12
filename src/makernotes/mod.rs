@@ -20,6 +20,45 @@ pub struct MakerNoteTag {
     pub tag_id: u16,
     pub tag_name: Option<&'static str>,
     pub value: ExifValue,
+    /// Raw value for exiv2 format output (numeric value before decoding)
+    pub raw_value: Option<ExifValue>,
+    /// exiv2 group name (e.g., "CanonCs", "CanonSi", "NikonPc")
+    pub exiv2_group: Option<&'static str>,
+    /// exiv2 tag name within the group (e.g., "Macro", "Selftimer")
+    pub exiv2_name: Option<&'static str>,
+}
+
+impl MakerNoteTag {
+    /// Create a new MakerNoteTag with optional exiv2 fields set to None
+    pub fn new(tag_id: u16, tag_name: Option<&'static str>, value: ExifValue) -> Self {
+        Self {
+            tag_id,
+            tag_name,
+            value,
+            raw_value: None,
+            exiv2_group: None,
+            exiv2_name: None,
+        }
+    }
+
+    /// Create a MakerNoteTag with exiv2 output support
+    pub fn with_exiv2(
+        tag_id: u16,
+        tag_name: Option<&'static str>,
+        value: ExifValue,
+        raw_value: ExifValue,
+        exiv2_group: &'static str,
+        exiv2_name: &'static str,
+    ) -> Self {
+        Self {
+            tag_id,
+            tag_name,
+            value,
+            raw_value: Some(raw_value),
+            exiv2_group: Some(exiv2_group),
+            exiv2_name: Some(exiv2_name),
+        }
+    }
 }
 
 /// Parse maker notes based on camera make
