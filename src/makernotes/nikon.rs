@@ -156,6 +156,7 @@ pub const NIKON_FACE_DETECT: u16 = 0x0021;
 pub const NIKON_ACTIVE_D_LIGHTING: u16 = 0x0022;
 pub const NIKON_HIGH_ISO_NOISE_REDUCTION: u16 = 0x00B1;
 pub const NIKON_PICTURE_CONTROL_DATA: u16 = 0x0023;
+pub const NIKON_PICTURE_CONTROL_DATA_2: u16 = 0x00BD; // Coolpix (P6000, P7000, etc.)
 pub const NIKON_WORLD_TIME: u16 = 0x0024;
 pub const NIKON_ISO_INFO: u16 = 0x0025;
 pub const NIKON_VIGNETTE_CONTROL: u16 = 0x002A;
@@ -212,6 +213,7 @@ pub const NIKON_CAPTURE_OUTPUT: u16 = 0x0E1E;
 pub const NIKON_MULTI_EXPOSURE: u16 = 0x00B0; // Also HDRInfo for some cameras
 pub const NIKON_LOCATION_INFO: u16 = 0x00B5;
 pub const NIKON_BLACK_LEVEL: u16 = 0x00B6;
+pub const NIKON_POWER_UP_TIME_2: u16 = 0x00B6;
 pub const NIKON_AF_INFO_2: u16 = 0x00B7;
 pub const NIKON_FILE_INFO: u16 = 0x00B8;
 pub const NIKON_AF_TUNE: u16 = 0x00B9;
@@ -624,8 +626,8 @@ fn format_rational_like_exiftool(n: u32, d: u32) -> String {
     if (value.fract().abs() < 1e-10) || (value - value.round()).abs() < 1e-10 {
         return format!("{}", value.round() as i64);
     }
-    // Format with 8 decimal places and strip trailing zeros
-    let formatted = format!("{:.8}", value);
+    // Format with 9 decimal places and strip trailing zeros
+    let formatted = format!("{:.9}", value);
     let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
     trimmed.to_string()
 }
@@ -648,8 +650,11 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_VR_INFO => Some("VRInfo"),
         NIKON_ACTIVE_D_LIGHTING => Some("ActiveD-Lighting"),
         NIKON_PICTURE_CONTROL_DATA => Some("PictureControlData"),
+        NIKON_PICTURE_CONTROL_DATA_2 => Some("PictureControlData"),
         NIKON_VIGNETTE_CONTROL => Some("VignetteControl"),
         NIKON_DISTORTION_CONTROL => Some("DistortionControl"),
+        NIKON_AF_TUNE => Some("AFTune"),
+        NIKON_POWER_UP_TIME_2 => Some("PowerUpTime"),
         NIKON_AUXILIARY_LENS => Some("AuxiliaryLens"),
         NIKON_LENS_TYPE => Some("LensType"),
         NIKON_LENS => Some("Lens"),
@@ -695,6 +700,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_ISO_SELECTION => Some("ISOSelection"),
         NIKON_FLASH_EXPOSURE_COMP => Some("FlashExposureComp"),
         NIKON_ISO_SETTING_2 => Some("ISOSetting"),
+        NIKON_COLOR_BALANCE_A => Some("NRWData"),
         NIKON_IMAGE_BOUNDARY => Some("ImageBoundary"),
         NIKON_EXTERNAL_FLASH_EXPOSURE_COMP => Some("ExternalFlashExposureComp"),
         NIKON_FLASH_EXPOSURE_BRACKET_VALUE => Some("FlashExposureBracketValue"),
@@ -782,12 +788,14 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "9E 40 2D 6A 2C 3C B8 0E" => Some("AF-S DX VR Zoom-Nikkor 18-105mm f/3.5-5.6G ED"),
         "9F 58 44 44 14 14 B9 06" => Some("AF-S DX Nikkor 35mm f/1.8G"),
         "A0 54 50 50 0C 0C BA 06" => Some("AF-S Nikkor 50mm f/1.4G"),
+        "A0 54 50 50 0C 0C A2 06" => Some("AF-S Nikkor 50mm f/1.4G"),
         "A1 40 18 37 2C 34 BB 06" => Some("AF-S DX Nikkor 10-24mm f/3.5-4.5G ED"),
         "A2 48 5C 80 24 24 BC 0E" => Some("AF-S Nikkor 70-200mm f/2.8G ED VR II"),
         "A3 3C 29 44 30 30 BD 0E" => Some("AF-S Nikkor 16-35mm f/4G ED VR"),
         "A4 54 37 37 0C 0C BE 06" => Some("AF-S Nikkor 24mm f/1.4G ED"),
         "A5 40 3C 8E 2C 3C BF 0E" => Some("AF-S Nikkor 28-300mm f/3.5-5.6G ED VR"),
         "A6 48 8E 8E 24 24 C0 0E" => Some("AF-S Nikkor 300mm f/2.8G ED VR II"),
+        "A8 48 8E 8E 30 30 C3 4E" => Some("AF-S Nikkor 300mm f/4E PF ED VR"),
         "A7 4C 2D 50 24 24 C1 06" => Some("AF-S DX Nikkor 18-50mm f/2.8G ED"),
         "A8 48 80 98 30 30 C2 0E" => Some("AF-S Zoom-Nikkor 200-400mm f/4G IF-ED VR"),
         "A9 54 80 80 18 18 C3 0E" => Some("AF-S Nikkor 200mm f/2G ED VR II"),
@@ -811,6 +819,8 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "7F 40 2D 5C 2C 34 84 06" => Some("AF-S DX Zoom-Nikkor 18-70mm f/3.5-4.5G IF-ED"),
         "7D 48 2B 53 24 24 82 06" => Some("AF-S DX Zoom-Nikkor 17-55mm f/2.8G IF-ED"),
         "8B 40 2D 80 2C 3C 8D 0E" => Some("AF-S DX VR Zoom-Nikkor 18-200mm f/3.5-5.6G IF-ED"),
+        "8B 40 2D 80 2C 3C FD 0E" => Some("AF-S DX VR Zoom-Nikkor 18-200mm f/3.5-5.6G IF-ED [II]"),
+        "A0 40 2D 74 2C 3C BB 0E" => Some("AF-S DX Nikkor 18-140mm f/3.5-5.6G ED VR"),
         "8D 44 5C 8E 34 3C 8F 0E" => Some("AF-S VR Zoom-Nikkor 70-300mm f/4.5-5.6G IF-ED"),
         "93 48 37 5C 24 24 95 06" => Some("AF-S Zoom-Nikkor 24-70mm f/2.8G ED"),
         "9A 40 2D 53 2C 3C 9C 0E" => Some("AF-S DX VR Zoom-Nikkor 18-55mm f/3.5-5.6G"),
@@ -819,10 +829,34 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "A2 40 2D 53 2C 3C BD 0E" => Some("AF-S DX Nikkor 18-55mm f/3.5-5.6G VR II"),
         "B0 4C 50 50 14 14 B2 06" => Some("AF-S Nikkor 50mm f/1.8G"),
         "B4 40 37 62 2C 34 B6 0E" => Some("AF-S Zoom-Nikkor 24-85mm f/3.5-4.5G IF-ED VR"),
+        // Additional Nikon lenses
+        "69 48 5C 8E 30 3C 6F 06" => Some("AF Zoom-Nikkor 70-300mm f/4-5.6G"),
+        "9F 58 44 44 14 14 A1 06" => Some("AF-S DX Nikkor 35mm f/1.8G"),
+        "92 48 24 37 24 24 94 06" => Some("AF-S Zoom-Nikkor 14-24mm f/2.8G ED"),
+        "A0 40 2D 53 2C 3C CA 8E" => Some("AF-P DX Nikkor 18-55mm f/3.5-5.6G"),
+        "A5 54 6A 6A 0C 0C D0 46" => Some("AF-S Nikkor 105mm f/1.4E ED"),
+        "A9 4C 31 31 14 14 C4 06" => Some("AF-S Nikkor 20mm f/1.8G ED"),
+        "99 40 29 62 2C 3C 9B 0E" => Some("AF-S DX VR Zoom-Nikkor 16-85mm f/3.5-5.6G ED"),
+        "8F 40 2D 72 2C 3C 91 06" => Some("AF-S DX Zoom-Nikkor 18-135mm f/3.5-5.6G IF-ED"),
+        "8A 54 6A 6A 24 24 8C 0E" => Some("AF-S VR Micro-Nikkor 105mm f/2.8G IF-ED"),
+        "7A 3C 1F 37 30 30 7E 06" => Some("AF-S DX Zoom-Nikkor 12-24mm f/4G IF-ED"),
         // Third-party lenses
         "26 40 2D 50 2C 3C 1C 06" => Some("Sigma 18-50mm F3.5-5.6 DC"),
         "26 40 2D 70 2B 3C 1C 06" => Some("Sigma 18-125mm F3.5-5.6 DC"),
         "A1 41 19 31 2C 2C 4B 06" => Some("Sigma 10-20mm F3.5 EX DC HSM"),
+        "91 54 44 44 0C 0C 4B 06" => Some("Sigma 35mm F1.4 DG HSM | A"),
+        "87 2C 2D 8E 2C 40 4B 0E" => Some("Sigma 18-300mm F3.5-6.3 DC Macro HSM"),
+        "92 35 2D 88 2C 40 4B 0E" => Some("Sigma 18-250mm F3.5-6.3 DC Macro OS HSM"),
+        "FA 54 3C 5E 24 24 DF 06" => {
+            Some("Tamron SP AF 28-75mm f/2.8 XR Di LD Aspherical (IF) Macro (A09NII)")
+        }
+        "FE 48 37 5C 24 24 DF 0E" => Some("Tamron SP 24-70mm f/2.8 Di VC USD (A007)"),
+        "E8 4C 44 44 14 14 DF 0E" => Some("Tamron SP 35mm f/1.8 Di VC USD (F012)"),
+        "00 40 2D 88 2C 40 62 06" => {
+            Some("Tamron AF 18-250mm f/3.5-6.3 Di II LD Aspherical (IF) Macro (A18)")
+        }
+        "8F 48 2B 50 24 24 4B 0E" => Some("Sigma 17-50mm F2.8 EX DC OS HSM"),
+        "7A 48 1C 30 24 24 7E 06" => Some("Tokina AT-X 11-20 F2.8 PRO DX (AF 11-20mm f/2.8)"),
         // Manual/no CPU lenses
         "00 00 00 00 00 00 00 01" => Some("Manual Lens No CPU"),
         // Z-mount lenses (Nikon Z)
@@ -839,6 +873,7 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
             let trimmed = value.trim();
             match trimmed {
                 "AUTO" => "Auto".to_string(),
+                "AUTO0" => "Auto0".to_string(),
                 "AUTO1" => "Auto1".to_string(),
                 "AUTO2" => "Auto2".to_string(),
                 "SUNNY" => "Sunny".to_string(),
@@ -949,6 +984,17 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
                 format!("No= {}", rest)
             } else {
                 trimmed.to_string()
+            }
+        }
+        NIKON_AF_RESPONSE => {
+            // Transform "STANDARD" -> "Standard", "FOCUS" -> "Focus", etc.
+            let trimmed = value.trim();
+            match trimmed {
+                "STANDARD" => "Standard".to_string(),
+                "FOCUS" => "Focus".to_string(),
+                "LOCK" => "Lock".to_string(),
+                "RELEASE" => "Release".to_string(),
+                _ => trimmed.to_string(),
             }
         }
         _ => value.trim().to_string(),
@@ -1313,13 +1359,14 @@ pub fn decode_focus_mode_exiv2(value: &str) -> String {
 }
 
 /// Decode FlashSetting/FlashSyncMode value (tag 0x0008) - ExifTool format
-/// From Nikon.pm - values: "Normal", "Slow", "Rear Slow", "RED-EYE", "RED-EYE SLOW"
+/// From Nikon.pm - values: "Normal", "Slow", "Rear", "Rear Slow", "RED-EYE", "RED-EYE SLOW"
 pub fn decode_flash_setting_exiftool(value: &str) -> String {
     let val = value.trim().to_uppercase();
     let result = match val.as_str() {
         "NORMAL" => "Normal",
         "SLOW" => "Slow",
-        "REAR" | "REAR SLOW" => "Rear Slow",
+        "REAR" => "Rear",
+        "REAR SLOW" => "Rear Slow",
         "RED-EYE" | "REDEYE" => "Red-eye",
         "RED-EYE SLOW" | "REDEYE SLOW" => "Red-eye Slow",
         "SLOW REAR" => "Slow Rear",
@@ -1618,9 +1665,7 @@ fn parse_vr_info(data: &[u8], _endian: Endianness, model: Option<&str>) -> Vec<(
         2 => "Off",
         _ => "Unknown",
     };
-    if vr != 0 {
-        tags.push(("VibrationReduction".to_string(), vr_str.to_string()));
-    }
+    tags.push(("VibrationReduction".to_string(), vr_str.to_string()));
 
     // Offset 0x06: VRMode (int8u)
     // Z-series cameras use different mapping than older cameras
@@ -1645,6 +1690,86 @@ fn parse_vr_info(data: &[u8], _endian: Endianness, model: Option<&str>) -> Vec<(
         }
     };
     tags.push(("VRMode".to_string(), vr_mode_str.to_string()));
+
+    tags
+}
+
+/// Parse DistortInfo tag data (tag 0x002B)
+fn parse_distort_info(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 5 {
+        return tags;
+    }
+
+    // Offset 0x00: DistortionVersion (undef[4])
+    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    tags.push(("DistortionVersion".to_string(), version));
+
+    // Offset 0x04: AutoDistortionControl (int8u)
+    let adc = data[4];
+    let adc_str = match adc {
+        0 => "Off",
+        1 => "On",
+        2 => "On (underwater)",
+        _ => "Unknown",
+    };
+    tags.push(("AutoDistortionControl".to_string(), adc_str.to_string()));
+
+    tags
+}
+
+/// Parse AFTune tag data (tag 0x00B9)
+fn parse_af_tune(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.is_empty() {
+        return tags;
+    }
+
+    // Offset 0x00: AFFineTune (int8u)
+    let af_fine_tune = data[0];
+    let af_str = match af_fine_tune {
+        0 => "Off",
+        1 => "On (1)",
+        2 => "On (2)",
+        3 => "On (Zoom)",
+        _ => "Unknown",
+    };
+    tags.push(("AFFineTune".to_string(), af_str.to_string()));
+
+    // Offset 0x01: AFFineTuneIndex (int8u)
+    if data.len() > 1 {
+        let index = data[1];
+        let index_str = if index == 255 {
+            "n/a".to_string()
+        } else {
+            index.to_string()
+        };
+        tags.push(("AFFineTuneIndex".to_string(), index_str));
+    }
+
+    // Offset 0x02: AFFineTuneAdj (int8s)
+    if data.len() > 2 {
+        let adj = data[2] as i8;
+        let adj_str = if adj > 0 {
+            format!("+{}", adj)
+        } else {
+            adj.to_string()
+        };
+        tags.push(("AFFineTuneAdj".to_string(), adj_str));
+    }
+
+    // Offset 0x03: AFFineTuneAdjTele (int8s)
+    if data.len() > 3 {
+        let adj_tele = data[3] as i8;
+        let adj_str = if adj_tele > 0 {
+            format!("+{}", adj_tele)
+        } else {
+            adj_tele.to_string()
+        };
+        tags.push(("AFFineTuneAdjTele".to_string(), adj_str));
+    }
 
     tags
 }
@@ -1760,11 +1885,15 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
         // Offset 0x34: Brightness (int8u)
         if data.len() > 0x34 {
             let bright = data[0x34];
-            let value = bright.wrapping_sub(128) as i8;
-            if value == 0 {
-                tags.push(("Brightness".to_string(), "Normal".to_string()));
+            if bright == 0xff {
+                tags.push(("Brightness".to_string(), "n/a".to_string()));
             } else {
-                tags.push(("Brightness".to_string(), value.to_string()));
+                let value = bright.wrapping_sub(128) as i8;
+                if value == 0 {
+                    tags.push(("Brightness".to_string(), "Normal".to_string()));
+                } else {
+                    tags.push(("Brightness".to_string(), value.to_string()));
+                }
             }
         }
 
@@ -2009,15 +2138,80 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             || version == "0108";
 
         if is_extended_version {
+            // Offset 0x0C (12): FlashFocalLength (int8u)
+            if data.len() > 12 {
+                let fl = data[12];
+                if fl != 0 && fl != 255 {
+                    tags.push(("FlashFocalLength".to_string(), format!("{} mm", fl)));
+                }
+            }
+
+            // Offset 0x0D (13): RepeatingFlashRate (int8u)
+            if data.len() > 13 {
+                let rate = data[13];
+                if rate != 0 && rate != 255 {
+                    tags.push(("RepeatingFlashRate".to_string(), format!("{} Hz", rate)));
+                }
+            }
+
+            // Offset 0x0E (14): RepeatingFlashCount (int8u)
+            if data.len() > 14 {
+                let count = data[14];
+                if count != 0 && count != 255 {
+                    tags.push(("RepeatingFlashCount".to_string(), count.to_string()));
+                }
+            }
+
             // Offset 0x0F (15): FlashGNDistance (int8u)
             if data.len() > 15 {
                 let gn = data[15];
-                tags.push(("FlashGNDistance".to_string(), gn.to_string()));
+                // Convert to distance string (direct lookup, no +3 adjustment)
+                let gn_str = match gn {
+                    0 => "0".to_string(),
+                    1 => "0.1 m".to_string(),
+                    2 => "0.2 m".to_string(),
+                    3 => "0.3 m".to_string(),
+                    4 => "0.4 m".to_string(),
+                    5 => "0.5 m".to_string(),
+                    6 => "0.6 m".to_string(),
+                    7 => "0.7 m".to_string(),
+                    8 => "0.8 m".to_string(),
+                    9 => "0.9 m".to_string(),
+                    10 => "1.0 m".to_string(),
+                    11 => "1.1 m".to_string(),
+                    12 => "1.3 m".to_string(),
+                    13 => "1.4 m".to_string(),
+                    14 => "1.6 m".to_string(),
+                    15 => "1.8 m".to_string(),
+                    16 => "2.0 m".to_string(),
+                    17 => "2.2 m".to_string(),
+                    18 => "2.5 m".to_string(),
+                    19 => "2.8 m".to_string(),
+                    20 => "3.2 m".to_string(),
+                    21 => "3.6 m".to_string(),
+                    22 => "4.0 m".to_string(),
+                    23 => "4.5 m".to_string(),
+                    24 => "5.0 m".to_string(),
+                    25 => "5.6 m".to_string(),
+                    26 => "6.3 m".to_string(),
+                    27 => "7.1 m".to_string(),
+                    28 => "8.0 m".to_string(),
+                    29 => "9.0 m".to_string(),
+                    30 => "10.0 m".to_string(),
+                    31 => "11.0 m".to_string(),
+                    32 => "13.0 m".to_string(),
+                    33 => "14.0 m".to_string(),
+                    34 => "16.0 m".to_string(),
+                    35 => "18.0 m".to_string(),
+                    36 => "20.0 m".to_string(),
+                    255 => "n/a".to_string(),
+                    _ => gn.to_string(), // Unknown values pass through
+                };
+                tags.push(("FlashGNDistance".to_string(), gn_str));
             }
 
-            // FlashColorFilter at offset 0x10 (16) for versions 0106+
-            let is_v106_plus = version == "0106" || version == "0107" || version == "0108";
-            if is_v106_plus && data.len() > 16 {
+            // FlashColorFilter at offset 0x10 (16) for versions 0103+
+            if data.len() > 16 {
                 let color_filter = data[16];
                 let color_str = match color_filter {
                     0x00 => "None",
@@ -2096,6 +2290,37 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
                     format_flash_compensation(ev),
                 ));
             }
+
+            // ExternalFlashCompensation at offset 0x1b (27) - versions 0103+
+            if version != "0102" && data.len() > 0x1b {
+                let comp = data[0x1b] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "ExternalFlashCompensation".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
+
+            // FlashExposureComp3 at offset 0x1d (29) - does not include bracketing
+            if version != "0102" && data.len() > 0x1d {
+                let comp = data[0x1d] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "FlashExposureComp3".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
+
+            // FlashExposureComp4 at offset 0x27 (39) - includes flash bracketing effect
+            // Available in versions 0103+ (not 0102)
+            if version != "0102" && data.len() > 0x27 {
+                let comp = data[0x27] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "FlashExposureComp4".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
         }
     }
 
@@ -2117,17 +2342,16 @@ fn parse_shot_info_basic(data: &[u8]) -> Vec<(String, String)> {
     if version.chars().all(|c| c.is_ascii_digit()) {
         tags.push(("ShotInfoVersion".to_string(), version.clone()));
 
-        // Offset 0x04: FirmwareVersion (string[5]) - NOT encrypted for some versions
-        // Note: The first 4 bytes of ShotInfo are unencrypted (version string)
-        // After that, data is encrypted for ShotInfoVersion 02xx
-        // Only parse FirmwareVersion if we have unencrypted data
-        if !version.starts_with("02") && data.len() >= 9 {
+        // Offset 0x04: FirmwareVersion (string[5])
+        // Note: FirmwareVersion is stored unencrypted at offset 0x04 for all versions
+        // The encryption in 02xx versions starts after FirmwareVersion
+        if data.len() >= 9 {
             let firmware = String::from_utf8_lossy(&data[4..9]);
-            // Check if it looks like a valid firmware version (typically like "1.00 ")
+            // Check if it looks like a valid firmware version (typically like "1.00k" or "1.00 ")
             if firmware.chars().any(|c| c.is_ascii_digit()) {
                 tags.push((
                     "FirmwareVersion".to_string(),
-                    firmware.trim_end().to_string(),
+                    firmware.trim_end_matches('\0').trim_end().to_string(),
                 ));
             }
         }
@@ -4088,24 +4312,52 @@ fn parse_world_time(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
 
 /// Parse ColorBalance tag data (tag 0x0097)
 /// Extracts white balance levels
-fn parse_color_balance(data: &[u8], _endian: Endianness) -> Vec<(String, String)> {
+/// serial/shutter_count needed for version 02xx decryption
+fn parse_color_balance(
+    data: &[u8],
+    endian: Endianness,
+    serial: Option<u32>,
+    shutter_count: Option<u32>,
+) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
     if data.len() < 8 {
         return tags;
     }
 
-    // First 4 bytes: version
-    let version = match std::str::from_utf8(&data[0..4]) {
-        Ok(v) => v,
-        Err(_) => return tags,
+    // Check for NRW format first (starts with "NRW ")
+    let is_nrw = data.len() >= 4 && &data[0..4] == b"NRW ";
+
+    // First 4 bytes: version (or "NRW " for NRW files)
+    let version = if is_nrw {
+        // For NRW files, version is at offset 0x0004
+        if data.len() >= 8 {
+            match std::str::from_utf8(&data[4..8]) {
+                Ok(v) => v,
+                Err(_) => return tags,
+            }
+        } else {
+            return tags;
+        }
+    } else {
+        match std::str::from_utf8(&data[0..4]) {
+            Ok(v) => v,
+            Err(_) => return tags,
+        }
     };
 
+    // Output version string
+    tags.push(("ColorBalanceVersion".to_string(), version.to_string()));
+
     // ColorBalance structures have WB levels at different offsets
-    // Version 0100: RBGG at offset 72 (0x48), big-endian, NOT encrypted
-    // Version 02xx: Encrypted - require decryption which we don't have keys for here
-    // Only handle version 0100 which is unencrypted
-    if version == "0100" && data.len() >= 72 + 8 {
+    // For non-NRW files:
+    //   Version 0100: RBGG at offset 72 (0x48), big-endian, NOT encrypted (D100, Coolpix)
+    //   Version 0102: RGGB at offset 10, NOT encrypted (D2H)
+    //   Version 0103: RGBG at offset 20, NOT encrypted (D70/D70s)
+    //   Version 02xx (others): Encrypted - require decryption which we don't have keys for
+    // For NRW files (handled below with is_nrw check):
+    //   Uses ColorBalanceC structure with int32u values at different offsets
+    if !is_nrw && version == "0100" && data.len() >= 72 + 8 {
         // Version 0100: RBGG at offset 72, big-endian
         let mut cursor = Cursor::new(&data[72..]);
         let vals: [u16; 4] = [
@@ -4133,7 +4385,189 @@ fn parse_color_balance(data: &[u8], _endian: Endianness) -> Vec<(String, String)
                 tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
             }
         }
+    } else if !is_nrw && version == "0102" && data.len() >= 10 + 8 {
+        // Version 0102: RGGB at offset 10 (D2H) - non-NRW only
+        let mut cursor = Cursor::new(&data[10..]);
+        let vals: [u16; 4] = [
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+        ];
+
+        if !vals.iter().all(|&v| v == 0) {
+            tags.push((
+                "WB_RGGBLevels".to_string(),
+                format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+            ));
+
+            // RGGB: R=vals[0], G1=vals[1], G2=vals[2], B=vals[3]
+            let g = ((vals[1] as f64) + (vals[2] as f64)) / 2.0;
+            if g > 0.0 {
+                let red = (vals[0] as f64) / g;
+                let blue = (vals[3] as f64) / g;
+                tags.push(("RedBalance".to_string(), format!("{:.6}", red)));
+                tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
+            }
+        }
+    } else if !is_nrw && version == "0103" && data.len() >= 20 + 8 {
+        // Version 0103: RGBG at offset 20 (D70/D70s) - non-NRW only
+        let mut cursor = Cursor::new(&data[20..]);
+        let vals: [u16; 4] = [
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+        ];
+
+        if !vals.iter().all(|&v| v == 0) {
+            tags.push((
+                "WB_RGBGLevels".to_string(),
+                format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+            ));
+
+            // RGBG: R=vals[0], G1=vals[1], B=vals[2], G2=vals[3]
+            let g = ((vals[1] as f64) + (vals[3] as f64)) / 2.0;
+            if g > 0.0 {
+                let red = (vals[0] as f64) / g;
+                let blue = (vals[2] as f64) / g;
+                tags.push(("RedBalance".to_string(), format!("{:.6}", red)));
+                tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
+            }
+        }
+    } else if !is_nrw && version.starts_with("02") {
+        // Version 02xx: Various encrypted ColorBalance structures
+        // Different versions have different DecryptStart, DirOffset, and WB channel orders
+        // Byte order follows the makernote's byte order (passed as endian parameter)
+        if let (Some(ser), Some(count)) = (serial, shutter_count) {
+            // Determine decrypt_start, dir_offset, wb_name, is_grbg based on version
+            let (decrypt_start, dir_offset, wb_name, is_grbg): (usize, usize, &str, bool) =
+                match version {
+                    // ColorBalance0205: D50
+                    "0205" => (4, 14, "WB_RGGBLevels", false),
+                    // ColorBalance02: D2X/D2Xs(0204), D2Hs(0206), D200(0207), D40/D40X/D80(0208), D60(0210)
+                    "0204" | "0206" | "0207" | "0208" | "0210" => (284, 6, "WB_RGGBLevels", false),
+                    // ColorBalance0209: D3/D3X/D300/D700(0209), D300S(0212), D3S(0214)
+                    "0209" | "0212" | "0214" => (284, 10, "WB_GRBGLevels", true),
+                    // ColorBalance0211: D90, D5000
+                    "0211" => (284, 16, "WB_GRBGLevels", true),
+                    // ColorBalance0213: D3000
+                    "0213" => (284, 10, "WB_RGGBLevels", false),
+                    // ColorBalance0215: D3100(0215), D7000/D5100(0216), D4/D600/D800/D3200(0217)
+                    "0215" | "0216" | "0217" => (284, 4, "WB_GRBGLevels", true),
+                    // ColorBalance0219: D5300(0219), D3300(0221), D4S(0222), D750/D810(0223), D3400-D7200(0224)
+                    "0219" | "0221" | "0222" | "0223" | "0224" => (4, 0x7c, "WB_RGGBLevels", false),
+                    // Unknown versions - skip WB extraction
+                    _ => return tags,
+                };
+
+            let wb_offset = decrypt_start + dir_offset;
+            if data.len() < wb_offset + 8 {
+                return tags;
+            }
+
+            // Make mutable copy for decryption
+            let mut decrypted = data.to_vec();
+
+            // Decrypt starting at DecryptStart
+            nikon_decrypt(ser, count, &mut decrypted, decrypt_start);
+
+            // Read WB levels at DirOffset from DecryptStart
+            // Format: 4 x int16u, follows makernote byte order
+            let mut cursor = Cursor::new(&decrypted[wb_offset..]);
+            let vals: [u16; 4] = match endian {
+                Endianness::Little => [
+                    cursor.read_u16::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u16::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u16::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u16::<LittleEndian>().unwrap_or(0),
+                ],
+                Endianness::Big => [
+                    cursor.read_u16::<BigEndian>().unwrap_or(0),
+                    cursor.read_u16::<BigEndian>().unwrap_or(0),
+                    cursor.read_u16::<BigEndian>().unwrap_or(0),
+                    cursor.read_u16::<BigEndian>().unwrap_or(0),
+                ],
+            };
+
+            // Skip if all zeros
+            if !vals.iter().all(|&v| v == 0) {
+                tags.push((
+                    wb_name.to_string(),
+                    format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+                ));
+
+                // Compute RedBalance and BlueBalance
+                // Channel order varies: RGGB vs GRBG
+                let (r, g1, g2, b) = if is_grbg {
+                    // GRBG: G=vals[0], R=vals[1], B=vals[2], G=vals[3]
+                    (vals[1], vals[0], vals[3], vals[2])
+                } else {
+                    // RGGB: R=vals[0], G1=vals[1], G2=vals[2], B=vals[3]
+                    (vals[0], vals[1], vals[2], vals[3])
+                };
+
+                let g = ((g1 as f64) + (g2 as f64)) / 2.0;
+                if g > 0.0 {
+                    let red = (r as f64) / g;
+                    let blue = (b as f64) / g;
+                    tags.push(("RedBalance".to_string(), format!("{:.6}", red)));
+                    tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
+                }
+            }
+        }
     }
+
+    // Check for NRW ColorBalanceC format (starts with "NRW ")
+    // Used by P1000, P7000, P7100, B700
+    if is_nrw {
+        // ColorBalanceC structure - WB_RGGBLevels at various offsets
+        // Format: 4 x int32u at each offset, little-endian
+        // ValueConv: vals[0]*=2; vals[3]*=2
+        let wb_offsets: &[(&str, usize)] = &[
+            ("WB_RGGBLevels", 0x0038),
+            ("WB_RGGBLevelsDaylight", 0x004c),
+            ("WB_RGGBLevelsCloudy", 0x0060),
+            ("WB_RGGBLevelsTungsten", 0x0088),
+            ("WB_RGGBLevelsFluorescentW", 0x009c),
+            ("WB_RGGBLevelsFluorescentN", 0x00b0),
+            ("WB_RGGBLevelsFluorescentD", 0x00c4),
+            ("WB_RGGBLevelsHTMercury", 0x00d8),
+            ("WB_RGGBLevelsCustom", 0x0100),
+            ("WB_RGGBLevelsAuto", 0x0114),
+        ];
+
+        for (name, offset) in wb_offsets {
+            if data.len() >= offset + 16 {
+                let mut cursor = Cursor::new(&data[*offset..]);
+                let mut vals: [u32; 4] = [
+                    cursor.read_u32::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u32::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u32::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u32::<LittleEndian>().unwrap_or(0),
+                ];
+
+                // Apply ValueConv: vals[0] *= 2; vals[3] *= 2
+                vals[0] *= 2;
+                vals[3] *= 2;
+
+                // Skip if all zeros (custom preset not used)
+                if !vals.iter().all(|&v| v == 0) {
+                    tags.push((
+                        name.to_string(),
+                        format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+                    ));
+                }
+            }
+        }
+
+        // BlackLevel at offset 0x0020 (int16u)
+        if data.len() >= 0x0022 {
+            let black_level = u16::from_le_bytes([data[0x0020], data[0x0021]]);
+            tags.push(("BlackLevel".to_string(), black_level.to_string()));
+        }
+    }
+
     // Note: For encrypted versions (02xx), RedBalance/BlueBalance should come from
     // WB_RBLevels (0x000C) which already contains the correct R/G and B/G ratios
 
@@ -4314,6 +4748,8 @@ pub fn decode_flash_type_exiftool(value: &str) -> String {
         "NEW" => "New",
         "NORMAL" => "Built-in",
         "EXTERNAL" | "STROBE" => "External",
+        // Handle specific "Optional,AA" -> "Optional,Aa" case
+        "OPTIONAL,AA" => "Optional,Aa",
         _ => return value.trim().to_string(),
     };
     result.to_string()
@@ -4570,6 +5006,10 @@ pub fn parse_nikon_maker_notes(
     let mut shutter_count_val: Option<u32> = None;
     // Store LensData for deferred processing (needs serial/shutter_count which come later)
     let mut lens_data_bytes: Option<Vec<u8>> = None;
+    // Store ColorBalance for deferred processing (version 02xx needs serial/shutter_count for decryption)
+    let mut color_balance_bytes: Option<Vec<u8>> = None;
+    // Store ShotInfo for deferred processing (version 02xx needs serial/shutter_count for decryption)
+    let mut shot_info_bytes: Option<Vec<u8>> = None;
 
     // Nikon maker notes often start with "Nikon\0" header
     if data.len() < 18 {
@@ -5103,9 +5543,16 @@ pub fn parse_nikon_maker_notes(
                 }
             };
 
-            // Skip tags that are better represented by their parsed sub-structure values
-            // These tags contain raw/binary data that's decoded from ISOInfo structure
-            if matches!(tag_id, NIKON_ISO_SETTING) {
+            // For tag 0x0002 (ISO), output as "ISO" with the extracted value
+            // Older cameras (D1, D1X, D100) don't have ISOInfo tag so this is the only source
+            if tag_id == NIKON_ISO_SETTING {
+                if let ExifValue::Short(ref vals) = value {
+                    if !vals.is_empty() && vals[0] > 0 {
+                        // Create synthetic ISO tag with ID 0xFFFF to avoid conflict
+                        let iso_tag = MakerNoteTag::new(0xFFFF, Some("ISO"), value.clone());
+                        tags.insert(0xFFFF, iso_tag);
+                    }
+                }
                 continue;
             }
 
@@ -5191,7 +5638,7 @@ pub fn parse_nikon_maker_notes(
                         }
                     }
                 }
-                NIKON_PICTURE_CONTROL_DATA => {
+                NIKON_PICTURE_CONTROL_DATA | NIKON_PICTURE_CONTROL_DATA_2 => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_picture_control(bytes) {
                             let tag_id = 0x9200 + tags.len() as u16;
@@ -5213,6 +5660,58 @@ pub fn parse_nikon_maker_notes(
                                     ExifValue::Ascii(val),
                                 )
                             };
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_DISTORTION_CONTROL => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_distort_info(bytes) {
+                            let tag_id = 0x9150 + tags.len() as u16;
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some(Box::leak(name.into_boxed_str())),
+                                ExifValue::Ascii(val),
+                            );
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_AF_TUNE => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_af_tune(bytes) {
+                            let tag_id = 0x9160 + tags.len() as u16;
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some(Box::leak(name.into_boxed_str())),
+                                ExifValue::Ascii(val),
+                            );
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_POWER_UP_TIME_2 => {
+                    // PowerUpTime: 7 bytes = year(2) + month + day + hour + min + sec
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        if bytes.len() >= 7 {
+                            let year = match maker_endian {
+                                Endianness::Little => u16::from_le_bytes([bytes[0], bytes[1]]),
+                                Endianness::Big => u16::from_be_bytes([bytes[0], bytes[1]]),
+                            };
+                            let month = bytes[2];
+                            let day = bytes[3];
+                            let hour = bytes[4];
+                            let min = bytes[5];
+                            let sec = bytes[6];
+                            let formatted = format!(
+                                "{:04}:{:02}:{:02} {:02}:{:02}:{:02}",
+                                year, month, day, hour, min, sec
+                            );
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some("PowerUpTime"),
+                                ExifValue::Ascii(formatted),
+                            );
                             tags.insert(tag_id, tag);
                         }
                     }
@@ -5271,15 +5770,40 @@ pub fn parse_nikon_maker_notes(
                 }
                 NIKON_SHOT_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_shot_info_basic(bytes) {
-                            let tag_id = 0x9380 + tags.len() as u16;
-                            // Note: NIKON_SHOT_INFO is not mapped to exiv2 groups currently
-                            let tag = MakerNoteTag::new(
-                                tag_id,
-                                Some(Box::leak(name.into_boxed_str())),
-                                ExifValue::Ascii(val),
-                            );
-                            tags.insert(tag_id, tag);
+                        // Check version to determine if we need decryption
+                        let version = if bytes.len() >= 4 {
+                            String::from_utf8_lossy(&bytes[0..4]).to_string()
+                        } else {
+                            String::new()
+                        };
+
+                        // Version 02xx needs decryption - defer processing
+                        if version.starts_with("02") {
+                            // Parse basic info (version) immediately since it's unencrypted
+                            if version.chars().all(|c| c.is_ascii_digit()) {
+                                let tag_id = 0x9380_u16;
+                                tags.insert(
+                                    tag_id,
+                                    MakerNoteTag::new(
+                                        tag_id,
+                                        Some("ShotInfoVersion"),
+                                        ExifValue::Ascii(version),
+                                    ),
+                                );
+                            }
+                            // Store for deferred decryption processing
+                            shot_info_bytes = Some(bytes.clone());
+                        } else {
+                            // Version 01xx or other - not encrypted, parse directly
+                            for (name, val) in parse_shot_info_basic(bytes) {
+                                let tag_id = 0x9380 + tags.len() as u16;
+                                let tag = MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                );
+                                tags.insert(tag_id, tag);
+                            }
                         }
                     }
                 }
@@ -5409,11 +5933,19 @@ pub fn parse_nikon_maker_notes(
                 }
                 NIKON_COLOR_BALANCE => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_color_balance(bytes, maker_endian) {
+                        // Defer processing - version 02xx needs serial/shutter_count for decryption
+                        color_balance_bytes = Some(bytes.clone());
+                    }
+                }
+                NIKON_COLOR_BALANCE_A => {
+                    // NRWData for P1000, P7000, P7100, B700 - uses ColorBalanceC structure
+                    // NRW files don't need decryption
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_color_balance(bytes, maker_endian, None, None) {
                             tags.insert(
-                                0x9800 + tags.len() as u16,
+                                0x9A00 + tags.len() as u16,
                                 MakerNoteTag::new(
-                                    0x9800 + tags.len() as u16,
+                                    0x9A00 + tags.len() as u16,
                                     Some(Box::leak(name.into_boxed_str())),
                                     ExifValue::Ascii(val),
                                 ),
@@ -5439,6 +5971,49 @@ pub fn parse_nikon_maker_notes(
                     }
                 }
                 _ => {}
+            }
+        }
+    }
+
+    // Deferred ColorBalance processing - version 02xx needs serial/shutter_count for decryption
+    if let Some(bytes) = color_balance_bytes {
+        for (name, val) in
+            parse_color_balance(&bytes, maker_endian, serial_number, shutter_count_val)
+        {
+            tags.insert(
+                0x9800 + tags.len() as u16,
+                MakerNoteTag::new(
+                    0x9800 + tags.len() as u16,
+                    Some(Box::leak(name.into_boxed_str())),
+                    ExifValue::Ascii(val),
+                ),
+            );
+        }
+    }
+
+    // Deferred ShotInfo processing - version 02xx needs serial/shutter_count for decryption
+    if let Some(bytes) = shot_info_bytes {
+        if let (Some(ser), Some(count)) = (serial_number, shutter_count_val) {
+            // Decrypt ShotInfo starting at offset 4 (version string is unencrypted)
+            if bytes.len() > 9 {
+                let mut decrypted = bytes.clone();
+                nikon_decrypt(ser, count, &mut decrypted, 4);
+
+                // Extract FirmwareVersion from decrypted data (offset 4, string[5])
+                let firmware = String::from_utf8_lossy(&decrypted[4..9]);
+                if firmware.chars().any(|c| c.is_ascii_digit()) {
+                    let tag_id = 0x9381_u16;
+                    tags.insert(
+                        tag_id,
+                        MakerNoteTag::new(
+                            tag_id,
+                            Some("FirmwareVersion"),
+                            ExifValue::Ascii(
+                                firmware.trim_end_matches('\0').trim_end().to_string(),
+                            ),
+                        ),
+                    );
+                }
             }
         }
     }

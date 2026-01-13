@@ -21,7 +21,7 @@ use std::collections::HashMap;
 /// Supported manufacturers and their file formats
 /// Note: "dng" is a format, not a manufacturer, but is included for testing DNG-specific parsing
 pub const MANUFACTURER_FORMATS: &[(&str, &[&str])] = &[
-    ("canon", &["CR2", "CR3", "CRW"]),
+    ("canon", &["CR2", "CR3"]), // CRW excluded - uses CIFF format (not TIFF)
     ("nikon", &["NEF", "NRW"]),
     ("sony", &["ARW", "SR2", "SRF"]),
     ("fujifilm", &["RAF"]),

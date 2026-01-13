@@ -474,6 +474,21 @@ where
         }
     }
 
+    // For Sony ARW files, parse SR2Private IFD from DNGPrivateData offset
+    // Sony stores tag 0xC634 as a LONG offset to the SR2Private IFD
+    if let Some(make_str) = &make {
+        if make_str.to_uppercase().contains("SONY") {
+            if let Some(sr2_tags) = parse_sony_sr2_private(&app1_data, tiff_offset, endian) {
+                if let Some(ref mut maker_notes) = exif_data.maker_notes {
+                    // Add SR2SubIFD tags to existing maker notes
+                    maker_notes.extend(sr2_tags);
+                } else {
+                    exif_data.maker_notes = Some(sr2_tags);
+                }
+            }
+        }
+    }
+
     // Override Compression for RW2 files with the value from main IFD0
     if let Some(compression) = rw2_compression {
         let tag_id = crate::tags::ExifTagId::new(0x0103, crate::tags::TagGroup::Main);
@@ -1100,4 +1115,348 @@ fn find_tag_data_offset(
     }
 
     None
+}
+
+/// Parse Sony SR2Private IFD from DNGPrivateData (tag 0xC634)
+/// For Sony ARW files, 0xC634 contains an offset to the SR2Private IFD
+/// which contains SR2SubIFDOffset (0x7200), SR2SubIFDLength (0x7201), and SR2SubIFDKey (0x7221)
+fn parse_sony_sr2_private(
+    app1_data: &[u8],
+    tiff_offset: usize,
+    endian: Endianness,
+) -> Option<HashMap<u16, crate::makernotes::MakerNoteTag>> {
+    let tiff_data = &app1_data[tiff_offset..];
+    if tiff_data.len() < 8 {
+        return None;
+    }
+
+    // Read IFD0 offset from TIFF header (bytes 4-7)
+    let ifd0_offset = read_u32(&tiff_data[4..8], endian) as usize;
+    if ifd0_offset + 2 > tiff_data.len() {
+        return None;
+    }
+
+    // Find tag 0xC634 (DNGPrivateData) in IFD0
+    let num_entries = read_u16(&tiff_data[ifd0_offset..ifd0_offset + 2], endian) as usize;
+
+    let mut sr2_private_offset: Option<u32> = None;
+
+    for i in 0..num_entries {
+        let entry_offset = ifd0_offset + 2 + i * 12;
+        if entry_offset + 12 > tiff_data.len() {
+            break;
+        }
+
+        let tag_id = read_u16(&tiff_data[entry_offset..entry_offset + 2], endian);
+        if tag_id == 0xC634 {
+            // DNGPrivateData found
+            // Sony stores this as BYTE[4] (type 1), LONG (type 4), or UNDEFINED (type 7)
+            // The value is always a 4-byte offset to the SR2Private IFD
+            // Read the offset value directly from bytes 8-11
+            sr2_private_offset = Some(read_u32(
+                &tiff_data[entry_offset + 8..entry_offset + 12],
+                endian,
+            ));
+            break;
+        }
+    }
+
+    let sr2_ifd_offset = sr2_private_offset? as usize;
+    if sr2_ifd_offset + 2 > tiff_data.len() {
+        return None;
+    }
+
+    // Parse SR2Private IFD
+    let sr2_num_entries = read_u16(&tiff_data[sr2_ifd_offset..sr2_ifd_offset + 2], endian) as usize;
+    if sr2_num_entries > 100 {
+        // Sanity check
+        return None;
+    }
+
+    let mut sr2_subifd_offset: Option<u32> = None;
+    let mut sr2_subifd_length: Option<u32> = None;
+    let mut sr2_subifd_key: Option<u32> = None;
+
+    for i in 0..sr2_num_entries {
+        let entry_offset = sr2_ifd_offset + 2 + i * 12;
+        if entry_offset + 12 > tiff_data.len() {
+            break;
+        }
+
+        let tag_id = read_u16(&tiff_data[entry_offset..entry_offset + 2], endian);
+        let value = read_u32(&tiff_data[entry_offset + 8..entry_offset + 12], endian);
+
+        match tag_id {
+            0x7200 => sr2_subifd_offset = Some(value),
+            0x7201 => sr2_subifd_length = Some(value),
+            0x7221 => sr2_subifd_key = Some(value),
+            _ => {}
+        }
+    }
+
+    // Need all three values to decrypt SR2SubIFD
+    let offset = sr2_subifd_offset? as usize;
+    let length = sr2_subifd_length? as usize;
+    let key = sr2_subifd_key?;
+
+    if offset + length > tiff_data.len() || length < 4 {
+        return None;
+    }
+
+    // Copy and decrypt the SR2SubIFD data
+    let mut sr2_data = tiff_data[offset..offset + length].to_vec();
+    decrypt_sr2(&mut sr2_data, key);
+
+    // Parse the decrypted SR2SubIFD
+    // Note: offsets in SR2SubIFD are TIFF-absolute, so we pass the SR2SubIFD base offset
+    Some(parse_sr2_subifd(&sr2_data, endian, offset))
+}
+
+/// Decrypt Sony SR2SubIFD data (reversible encryption)
+/// Based on ExifTool's Decrypt function in Sony.pm
+fn decrypt_sr2(data: &mut [u8], key: u32) {
+    if data.len() < 4 {
+        return;
+    }
+
+    // Generate 127-element pad array from key
+    // ExifTool algorithm: lo = (key & 0xffff) * 0x0edd + 1
+    //                     hi = (key >> 16) * 0x0edd + (key & 0xffff) * 0x02e9 + (lo >> 16)
+    //                     key = ((hi & 0xffff) << 16) + (lo & 0xffff)
+    let mut pad = [0u32; 128];
+    let mut k = key;
+    for p in pad.iter_mut().take(4) {
+        let lo = (k & 0xffff) * 0x0edd + 1;
+        let hi = (k >> 16) * 0x0edd + (k & 0xffff) * 0x02e9 + (lo >> 16);
+        k = ((hi & 0xffff) << 16) + (lo & 0xffff);
+        *p = k;
+    }
+    pad[3] = (pad[3] << 1) | ((pad[0] ^ pad[2]) >> 31);
+    for i in 4..0x7f {
+        pad[i] = ((pad[i - 4] ^ pad[i - 2]) << 1) | ((pad[i - 3] ^ pad[i - 1]) >> 31);
+    }
+
+    // Decrypt data in 4-byte chunks (big-endian)
+    // ExifTool: for ($i=0x7f,$j=0; $j<$words; ++$i,++$j) {
+    //              $data[$j] ^= $pad[$i & 0x7f] = $pad[($i+1) & 0x7f] ^ $pad[($i+65) & 0x7f];
+    //           }
+    let words = data.len() / 4;
+    let mut i = 0x7f_usize;
+    for j in 0..words {
+        let offset = j * 4;
+        let chunk = u32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        // Update pad and XOR
+        let new_pad = pad[(i + 1) & 0x7f] ^ pad[(i + 65) & 0x7f];
+        pad[i & 0x7f] = new_pad;
+        let decrypted = chunk ^ new_pad;
+        let bytes = decrypted.to_be_bytes();
+        data[offset] = bytes[0];
+        data[offset + 1] = bytes[1];
+        data[offset + 2] = bytes[2];
+        data[offset + 3] = bytes[3];
+        i += 1;
+    }
+}
+
+/// Parse decrypted SR2SubIFD and return MakerNote tags
+fn parse_sr2_subifd(
+    data: &[u8],
+    endian: Endianness,
+    base_offset: usize,
+) -> HashMap<u16, crate::makernotes::MakerNoteTag> {
+    use crate::data_types::ExifValue;
+    use crate::makernotes::MakerNoteTag;
+
+    let mut tags = HashMap::new();
+
+    if data.len() < 2 {
+        return tags;
+    }
+
+    let num_entries = read_u16(&data[0..2], endian) as usize;
+    if num_entries > 200 {
+        return tags;
+    }
+
+    for i in 0..num_entries {
+        let entry_offset = 2 + i * 12;
+        if entry_offset + 12 > data.len() {
+            break;
+        }
+
+        let tag_id = read_u16(&data[entry_offset..entry_offset + 2], endian);
+        let tag_type = read_u16(&data[entry_offset + 2..entry_offset + 4], endian);
+        let count = read_u32(&data[entry_offset + 4..entry_offset + 8], endian) as usize;
+        let value_bytes = &data[entry_offset + 8..entry_offset + 12];
+
+        // Get tag name
+        let tag_name = get_sr2_tag_name(tag_id);
+        if tag_name.is_none() {
+            continue;
+        }
+        let name = tag_name.unwrap();
+
+        // Calculate value size and get value data
+        let type_size = match tag_type {
+            1 | 2 | 6 | 7 => 1,
+            3 | 8 => 2,
+            4 | 9 => 4,
+            5 | 10 => 8,
+            _ => 1,
+        };
+        let total_size = count * type_size;
+        let value_data: &[u8] = if total_size <= 4 {
+            &value_bytes[..total_size.min(4)]
+        } else {
+            // Offsets in SR2SubIFD are TIFF-absolute, so subtract base_offset
+            let tiff_offset = read_u32(value_bytes, endian) as usize;
+            let local_offset = tiff_offset.saturating_sub(base_offset);
+            if local_offset + total_size <= data.len() {
+                &data[local_offset..local_offset + total_size]
+            } else {
+                continue;
+            }
+        };
+
+        // Parse based on tag
+        let formatted_value = match tag_id {
+            0x7300 | 0x7310 => {
+                // BlackLevel - int16u[4]
+                if count >= 4 && value_data.len() >= 8 {
+                    let v: Vec<String> = (0..4)
+                        .map(|j| read_u16(&value_data[j * 2..j * 2 + 2], endian).to_string())
+                        .collect();
+                    v.join(" ")
+                } else {
+                    continue;
+                }
+            }
+            0x7302 | 0x7303 | 0x7312 | 0x7313 => {
+                // WB GRBG/RGGB Levels - int16s[4]
+                if count >= 4 && value_data.len() >= 8 {
+                    let v: Vec<String> = (0..4)
+                        .map(|j| read_i16(&value_data[j * 2..j * 2 + 2], endian).to_string())
+                        .collect();
+                    v.join(" ")
+                } else {
+                    continue;
+                }
+            }
+            0x7480 | 0x7481 | 0x7482 | 0x7483 | 0x7484 | 0x7486 => {
+                // WB RGB Levels (old format) - int16s[4]
+                if count >= 4 && value_data.len() >= 8 {
+                    let v: Vec<String> = (0..4)
+                        .map(|j| read_i16(&value_data[j * 2..j * 2 + 2], endian).to_string())
+                        .collect();
+                    v.join(" ")
+                } else {
+                    continue;
+                }
+            }
+            0x7820..=0x782d => {
+                // WB RGB Levels (new format) - int16s[3]
+                if count >= 3 && value_data.len() >= 6 {
+                    let v: Vec<String> = (0..3)
+                        .map(|j| read_i16(&value_data[j * 2..j * 2 + 2], endian).to_string())
+                        .collect();
+                    v.join(" ")
+                } else {
+                    continue;
+                }
+            }
+            0x787f => {
+                // WhiteLevel - int16u[3]
+                if count >= 3 && value_data.len() >= 6 {
+                    let v: Vec<String> = (0..3)
+                        .map(|j| read_u16(&value_data[j * 2..j * 2 + 2], endian).to_string())
+                        .collect();
+                    v.join(" ")
+                } else {
+                    continue;
+                }
+            }
+            0x7800 => {
+                // ColorMatrix - int16s array
+                if value_data.len() >= count * 2 {
+                    let v: Vec<String> = (0..count)
+                        .map(|j| read_i16(&value_data[j * 2..j * 2 + 2], endian).to_string())
+                        .collect();
+                    v.join(" ")
+                } else {
+                    continue;
+                }
+            }
+            0x74c1 => {
+                // WhiteLevel - int16u
+                if value_data.len() >= 2 {
+                    read_u16(&value_data[0..2], endian).to_string()
+                } else {
+                    continue;
+                }
+            }
+            _ => continue,
+        };
+
+        // Use a virtual tag ID that won't conflict with main makernotes
+        // SR2SubIFD tags start at 0x7300, so use tag_id + 0x10000 to avoid conflicts
+        let virtual_tag_id = tag_id;
+        tags.insert(
+            virtual_tag_id,
+            MakerNoteTag {
+                tag_id: virtual_tag_id,
+                tag_name: Some(name),
+                value: ExifValue::Ascii(formatted_value.clone()),
+                raw_value: Some(ExifValue::Ascii(formatted_value)),
+                exiv2_group: Some("SR2SubIFD"),
+                exiv2_name: Some(name),
+            },
+        );
+    }
+
+    tags
+}
+
+/// Get tag name for SR2SubIFD tag
+fn get_sr2_tag_name(tag_id: u16) -> Option<&'static str> {
+    match tag_id {
+        0x7300 => Some("BlackLevel"),
+        0x7302 => Some("WB_GRBGLevelsAuto"),
+        0x7303 => Some("WB_GRBGLevels"),
+        0x7310 => Some("BlackLevel"),
+        0x7312 => Some("WB_RGGBLevelsAuto"),
+        0x7313 => Some("WB_RGGBLevels"),
+        0x7480 => Some("WB_RGBLevelsDaylight"),
+        0x7481 => Some("WB_RGBLevelsCloudy"),
+        0x7482 => Some("WB_RGBLevelsTungsten"),
+        0x7483 => Some("WB_RGBLevelsFlash"),
+        0x7484 => Some("WB_RGBLevels4500K"),
+        0x7486 => Some("WB_RGBLevelsFluorescent"),
+        0x7800 => Some("ColorMatrix"),
+        0x7820 => Some("WB_RGBLevelsDaylight"),
+        0x7821 => Some("WB_RGBLevelsCloudy"),
+        0x7822 => Some("WB_RGBLevelsTungsten"),
+        0x7823 => Some("WB_RGBLevelsFlash"),
+        0x7824 => Some("WB_RGBLevels4500K"),
+        0x7825 => Some("WB_RGBLevelsShade"),
+        0x7826 => Some("WB_RGBLevelsFluorescent"),
+        0x7827 => Some("WB_RGBLevelsFluorescentP1"),
+        0x7828 => Some("WB_RGBLevelsFluorescentP2"),
+        0x7829 => Some("WB_RGBLevelsFluorescentM1"),
+        0x782a => Some("WB_RGBLevels8500K"),
+        0x782b => Some("WB_RGBLevels6000K"),
+        0x782c => Some("WB_RGBLevels3200K"),
+        0x782d => Some("WB_RGBLevels2500K"),
+        0x74a0 => Some("MaxApertureAtMaxFocal"),
+        0x74a1 => Some("MaxApertureAtMinFocal"),
+        0x74a2 => Some("MaxFocalLength"),
+        0x74a3 => Some("MinFocalLength"),
+        0x74c1 => Some("WhiteLevel"),
+        0x787f => Some("WhiteLevel"),
+        _ => None,
+    }
 }

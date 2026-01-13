@@ -503,6 +503,16 @@ pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 
+// CR2-specific tags
+pub const TAG_CR2_CFA_PATTERN: ExifTagId = ExifTagId {
+    id: 0xC5E0,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SRAW_TYPE: ExifTagId = ExifTagId {
+    id: 0xC6C5,
+    ifd: TagGroup::Main,
+};
+
 // CRW/CIFF FocalPlaneSize tags (private range)
 pub const TAG_FOCAL_PLANE_X_SIZE: ExifTagId = ExifTagId {
     id: 0xC001,
@@ -996,6 +1006,10 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_BEST_QUALITY_SCALE, "BestQualityScale");
     map.insert(TAG_ACTIVE_AREA, "ActiveArea");
     map.insert(TAG_RAW_IMAGE_DIGEST, "RawImageDigest");
+
+    // CR2-specific tags
+    map.insert(TAG_CR2_CFA_PATTERN, "CR2CFAPattern");
+    map.insert(TAG_SRAW_TYPE, "SRawType");
 
     // Sony ARW SubIFD tags
     map.insert(TAG_SONY_VIGNETTING_CORRECTION, "VignettingCorrection");

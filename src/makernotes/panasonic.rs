@@ -64,11 +64,11 @@ pub const PANA_BATTERY_LEVEL: u16 = 0x0038;
 pub const PANA_CITY: u16 = 0x006D;
 pub const PANA_LANDMARK: u16 = 0x006F;
 pub const PANA_INTELLIGENT_RESOLUTION: u16 = 0x0070;
-pub const PANA_CLEAR_RETOUCH: u16 = 0x0077;
+pub const PANA_CLEAR_RETOUCH: u16 = 0x007C;
 pub const PANA_PHOTO_STYLE: u16 = 0x0089;
 pub const PANA_HDR_SHOT: u16 = 0x0093;
 pub const PANA_SHUTTER_TYPE: u16 = 0x009F;
-pub const PANA_FLASH_CURTAIN: u16 = 0x00AB;
+pub const PANA_FLASH_CURTAIN: u16 = 0x0048;
 pub const PANA_TOUCH_AE: u16 = 0x00AE;
 pub const PANA_SATURATION: u16 = 0x0040;
 pub const PANA_SHARPNESS: u16 = 0x0041;
@@ -108,7 +108,7 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
         PANA_AUDIO => Some("Audio"),
         PANA_FLASH_BIAS => Some("FlashBias"),
         PANA_INTERNAL_SERIAL_NUMBER => Some("InternalSerialNumber"),
-        PANA_EXIF_VERSION => Some("ExifVersion"),
+        PANA_EXIF_VERSION => Some("PanasonicExifVersion"),
         PANA_COLOR_EFFECT => Some("ColorEffect"),
         PANA_TIME_SINCE_POWER_ON => Some("TimeSincePowerOn"),
         PANA_BURST_MODE => Some("BurstMode"),
@@ -217,8 +217,12 @@ define_tag_decoder! {
         5 => "Manual",
         8 => "Flash",
         10 => "Black & White",
-        11 => "Shade",
-        12 => "Kelvin",
+        11 => "Manual 2",
+        12 => "Shade",
+        13 => "Kelvin",
+        14 => "Manual 3",
+        15 => "Manual 4",
+        19 => "Auto (cool)",
     },
     exiv2: {
         1 => "Auto",
@@ -332,15 +336,66 @@ define_tag_decoder! {
         13 => "Panning",
         14 => "Simple",
         15 => "Color Effects",
+        16 => "Self Portrait",
+        17 => "Economy",
         18 => "Fireworks",
         19 => "Party",
         20 => "Snow",
         21 => "Night Scenery",
         22 => "Food",
         23 => "Baby",
+        24 => "Soft Skin",
+        25 => "Candlelight",
+        26 => "Starry Night",
         27 => "High Sensitivity",
+        28 => "Panorama Assist",
         29 => "Underwater",
+        30 => "Beach",
+        31 => "Aerial Photo",
+        32 => "Sunset",
         33 => "Pet",
+        34 => "Intelligent ISO",
+        35 => "Clipboard",
+        36 => "High Speed Continuous Shooting",
+        37 => "Intelligent Auto",
+        39 => "Multi-aspect",
+        41 => "Transform",
+        42 => "Flash Burst",
+        43 => "Pin Hole",
+        44 => "Film Grain",
+        45 => "My Color",
+        46 => "Photo Frame",
+        48 => "Movie",
+        51 => "HDR",
+        52 => "Peripheral Defocus",
+        55 => "Handheld Night Shot",
+        57 => "3D",
+        59 => "Creative Control",
+        60 => "Intelligent Auto Plus",
+        62 => "Panorama",
+        63 => "Glass Through",
+        64 => "HDR",
+        66 => "Digital Filter",
+        67 => "Clear Portrait",
+        68 => "Silky Skin",
+        69 => "Backlit Softness",
+        70 => "Clear in Backlight",
+        71 => "Relaxing Tone",
+        72 => "Sweet Child's Face",
+        73 => "Distinct Scenery",
+        74 => "Bright Blue Sky",
+        75 => "Romantic Sunset Glow",
+        76 => "Vivid Sunset Glow",
+        77 => "Glistening Water",
+        78 => "Clear Nightscape",
+        79 => "Cool Night Sky",
+        80 => "Warm Glowing Nightscape",
+        81 => "Artistic Nightscape",
+        82 => "Glittering Illuminations",
+        83 => "Clear Night Portrait",
+        84 => "Soft Image of a Flower",
+        85 => "Appetizing Food",
+        86 => "Cute Dessert",
     }
 }
 
@@ -392,9 +447,13 @@ define_tag_decoder! {
         0 => "Normal",
         1 => "Low",
         2 => "High",
+        5 => "Normal 2",
         6 => "Medium Low",
         7 => "Medium High",
         13 => "High Dynamic",
+        24 => "Dynamic Range (film-like)",
+        46 => "Match Filter Effects Toy",
+        55 => "Match Photo Style L. Monochrome",
         256 => "Low",
         272 => "Standard",
         288 => "High",
@@ -403,8 +462,13 @@ define_tag_decoder! {
         0 => "Normal",
         1 => "Low",
         2 => "High",
+        5 => "Normal 2",
         6 => "Medium low",
         7 => "Medium high",
+        13 => "High Dynamic",
+        24 => "Dynamic Range (film-like)",
+        46 => "Match Filter Effects Toy",
+        55 => "Match Photo Style L. Monochrome",
         256 => "Low",
         272 => "Standard",
         288 => "High",
@@ -420,9 +484,28 @@ define_tag_decoder! {
         2 => "Normal",
         3 => "+1",
         4 => "+2",
-        5 => "-1",
-        6 => "Normal",
-        7 => "+1",
+        5 => "Normal 2",
+        7 => "Nature (Color Film)",
+        9 => "Expressive",
+        12 => "Smooth (Color Film) or Pure (My Color)",
+        17 => "Dynamic (B&W Film)",
+        22 => "Smooth (B&W Film)",
+        25 => "High Dynamic",
+        26 => "Retro",
+        27 => "Dynamic (Color Film)",
+        28 => "Low Key",
+        29 => "Toy Effect",
+        32 => "Vibrant (Color Film) or Expressive (My Color)",
+        33 => "Elegant (My Color)",
+        37 => "Nostalgic (Color Film)",
+        41 => "Dynamic Art (My Color)",
+        42 => "Retro (My Color)",
+        45 => "Cinema",
+        47 => "Dynamic Mono",
+        50 => "Impressive Art",
+        51 => "Cross Process",
+        100 => "High Dynamic 2",
+        101 => "Retro 2",
     },
     exiv2: {
         0 => "-2",
@@ -430,9 +513,28 @@ define_tag_decoder! {
         2 => "Normal",
         3 => "+1",
         4 => "+2",
-        5 => "-1",
-        6 => "Normal",
-        7 => "+1",
+        5 => "Normal 2",
+        7 => "Nature (Color Film)",
+        9 => "Expressive",
+        12 => "Smooth (Color Film) or Pure (My Color)",
+        17 => "Dynamic (B&W Film)",
+        22 => "Smooth (B&W Film)",
+        25 => "High Dynamic",
+        26 => "Retro",
+        27 => "Dynamic (Color Film)",
+        28 => "Low Key",
+        29 => "Toy Effect",
+        32 => "Vibrant (Color Film) or Expressive (My Color)",
+        33 => "Elegant (My Color)",
+        37 => "Nostalgic (Color Film)",
+        41 => "Dynamic Art (My Color)",
+        42 => "Retro (My Color)",
+        45 => "Cinema",
+        47 => "Dynamic Mono",
+        50 => "Impressive Art",
+        51 => "Cross Process",
+        100 => "High Dynamic 2",
+        101 => "Retro 2",
     }
 }
 
@@ -448,17 +550,18 @@ pub fn decode_contrast_mode_with_model(value: u16, model: Option<&str>) -> Strin
     let model_upper = model_str.to_uppercase();
 
     // Check if this is a model that outputs raw values (no decoding)
-    let is_raw_output_model = model_upper.contains("DMC-G1")
-        || model_upper.contains("DMC-L1")
-        || model_upper.contains("DMC-L10")
-        || model_upper.contains("DMC-LC80")
-        || model_upper.contains("DMC-FX10")
-        || model_upper.contains("DMC-TZ10")
-        || model_upper.contains("DMC-ZS7")
+    // NOTE: Use exact matching to avoid false positives (e.g., DMC-TZ10 vs DMC-TZ100)
+    let is_raw_output_model = model_upper == "DMC-G1"
+        || model_upper == "DMC-L1"
+        || model_upper == "DMC-L10"
+        || model_upper == "DMC-LC80"
+        || model_upper == "DMC-FX10"
+        || model_upper == "DMC-TZ10"
+        || model_upper == "DMC-ZS7"
         || model_upper.starts_with("DC-");
 
-    // Check if this is a GF/G2 series camera
-    let is_gf_model = model_upper.contains("DMC-GF") || model_upper.contains("DMC-G2");
+    // Check if this is a GF/G2 series camera (DMC-GF1, DMC-GF2, etc. or DMC-G2)
+    let is_gf_model = model_upper.starts_with("DMC-GF") || model_upper == "DMC-G2";
 
     if is_raw_output_model {
         // Output raw value like ExifTool
@@ -502,7 +605,7 @@ define_tag_decoder! {
     }
 }
 
-// ClearRetouch (tag 0x0077): Panasonic.pm / panasonicmn_int.cpp
+// ClearRetouch (tag 0x007C): Panasonic.pm / panasonicmn_int.cpp
 define_tag_decoder! {
     clear_retouch,
     both: {
@@ -520,7 +623,7 @@ define_tag_decoder! {
     }
 }
 
-// FlashCurtain (tag 0x00AB): Panasonic.pm / panasonicmn_int.cpp
+// FlashCurtain (tag 0x0048): Panasonic.pm / panasonicmn_int.cpp
 define_tag_decoder! {
     flash_curtain,
     both: {
@@ -565,7 +668,8 @@ pub fn decode_af_area_mode_pair(byte0: u8, byte1: u8) -> &'static str {
         (64, 2) => "Face Detect + 3-area (center)",
         (64, 3) => "Face Detect + 3-area (right)",
         (64, 4) => "Face Detect + 1-area",
-        (128, 0) => "Pinpoint",
+        (128, 0) => "Pinpoint focus",
+        (240, 0) => "Tracking",
         _ => "Unknown",
     }
 }
@@ -1270,8 +1374,18 @@ pub fn parse_panasonic_maker_notes(
                             PANA_SHADING_COMPENSATION => {
                                 Some(decode_shading_compensation_exiftool(v).to_string())
                             }
-                            PANA_PROGRAM_ISO | PANA_TRAVEL_DAY => {
-                                // 65535 means "n/a" for these tags
+                            PANA_PROGRAM_ISO => {
+                                // Special values for ProgramISO
+                                if v == 65534 {
+                                    Some("Intelligent ISO".to_string())
+                                } else if v == 65535 {
+                                    Some("n/a".to_string())
+                                } else {
+                                    None // Pass through raw value
+                                }
+                            }
+                            PANA_TRAVEL_DAY => {
+                                // 65535 means "n/a" for TravelDay
                                 if v == 65535 {
                                     Some("n/a".to_string())
                                 } else {
@@ -1585,6 +1699,13 @@ pub fn parse_panasonic_maker_notes(
                             } else {
                                 ExifValue::Undefined(bytes[..4].to_vec())
                             }
+                        } else if tag_id == PANA_EXIF_VERSION && count == 4 {
+                            // PanasonicExifVersion: ASCII bytes "0330" -> "0330"
+                            if let Ok(s) = std::str::from_utf8(&bytes[..4]) {
+                                ExifValue::Ascii(s.to_string())
+                            } else {
+                                ExifValue::Undefined(bytes[..4].to_vec())
+                            }
                         } else {
                             ExifValue::Undefined(bytes[..count as usize].to_vec())
                         }
@@ -1610,6 +1731,13 @@ pub fn parse_panasonic_maker_notes(
                         if let Some(value_bytes) = value_bytes {
                             // MakerNoteVersion: ASCII bytes -> string
                             if tag_id == PANA_MAKERNOTE_VERSION && count == 4 {
+                                if let Ok(s) = std::str::from_utf8(value_bytes) {
+                                    ExifValue::Ascii(s.to_string())
+                                } else {
+                                    ExifValue::Undefined(value_bytes.to_vec())
+                                }
+                            } else if tag_id == PANA_EXIF_VERSION && count == 4 {
+                                // PanasonicExifVersion: ASCII bytes -> string
                                 if let Ok(s) = std::str::from_utf8(value_bytes) {
                                     ExifValue::Ascii(s.to_string())
                                 } else {
@@ -1847,6 +1975,11 @@ pub fn parse_panasonic_maker_notes(
                     "HDR" => Some(51),
                     "Handheld Night Shot" => Some(55),
                     "3D" => Some(57),
+                    "Creative Control" => Some(59),
+                    "Intelligent Auto Plus" => Some(60),
+                    "Panorama" => Some(62),
+                    "Glass Through" => Some(63),
+                    "Photo Style" => Some(90),
                     _ => None,
                 }
             }

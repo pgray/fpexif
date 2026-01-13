@@ -17,6 +17,11 @@ fn gcd(a: u32, b: u32) -> u32 {
     }
 }
 
+/// Round a float value to 6 decimal places (for balance values like ExifTool)
+fn round_balance_value(val: f64) -> f64 {
+    (val * 1_000_000.0).round() / 1_000_000.0
+}
+
 /// Convert uppercase string to title case (e.g., "LOW" -> "Low", "WIDE ADAPTER" -> "Wide Adapter")
 /// This matches ExifTool's formatting for certain Nikon MakerNote string values
 fn to_title_case(s: &str) -> String {
@@ -800,10 +805,9 @@ fn format_undefined_value(data: &[u8], tag_id: u16) -> Value {
         ),
         // ContrastCurve (MakerNote 0x008C) - always output as binary data message
         0x008C => Value::String(format_binary_data(data)),
-        // TIFF-EPStandardID (0x9216) - format as version string "1.0.0.0"
-        0x9216 if data.len() == 4 => {
-            Value::String(format!("{}.{}.{}.{}", data[0], data[1], data[2], data[3]))
-        }
+        // TIFF-EPStandardID (0x9216) - when stored as undef, ExifTool outputs raw bytes
+        // (only format as "1.0.0.0" when it's stored as int8u/Byte type, handled separately)
+        // So for undefined type, we should NOT format it - let it fall through to raw output
         _ => {
             if data.len() <= 32 {
                 // For short undefined data, show as hex
@@ -1087,9 +1091,12 @@ pub fn format_exif_value_for_json_with_make_and_name(
             if cleaned.is_empty() {
                 return Value::String(String::new());
             }
+            // FirmwareVersion should stay as string even if it looks numeric (e.g., "1.00")
+            // Otherwise ExifTool JSON outputs "1.0" instead of "1.00"
+            let is_firmware_version = tag_name == Some("FirmwareVersion");
             // ExifTool outputs pure numeric strings (like SerialNumber, SubSecTime)
             // as JSON numbers, so we do the same
-            if is_numeric_string(&cleaned) {
+            if !is_firmware_version && is_numeric_string(&cleaned) {
                 // Try parsing as unsigned integer first
                 if let Ok(n) = cleaned.parse::<u64>() {
                     return Value::Number(n.into());
@@ -1670,10 +1677,19 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             } else {
                 format!("{:.1}", rounded)
             };
+            // ExifTool defaults unknown altitude ref to "Above Sea Level" for non-negative values
             let formatted = if let Some(ref_str) = ref_desc {
-                format!("{} m {}", alt_str, ref_str)
+                if ref_str != "Unknown" {
+                    format!("{} m {}", alt_str, ref_str)
+                } else if altitude < 0.0 {
+                    format!("{} m Below Sea Level", alt_str.trim_start_matches('-'))
+                } else {
+                    format!("{} m Above Sea Level", alt_str)
+                }
+            } else if altitude < 0.0 {
+                format!("{} m Below Sea Level", alt_str.trim_start_matches('-'))
             } else {
-                format!("{} m", alt_str)
+                format!("{} m Above Sea Level", alt_str)
             };
             output.insert("GPSAltitude".to_string(), Value::String(formatted));
         }
@@ -1834,36 +1850,56 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         _ => None,
     });
 
-    // SubSecModifyDate = ModifyDate (0x0132) + SubSecTime (0x9290)
+    // OffsetTime tags for timezone info (EXIF 2.31+)
+    // 0x9010: OffsetTime (for ModifyDate)
+    // 0x9011: OffsetTimeOriginal (for DateTimeOriginal)
+    // 0x9012: OffsetTimeDigitized (for CreateDate/DateTimeDigitized)
+    let offset_time = exif_data.get_tag_by_id(0x9010).and_then(|v| match v {
+        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        _ => None,
+    });
+    let offset_time_original = exif_data.get_tag_by_id(0x9011).and_then(|v| match v {
+        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        _ => None,
+    });
+    let offset_time_digitized = exif_data.get_tag_by_id(0x9012).and_then(|v| match v {
+        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        _ => None,
+    });
+
+    // SubSecModifyDate = ModifyDate (0x0132) + SubSecTime (0x9290) + OffsetTime (0x9010)
     if let (Some(ExifValue::Ascii(date)), Some(subsec)) =
         (exif_data.get_tag_by_id(0x0132), &subsec_time)
     {
         let cleaned = date.trim_end_matches('\0').trim();
+        let tz = offset_time.as_deref().unwrap_or("");
         output.insert(
             "SubSecModifyDate".to_string(),
-            Value::String(format!("{}.{}", cleaned, subsec)),
+            Value::String(format!("{}.{}{}", cleaned, subsec, tz)),
         );
     }
 
-    // SubSecDateTimeOriginal = DateTimeOriginal (0x9003) + SubSecTimeOriginal (0x9291)
+    // SubSecDateTimeOriginal = DateTimeOriginal (0x9003) + SubSecTimeOriginal (0x9291) + OffsetTimeOriginal (0x9011)
     if let (Some(ExifValue::Ascii(date)), Some(subsec)) =
         (exif_data.get_tag_by_id(0x9003), &subsec_original)
     {
         let cleaned = date.trim_end_matches('\0').trim();
+        let tz = offset_time_original.as_deref().unwrap_or("");
         output.insert(
             "SubSecDateTimeOriginal".to_string(),
-            Value::String(format!("{}.{}", cleaned, subsec)),
+            Value::String(format!("{}.{}{}", cleaned, subsec, tz)),
         );
     }
 
-    // SubSecCreateDate = DateTimeDigitized (0x9004) + SubSecTimeDigitized (0x9292)
+    // SubSecCreateDate = DateTimeDigitized (0x9004) + SubSecTimeDigitized (0x9292) + OffsetTimeDigitized (0x9012)
     if let (Some(ExifValue::Ascii(date)), Some(subsec)) =
         (exif_data.get_tag_by_id(0x9004), &subsec_digitized)
     {
         let cleaned = date.trim_end_matches('\0').trim();
+        let tz = offset_time_digitized.as_deref().unwrap_or("");
         output.insert(
             "SubSecCreateDate".to_string(),
-            Value::String(format!("{}.{}", cleaned, subsec)),
+            Value::String(format!("{}.{}{}", cleaned, subsec, tz)),
         );
     }
 
@@ -1997,68 +2033,122 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         if should_replace {
             if let Some(lens_type2) = output.get("LensType2").cloned() {
                 output.insert("LensID".to_string(), lens_type2);
-            } else if let Some(lens_type) = output.get("LensType").cloned() {
-                // Only use LensType if it's not the generic E-mount placeholder
-                if let Value::String(s) = &lens_type {
-                    if !s.contains("E-Mount") && !s.contains("T-Mount") && !s.contains("Other Lens")
+            } else if let Some(Value::String(lens_model)) = output.get("LensModel") {
+                // Prefer LensModel when it contains detailed lens info (e.g., "FE 70-200mm F2.8 GM OSS II")
+                // LensModel often has more complete info than LensSpec
+                if lens_model.contains("mm") && lens_model.contains("F") {
+                    let lens_id = if (lens_model.starts_with("E ")
+                        || lens_model.starts_with("FE ")
+                        || lens_model.starts_with("DT "))
+                        && !lens_model.contains("Tamron")
+                        && !lens_model.contains("Sigma")
+                        && !lens_model.contains("Zeiss")
+                        && !lens_model.contains("Samyang")
+                        && !lens_model.contains("Voigtlander")
                     {
-                        output.insert("LensID".to_string(), lens_type);
+                        format!("Sony {}", lens_model)
+                    } else {
+                        lens_model.clone()
+                    };
+                    output.insert("LensID".to_string(), Value::String(lens_id));
+                }
+            }
+            // Fallback to LensSpec if LensID still not set
+            // Skip LensSpec if it's "Unknown..." (no lens attached or unrecognized)
+            if !output.contains_key("LensID")
+                || matches!(output.get("LensID"), Some(Value::String(s)) if s.contains("E-Mount"))
+            {
+                if let Some(Value::String(lens_spec)) = output.get("LensSpec") {
+                    // Only use LensSpec if it's a valid lens specification
+                    if !lens_spec.starts_with("Unknown") {
+                        // Use LensSpec for E-mount lenses when LensType2 isn't available
+                        // Add "Sony " prefix only for Sony lenses (E/FE/DT prefix without brand name)
+                        let lens_id = if (lens_spec.starts_with("E ")
+                            || lens_spec.starts_with("FE ")
+                            || lens_spec.starts_with("DT "))
+                            && !lens_spec.contains("Tamron")
+                            && !lens_spec.contains("Sigma")
+                            && !lens_spec.contains("Zeiss")
+                            && !lens_spec.contains("Samyang")
+                            && !lens_spec.contains("Voigtlander")
+                        {
+                            format!("Sony {}", lens_spec)
+                        } else {
+                            lens_spec.clone()
+                        };
+                        output.insert("LensID".to_string(), Value::String(lens_id));
                     }
-                } else {
+                }
+            }
+            // Fallback to LensType - use it even for E-Mount placeholder if no better option
+            if !output.contains_key("LensID") {
+                if let Some(lens_type) = output.get("LensType").cloned() {
                     output.insert("LensID".to_string(), lens_type);
                 }
             }
         }
     } else if !output.contains_key("LensID") {
         if is_canon || is_olympus {
+            // Canon: First check RFLensType for RF mount lenses - this gives specific lens ID
+            if is_canon {
+                if let Some(Value::String(rf_lens_type)) = output.get("RFLensType") {
+                    if rf_lens_type != "n/a" && rf_lens_type != "Unknown" {
+                        output.insert("LensID".to_string(), Value::String(rf_lens_type.clone()));
+                    }
+                }
+            }
+
             // Canon/Olympus: LensID should come from LensType, but disambiguated using LensModel
             // If LensType has "or ..." suffix and LensModel matches the Canon lens, remove the suffix
-            if let Some(Value::String(lens_type)) = output.get("LensType") {
-                let lens_id = if lens_type.contains(" or ") {
-                    // Try to disambiguate using LensModel
-                    if let Some(Value::String(lens_model)) = output.get("LensModel") {
-                        // LensModel has format like "EF17-40mm f/4L USM" - normalize and compare
-                        let model_normalized = lens_model
-                            .replace("EF-S", "EF-S ")
-                            .replace("EF", "EF ")
-                            .replace("  ", " ")
-                            .trim()
-                            .to_string();
+            // Skip if LensID was already set from RFLensType above
+            if !output.contains_key("LensID") {
+                if let Some(Value::String(lens_type)) = output.get("LensType") {
+                    let lens_id = if lens_type.contains(" or ") {
+                        // Try to disambiguate using LensModel
+                        if let Some(Value::String(lens_model)) = output.get("LensModel") {
+                            // LensModel has format like "EF17-40mm f/4L USM" - normalize and compare
+                            let model_normalized = lens_model
+                                .replace("EF-S", "EF-S ")
+                                .replace("EF", "EF ")
+                                .replace("  ", " ")
+                                .trim()
+                                .to_string();
 
-                        // Extract Canon lens name (before " or ")
-                        let canon_part = lens_type.split(" or ").next().unwrap_or(lens_type);
+                            // Extract Canon lens name (before " or ")
+                            let canon_part = lens_type.split(" or ").next().unwrap_or(lens_type);
 
-                        // Check if the model matches the Canon lens (focal lengths and aperture)
-                        let model_matches = {
-                            // Extract key parts: focal length and aperture
-                            let model_has_match =
-                                model_normalized.contains("f/") || lens_model.contains("f/");
-                            let type_has_match = canon_part.contains("f/");
+                            // Check if the model matches the Canon lens (focal lengths and aperture)
+                            let model_matches = {
+                                // Extract key parts: focal length and aperture
+                                let model_has_match =
+                                    model_normalized.contains("f/") || lens_model.contains("f/");
+                                let type_has_match = canon_part.contains("f/");
 
-                            // If both have aperture info, they should match
-                            if model_has_match && type_has_match {
-                                // Simple check: if LensModel starts with EF/EF-S and
-                                // contains similar focal length info, it's likely a Canon lens
-                                lens_model.starts_with("EF")
+                                // If both have aperture info, they should match
+                                if model_has_match && type_has_match {
+                                    // Simple check: if LensModel starts with EF/EF-S and
+                                    // contains similar focal length info, it's likely a Canon lens
+                                    lens_model.starts_with("EF")
+                                } else {
+                                    // Fall back to checking if it looks like a Canon lens
+                                    lens_model.starts_with("EF")
+                                }
+                            };
+
+                            if model_matches {
+                                // Use Canon part only (without " or ..." suffix)
+                                Value::String(canon_part.to_string())
                             } else {
-                                // Fall back to checking if it looks like a Canon lens
-                                lens_model.starts_with("EF")
+                                Value::String(lens_type.clone())
                             }
-                        };
-
-                        if model_matches {
-                            // Use Canon part only (without " or ..." suffix)
-                            Value::String(canon_part.to_string())
                         } else {
                             Value::String(lens_type.clone())
                         }
                     } else {
                         Value::String(lens_type.clone())
-                    }
-                } else {
-                    Value::String(lens_type.clone())
-                };
-                output.insert("LensID".to_string(), lens_id);
+                    };
+                    output.insert("LensID".to_string(), lens_id);
+                }
             }
         } else {
             // Nikon and others: Use LensModel if available
@@ -2100,6 +2190,39 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 };
                 output.insert("LensID".to_string(), lens_id);
             }
+        }
+    }
+
+    // Canon DriveMode composite - computed from ContinuousDrive and SelfTimer
+    // Based on ExifTool's Canon::Composite DriveMode
+    if is_canon && !output.contains_key("DriveMode") {
+        let continuous = output.get("ContinuousDrive").and_then(|v| {
+            if let Value::String(s) = v {
+                Some(s.clone())
+            } else {
+                None
+            }
+        });
+        let self_timer = output.get("SelfTimer").and_then(|v| {
+            if let Value::String(s) = v {
+                Some(s.clone())
+            } else {
+                None
+            }
+        });
+
+        if let (Some(cont), Some(timer)) = (continuous, self_timer) {
+            let drive_mode = if cont != "Single" && cont != "Off" {
+                "Continuous Shooting"
+            } else if timer != "Off" && timer != "0" && !timer.starts_with("0 ") {
+                "Self-timer Operation"
+            } else {
+                "Single-frame Shooting"
+            };
+            output.insert(
+                "DriveMode".to_string(),
+                Value::String(drive_mode.to_string()),
+            );
         }
     }
 
@@ -2270,8 +2393,8 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 } else {
                     output.insert(key.clone(), Value::String(value.clone()));
                 }
-            } else if key == "RawExposureBias" {
-                // RawExposureBias should be a number in JSON (e.g., -0.7)
+            } else if key == "RawExposureBias" || key == "RedBalance" || key == "BlueBalance" {
+                // These should be numbers in JSON
                 if let Ok(n) = value.parse::<f64>() {
                     if let Some(num) = serde_json::Number::from_f64(n) {
                         output.insert(key.clone(), Value::Number(num));
@@ -2425,13 +2548,13 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             let r = parts[1];
             let b = parts[2];
             if !output.contains_key("RedBalance") {
-                let red_balance = r / g;
+                let red_balance = round_balance_value(r / g);
                 if let Some(num) = serde_json::Number::from_f64(red_balance) {
                     output.insert("RedBalance".to_string(), Value::Number(num));
                 }
             }
             if !output.contains_key("BlueBalance") {
-                let blue_balance = b / g;
+                let blue_balance = round_balance_value(b / g);
                 if let Some(num) = serde_json::Number::from_f64(blue_balance) {
                     output.insert("BlueBalance".to_string(), Value::Number(num));
                 }
@@ -2454,12 +2577,14 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 let g = (g1 + g2) / 2.0;
                 if g != 0.0 {
                     if !output.contains_key("RedBalance") {
-                        if let Some(num) = serde_json::Number::from_f64(r / g) {
+                        let red_balance = round_balance_value(r / g);
+                        if let Some(num) = serde_json::Number::from_f64(red_balance) {
                             output.insert("RedBalance".to_string(), Value::Number(num));
                         }
                     }
                     if !output.contains_key("BlueBalance") {
-                        if let Some(num) = serde_json::Number::from_f64(b / g) {
+                        let blue_balance = round_balance_value(b / g);
+                        if let Some(num) = serde_json::Number::from_f64(blue_balance) {
                             output.insert("BlueBalance".to_string(), Value::Number(num));
                         }
                     }
@@ -2484,12 +2609,14 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                 // (from rggbLookup index 8: [0, 256, 256, 1])
                 let divisor = 256.0;
                 if !output.contains_key("RedBalance") {
-                    if let Some(num) = serde_json::Number::from_f64(r / divisor) {
+                    let red_balance = round_balance_value(r / divisor);
+                    if let Some(num) = serde_json::Number::from_f64(red_balance) {
                         output.insert("RedBalance".to_string(), Value::Number(num));
                     }
                 }
                 if !output.contains_key("BlueBalance") {
-                    if let Some(num) = serde_json::Number::from_f64(b / divisor) {
+                    let blue_balance = round_balance_value(b / divisor);
+                    if let Some(num) = serde_json::Number::from_f64(blue_balance) {
                         output.insert("BlueBalance".to_string(), Value::Number(num));
                     }
                 }
@@ -2912,23 +3039,37 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
 
     // Lens35efl - lens focal range with 35mm equivalent
     // Format: "min - max mm (35 mm equivalent: min35 - max35 mm)"
+    // When base focal length is non-zero but 35mm equivalent would be 0
+    // (unknown scale factor), just show the focal length without equivalent
     if !has_lens_35 {
-        if let Some(sf) = scale_factor {
-            if let (Some(min), Some(max)) = (min_fl, max_fl) {
-                let min35 = min * sf;
-                let max35 = max * sf;
-                let formatted = if (min - max).abs() < 0.01 {
-                    // Single focal length lens (prime)
-                    format!("{:.1} mm (35 mm equivalent: {:.1} mm)", min, min35)
+        if let (Some(min), Some(max)) = (min_fl, max_fl) {
+            let (min35, max35) = scale_factor
+                .map(|sf| (min * sf, max * sf))
+                .unwrap_or((0.0, 0.0));
+
+            // Only skip 35mm equivalent if base focal length is valid but
+            // scale factor is unknown (results in 0 equivalent)
+            let skip_35_equiv = min > 0.1 && min35 < 0.1;
+
+            let formatted = if (min - max).abs() < 0.01 {
+                // Single focal length lens (prime)
+                if skip_35_equiv {
+                    format!("{:.1} mm", min)
                 } else {
-                    // Zoom lens
+                    format!("{:.1} mm (35 mm equivalent: {:.1} mm)", min, min35)
+                }
+            } else {
+                // Zoom lens
+                if skip_35_equiv {
+                    format!("{:.1} - {:.1} mm", min, max)
+                } else {
                     format!(
                         "{:.1} - {:.1} mm (35 mm equivalent: {:.1} - {:.1} mm)",
                         min, max, min35, max35
                     )
-                };
-                output.insert("Lens35efl".to_string(), Value::String(formatted));
-            }
+                }
+            };
+            output.insert("Lens35efl".to_string(), Value::String(formatted));
         }
     }
 

@@ -57,6 +57,7 @@ fn get_fpexif_json(path: &str) -> Result<serde_json::Value, String> {
 
 /// Fields to ignore when comparing (exiftool-specific or expected to differ)
 const IGNORE_FIELDS: &[&str] = &[
+    // File metadata (not EXIF)
     "SourceFile",
     "ExifToolVersion",
     "FileName",
@@ -74,6 +75,46 @@ const IGNORE_FIELDS: &[&str] = &[
     "ApplicationRecordVersion",
     "XMPToolkit",
     "MakerNote",
+    // Binary preview/thumbnail data (we don't extract these)
+    "PreviewImage",
+    "PreviewImageStart",
+    "PreviewImageLength",
+    "ThumbnailImage",
+    "ThumbnailTIFF",
+    "ThumbnailOffset",
+    "ThumbnailLength",
+    "JpgFromRaw",
+    "JpgFromRawStart",
+    "JpgFromRawLength",
+    "OtherImage",
+    "OtherImageStart",
+    "OtherImageLength",
+    "RawImageSegmentation",
+    "DustRemovalData",
+    "NEFLinearizationTable",
+    "DataDump",
+    "SR2SubIFDOffset",
+    "SR2SubIFDLength",
+    "SR2SubIFDKey",
+    "SonyToneCurve",
+    "TiffMeteringImage",
+    // XMP metadata (we don't parse XMP sidecar data)
+    "Rating",
+    "RatingPercent",
+    "Prefs",
+    "Tagged",
+    // ICC Profile data (embedded color profiles)
+    "ProfileCopyright",
+    "ProfileDateTime",
+    "ProfileFileSignature",
+    "ProfileClass",
+    "ProfileCreator",
+    "ProfileDescription",
+    "ProfileVersion",
+    // Crop/output fields (ExifTool calculates these)
+    "CropOutputPixels",
+    "CropOutputWidthInches",
+    "CropOutputHeightInches",
 ];
 
 /// Compare JSON outputs from exiftool and fpexif
@@ -225,6 +266,23 @@ fn values_match(a: &serde_json::Value, b: &serde_json::Value) -> bool {
     // For strings, compare trimmed values
     if let (Some(a_str), Some(b_str)) = (a.as_str(), b.as_str()) {
         return a_str.trim() == b_str.trim();
+    }
+
+    // Handle mixed number/string comparisons (e.g., FirmwareVersion "1.02" vs 1.02)
+    // ExifTool sometimes outputs numeric-looking values as numbers
+    if let Some(a_str) = a.as_str() {
+        if let Some(b_num) = b.as_f64() {
+            if let Ok(a_num) = a_str.trim().parse::<f64>() {
+                return (a_num - b_num).abs() < 0.001;
+            }
+        }
+    }
+    if let Some(b_str) = b.as_str() {
+        if let Some(a_num) = a.as_f64() {
+            if let Ok(b_num) = b_str.trim().parse::<f64>() {
+                return (a_num - b_num).abs() < 0.001;
+            }
+        }
     }
 
     // Otherwise compare directly

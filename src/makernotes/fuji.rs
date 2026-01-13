@@ -51,6 +51,7 @@ pub const FUJI_ORDER_NUMBER: u16 = 0x8002;
 pub const FUJI_FRAME_NUMBER: u16 = 0x8003;
 pub const FUJI_FACES_DETECTED: u16 = 0x4100;
 pub const FUJI_FACE_POSITIONS: u16 = 0x4103;
+pub const FUJI_NUM_FACE_ELEMENTS: u16 = 0x4200;
 pub const FUJI_FACE_REC_INFO: u16 = 0x4282;
 pub const FUJI_RAW_IMAGE_FULL_SIZE: u16 = 0x0100;
 pub const FUJI_RAW_IMAGE_CROP_TOP_LEFT: u16 = 0x0110;
@@ -70,7 +71,7 @@ pub const FUJI_COLOR_CHROME_FX_BLUE: u16 = 0x104E;
 pub const FUJI_SHUTTER_TYPE: u16 = 0x1050;
 pub const FUJI_PANORAMA_DIRECTION: u16 = 0x1154;
 pub const FUJI_ADVANCED_FILTER: u16 = 0x1201;
-pub const FUJI_FINE_PIX_COLOR: u16 = 0x1210;
+pub const FUJI_COLOR_MODE: u16 = 0x1210;
 pub const FUJI_IMAGE_STABILIZATION: u16 = 0x1422;
 pub const FUJI_SCENE_RECOGNITION: u16 = 0x1425;
 pub const FUJI_IMAGE_GENERATION: u16 = 0x1436;
@@ -84,9 +85,22 @@ pub const FUJI_CONTINUOUS_DRIVE: u16 = 0x1103;
 pub const FUJI_VIDEO_MODE: u16 = 0x1303;
 pub const FUJI_LENS_MOUNT_TYPE: u16 = 0x1600;
 pub const FUJI_RATING: u16 = 0x1431;
+pub const FUJI_RELATIVE_EXPOSURE: u16 = 0x9200;
 pub const FUJI_RAW_EXPOSURE_BIAS: u16 = 0x9650;
 pub const FUJI_RATINGS_INFO: u16 = 0xB211;
 pub const FUJI_GE_IMAGE_SIZE: u16 = 0xB212;
+
+// WB_GRGBLevels tags (int16u[4] in GRGB order)
+pub const FUJI_WB_GRGB_LEVELS_AUTO: u16 = 0x2000;
+pub const FUJI_WB_GRGB_LEVELS_DAYLIGHT: u16 = 0x2100;
+pub const FUJI_WB_GRGB_LEVELS_CLOUDY: u16 = 0x2200;
+pub const FUJI_WB_GRGB_LEVELS_DAYLIGHT_FLUOR: u16 = 0x2300;
+pub const FUJI_WB_GRGB_LEVELS_DAY_WHITE_FLUOR: u16 = 0x2301;
+pub const FUJI_WB_GRGB_LEVELS_WHITE_FLUOR: u16 = 0x2302;
+pub const FUJI_WB_GRGB_LEVELS_WARM_WHITE_FLUOR: u16 = 0x2310;
+pub const FUJI_WB_GRGB_LEVELS_LIVING_ROOM_WARM_WHITE_FLUOR: u16 = 0x2311;
+pub const FUJI_WB_GRGB_LEVELS_TUNGSTEN: u16 = 0x2400;
+pub const FUJI_WB_GRGB_LEVELS: u16 = 0x2FF0;
 
 /// Get the name of a Fujifilm MakerNote tag
 pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -143,7 +157,7 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_EXPOSURE_WARNING => Some("ExposureWarning"),
         FUJI_PANORAMA_DIRECTION => Some("PanoramaDirection"),
         FUJI_ADVANCED_FILTER => Some("AdvancedFilter"),
-        FUJI_FINE_PIX_COLOR => Some("FinePixColor"),
+        FUJI_COLOR_MODE => Some("ColorMode"),
         FUJI_DYNAMIC_RANGE => Some("DynamicRange"),
         FUJI_FILM_MODE => Some("FilmMode"),
         FUJI_DYNAMIC_RANGE_SETTING => Some("DynamicRangeSetting"),
@@ -161,6 +175,7 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_FRAME_NUMBER => Some("FrameNumber"),
         FUJI_FACES_DETECTED => Some("FacesDetected"),
         FUJI_FACE_POSITIONS => Some("FacePositions"),
+        FUJI_NUM_FACE_ELEMENTS => Some("NumFaceElements"),
         FUJI_FACE_REC_INFO => Some("FaceRecInfo"),
         FUJI_RAW_IMAGE_FULL_SIZE => Some("RawImageFullSize"),
         FUJI_RAW_IMAGE_CROP_TOP_LEFT => Some("RawImageCropTopLeft"),
@@ -168,9 +183,23 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_RAW_IMAGE_ASPECT_RATIO => Some("RawImageAspectRatio"),
         FUJI_LENS_MOUNT_TYPE => Some("LensMountType"),
         FUJI_RATING => Some("Rating"),
+        FUJI_RELATIVE_EXPOSURE => Some("RelativeExposure"),
         FUJI_RAW_EXPOSURE_BIAS => Some("RawExposureBias"),
         FUJI_RATINGS_INFO => Some("RatingsInfo"),
         FUJI_GE_IMAGE_SIZE => Some("GEImageSize"),
+        // WB_GRGBLevels tags
+        FUJI_WB_GRGB_LEVELS_AUTO => Some("WB_GRGBLevelsAuto"),
+        FUJI_WB_GRGB_LEVELS_DAYLIGHT => Some("WB_GRGBLevelsDaylight"),
+        FUJI_WB_GRGB_LEVELS_CLOUDY => Some("WB_GRGBLevelsCloudy"),
+        FUJI_WB_GRGB_LEVELS_DAYLIGHT_FLUOR => Some("WB_GRGBLevelsDaylightFluor"),
+        FUJI_WB_GRGB_LEVELS_DAY_WHITE_FLUOR => Some("WB_GRGBLevelsDayWhiteFluor"),
+        FUJI_WB_GRGB_LEVELS_WHITE_FLUOR => Some("WB_GRGBLevelsWhiteFluorescent"),
+        FUJI_WB_GRGB_LEVELS_WARM_WHITE_FLUOR => Some("WB_GRGBLevelsWarmWhiteFluor"),
+        FUJI_WB_GRGB_LEVELS_LIVING_ROOM_WARM_WHITE_FLUOR => {
+            Some("WB_GRGBLevelsLivingRoomWarmWhiteFluor")
+        }
+        FUJI_WB_GRGB_LEVELS_TUNGSTEN => Some("WB_GRGBLevelsTungsten"),
+        FUJI_WB_GRGB_LEVELS => Some("WB_GRGBLevels"),
         _ => None,
     }
 }
@@ -324,13 +353,22 @@ define_tag_decoder! {
         0x0 => "0 (normal)",
         0x80 => "+1 (medium high)",
         0x100 => "+2 (high)",
-        0x180 => "+3 (very high)",
-        0x200 => "+4 (highest)",
-        0x300 => "+4.5",
-        0x301 => "Acros",
-        0x302 => "Acros+Ye Filter",
-        0x303 => "Acros+R Filter",
-        0x304 => "Acros+G Filter",
+        0xc0 => "+3 (very high)",
+        0xe0 => "+4 (highest)",
+        0x180 => "-1 (medium low)",
+        0x200 => "Low",
+        0x300 => "None (B&W)",
+        0x301 => "B&W Red Filter",
+        0x302 => "B&W Yellow Filter",
+        0x303 => "B&W Green Filter",
+        0x310 => "B&W Sepia",
+        0x400 => "-2 (low)",
+        0x4c0 => "-3 (very low)",
+        0x4e0 => "-4 (lowest)",
+        0x500 => "Acros",
+        0x501 => "Acros Red Filter",
+        0x502 => "Acros Yellow Filter",
+        0x503 => "Acros Green Filter",
         0x8000 => "Film Simulation",
         0xffff => "n/a",
     },
@@ -753,13 +791,23 @@ define_tag_decoder! {
     }
 }
 
-// ColorChromeEffect/GrainEffectSize/ColorChromeFXBlue - fujimn_int.cpp
+// ColorChromeEffect/ColorChromeFXBlue - fujimn_int.cpp
 define_tag_decoder! {
     off_weak_strong,
     both: {
         0 => "Off",
         32 => "Weak",
         64 => "Strong",
+    }
+}
+
+// GrainEffectSize (tag 0x104c): FujiFilm.pm
+define_tag_decoder! {
+    grain_effect_size,
+    both: {
+        0 => "Off",
+        16 => "Small",
+        32 => "Large",
     }
 }
 
@@ -824,10 +872,15 @@ define_tag_decoder! {
     }
 }
 
-// FinePixColor (tag 0x1210): fujimn_int.cpp
+// ColorMode (tag 0x1210): FujiFilm.pm / fujimn_int.cpp
 define_tag_decoder! {
-    fine_pix_color,
-    both: {
+    color_mode,
+    exiftool: {
+        0x00 => "Standard",
+        0x10 => "Chrome",
+        0x30 => "B & W",
+    },
+    exiv2: {
         0 => "Standard",
         16 => "Chrome",
         48 => "Black & white",
@@ -858,18 +911,30 @@ define_tag_decoder! {
 }
 
 // ShadowTone/HighlightTone ExifTool (tags 0x1040/0x1041): FujiFilm.pm
-define_tag_decoder! {
-    shadow_highlight_tone_ext,
-    type: i32,
-    both: {
-        -64 => "+4 (hardest)",
-        -48 => "+3 (very hard)",
-        -32 => "+2 (hard)",
-        -16 => "+1 (medium hard)",
-        0 => "0 (normal)",
-        16 => "-1 (medium soft)",
-        32 => "-2 (soft)",
+// For values not in the table, ExifTool calculates: -val / 16
+pub fn decode_shadow_highlight_tone_ext_exiftool(value: i32) -> String {
+    match value {
+        -64 => "+4 (hardest)".to_string(),
+        -48 => "+3 (very hard)".to_string(),
+        -32 => "+2 (hard)".to_string(),
+        -16 => "+1 (medium hard)".to_string(),
+        0 => "0 (normal)".to_string(),
+        16 => "-1 (medium soft)".to_string(),
+        32 => "-2 (soft)".to_string(),
+        // For other values, calculate: -val / 16
+        _ => {
+            let result = -value as f64 / 16.0;
+            if result == result.floor() {
+                format!("{}", result as i32)
+            } else {
+                format!("{}", result)
+            }
+        }
     }
+}
+
+pub fn decode_shadow_highlight_tone_ext_exiv2(value: i32) -> String {
+    decode_shadow_highlight_tone_ext_exiftool(value)
 }
 
 // LensModulationOptimizer (tag 0x1045): FujiFilm.pm
@@ -931,6 +996,23 @@ define_tag_decoder! {
         0x2c0 => "-3 (very weak)",
         0x2e0 => "-4 (weakest)",
     }
+}
+
+/// Check if a tag is a WB_GRGBLevels variant
+fn is_wb_grgb_levels_tag(tag_id: u16) -> bool {
+    matches!(
+        tag_id,
+        FUJI_WB_GRGB_LEVELS_AUTO
+            | FUJI_WB_GRGB_LEVELS_DAYLIGHT
+            | FUJI_WB_GRGB_LEVELS_CLOUDY
+            | FUJI_WB_GRGB_LEVELS_DAYLIGHT_FLUOR
+            | FUJI_WB_GRGB_LEVELS_DAY_WHITE_FLUOR
+            | FUJI_WB_GRGB_LEVELS_WHITE_FLUOR
+            | FUJI_WB_GRGB_LEVELS_WARM_WHITE_FLUOR
+            | FUJI_WB_GRGB_LEVELS_LIVING_ROOM_WARM_WHITE_FLUOR
+            | FUJI_WB_GRGB_LEVELS_TUNGSTEN
+            | FUJI_WB_GRGB_LEVELS
+    )
 }
 
 /// Parse Fujifilm maker notes
@@ -1111,12 +1193,13 @@ pub fn parse_fuji_maker_notes(
                                 Some(decode_off_weak_strong_exiftool(v).to_string())
                             }
                             FUJI_GRAIN_EFFECT_SIZE => {
-                                Some(decode_off_weak_strong_exiftool(v).to_string())
+                                Some(decode_grain_effect_size_exiftool(v).to_string())
                             }
                             FUJI_COLOR_CHROME_FX_BLUE => {
                                 Some(decode_off_weak_strong_exiftool(v).to_string())
                             }
                             FUJI_CROP_MODE => Some(decode_crop_mode_exiftool(v).to_string()),
+                            FUJI_COLOR_MODE => Some(decode_color_mode_exiftool(v).to_string()),
                             _ => None,
                         };
 
@@ -1140,6 +1223,11 @@ pub fn parse_fuji_maker_notes(
                         // Convert shorts to u32 for the decode function
                         let long_vals: Vec<u32> = values.iter().map(|&v| v as u32).collect();
                         ExifValue::Ascii(decode_image_stabilization_exiftool(&long_vals))
+                    } else if is_wb_grgb_levels_tag(tag_id) && values.len() >= 4 {
+                        // WB_GRGBLevels tags: format as space-separated values "G R G B"
+                        let formatted =
+                            format!("{} {} {} {}", values[0], values[1], values[2], values[3]);
+                        ExifValue::Ascii(formatted)
                     } else {
                         ExifValue::Short(values)
                     }
@@ -1268,8 +1356,21 @@ pub fn parse_fuji_maker_notes(
                         let den = cursor.read_i32::<LittleEndian>().unwrap_or(1);
                         if den != 0 {
                             let val = num as f64 / den as f64;
+                            // RelativeExposure: apply log2 conversion like ExifTool
+                            if tag_id == FUJI_RELATIVE_EXPOSURE {
+                                let converted = if val > 0.0 {
+                                    val.ln() / 2.0_f64.ln()
+                                } else {
+                                    0.0
+                                };
+                                // Format: 0 for zero, else +/- with 1 decimal
+                                if converted == 0.0 {
+                                    ExifValue::Ascii("0".to_string())
+                                } else {
+                                    ExifValue::Ascii(format!("{:+.1}", converted))
+                                }
                             // Format as integer if it's a whole number
-                            if val == val.floor() {
+                            } else if val == val.floor() {
                                 ExifValue::Ascii(format!("{}", val as i64))
                             } else {
                                 ExifValue::Ascii(format!("{:.1}", val))
