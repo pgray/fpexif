@@ -4548,8 +4548,8 @@ fn parse_color_balance(
                 ];
 
                 // Apply ValueConv: vals[0] *= 2; vals[3] *= 2
-                vals[0] *= 2;
-                vals[3] *= 2;
+                vals[0] = vals[0].saturating_mul(2);
+                vals[3] = vals[3].saturating_mul(2);
 
                 // Skip if all zeros (custom preset not used)
                 if !vals.iter().all(|&v| v == 0) {
