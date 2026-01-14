@@ -181,7 +181,7 @@ where
     const MAX_IFD_CHAIN: u32 = 10; // Prevent infinite loops
 
     // Tags that should be taken from the last (raw data) IFD
-    const RAW_DATA_TAGS: [u16; 7] = [
+    const RAW_DATA_TAGS: [u16; 10] = [
         0x0111, // StripOffsets
         0x0117, // StripByteCounts
         0x0116, // RowsPerStrip
@@ -189,6 +189,9 @@ where
         0x011C, // PlanarConfiguration
         0x0106, // PhotometricInterpretation
         0x0103, // Compression (for raw data IFD)
+        0xc5e0, // CR2CFAPattern (Canon CR2 CFA pattern in IFD3)
+        0xc6c5, // SRawType (Canon CR2 sRAW type in IFD3)
+        0xc640, // RawImageSegmentation (Canon CR2)
     ];
 
     // Helper to check if a compression value is RAW-specific

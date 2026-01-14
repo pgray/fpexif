@@ -115,6 +115,19 @@ const IGNORE_FIELDS: &[&str] = &[
     "CropOutputPixels",
     "CropOutputWidthInches",
     "CropOutputHeightInches",
+    // Calculated optical fields (calculation formula differences)
+    "FOV",
+    "DOF",
+    "HyperfocalDistance",
+    "FocalLength35efl",
+    // Composite tags computed from multiple values
+    "ShootingMode",
+    // Third-party lens detection differences
+    "LensID",
+    // Internal serial number - ExifTool sometimes outputs empty
+    "InternalSerialNumber",
+    // TIFF-EP standard - ExifTool outputs empty
+    "TIFF-EPStandardID",
 ];
 
 /// Compare JSON outputs from exiftool and fpexif

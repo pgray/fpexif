@@ -872,6 +872,14 @@ pub const TAG_INTEROP_VERSION: ExifTagId = ExifTagId {
     id: 0x0002,
     ifd: TagGroup::Interop,
 };
+pub const TAG_RELATED_IMAGE_WIDTH: ExifTagId = ExifTagId {
+    id: 0x1001,
+    ifd: TagGroup::Interop,
+};
+pub const TAG_RELATED_IMAGE_HEIGHT: ExifTagId = ExifTagId {
+    id: 0x1002,
+    ifd: TagGroup::Interop,
+};
 
 // A static mapping of tag IDs to names
 static TAG_NAMES: OnceLock<HashMap<ExifTagId, &'static str>> = OnceLock::new();
@@ -1108,6 +1116,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     // Interoperability tags
     map.insert(TAG_INTEROP_INDEX, "InteropIndex");
     map.insert(TAG_INTEROP_VERSION, "InteropVersion");
+    map.insert(TAG_RELATED_IMAGE_WIDTH, "RelatedImageWidth");
+    map.insert(TAG_RELATED_IMAGE_HEIGHT, "RelatedImageHeight");
 
     map
 }

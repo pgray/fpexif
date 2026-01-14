@@ -1136,7 +1136,27 @@ pub fn format_exif_value_for_json_with_make_and_name(
         }
 
         // Single-value other numeric types
-        ExifValue::Long(v) if v.len() == 1 => Value::Number(v[0].into()),
+        ExifValue::Long(v) if v.len() == 1 => {
+            // Canon CR2 tags in IFD3
+            match tag_id {
+                0xc5e0 => {
+                    // CR2CFAPattern
+                    let pattern = match v[0] {
+                        1 => "[Red,Green][Green,Blue]",
+                        2 => "[Blue,Green][Green,Red]",
+                        3 => "[Green,Blue][Red,Green]",
+                        4 => "[Green,Red][Blue,Green]",
+                        _ => return Value::Number(v[0].into()),
+                    };
+                    Value::String(pattern.to_string())
+                }
+                0xc6c5 => {
+                    // SRawType - ExifTool outputs raw numeric value
+                    Value::Number(v[0].into())
+                }
+                _ => Value::Number(v[0].into()),
+            }
+        }
         ExifValue::SByte(v) if v.len() == 1 => Value::Number(v[0].into()),
         ExifValue::SShort(v) if v.len() == 1 => {
             // Sony ARW SubIFD correction tags are stored as SShort
