@@ -1282,7 +1282,8 @@ fn parse_sr2_subifd(
     }
 
     let num_entries = read_u16(&data[0..2], endian) as usize;
-    if num_entries > 200 {
+    // SR2SubIFD can have up to ~250 entries on newer cameras (e.g. ILCA-77M2 has 209)
+    if num_entries > 300 {
         return tags;
     }
 

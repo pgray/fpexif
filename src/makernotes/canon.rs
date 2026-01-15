@@ -1,9 +1,9 @@
 // makernotes/canon.rs - Canon maker notes parsing
 
 use crate::data_types::{Endianness, ExifValue};
-use crate::define_tag_decoder;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
+use crate::{decode_field, define_tag_decoder};
 use std::collections::HashMap;
 
 // exiv2 group names for Canon sub-IFDs
@@ -2936,155 +2936,104 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     let mut decoded = HashMap::new();
 
     // Macro mode (index 1)
-    if data.len() > 1 {
-        decoded.insert(
-            "MacroMode".to_string(),
-            ExifValue::Ascii(decode_macro_mode_exiftool(data[1]).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 1, "MacroMode", decode_macro_mode_exiftool);
 
-    // Self timer (index 2)
+    // Self timer (index 2) - custom formatting
     if data.len() > 2 {
         let self_timer = if data[2] == 0 {
             "Off".to_string()
         } else {
-            // Value is in 1/10 seconds
             format!("{} s", data[2] as f64 / 10.0)
         };
         decoded.insert("SelfTimer".to_string(), ExifValue::Ascii(self_timer));
     }
 
     // Quality (index 3)
-    if data.len() > 3 {
-        decoded.insert(
-            "Quality".to_string(),
-            ExifValue::Ascii(decode_quality_exiftool(data[3] as i16).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 3, "Quality", decode_quality_exiftool, cast: i16);
 
-    // Flash mode (index 4) - ExifTool calls this "CanonFlashMode"
-    if data.len() > 4 {
-        decoded.insert(
-            "CanonFlashMode".to_string(),
-            ExifValue::Ascii(decode_flash_mode_exiftool(data[4]).to_string()),
-        );
-    }
+    // Flash mode (index 4)
+    decode_field!(
+        decoded,
+        data,
+        4,
+        "CanonFlashMode",
+        decode_flash_mode_exiftool
+    );
 
     // Continuous drive (index 5)
-    // Note: ExifTool calls this "ContinuousDrive", not "DriveMode"
-    // The composite "DriveMode" tag is computed elsewhere
-    if data.len() > 5 {
-        decoded.insert(
-            "ContinuousDrive".to_string(),
-            ExifValue::Ascii(decode_drive_mode_exiftool(data[5]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        5,
+        "ContinuousDrive",
+        decode_drive_mode_exiftool
+    );
 
     // Focus mode (index 7)
-    if data.len() > 7 {
-        decoded.insert(
-            "FocusMode".to_string(),
-            ExifValue::Ascii(decode_focus_mode_exiftool(data[7]).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 7, "FocusMode", decode_focus_mode_exiftool);
 
     // Record mode (index 9)
-    if data.len() > 9 {
-        let value = data[9] as i16;
-        decoded.insert(
-            "RecordMode".to_string(),
-            ExifValue::Ascii(decode_record_mode_exiftool(value).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 9, "RecordMode", decode_record_mode_exiftool, cast: i16);
 
     // Canon image size (index 10)
-    if data.len() > 10 {
-        let value = data[10] as i16;
-        decoded.insert(
-            "CanonImageSize".to_string(),
-            ExifValue::Ascii(decode_canon_image_size_exiftool(value).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 10, "CanonImageSize", decode_canon_image_size_exiftool, cast: i16);
 
     // Easy mode (index 11)
-    if data.len() > 11 {
-        decoded.insert(
-            "EasyMode".to_string(),
-            ExifValue::Ascii(decode_easy_mode_exiftool(data[11]).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 11, "EasyMode", decode_easy_mode_exiftool);
 
     // Digital zoom (index 12)
-    if data.len() > 12 {
-        decoded.insert(
-            "DigitalZoom".to_string(),
-            ExifValue::Ascii(decode_digital_zoom_exiftool(data[12]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        12,
+        "DigitalZoom",
+        decode_digital_zoom_exiftool
+    );
 
     // Contrast (index 13)
-    if data.len() > 13 && data[13] != 0x7fff {
-        decoded.insert(
-            "Contrast".to_string(),
-            ExifValue::Ascii(decode_contrast_exiftool(data[13])),
-        );
-    }
+    decode_field!(decoded, data, 13, "Contrast", decode_contrast_exiftool, skip_if: 0x7fff);
 
     // Saturation (index 14)
-    if data.len() > 14 && data[14] != 0x7fff {
-        decoded.insert(
-            "Saturation".to_string(),
-            ExifValue::Ascii(decode_saturation_exiftool(data[14])),
-        );
-    }
+    decode_field!(decoded, data, 14, "Saturation", decode_saturation_exiftool, skip_if: 0x7fff);
 
     // Sharpness (index 15)
-    if data.len() > 15 && data[15] != 0x7fff {
-        decoded.insert(
-            "Sharpness".to_string(),
-            ExifValue::Ascii(decode_sharpness_exiftool(data[15])),
-        );
-    }
+    decode_field!(decoded, data, 15, "Sharpness", decode_sharpness_exiftool, skip_if: 0x7fff);
 
     // Metering mode (index 17)
-    if data.len() > 17 {
-        decoded.insert(
-            "MeteringMode".to_string(),
-            ExifValue::Ascii(decode_metering_mode_exiftool(data[17]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        17,
+        "MeteringMode",
+        decode_metering_mode_exiftool
+    );
 
     // Focus range (index 18)
-    if data.len() > 18 {
-        decoded.insert(
-            "FocusRange".to_string(),
-            ExifValue::Ascii(decode_focus_range_exiftool(data[18]).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 18, "FocusRange", decode_focus_range_exiftool);
 
     // AF point (index 19)
-    if data.len() > 19 && data[19] != 0 {
-        decoded.insert(
-            "AFPoint".to_string(),
-            ExifValue::Ascii(decode_af_point_exiftool(data[19]).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 19, "AFPoint", decode_af_point_exiftool, skip_if: 0);
 
-    // Exposure mode (index 20) - ExifTool calls this "CanonExposureMode"
-    if data.len() > 20 {
-        decoded.insert(
-            "CanonExposureMode".to_string(),
-            ExifValue::Ascii(decode_exposure_mode_exiftool(data[20]).to_string()),
-        );
-    }
+    // Exposure mode (index 20)
+    decode_field!(
+        decoded,
+        data,
+        20,
+        "CanonExposureMode",
+        decode_exposure_mode_exiftool
+    );
 
     // Lens type (index 22) - decode to lens name
-    if data.len() > 22 && data[22] > 0 {
-        if let Some(lens_name) = get_canon_lens_name(data[22]) {
-            decoded.insert(
-                "LensType".to_string(),
-                ExifValue::Ascii(lens_name.to_string()),
-            );
+    if data.len() > 22 {
+        if data[22] == 65535 {
+            decoded.insert("LensType".to_string(), ExifValue::Ascii("n/a".to_string()));
+        } else if data[22] > 0 {
+            if let Some(lens_name) = get_canon_lens_name(data[22]) {
+                decoded.insert(
+                    "LensType".to_string(),
+                    ExifValue::Ascii(lens_name.to_string()),
+                );
+            }
         }
     }
 
@@ -3197,12 +3146,7 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     }
 
     // Flash activity (index 28)
-    if data.len() > 28 {
-        decoded.insert(
-            "FlashActivity".to_string(),
-            ExifValue::Short(vec![data[28]]),
-        );
-    }
+    decode_field!(decoded, data, 28, "FlashActivity", raw_u16);
 
     // Flash bits (index 29)
     if data.len() > 29 {
@@ -3242,32 +3186,21 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     }
 
     // Focus continuous (index 32)
-    if data.len() > 32 {
-        let value = data[32] as i16;
-        decoded.insert(
-            "FocusContinuous".to_string(),
-            ExifValue::Ascii(decode_focus_continuous_exiftool(value).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 32, "FocusContinuous", decode_focus_continuous_exiftool, cast: i16);
 
     // AE setting (index 33)
-    if data.len() > 33 {
-        let value = data[33] as i16;
-        decoded.insert(
-            "AESetting".to_string(),
-            ExifValue::Ascii(decode_ae_setting_exiftool(value).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 33, "AESetting", decode_ae_setting_exiftool, cast: i16);
 
     // Image stabilization (index 34)
-    if data.len() > 34 {
-        decoded.insert(
-            "ImageStabilization".to_string(),
-            ExifValue::Ascii(decode_image_stabilization_exiftool(data[34]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        34,
+        "ImageStabilization",
+        decode_image_stabilization_exiftool
+    );
 
-    // Display aperture (index 35)
+    // Display aperture (index 35) - custom formatting
     if data.len() > 35 && data[35] > 0 {
         let aperture = data[35] as f64 / 10.0;
         decoded.insert(
@@ -3277,29 +3210,13 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     }
 
     // Zoom source width (index 36)
-    if data.len() > 36 {
-        decoded.insert(
-            "ZoomSourceWidth".to_string(),
-            ExifValue::Short(vec![data[36]]),
-        );
-    }
+    decode_field!(decoded, data, 36, "ZoomSourceWidth", raw_u16);
 
     // Zoom target width (index 37)
-    if data.len() > 37 {
-        decoded.insert(
-            "ZoomTargetWidth".to_string(),
-            ExifValue::Short(vec![data[37]]),
-        );
-    }
+    decode_field!(decoded, data, 37, "ZoomTargetWidth", raw_u16);
 
     // Spot metering mode (index 39)
-    if data.len() > 39 {
-        let value = data[39] as i16;
-        decoded.insert(
-            "SpotMeteringMode".to_string(),
-            ExifValue::Ascii(decode_spot_metering_mode_exiftool(value).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 39, "SpotMeteringMode", decode_spot_metering_mode_exiftool, cast: i16);
 
     // Photo effect (index 40)
     if data.len() > 40 {
@@ -3513,12 +3430,16 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     }
 
     // Lens type (index 22) - decode to lens name
-    if data.len() > 22 && data[22] > 0 {
-        if let Some(lens_name) = get_canon_lens_name(data[22]) {
-            decoded.insert(
-                "LensType".to_string(),
-                ExifValue::Ascii(lens_name.to_string()),
-            );
+    if data.len() > 22 {
+        if data[22] == 65535 {
+            decoded.insert("LensType".to_string(), ExifValue::Ascii("n/a".to_string()));
+        } else if data[22] > 0 {
+            if let Some(lens_name) = get_canon_lens_name(data[22]) {
+                decoded.insert(
+                    "LensType".to_string(),
+                    ExifValue::Ascii(lens_name.to_string()),
+                );
+            }
         }
     }
 
@@ -3890,28 +3811,25 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     }
 
     // White balance (index 7)
-    if data.len() > 7 {
-        decoded.insert(
-            "WhiteBalance".to_string(),
-            ExifValue::Ascii(decode_white_balance_exiftool(data[7]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        7,
+        "WhiteBalance",
+        decode_white_balance_exiftool
+    );
 
     // Slow shutter (index 8)
-    if data.len() > 8 {
-        decoded.insert(
-            "SlowShutter".to_string(),
-            ExifValue::Ascii(decode_slow_shutter_exiftool(data[8]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        8,
+        "SlowShutter",
+        decode_slow_shutter_exiftool
+    );
 
     // Sequence number (index 9)
-    if data.len() > 9 {
-        decoded.insert(
-            "SequenceNumber".to_string(),
-            ExifValue::Short(vec![data[9]]),
-        );
-    }
+    decode_field!(decoded, data, 9, "SequenceNumber", raw_u16);
 
     // Optical zoom code (index 10)
     if data.len() > 10 {
@@ -3934,30 +3852,20 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
         );
     }
 
-    // AF points in focus (index 14)
-    // Used by D30, D60 and some PowerShot/Ixus models
-    if data.len() > 14 && data[14] != 0 {
-        decoded.insert(
-            "AFPointsInFocus".to_string(),
-            ExifValue::Ascii(decode_af_points_in_focus_exiftool(data[14]).to_string()),
-        );
-    }
+    // AF points in focus (index 14) - Used by D30, D60 and some PowerShot/Ixus models
+    decode_field!(decoded, data, 14, "AFPointsInFocus", decode_af_points_in_focus_exiftool, skip_if: 0);
 
     // Auto exposure bracketing (index 16)
-    if data.len() > 16 {
-        decoded.insert(
-            "AutoExposureBracketing".to_string(),
-            ExifValue::Ascii(decode_auto_exposure_bracketing_exiftool(data[16]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        16,
+        "AutoExposureBracketing",
+        decode_auto_exposure_bracketing_exiftool
+    );
 
     // Flash exposure compensation (index 15)
-    if data.len() > 15 {
-        decoded.insert(
-            "FlashExposureComp".to_string(),
-            ExifValue::Short(vec![data[15]]),
-        );
-    }
+    decode_field!(decoded, data, 15, "FlashExposureComp", raw_u16);
 
     // AEB Bracket Value (index 17) - using CanonEv encoding
     // Note: index 16 is AutoExposureBracketing (On/Off), index 17 is the actual bracket value
@@ -3976,12 +3884,13 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     }
 
     // Control mode (index 18)
-    if data.len() > 18 {
-        decoded.insert(
-            "ControlMode".to_string(),
-            ExifValue::Ascii(decode_control_mode_exiftool(data[18]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        18,
+        "ControlMode",
+        decode_control_mode_exiftool
+    );
 
     // Measured EV 2 (index 23)
     // Formula: val / 8 - 6
@@ -4003,12 +3912,7 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     }
 
     // Camera type (index 26)
-    if data.len() > 26 {
-        decoded.insert(
-            "CameraType".to_string(),
-            ExifValue::Ascii(decode_camera_type_exiftool(data[26]).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 26, "CameraType", decode_camera_type_exiftool);
 
     // Auto rotate (index 27)
     // Note: ExifTool calls this "AutoRotate" in ShotInfo, different from CameraOrientation
@@ -4020,11 +3924,17 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     }
 
     // ND filter (index 28)
-    if data.len() > 28 {
-        decoded.insert(
-            "NDFilter".to_string(),
-            ExifValue::Ascii(decode_nd_filter_exiftool(data[28] as i16).to_string()),
-        );
+    decode_field!(decoded, data, 28, "NDFilter", decode_nd_filter_exiftool, cast: i16);
+
+    // SelfTimer2 (index 29) - value / 10, only if >= 0
+    if data.len() > 29 && (data[29] as i16) >= 0 {
+        let val = data[29] as f64 / 10.0;
+        let formatted = if val == val.floor() {
+            format!("{}", val as i32)
+        } else {
+            format!("{}", val)
+        };
+        decoded.insert("SelfTimer2".to_string(), ExifValue::Ascii(formatted));
     }
 
     // Exposure compensation (index 6)
@@ -4497,25 +4407,19 @@ pub fn decode_file_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     // See Canon.pm lines 6793-6850 for the complex conditional decoding logic.
 
     // Bracket mode (index 3)
-    if data.len() > 3 {
-        decoded.insert(
-            "BracketMode".to_string(),
-            ExifValue::Ascii(decode_bracket_mode_exiftool(data[3]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        3,
+        "BracketMode",
+        decode_bracket_mode_exiftool
+    );
 
     // Bracket value (index 4)
-    if data.len() > 4 {
-        decoded.insert("BracketValue".to_string(), ExifValue::Short(vec![data[4]]));
-    }
+    decode_field!(decoded, data, 4, "BracketValue", raw_u16);
 
     // Bracket shot number (index 5)
-    if data.len() > 5 {
-        decoded.insert(
-            "BracketShotNumber".to_string(),
-            ExifValue::Short(vec![data[5]]),
-        );
-    }
+    decode_field!(decoded, data, 5, "BracketShotNumber", raw_u16);
 
     // RawJpgQuality (index 6)
     if data.len() > 6 {
@@ -4551,12 +4455,13 @@ pub fn decode_file_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     }
 
     // WBBracketMode (index 9)
-    if data.len() > 9 {
-        decoded.insert(
-            "WBBracketMode".to_string(),
-            ExifValue::Ascii(decode_wb_bracket_mode_exiftool(data[9]).to_string()),
-        );
-    }
+    decode_field!(
+        decoded,
+        data,
+        9,
+        "WBBracketMode",
+        decode_wb_bracket_mode_exiftool
+    );
 
     // WBBracketValueAB (index 12) - signed value for +/- adjustment
     if data.len() > 12 {
@@ -4717,22 +4622,12 @@ pub fn decode_processing_info_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     // Index 13: WBShiftGM
 
     // ToneCurve (index 1)
-    if data.len() > 1 {
-        decoded.insert(
-            "ToneCurve".to_string(),
-            ExifValue::Ascii(decode_tone_curve_exiftool(data[1]).to_string()),
-        );
-    }
+    decode_field!(decoded, data, 1, "ToneCurve", decode_tone_curve_exiftool);
 
     // Sharpness (index 2) - numeric value
-    // Note: ExifTool formatting varies by source block (CameraSettings uses +, ColorData doesn't)
-    if data.len() > 2 {
-        let sharpness = data[2] as i16;
-        decoded.insert("Sharpness".to_string(), ExifValue::SShort(vec![sharpness]));
-    }
+    decode_field!(decoded, data, 2, "Sharpness", raw_i16);
 
-    // SharpnessFrequency (index 3)
-    // ExifTool outputs "Unknown (value)" for unrecognized values
+    // SharpnessFrequency (index 3) - custom Unknown formatting
     if data.len() > 3 {
         let result = decode_sharpness_frequency_exiftool(data[3]);
         let formatted = if result == "Unknown" {
@@ -4746,37 +4641,17 @@ pub fn decode_processing_info_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         );
     }
 
-    // SensorRedLevel (index 4) - signed value, -1 means "not used"
-    if data.len() > 4 {
-        decoded.insert(
-            "SensorRedLevel".to_string(),
-            ExifValue::SShort(vec![data[4] as i16]),
-        );
-    }
+    // SensorRedLevel (index 4) - signed value
+    decode_field!(decoded, data, 4, "SensorRedLevel", raw_i16);
 
     // SensorBlueLevel (index 5) - signed value
-    if data.len() > 5 {
-        decoded.insert(
-            "SensorBlueLevel".to_string(),
-            ExifValue::SShort(vec![data[5] as i16]),
-        );
-    }
+    decode_field!(decoded, data, 5, "SensorBlueLevel", raw_i16);
 
     // WhiteBalanceRed (index 6) - signed value
-    if data.len() > 6 {
-        decoded.insert(
-            "WhiteBalanceRed".to_string(),
-            ExifValue::SShort(vec![data[6] as i16]),
-        );
-    }
+    decode_field!(decoded, data, 6, "WhiteBalanceRed", raw_i16);
 
     // WhiteBalanceBlue (index 7) - signed value
-    if data.len() > 7 {
-        decoded.insert(
-            "WhiteBalanceBlue".to_string(),
-            ExifValue::SShort(vec![data[7] as i16]),
-        );
-    }
+    decode_field!(decoded, data, 7, "WhiteBalanceBlue", raw_i16);
 
     // WhiteBalance (index 8) - only if value >= 0
     if data.len() > 8 {
@@ -4790,16 +4665,9 @@ pub fn decode_processing_info_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     }
 
     // ColorTemperature (index 9) - signed value
-    if data.len() > 9 {
-        decoded.insert(
-            "ColorTemperature".to_string(),
-            ExifValue::SShort(vec![data[9] as i16]),
-        );
-    }
+    decode_field!(decoded, data, 9, "ColorTemperature", raw_i16);
 
-    // PictureStyle (index 10)
-    // Note: When value is 0xffff, ExifTool shows "Unknown (0xffffffffffffffff)" because it
-    // reads the full 64-bit raw value. We match that format for compatibility.
+    // PictureStyle (index 10) - custom Unknown formatting
     if data.len() > 10 {
         let pic_style = if data[10] == 0xffff {
             "Unknown (0xffffffffffffffff)".to_string()
@@ -4810,20 +4678,125 @@ pub fn decode_processing_info_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     }
 
     // DigitalGain (index 11)
-    if data.len() > 11 && data[11] != 0 {
-        decoded.insert("DigitalGain".to_string(), ExifValue::Short(vec![data[11]]));
-    }
+    decode_field!(decoded, data, 11, "DigitalGain", raw_u16, skip_if: 0);
 
     // WBShiftAB (index 12) - signed
-    if data.len() > 12 {
-        let shift = data[12] as i16;
-        decoded.insert("WBShiftAB".to_string(), ExifValue::SShort(vec![shift]));
-    }
+    decode_field!(decoded, data, 12, "WBShiftAB", raw_i16);
 
     // WBShiftGM (index 13) - signed
-    if data.len() > 13 {
-        let shift = data[13] as i16;
-        decoded.insert("WBShiftGM".to_string(), ExifValue::SShort(vec![shift]));
+    decode_field!(decoded, data, 13, "WBShiftGM", raw_i16);
+
+    decoded
+}
+
+/// Decode Canon MyColors (tag 0x001D)
+///
+/// MyColorMode at index 2
+pub fn decode_my_colors(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // MyColorMode at index 2
+    if data.len() > 2 {
+        let mode = match data[2] {
+            0 => "Off",
+            1 => "Positive Film",
+            2 => "Light Skin Tone",
+            3 => "Dark Skin Tone",
+            4 => "Vivid Blue",
+            5 => "Vivid Green",
+            6 => "Vivid Red",
+            7 => "Color Accent",
+            8 => "Color Swap",
+            9 => "Custom",
+            12 => "Vivid",
+            13 => "Neutral",
+            14 => "Sepia",
+            15 => "B&W",
+            _ => "Unknown",
+        };
+        decoded.insert(
+            "MyColorMode".to_string(),
+            ExifValue::Ascii(mode.to_string()),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon HDRInfo (tag 0x4025)
+///
+/// HDRInfo uses int32s format with:
+/// Index 1: HDR mode (Off/Auto/On)
+/// Index 2: HDREffect (Natural/Art...)
+pub fn decode_hdr_info(data: &[i32]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // HDR mode (index 1, but offset from header at 0)
+    // In Canon.pm FIRST_ENTRY => 1, so index 1 is the first real value
+    if data.len() > 1 {
+        decoded.insert(
+            "HDR".to_string(),
+            ExifValue::Ascii(decode_hdr_exiftool(data[1] as u16).to_string()),
+        );
+    }
+
+    // HDREffect (index 2)
+    if data.len() > 2 {
+        decoded.insert(
+            "HDREffect".to_string(),
+            ExifValue::Ascii(decode_hdr_effect_exiftool(data[2] as u16).to_string()),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon AFInfo (old format, tag 0x0012)
+///
+/// Older cameras use this format with sequential fields:
+/// Index 0: NumAFPoints
+/// Index 1: ValidAFPoints
+/// Index 2: CanonImageWidth
+/// Index 3: CanonImageHeight
+/// Index 4: AFImageWidth
+/// Index 5: AFImageHeight
+pub fn decode_af_info(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // NumAFPoints (index 0)
+    if !data.is_empty() {
+        decoded.insert("NumAFPoints".to_string(), ExifValue::Short(vec![data[0]]));
+    }
+
+    // ValidAFPoints (index 1)
+    if data.len() > 1 {
+        decoded.insert("ValidAFPoints".to_string(), ExifValue::Short(vec![data[1]]));
+    }
+
+    // CanonImageWidth (index 2)
+    if data.len() > 2 {
+        decoded.insert(
+            "CanonImageWidth".to_string(),
+            ExifValue::Short(vec![data[2]]),
+        );
+    }
+
+    // CanonImageHeight (index 3)
+    if data.len() > 3 {
+        decoded.insert(
+            "CanonImageHeight".to_string(),
+            ExifValue::Short(vec![data[3]]),
+        );
+    }
+
+    // AFImageWidth (index 4)
+    if data.len() > 4 {
+        decoded.insert("AFImageWidth".to_string(), ExifValue::Short(vec![data[4]]));
+    }
+
+    // AFImageHeight (index 5)
+    if data.len() > 5 {
+        decoded.insert("AFImageHeight".to_string(), ExifValue::Short(vec![data[5]]));
     }
 
     decoded
@@ -8189,6 +8162,95 @@ pub fn decode_aspect_info_exiftool(data: &[u32]) -> HashMap<String, ExifValue> {
     decoded
 }
 
+/// Decode Canon TimeInfo array sub-fields
+///
+/// This function decodes the TimeInfo array which contains timezone information.
+pub fn decode_time_info(data: &[u32]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // TimeInfo structure (from ExifTool Canon.pm):
+    // Format: int32s (but we receive as u32, interpret as signed)
+    // Index 0: Size (skip)
+    // Index 1: TimeZone (minutes from UTC)
+    // Index 2: TimeZoneCity (city code)
+    // Index 3: DaylightSavings (0=Off, 60=On)
+
+    // TimeZone (index 1) - format as "+HH:MM" or "-HH:MM"
+    if data.len() > 1 {
+        let tz_minutes = data[1] as i32;
+        let sign = if tz_minutes >= 0 { "+" } else { "-" };
+        let abs_minutes = tz_minutes.abs();
+        let hours = abs_minutes / 60;
+        let mins = abs_minutes % 60;
+        decoded.insert(
+            "TimeZone".to_string(),
+            ExifValue::Ascii(format!("{}{:02}:{:02}", sign, hours, mins)),
+        );
+    }
+
+    // TimeZoneCity (index 2)
+    if data.len() > 2 {
+        let city = decode_time_zone_city(data[2]);
+        decoded.insert(
+            "TimeZoneCity".to_string(),
+            ExifValue::Ascii(city.to_string()),
+        );
+    }
+
+    // DaylightSavings (index 3)
+    if data.len() > 3 {
+        let dst = if data[3] == 60 { "On" } else { "Off" };
+        decoded.insert(
+            "DaylightSavings".to_string(),
+            ExifValue::Ascii(dst.to_string()),
+        );
+    }
+
+    decoded
+}
+
+/// Decode TimeZoneCity value
+fn decode_time_zone_city(value: u32) -> &'static str {
+    match value {
+        0 => "n/a",
+        1 => "Chatham Islands",
+        2 => "Wellington",
+        3 => "Solomon Islands",
+        4 => "Sydney",
+        5 => "Adelaide",
+        6 => "Tokyo",
+        7 => "Hong Kong",
+        8 => "Bangkok",
+        9 => "Yangon",
+        10 => "Dhaka",
+        11 => "Kathmandu",
+        12 => "Delhi",
+        13 => "Karachi",
+        14 => "Kabul",
+        15 => "Dubai",
+        16 => "Tehran",
+        17 => "Moscow",
+        18 => "Cairo",
+        19 => "Paris",
+        20 => "London",
+        21 => "Azores",
+        22 => "Fernando de Noronha",
+        23 => "Sao Paulo",
+        24 => "Newfoundland",
+        25 => "Santiago",
+        26 => "Caracas",
+        27 => "New York",
+        28 => "Chicago",
+        29 => "Denver",
+        30 => "Los Angeles",
+        31 => "Anchorage",
+        32 => "Honolulu",
+        33 => "Samoa",
+        32766 => "(not set)",
+        _ => "Unknown",
+    }
+}
+
 /// Decode Canon SensorInfo array sub-fields
 ///
 /// This function decodes the SensorInfo array which contains sensor dimensions and borders.
@@ -8426,18 +8488,78 @@ pub fn parse_canon_maker_notes(
                     | CANON_VIGNETTING_CORR
                     | CANON_VIGNETTING_CORR_2
                     | CANON_LIGHTING_OPT
+                    | CANON_TIME_INFO
+                    | CANON_HDR_INFO
+                    | CANON_CONTRAST_INFO
+                    | CANON_MY_COLORS
+                    | CANON_AF_INFO
             );
 
             if should_decode {
+                // Handle HDRInfo which uses int32s (signed 32-bit)
+                if tag_id == CANON_HDR_INFO {
+                    let slongs_data: Option<Vec<i32>> = match &value {
+                        ExifValue::SLong(slongs) => Some(slongs.clone()),
+                        ExifValue::Long(longs) => Some(longs.iter().map(|&v| v as i32).collect()),
+                        ExifValue::Undefined(bytes) => {
+                            if bytes.len() >= 4 && bytes.len() % 4 == 0 {
+                                let slongs: Vec<i32> = bytes
+                                    .chunks_exact(4)
+                                    .map(|chunk| {
+                                        i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+                                    })
+                                    .collect();
+                                Some(slongs)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(slongs) = slongs_data {
+                        let decoded = decode_hdr_info(&slongs);
+                        for (field_name, field_value) in decoded {
+                            tags.insert(
+                                synthetic_tag_id,
+                                MakerNoteTag::new(
+                                    synthetic_tag_id,
+                                    Some(Box::leak(field_name.into_boxed_str())),
+                                    field_value,
+                                ),
+                            );
+                            synthetic_tag_id = synthetic_tag_id.wrapping_add(1);
+                        }
+                        continue;
+                    }
+                }
+
                 // Handle tags that use u32 values (AspectInfo, VignettingCorr2, LightingOpt)
                 if matches!(
                     tag_id,
-                    CANON_ASPECT_INFO | CANON_VIGNETTING_CORR_2 | CANON_LIGHTING_OPT
+                    CANON_ASPECT_INFO
+                        | CANON_VIGNETTING_CORR_2
+                        | CANON_LIGHTING_OPT
+                        | CANON_TIME_INFO
                 ) {
                     let longs_data: Option<Vec<u32>> = match &value {
                         ExifValue::Long(longs) => Some(longs.clone()),
                         ExifValue::SLong(slongs) => {
                             Some(slongs.iter().map(|&v| v as u32).collect())
+                        }
+                        ExifValue::Undefined(bytes) => {
+                            // Some tags store int32 data as Undefined bytes
+                            if bytes.len() >= 4 && bytes.len() % 4 == 0 {
+                                let longs: Vec<u32> = bytes
+                                    .chunks_exact(4)
+                                    .map(|chunk| {
+                                        u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+                                    })
+                                    .collect();
+                                Some(longs)
+                            } else {
+                                None
+                            }
                         }
                         _ => None,
                     };
@@ -8447,6 +8569,7 @@ pub fn parse_canon_maker_notes(
                             CANON_ASPECT_INFO => decode_aspect_info(&longs),
                             CANON_VIGNETTING_CORR_2 => decode_vignetting_corr2(&longs),
                             CANON_LIGHTING_OPT => decode_lighting_opt(&longs),
+                            CANON_TIME_INFO => decode_time_info(&longs),
                             _ => HashMap::new(),
                         };
 
@@ -8522,6 +8645,8 @@ pub fn parse_canon_maker_notes(
                         CANON_SENSOR_INFO => decode_sensor_info(&shorts),
                         CANON_VIGNETTING_CORR => decode_vignetting_corr(&shorts),
                         CANON_CONTRAST_INFO => decode_contrast_info(&shorts),
+                        CANON_MY_COLORS => decode_my_colors(&shorts),
+                        CANON_AF_INFO => decode_af_info(&shorts),
                         _ => HashMap::new(),
                     };
 
@@ -8787,14 +8912,31 @@ pub fn parse_canon_maker_notes(
                     }
                 }
                 // PictureStyleUserDef - decode array of 3 shorts to style names
+                // ExifTool outputs BOTH individual tags AND combined string
                 CANON_PICTURE_STYLE_USER_DEF => {
                     if let ExifValue::Short(ref shorts) = value {
                         if shorts.len() >= 3 {
-                            let styles: Vec<String> = shorts
-                                .iter()
-                                .take(3)
-                                .map(|&s| get_picture_style_name(s).to_string())
-                                .collect();
+                            // Insert separate tags like ExifTool does
+                            let names = [
+                                "UserDef1PictureStyle",
+                                "UserDef2PictureStyle",
+                                "UserDef3PictureStyle",
+                            ];
+                            let mut styles = Vec::new();
+                            for (i, &short_val) in shorts.iter().take(3).enumerate() {
+                                let style_name = get_picture_style_name(short_val);
+                                styles.push(style_name.to_string());
+                                tags.insert(
+                                    synthetic_tag_id,
+                                    MakerNoteTag::new(
+                                        synthetic_tag_id,
+                                        Some(names[i]),
+                                        ExifValue::Ascii(style_name.to_string()),
+                                    ),
+                                );
+                                synthetic_tag_id += 1;
+                            }
+                            // Also output combined string as PictureStyleUserDef
                             ExifValue::Ascii(styles.join("; "))
                         } else {
                             value

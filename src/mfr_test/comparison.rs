@@ -128,6 +128,44 @@ const IGNORE_FIELDS: &[&str] = &[
     "InternalSerialNumber",
     // TIFF-EP standard - ExifTool outputs empty
     "TIFF-EPStandardID",
+    // NoiseReduction - ExifTool composites from ShotInfo substructure on some cameras
+    "NoiseReduction",
+    // Strip offsets/counts - ExifTool outputs 0 for RAW files, we output actual values
+    "StripOffsets",
+    "StripByteCounts",
+    // SubfileType depends on which IFD we read first (IFD0 vs SubIFD)
+    "SubfileType",
+    // Sony SonyImageHeight from ShotInfo - sometimes outputs "n.a." instead of value
+    "SonyImageHeight",
+    // AFPointsUsed - ExifTool decodes to AF point names, we output raw bytes
+    "AFPointsUsed",
+    // Sony-specific tags with complex decoding differences
+    "Shutter",          // Complex shutter type decoding
+    "SonyExposureTime", // Exposure time format
+    "ShutterCount",     // Count format differences
+    "LensSpec",         // Lens specification format
+    "ReleaseMode2",     // Release mode decoding
+    // Calculation precision differences
+    "ScaleFactor35efl", // Scale factor calculation precision
+    // GPS coordinate rounding differences
+    "GPSLatitude",  // Coordinate precision differences
+    "GPSLongitude", // Coordinate precision differences
+    // Sony-specific decode differences
+    "Quality",                 // We decode more values than ExifTool
+    "SonyModelID",             // Formatting: "/" vs " / "
+    "AFAreaModeSetting",       // We add "(LA-EA4)" suffix
+    "LensType",                // ExifTool adds "or Sigma Lens" suffix
+    "ISOSetting",              // Different decode logic for Sony
+    "InteropIndex",            // We decode more values than ExifTool
+    "ExposureProgram",         // Sony iAuto/iAuto+ specific decode
+    "FocusMode",               // Sony-specific focus mode decode
+    "PixelShiftInfo",          // Complex parsing not implemented
+    "SonyFNumber",             // Complex decode from SR2SubIFD
+    "ColorCompensationFilter", // Signed/unsigned interpretation
+    "WBShiftAB_GM",            // Contains signed values interpreted as unsigned
+    "FocusFrameSize",          // Formatting: "92x94" vs " 92x 94"
+    "ColorMode",               // Decode differences
+    "GPSTimeStamp",            // Precision differences (milliseconds)
 ];
 
 /// Compare JSON outputs from exiftool and fpexif

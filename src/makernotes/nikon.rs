@@ -197,6 +197,7 @@ pub const NIKON_LENS_F_STOPS: u16 = 0x008B;
 pub const NIKON_CONTRAST_CURVE: u16 = 0x008C;
 pub const NIKON_COLOR_HUE: u16 = 0x008D;
 pub const NIKON_SCENE_MODE: u16 = 0x008F;
+pub const NIKON_IMAGE_ADJUSTMENT: u16 = 0x0080;
 pub const NIKON_TONE_COMP: u16 = 0x0081;
 pub const NIKON_SENSOR_PIXEL_SIZE: u16 = 0x009A;
 pub const NIKON_UNKNOWN_TAG_9B: u16 = 0x009B;
@@ -212,7 +213,7 @@ pub const NIKON_ICC_PROFILE: u16 = 0x0E1D;
 pub const NIKON_CAPTURE_OUTPUT: u16 = 0x0E1E;
 pub const NIKON_MULTI_EXPOSURE: u16 = 0x00B0; // Also HDRInfo for some cameras
 pub const NIKON_LOCATION_INFO: u16 = 0x00B5;
-pub const NIKON_BLACK_LEVEL: u16 = 0x00B6;
+pub const NIKON_BLACK_LEVEL: u16 = 0x003D;
 pub const NIKON_POWER_UP_TIME_2: u16 = 0x00B6;
 pub const NIKON_AF_INFO_2: u16 = 0x00B7;
 pub const NIKON_FILE_INFO: u16 = 0x00B8;
@@ -648,6 +649,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_SERIAL_NUMBER => Some("SerialNumber"),
         NIKON_COLOR_SPACE => Some("ColorSpace"),
         NIKON_VR_INFO => Some("VRInfo"),
+        NIKON_BLACK_LEVEL => Some("BlackLevel"),
         NIKON_ACTIVE_D_LIGHTING => Some("ActiveD-Lighting"),
         NIKON_PICTURE_CONTROL_DATA => Some("PictureControlData"),
         NIKON_PICTURE_CONTROL_DATA_2 => Some("PictureControlData"),
@@ -665,7 +667,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_SHOT_INFO => Some("ShotInfo"),
         NIKON_HUE_ADJUSTMENT => Some("HueAdjustment"),
         NIKON_NEF_COMPRESSION => Some("NEFCompression"),
-        NIKON_SATURATION => Some("Saturation"),
+        NIKON_SATURATION => Some("SaturationAdj"),
         NIKON_NOISE_REDUCTION => Some("NoiseReduction"),
         NIKON_COLOR_BALANCE => Some("ColorBalance"),
         NIKON_LENS_DATA => Some("LensData"),
@@ -682,6 +684,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_CONTRAST_CURVE => Some("ContrastCurve"),
         NIKON_COLOR_HUE => Some("ColorHue"),
         NIKON_SCENE_MODE => Some("SceneMode"),
+        NIKON_IMAGE_ADJUSTMENT => Some("ImageAdjustment"),
         NIKON_TONE_COMP => Some("ToneComp"),
         NIKON_SERIAL_NUMBER_2 => Some("SerialNumber"),
         NIKON_IMAGE_DATA_SIZE => Some("ImageDataSize"),
@@ -1847,7 +1850,9 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
         // Offset 0x31: PictureControlQuickAdjust (int8u)
         if data.len() > 0x31 {
             let quick = data[0x31];
-            if quick != 0xff {
+            if quick == 0xff {
+                tags.push(("PictureControlQuickAdjust".to_string(), "n/a".to_string()));
+            } else {
                 let value = quick.wrapping_sub(128) as i8;
                 if value == 0 {
                     tags.push((
@@ -2015,6 +2020,26 @@ fn format_flash_firmware(major: u8, minor: u8) -> String {
         Some(name) => format!("{}.{:02} ({})", major, minor, name),
         None => format!("{}.{:02} (Unknown model)", major, minor),
     }
+}
+
+/// Parse FaceDetect tag data (tag 0x0021)
+/// Extracts FacesDetected count
+fn parse_face_detect(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    // FaceDetect structure (FORMAT => 'int16u' in ExifTool):
+    // Index 0x00: unknown (bytes 0-1)
+    // Index 0x01-0x02: FaceDetectFrameSize int16u[2] (bytes 2-5)
+    // Index 0x03: FacesDetected int16u (bytes 6-7)
+    if data.len() >= 8 {
+        let faces = match endian {
+            Endianness::Big => u16::from_be_bytes([data[6], data[7]]),
+            Endianness::Little => u16::from_le_bytes([data[6], data[7]]),
+        };
+        tags.push(("FacesDetected".to_string(), faces.to_string()));
+    }
+
+    tags
 }
 
 /// Parse FlashInfo tag data (tag 0x00A8)
@@ -2318,6 +2343,92 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
                 let ev = -(comp as f64) / 6.0;
                 tags.push((
                     "FlashExposureComp4".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
+        } else if (version == "0100" || version == "0101") && data.len() >= 19 {
+            // FlashInfo 0100/0101 structure (D200, D50, D70, D80, etc.)
+            // FlashGNDistance at offset 14
+            if data.len() > 14 {
+                let gn = data[14];
+                let gn_str = match gn {
+                    0 => "0".to_string(),
+                    1 => "0.1 m".to_string(),
+                    2 => "0.2 m".to_string(),
+                    3 => "0.3 m".to_string(),
+                    4 => "0.4 m".to_string(),
+                    5 => "0.5 m".to_string(),
+                    6 => "0.6 m".to_string(),
+                    7 => "0.7 m".to_string(),
+                    8 => "0.8 m".to_string(),
+                    9 => "0.9 m".to_string(),
+                    10 => "1.0 m".to_string(),
+                    11 => "1.1 m".to_string(),
+                    12 => "1.3 m".to_string(),
+                    13 => "1.4 m".to_string(),
+                    14 => "1.6 m".to_string(),
+                    15 => "1.8 m".to_string(),
+                    16 => "2.0 m".to_string(),
+                    17 => "2.2 m".to_string(),
+                    18 => "2.5 m".to_string(),
+                    19 => "2.8 m".to_string(),
+                    20 => "3.2 m".to_string(),
+                    21 => "3.6 m".to_string(),
+                    22 => "4.0 m".to_string(),
+                    23 => "4.5 m".to_string(),
+                    24 => "5.0 m".to_string(),
+                    25 => "5.6 m".to_string(),
+                    26 => "6.3 m".to_string(),
+                    27 => "7.1 m".to_string(),
+                    28 => "8.0 m".to_string(),
+                    29 => "9.0 m".to_string(),
+                    30 => "10.0 m".to_string(),
+                    31 => "11.0 m".to_string(),
+                    32 => "13.0 m".to_string(),
+                    33 => "14.0 m".to_string(),
+                    34 => "16.0 m".to_string(),
+                    35 => "18.0 m".to_string(),
+                    36 => "20.0 m".to_string(),
+                    255 => "n/a".to_string(),
+                    _ => gn.to_string(),
+                };
+                tags.push(("FlashGNDistance".to_string(), gn_str));
+            }
+
+            // FlashGroupAControlMode at offset 15 (mask 0x0f)
+            if data.len() > 15 {
+                let group_a = data[15] & 0x0F;
+                tags.push((
+                    "FlashGroupAControlMode".to_string(),
+                    decode_flash_control_mode(group_a).to_string(),
+                ));
+            }
+
+            // FlashGroupBControlMode at offset 16 (mask 0x0f)
+            if data.len() > 16 {
+                let group_b = data[16] & 0x0F;
+                tags.push((
+                    "FlashGroupBControlMode".to_string(),
+                    decode_flash_control_mode(group_b).to_string(),
+                ));
+            }
+
+            // FlashGroupACompensation at offset 17
+            if data.len() > 17 {
+                let comp = data[17] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "FlashGroupACompensation".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
+
+            // FlashGroupBCompensation at offset 18
+            if data.len() > 18 {
+                let comp = data[18] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "FlashGroupBCompensation".to_string(),
                     format_flash_compensation(ev),
                 ));
             }
@@ -5739,6 +5850,21 @@ pub fn parse_nikon_maker_notes(
                                 )
                             };
                             tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_FACE_DETECT => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_face_detect(bytes, endian) {
+                            let tag_id = 0x9340 + tags.len() as u16;
+                            tags.insert(
+                                tag_id,
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                ),
+                            );
                         }
                     }
                 }

@@ -244,6 +244,7 @@ fn format_short_value_with_make(value: u16, tag_id: u16, make: Option<&str>) -> 
         // FocalLengthIn35mmFormat - add "mm" suffix
         0xA405 => Value::String(format!("{} mm", value)),
         // Sony ARW SubIFD tags
+        0x7000 => Value::String(crate::tags::get_sony_raw_file_type_description(value).to_string()),
         0x7030 => Value::String(
             crate::tags::get_sony_vignetting_correction_description(value).to_string(),
         ),
@@ -477,6 +478,16 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
     }
 
     match tag_id {
+        0x9400 => {
+            // AmbientTemperature - output with " C" suffix
+            let temp = num as f64 / den as f64;
+            // Use one decimal place like ExifTool (e.g., "27 C" or "27.5 C")
+            if temp.fract() == 0.0 {
+                Value::String(format!("{} C", temp as i32))
+            } else {
+                Value::String(format!("{:.1} C", temp))
+            }
+        }
         0x9201 => {
             // ShutterSpeedValue (APEX) - convert to shutter speed
             // APEX: Tv = log2(1/t) where t is exposure time in seconds
@@ -1932,8 +1943,14 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         // higher IDs are used for newer cameras and should take precedence
         // Note: Saturation/Contrast/Sharpness handled separately below for Pentax/Samsung
         // where MakerNote format differs (e.g., "0 (normal)" vs standard "Normal")
-        const MAKERNOTE_PRIORITY_TAGS: &[&str] =
-            &["MeteringMode", "WhiteBalance", "LightSource", "FocusMode"];
+        // WhiteLevel: Sony SR2SubIFD WhiteLevel (3 values) should override main IFD WhiteLevel (1 value)
+        const MAKERNOTE_PRIORITY_TAGS: &[&str] = &[
+            "MeteringMode",
+            "WhiteBalance",
+            "LightSource",
+            "FocusMode",
+            "WhiteLevel",
+        ];
 
         // Sort by tag_id to ensure consistent ordering (lower IDs processed first)
         // This is important for Olympus where CameraSettings ImageStabilization (0x2624)
@@ -2304,8 +2321,8 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     // Note: SonyImageWidth/Height are NOT used here - they're standalone tags, not replacements
     // for ImageWidth/Height (ExifTool uses different logic for Sony)
 
-    // For Sony: Process FullImageSize (tag 0xb02b) which is stored as "height width"
-    // Reformat as "widthxheight" like ExifTool does
+    // For Sony: Process FullImageSize (tag 0xb02b)
+    // The tag is already formatted as "WxH" in sony.rs, we just need to extract dimensions
     // Note: Only older Sony cameras (A100-A900) use FullImageSize for ImageWidth/Height/ImageSize
     // Newer cameras (A6000+, A7+) use IFD0 ImageWidth/ImageLength instead
     let is_sony_camera = make_ref
@@ -2313,16 +2330,11 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         .unwrap_or(false);
     if is_sony_camera {
         if let Some(Value::String(full_size)) = output.get("FullImageSize").cloned() {
-            let parts: Vec<&str> = full_size.split_whitespace().collect();
+            // FullImageSize is already formatted as "WxH" (e.g., "3872x2592") in sony.rs
+            let parts: Vec<&str> = full_size.split('x').collect();
             if parts.len() == 2 {
-                if let (Ok(height), Ok(width)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>())
+                if let (Ok(width), Ok(height)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>())
                 {
-                    // Reformat FullImageSize as "widthxheight"
-                    output.insert(
-                        "FullImageSize".to_string(),
-                        Value::String(format!("{}x{}", width, height)),
-                    );
-
                     // Determine whether to use FullImageSize for ImageWidth/Height
                     // Early DSLR-A models (A100-A350, A700, A850, A900) use FullImageSize
                     // Later models (A550+, SLT, NEX, ILCE, DSC) use IFD0 dimensions
@@ -2333,12 +2345,14 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
                     let has_sony_image_width = output.contains_key("SonyImageWidth");
 
                     // Use FullImageSize for specific early DSLR-A models
-                    // These models have sensor overscan that needs cropping
+                    // These models have sensor overscan that needs cropping via FullImageSize
+                    // Note: A450/A500/A550 use IFD0 dimensions directly (FullImageSize is different)
                     let is_early_dslr = model.is_some_and(|m| {
                         m.starts_with("DSLR-A")
                             && (m.contains("A100")
                                 || m.contains("A200")
                                 || m.contains("A230")
+                                || m.contains("A290")
                                 || m.contains("A300")
                                 || m.contains("A330")
                                 || m.contains("A350")

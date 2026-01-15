@@ -212,6 +212,10 @@ pub const SR2_WB_RGB_LEVELS_FLUORESCENT_2: u16 = 0x7826;
 pub const SR2_WB_RGB_LEVELS_FLUORESCENT_P1: u16 = 0x7827;
 pub const SR2_WB_RGB_LEVELS_FLUORESCENT_P2: u16 = 0x7828;
 pub const SR2_WB_RGB_LEVELS_FLUORESCENT_M1: u16 = 0x7829;
+pub const SR2_WB_RGB_LEVELS_8500K: u16 = 0x782a;
+pub const SR2_WB_RGB_LEVELS_6000K: u16 = 0x782b;
+pub const SR2_WB_RGB_LEVELS_3200K: u16 = 0x782c;
+pub const SR2_WB_RGB_LEVELS_2500K: u16 = 0x782d;
 
 // CameraSettings sub-tag storage IDs (A200/A300/A350/A700/A850/A900)
 // These are virtual tag IDs for sub-tags extracted from the CameraSettings binary blob
@@ -231,6 +235,7 @@ pub const CS_CONTRAST: u16 = 0xC01D; // Offset 0x1d in CameraSettings
 pub const CS_SATURATION: u16 = 0xC01E; // Offset 0x1e in CameraSettings
 pub const CS_ZONE_MATCHING_VALUE: u16 = 0xC01F; // Offset 0x1f in CameraSettings
 pub const CS_BRIGHTNESS: u16 = 0xC022; // Offset 0x22 in CameraSettings
+pub const CS_FLASH_MODE: u16 = 0xC013; // Offset 0x13 in CameraSettings
 pub const CS_FLASH_CONTROL: u16 = 0xC023; // Offset 0x23 in CameraSettings
 pub const CS_PRIORITY_SETUP_SHUTTER_RELEASE: u16 = 0xC025; // Offset 0x25 in CameraSettings
 pub const CS_AF_ILLUMINATOR: u16 = 0xC029; // Offset 0x29 in CameraSettings
@@ -245,6 +250,48 @@ pub const CS_SONY_IMAGE_SIZE: u16 = 0xC054; // Offset 0x54 in CameraSettings
 pub const CS_ASPECT_RATIO: u16 = 0xC055; // Offset 0x55 in CameraSettings
 pub const CS_QUALITY: u16 = 0xC056; // Offset 0x56 in CameraSettings
 pub const CS_EXPOSURE_LEVEL_INCREMENTS: u16 = 0xC058; // Offset 0x58 in CameraSettings
+
+// CameraSettings3 tags (int8u format) - used by A33/A35/A55/A450/A500/A550/A560/A580/NEX-3/NEX-5/etc
+// Using 0xC3xx prefix to differentiate from CS1/CS2 (0xC0xx)
+pub const CS3_SHUTTER_SPEED_SETTING: u16 = 0xC300; // Offset 0x00
+pub const CS3_APERTURE_SETTING: u16 = 0xC301; // Offset 0x01
+pub const CS3_ISO_SETTING: u16 = 0xC302; // Offset 0x02
+pub const CS3_EXPOSURE_COMP_SET: u16 = 0xC303; // Offset 0x03
+pub const CS3_DRIVE_MODE_SETTING: u16 = 0xC304; // Offset 0x04
+pub const CS3_EXPOSURE_PROGRAM: u16 = 0xC305; // Offset 0x05
+pub const CS3_FOCUS_MODE_SETTING: u16 = 0xC306; // Offset 0x06
+pub const CS3_METERING_MODE: u16 = 0xC307; // Offset 0x07
+pub const CS3_SONY_IMAGE_SIZE: u16 = 0xC309; // Offset 0x09
+pub const CS3_ASPECT_RATIO: u16 = 0xC30A; // Offset 0x0a
+pub const CS3_QUALITY: u16 = 0xC30B; // Offset 0x0b
+pub const CS3_DRO_SETTING: u16 = 0xC30C; // Offset 0x0c
+pub const CS3_DRO_LEVEL: u16 = 0xC30D; // Offset 0x0d
+pub const CS3_COLOR_SPACE: u16 = 0xC30E; // Offset 0x0e
+pub const CS3_CREATIVE_STYLE: u16 = 0xC30F; // Offset 0x0f
+pub const CS3_CONTRAST_SETTING: u16 = 0xC310; // Offset 0x10
+pub const CS3_SATURATION_SETTING: u16 = 0xC311; // Offset 0x11
+pub const CS3_SHARPNESS_SETTING: u16 = 0xC312; // Offset 0x12
+pub const CS3_WHITE_BALANCE_SETTING: u16 = 0xC316; // Offset 0x16
+pub const CS3_COLOR_TEMP_SETTING: u16 = 0xC317; // Offset 0x17
+pub const CS3_COLOR_COMP_FILTER: u16 = 0xC318; // Offset 0x18
+pub const CS3_FLASH_MODE: u16 = 0xC320; // Offset 0x20
+pub const CS3_FLASH_CONTROL: u16 = 0xC321; // Offset 0x21
+pub const CS3_FLASH_EXPOSURE_COMP: u16 = 0xC323; // Offset 0x23
+pub const CS3_AF_AREA_MODE: u16 = 0xC324; // Offset 0x24
+pub const CS3_LONG_EXPOSURE_NR: u16 = 0xC325; // Offset 0x25
+pub const CS3_HIGH_ISO_NR: u16 = 0xC326; // Offset 0x26
+pub const CS3_SMILE_SHUTTER_MODE: u16 = 0xC327; // Offset 0x27
+pub const CS3_RED_EYE_REDUCTION: u16 = 0xC328; // Offset 0x28
+pub const CS3_HDR_SETTING: u16 = 0xC32D; // Offset 0x2d
+pub const CS3_HDR_LEVEL: u16 = 0xC32E; // Offset 0x2e
+pub const CS3_VIEWING_MODE: u16 = 0xC32F; // Offset 0x2f
+pub const CS3_FACE_DETECTION: u16 = 0xC330; // Offset 0x30
+pub const CS3_SMILE_SHUTTER: u16 = 0xC331; // Offset 0x31
+pub const CS3_SWEEP_PANORAMA_SIZE: u16 = 0xC332; // Offset 0x32
+pub const CS3_SWEEP_PANORAMA_DIR: u16 = 0xC333; // Offset 0x33
+pub const CS3_DRIVE_MODE: u16 = 0xC334; // Offset 0x34
+pub const CS3_MULTI_FRAME_NR: u16 = 0xC335; // Offset 0x35
+pub const CS3_LIVE_VIEW_AF_SETTING: u16 = 0xC336; // Offset 0x36
 
 // MRWInfo tag for A100 and older cameras - contains MinoltaRaw RIF structure
 pub const SONY_MRW_INFO: u16 = 0x7250;
@@ -335,13 +382,14 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         SONY_WHITE_BALANCE_FINE_TUNE => Some("WhiteBalanceFineTune"),
         SONY_SOFT_SKIN_EFFECT => Some("SoftSkinEffect"),
         SONY_LATERAL_CHROMATIC_ABERRATION => Some("LateralChromaticAberration"),
-        SONY_WB_SHIFT_AB => Some("WBShiftAB"),
-        SONY_WB_SHIFT_GM => Some("WBShiftGM"),
+        SONY_WB_SHIFT_AB => Some("WBShiftAB_GM"),
+        // Note: 0x2015 is undocumented in ExifTool; WBShiftAB_GM at 0x2014 contains both AB and GM values
         SONY_AUTO_PORTRAIT_FRAMED => Some("AutoPortraitFramed"),
         SONY_COLOR_COMPENSATION_FILTER => Some("ColorCompensationFilter"),
         SONY_ZONE_MATCHING => Some("ZoneMatching"),
         SONY_COLOR_MODE => Some("ColorMode"),
         SONY_FULL_IMAGE_SIZE => Some("FullImageSize"),
+        SONY_PREVIEW_IMAGE_SIZE => Some("PreviewImageSize"),
         SONY_FILE_FORMAT => Some("FileFormat"),
         SONY_AF_ILLUMINATOR => Some("AFIlluminator"),
         SONY_FOCUS_MODE_2 => Some("FocusMode"),
@@ -2113,6 +2161,19 @@ fn decode_flash_control_cs_exiftool(value: u16) -> &'static str {
     }
 }
 
+/// Decode CameraSettings1 FlashMode (offset 0x13)
+fn decode_flash_mode_cs_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Autoflash",
+        2 => "Rear Sync",
+        3 => "Wireless",
+        4 => "Fill-flash",
+        5 => "Flash Off",
+        6 => "Slow Sync",
+        _ => "Unknown",
+    }
+}
+
 fn decode_priority_setup_cs_exiftool(value: u16) -> &'static str {
     match value {
         0 => "AF",
@@ -2319,6 +2380,10 @@ fn get_sr2_tag_name(tag_id: u16) -> Option<&'static str> {
         SR2_WB_RGB_LEVELS_FLUORESCENT_P1 => Some("WB_RGBLevelsFluorescentP1"),
         SR2_WB_RGB_LEVELS_FLUORESCENT_P2 => Some("WB_RGBLevelsFluorescentP2"),
         SR2_WB_RGB_LEVELS_FLUORESCENT_M1 => Some("WB_RGBLevelsFluorescentM1"),
+        SR2_WB_RGB_LEVELS_8500K => Some("WB_RGBLevels8500K"),
+        SR2_WB_RGB_LEVELS_6000K => Some("WB_RGBLevels6000K"),
+        SR2_WB_RGB_LEVELS_3200K => Some("WB_RGBLevels3200K"),
+        SR2_WB_RGB_LEVELS_2500K => Some("WB_RGBLevels2500K"),
         SR2_COLOR_MATRIX => Some("ColorMatrix"),
         _ => None,
     }
@@ -2445,7 +2510,11 @@ fn parse_sr2_subifd(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, Mak
             | SR2_WB_RGB_LEVELS_FLUORESCENT_2
             | SR2_WB_RGB_LEVELS_FLUORESCENT_P1
             | SR2_WB_RGB_LEVELS_FLUORESCENT_P2
-            | SR2_WB_RGB_LEVELS_FLUORESCENT_M1 => {
+            | SR2_WB_RGB_LEVELS_FLUORESCENT_M1
+            | SR2_WB_RGB_LEVELS_8500K
+            | SR2_WB_RGB_LEVELS_6000K
+            | SR2_WB_RGB_LEVELS_3200K
+            | SR2_WB_RGB_LEVELS_2500K => {
                 // int16s[3]
                 if count >= 3 && value_data.len() >= 6 {
                     let v: Vec<String> = (0..3)
@@ -2548,8 +2617,16 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness, tags: &mut HashMap<u1
     let is_cs1 = data_len == 280 || data_len == 364;
     let is_cs2 = data_len == 332;
 
+    // CameraSettings3 (int8u format) for A33/A35/A55/A450/A500/A550/A560/A580/NEX-3/NEX-5/etc
+    let is_cs3 = data_len == 1536 || data_len == 2048;
+
+    if is_cs3 {
+        parse_camera_settings3(data, tags);
+        return;
+    }
+
     if !is_cs1 && !is_cs2 {
-        // CameraSettings3 or unknown format - skip
+        // Unknown format - skip
         return;
     }
 
@@ -2755,6 +2832,20 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness, tags: &mut HashMap<u1
         }
     }
 
+    // FlashMode - offset 0x13 (CS1 only)
+    if is_cs1 {
+        if let Some(raw) = read_cs_u16(data, 0x13) {
+            let decoded = decode_flash_mode_cs_exiftool(raw);
+            insert_cs_tag(
+                tags,
+                CS_FLASH_MODE,
+                "FlashMode",
+                ExifValue::Ascii(decoded.to_string()),
+                ExifValue::Short(vec![raw]),
+            );
+        }
+    }
+
     // FlashControl - offset 0x23 (CS1) or 0x1f (CS2)
     let flash_ctrl_idx = if is_cs1 { 0x23 } else { 0x1f };
     if let Some(raw) = read_cs_u16(data, flash_ctrl_idx) {
@@ -2924,6 +3015,927 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness, tags: &mut HashMap<u1
             ExifValue::Ascii(decoded.to_string()),
             ExifValue::Short(vec![raw]),
         );
+    }
+}
+
+/// Insert a CameraSettings3 tag (int8u format)
+fn insert_cs3_tag(
+    tags: &mut HashMap<u16, MakerNoteTag>,
+    tag_id: u16,
+    name: &'static str,
+    display_value: ExifValue,
+    _raw_value: ExifValue,
+) {
+    let tag = MakerNoteTag::new(tag_id, Some(name), display_value);
+    tags.insert(tag_id, tag);
+}
+
+/// Decode CameraSettings3 ExposureProgram (offset 0x05)
+fn decode_cs3_exposure_program(value: u8) -> &'static str {
+    // From ExifTool Sony.pm %sonyExposureProgram2
+    match value {
+        1 => "Program AE",
+        2 => "Aperture-priority AE",
+        3 => "Shutter speed priority AE",
+        4 => "Manual",
+        5 => "Cont. Priority AE",
+        16 => "Auto",
+        17 => "Auto (no flash)",
+        48 => "Portrait",
+        49 => "Sport",
+        50 => "Sunset",
+        51 => "Night Portrait",
+        52 => "Sports-action",
+        53 => "Landscape",
+        54 => "Macro",
+        56 => "Hand-held Twilight",
+        57 => "3D Sweep Panorama",
+        64 => "Auto 2",
+        65 => "Auto 2 (no flash)",
+        80 => "Sweep Panorama",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 FocusModeSetting (offset 0x06)
+fn decode_cs3_focus_mode(value: u8) -> &'static str {
+    match value {
+        17 => "AF-S",
+        18 => "AF-C",
+        19 => "AF-A",
+        32 => "Manual",
+        48 => "DMF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 MeteringMode (offset 0x07)
+fn decode_cs3_metering_mode(value: u8) -> &'static str {
+    match value {
+        1 => "Multi-segment",
+        2 => "Center-weighted average",
+        3 => "Spot",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 SonyImageSize (offset 0x09)
+fn decode_cs3_image_size(value: u8) -> &'static str {
+    match value {
+        21 => "Large (3:2)",
+        22 => "Medium (3:2)",
+        23 => "Small (3:2)",
+        25 => "Large (16:9)",
+        26 => "Medium (16:9)",
+        27 => "Small (16:9)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 AspectRatio (offset 0x0a)
+fn decode_cs3_aspect_ratio(value: u8) -> &'static str {
+    match value {
+        4 => "3:2",
+        8 => "16:9",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 Quality (offset 0x0b)
+fn decode_cs3_quality(value: u8) -> &'static str {
+    match value {
+        2 => "RAW",
+        4 => "RAW + JPEG",
+        6 => "Fine",
+        7 => "Standard",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 DynamicRangeOptimizerSetting (offset 0x0c)
+fn decode_cs3_dro_setting(value: u8) -> &'static str {
+    match value {
+        1 => "Off",
+        16 => "On (Auto)",
+        17 => "On (Manual)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 ColorSpace (offset 0x0e)
+fn decode_cs3_color_space(value: u8) -> &'static str {
+    match value {
+        1 => "sRGB",
+        2 => "Adobe RGB",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 CreativeStyleSetting (offset 0x0f)
+fn decode_cs3_creative_style(value: u8) -> &'static str {
+    match value {
+        16 => "Standard",
+        32 => "Vivid",
+        64 => "Portrait",
+        80 => "Landscape",
+        96 => "B&W",
+        160 => "Sunset",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 WhiteBalanceSetting (offset 0x16)
+fn decode_cs3_white_balance(value: u8) -> &'static str {
+    // From ExifTool %whiteBalanceSetting
+    // Values include fine-tune adjustment: base + (0-6) for adjustments (-3 to +3)
+    match value {
+        0x10 => "Auto (-3)",
+        0x11 => "Auto (-2)",
+        0x12 => "Auto (-1)",
+        0x13 => "Auto (0)",
+        0x14 => "Auto (+1)",
+        0x15 => "Auto (+2)",
+        0x16 => "Auto (+3)",
+        0x20 => "Daylight (-3)",
+        0x21 => "Daylight (-2)",
+        0x22 => "Daylight (-1)",
+        0x23 => "Daylight (0)",
+        0x24 => "Daylight (+1)",
+        0x25 => "Daylight (+2)",
+        0x26 => "Daylight (+3)",
+        0x30 => "Shade (-3)",
+        0x31 => "Shade (-2)",
+        0x32 => "Shade (-1)",
+        0x33 => "Shade (0)",
+        0x34 => "Shade (+1)",
+        0x35 => "Shade (+2)",
+        0x36 => "Shade (+3)",
+        0x40 => "Cloudy (-3)",
+        0x41 => "Cloudy (-2)",
+        0x42 => "Cloudy (-1)",
+        0x43 => "Cloudy (0)",
+        0x44 => "Cloudy (+1)",
+        0x45 => "Cloudy (+2)",
+        0x46 => "Cloudy (+3)",
+        0x50 => "Incandescent (-3)",
+        0x51 => "Incandescent (-2)",
+        0x52 => "Incandescent (-1)",
+        0x53 => "Incandescent (0)",
+        0x54 => "Incandescent (+1)",
+        0x55 => "Incandescent (+2)",
+        0x56 => "Incandescent (+3)",
+        0x60 => "Fluorescent (-3)",
+        0x61 => "Fluorescent (-2)",
+        0x62 => "Fluorescent (-1)",
+        0x63 => "Fluorescent (0)",
+        0x64 => "Fluorescent (+1)",
+        0x65 => "Fluorescent (+2)",
+        0x66 => "Fluorescent (+3)",
+        0x70 => "Flash (-3)",
+        0x71 => "Flash (-2)",
+        0x72 => "Flash (-1)",
+        0x73 => "Flash (0)",
+        0x74 => "Flash (+1)",
+        0x75 => "Flash (+2)",
+        0x76 => "Flash (+3)",
+        0x80 => "Color Temperature/Color Filter (-3)",
+        0x81 => "Color Temperature/Color Filter (-2)",
+        0x82 => "Color Temperature/Color Filter (-1)",
+        0x83 => "Color Temperature/Color Filter (0)",
+        0x84 => "Color Temperature/Color Filter (+1)",
+        0x85 => "Color Temperature/Color Filter (+2)",
+        0x86 => "Color Temperature/Color Filter (+3)",
+        0xa0 => "Custom (-3)",
+        0xa1 => "Custom (-2)",
+        0xa2 => "Custom (-1)",
+        0xa3 => "Custom (0)",
+        0xa4 => "Custom (+1)",
+        0xa5 => "Custom (+2)",
+        0xa6 => "Custom (+3)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 FlashMode (offset 0x20)
+fn decode_cs3_flash_mode(value: u8) -> &'static str {
+    match value {
+        1 => "Flash Off",
+        16 => "Autoflash",
+        17 => "Fill-flash",
+        18 => "Slow Sync",
+        19 => "Rear Sync",
+        20 => "Wireless",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 FlashControl (offset 0x21)
+fn decode_cs3_flash_control(value: u8) -> &'static str {
+    match value {
+        1 => "ADI Flash",
+        2 => "Pre-flash TTL",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 AFAreaMode (offset 0x24)
+fn decode_cs3_af_area_mode(value: u8) -> &'static str {
+    match value {
+        1 => "Wide",
+        2 => "Spot",
+        3 => "Local",
+        4 => "Flexible",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 LongExposureNoiseReduction (offset 0x25)
+fn decode_cs3_long_exposure_nr(value: u8) -> &'static str {
+    match value {
+        1 => "Off",
+        16 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 HighISONoiseReduction (offset 0x26)
+fn decode_cs3_high_iso_nr(value: u8) -> &'static str {
+    match value {
+        16 => "Low",
+        17 => "High",
+        19 => "Auto",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 SmileShutterMode (offset 0x27)
+fn decode_cs3_smile_shutter_mode(value: u8) -> &'static str {
+    match value {
+        17 => "Slight Smile",
+        18 => "Normal Smile",
+        19 => "Big Smile",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 RedEyeReduction (offset 0x28)
+fn decode_cs3_red_eye_reduction(value: u8) -> &'static str {
+    match value {
+        1 => "Off",
+        16 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 HDRSetting (offset 0x2d)
+fn decode_cs3_hdr_setting(value: u8) -> &'static str {
+    match value {
+        1 => "Off",
+        16 => "On (Auto)",
+        17 => "On (Manual)",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 HDRLevel (offset 0x2e)
+fn decode_cs3_hdr_level(value: u8) -> &'static str {
+    match value {
+        33 => "1 EV",
+        34 => "1.5 EV",
+        35 => "2 EV",
+        36 => "2.5 EV",
+        37 => "3 EV",
+        38 => "3.5 EV",
+        39 => "4 EV",
+        40 => "5 EV",
+        41 => "6 EV",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 ViewingMode (offset 0x2f)
+fn decode_cs3_viewing_mode(value: u8) -> &'static str {
+    match value {
+        16 => "ViewFinder",
+        33 => "Focus Check Live View",
+        34 => "Quick AF Live View",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 FaceDetection (offset 0x30)
+fn decode_cs3_face_detection(value: u8) -> &'static str {
+    match value {
+        1 => "Off",
+        16 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 SmileShutter (offset 0x31)
+fn decode_cs3_smile_shutter(value: u8) -> &'static str {
+    match value {
+        1 => "Off",
+        16 => "On",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 SweepPanoramaSize (offset 0x32)
+fn decode_cs3_sweep_panorama_size(value: u8) -> &'static str {
+    match value {
+        1 => "Standard",
+        2 => "Wide",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 SweepPanoramaDirection (offset 0x33)
+fn decode_cs3_sweep_panorama_dir(value: u8) -> &'static str {
+    match value {
+        1 => "Right",
+        2 => "Left",
+        3 => "Up",
+        4 => "Down",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 DriveMode (offset 0x34)
+fn decode_cs3_drive_mode(value: u8) -> &'static str {
+    match value {
+        0x10 => "Single Frame",
+        0x21 => "Continuous High",
+        0x22 => "Continuous Low",
+        0x30 => "Speed Priority Continuous",
+        0x51 => "Self-timer 10 sec",
+        0x52 => "Self-timer 2 sec, Mirror Lock-up",
+        0x71 => "Continuous Bracketing 0.3 EV",
+        0x75 => "Continuous Bracketing 0.7 EV",
+        0x91 => "White Balance Bracketing Low",
+        0x92 => "White Balance Bracketing High",
+        0xc0 => "Remote Commander",
+        0xd1 => "Continuous - HDR",
+        0xd2 => "Continuous - Multi Frame NR",
+        0xd3 => "Continuous - Handheld Night Shot",
+        0xd4 => "Continuous - Anti Motion Blur",
+        0xd5 => "Continuous - Sweep Panorama",
+        0xd6 => "Continuous - 3D Sweep Panorama",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 MultiFrameNoiseReduction (offset 0x35)
+fn decode_cs3_multi_frame_nr(value: u8) -> &'static str {
+    match value {
+        0 => "n/a",
+        1 => "Off",
+        16 => "On",
+        255 => "None",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 LiveViewAFSetting (offset 0x36)
+fn decode_cs3_live_view_af(value: u8) -> &'static str {
+    match value {
+        0 => "n/a",
+        1 => "Phase-detect AF",
+        2 => "Contrast AF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode CameraSettings3 DriveModeSetting (offset 0x04)
+fn decode_cs3_drive_mode_setting(value: u8) -> &'static str {
+    match value {
+        0x10 => "Single Frame",
+        0x21 => "Continuous High",
+        0x22 => "Continuous Low",
+        0x30 => "Speed Priority Continuous",
+        0x51 => "Self-timer 10 sec",
+        0x52 => "Self-timer 2 sec, Mirror Lock-up",
+        0x71 => "Continuous Bracketing 0.3 EV",
+        0x75 => "Continuous Bracketing 0.7 EV",
+        0x91 => "White Balance Bracketing Low",
+        0x92 => "White Balance Bracketing High",
+        0xc0 => "Remote Commander",
+        _ => "Unknown",
+    }
+}
+
+/// Parse CameraSettings3 binary data (int8u format)
+/// Used by A33/A35/A55/A450/A500/A550/A560/A580/NEX-3/NEX-5/NEX-C3/NEX-VG10E
+fn parse_camera_settings3(data: &[u8], tags: &mut HashMap<u16, MakerNoteTag>) {
+    // CameraSettings3 uses int8u (single byte) values
+
+    // ShutterSpeedSetting (0x00) - requires complex conversion, skip for now
+    // ApertureSetting (0x01) - requires complex conversion, skip for now
+    // ISOSetting (0x02) - requires complex conversion, skip for now
+
+    // ExposureCompensationSet (0x03)
+    if data.len() > 0x03 {
+        let raw = data[0x03];
+        // ValueConv: ($val - 128) / 24
+        let comp = (raw as f64 - 128.0) / 24.0;
+        let display = if comp == 0.0 {
+            "0".to_string()
+        } else {
+            format!("{:+.1}", comp)
+        };
+        insert_cs3_tag(
+            tags,
+            CS3_EXPOSURE_COMP_SET,
+            "ExposureCompensationSet",
+            ExifValue::Ascii(display),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // DriveModeSetting (0x04)
+    if data.len() > 0x04 {
+        let raw = data[0x04];
+        let decoded = decode_cs3_drive_mode_setting(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_DRIVE_MODE_SETTING,
+            "DriveModeSetting",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // ExposureProgram (0x05)
+    if data.len() > 0x05 {
+        let raw = data[0x05];
+        let decoded = decode_cs3_exposure_program(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_EXPOSURE_PROGRAM,
+            "ExposureProgram",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // FocusModeSetting (0x06)
+    if data.len() > 0x06 {
+        let raw = data[0x06];
+        let decoded = decode_cs3_focus_mode(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_FOCUS_MODE_SETTING,
+            "FocusModeSetting",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // MeteringMode (0x07)
+    if data.len() > 0x07 {
+        let raw = data[0x07];
+        let decoded = decode_cs3_metering_mode(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_METERING_MODE,
+            "MeteringMode",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // SonyImageSize (0x09)
+    if data.len() > 0x09 {
+        let raw = data[0x09];
+        let decoded = decode_cs3_image_size(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_SONY_IMAGE_SIZE,
+            "SonyImageSize",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // AspectRatio (0x0a)
+    if data.len() > 0x0a {
+        let raw = data[0x0a];
+        let decoded = decode_cs3_aspect_ratio(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_ASPECT_RATIO,
+            "AspectRatio",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // Quality (0x0b)
+    if data.len() > 0x0b {
+        let raw = data[0x0b];
+        let decoded = decode_cs3_quality(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_QUALITY,
+            "Quality",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // DynamicRangeOptimizerSetting (0x0c)
+    if data.len() > 0x0c {
+        let raw = data[0x0c];
+        let decoded = decode_cs3_dro_setting(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_DRO_SETTING,
+            "DynamicRangeOptimizerSetting",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // DynamicRangeOptimizerLevel (0x0d)
+    if data.len() > 0x0d {
+        let raw = data[0x0d];
+        insert_cs3_tag(
+            tags,
+            CS3_DRO_LEVEL,
+            "DynamicRangeOptimizerLevel",
+            ExifValue::Ascii(raw.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // ColorSpace (0x0e)
+    if data.len() > 0x0e {
+        let raw = data[0x0e];
+        let decoded = decode_cs3_color_space(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_COLOR_SPACE,
+            "ColorSpace",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // CreativeStyleSetting (0x0f)
+    if data.len() > 0x0f {
+        let raw = data[0x0f];
+        let decoded = decode_cs3_creative_style(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_CREATIVE_STYLE,
+            "CreativeStyleSetting",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // ContrastSetting (0x10) - int8s
+    if data.len() > 0x10 {
+        let raw = data[0x10] as i8;
+        let display = if raw > 0 {
+            format!("+{}", raw)
+        } else {
+            raw.to_string()
+        };
+        insert_cs3_tag(
+            tags,
+            CS3_CONTRAST_SETTING,
+            "ContrastSetting",
+            ExifValue::Ascii(display),
+            ExifValue::SByte(vec![raw]),
+        );
+    }
+
+    // SaturationSetting (0x11) - int8s
+    if data.len() > 0x11 {
+        let raw = data[0x11] as i8;
+        let display = if raw > 0 {
+            format!("+{}", raw)
+        } else {
+            raw.to_string()
+        };
+        insert_cs3_tag(
+            tags,
+            CS3_SATURATION_SETTING,
+            "SaturationSetting",
+            ExifValue::Ascii(display),
+            ExifValue::SByte(vec![raw]),
+        );
+    }
+
+    // SharpnessSetting (0x12) - int8s
+    if data.len() > 0x12 {
+        let raw = data[0x12] as i8;
+        let display = if raw > 0 {
+            format!("+{}", raw)
+        } else {
+            raw.to_string()
+        };
+        insert_cs3_tag(
+            tags,
+            CS3_SHARPNESS_SETTING,
+            "SharpnessSetting",
+            ExifValue::Ascii(display),
+            ExifValue::SByte(vec![raw]),
+        );
+    }
+
+    // WhiteBalanceSetting (0x16)
+    if data.len() > 0x16 {
+        let raw = data[0x16];
+        let decoded = decode_cs3_white_balance(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_WHITE_BALANCE_SETTING,
+            "WhiteBalanceSetting",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // ColorTemperatureSetting (0x17)
+    if data.len() > 0x17 {
+        let raw = data[0x17];
+        // ValueConv: $val * 100
+        let kelvin = (raw as u32) * 100;
+        insert_cs3_tag(
+            tags,
+            CS3_COLOR_TEMP_SETTING,
+            "ColorTemperatureSetting",
+            ExifValue::Ascii(format!("{} K", kelvin)),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // ColorCompensationFilterSet (0x18) - int8s
+    if data.len() > 0x18 {
+        let raw = data[0x18] as i8;
+        let display = if raw > 0 {
+            format!("+{}", raw)
+        } else {
+            raw.to_string()
+        };
+        insert_cs3_tag(
+            tags,
+            CS3_COLOR_COMP_FILTER,
+            "ColorCompensationFilterSet",
+            ExifValue::Ascii(display),
+            ExifValue::SByte(vec![raw]),
+        );
+    }
+
+    // FlashMode (0x20)
+    if data.len() > 0x20 {
+        let raw = data[0x20];
+        let decoded = decode_cs3_flash_mode(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_FLASH_MODE,
+            "FlashMode",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // FlashControl (0x21)
+    if data.len() > 0x21 {
+        let raw = data[0x21];
+        let decoded = decode_cs3_flash_control(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_FLASH_CONTROL,
+            "FlashControl",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // FlashExposureCompSet (0x23)
+    if data.len() > 0x23 {
+        let raw = data[0x23];
+        // ValueConv: ($val - 128) / 24
+        let comp = (raw as f64 - 128.0) / 24.0;
+        let display = if comp == 0.0 {
+            "0".to_string()
+        } else {
+            format!("{:+.1}", comp)
+        };
+        insert_cs3_tag(
+            tags,
+            CS3_FLASH_EXPOSURE_COMP,
+            "FlashExposureCompSet",
+            ExifValue::Ascii(display),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // AFAreaMode (0x24)
+    if data.len() > 0x24 {
+        let raw = data[0x24];
+        let decoded = decode_cs3_af_area_mode(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_AF_AREA_MODE,
+            "AFAreaMode",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // LongExposureNoiseReduction (0x25)
+    if data.len() > 0x25 {
+        let raw = data[0x25];
+        let decoded = decode_cs3_long_exposure_nr(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_LONG_EXPOSURE_NR,
+            "LongExposureNoiseReduction",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // HighISONoiseReduction (0x26)
+    if data.len() > 0x26 {
+        let raw = data[0x26];
+        let decoded = decode_cs3_high_iso_nr(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_HIGH_ISO_NR,
+            "HighISONoiseReduction",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // SmileShutterMode (0x27)
+    if data.len() > 0x27 {
+        let raw = data[0x27];
+        let decoded = decode_cs3_smile_shutter_mode(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_SMILE_SHUTTER_MODE,
+            "SmileShutterMode",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // RedEyeReduction (0x28)
+    if data.len() > 0x28 {
+        let raw = data[0x28];
+        let decoded = decode_cs3_red_eye_reduction(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_RED_EYE_REDUCTION,
+            "RedEyeReduction",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // HDRSetting (0x2d)
+    if data.len() > 0x2d {
+        let raw = data[0x2d];
+        let decoded = decode_cs3_hdr_setting(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_HDR_SETTING,
+            "HDRSetting",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // HDRLevel (0x2e)
+    if data.len() > 0x2e {
+        let raw = data[0x2e];
+        let decoded = decode_cs3_hdr_level(raw);
+        if decoded != "Unknown" {
+            insert_cs3_tag(
+                tags,
+                CS3_HDR_LEVEL,
+                "HDRLevel",
+                ExifValue::Ascii(decoded.to_string()),
+                ExifValue::Byte(vec![raw]),
+            );
+        }
+    }
+
+    // ViewingMode (0x2f)
+    if data.len() > 0x2f {
+        let raw = data[0x2f];
+        let decoded = decode_cs3_viewing_mode(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_VIEWING_MODE,
+            "ViewingMode",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // FaceDetection (0x30)
+    if data.len() > 0x30 {
+        let raw = data[0x30];
+        let decoded = decode_cs3_face_detection(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_FACE_DETECTION,
+            "FaceDetection",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // SmileShutter (0x31)
+    if data.len() > 0x31 {
+        let raw = data[0x31];
+        let decoded = decode_cs3_smile_shutter(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_SMILE_SHUTTER,
+            "SmileShutter",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // SweepPanoramaSize (0x32) - not for A450/A500/A550
+    if data.len() > 0x32 {
+        let raw = data[0x32];
+        let decoded = decode_cs3_sweep_panorama_size(raw);
+        if decoded != "Unknown" {
+            insert_cs3_tag(
+                tags,
+                CS3_SWEEP_PANORAMA_SIZE,
+                "SweepPanoramaSize",
+                ExifValue::Ascii(decoded.to_string()),
+                ExifValue::Byte(vec![raw]),
+            );
+        }
+    }
+
+    // SweepPanoramaDirection (0x33) - not for A450/A500/A550
+    if data.len() > 0x33 {
+        let raw = data[0x33];
+        let decoded = decode_cs3_sweep_panorama_dir(raw);
+        if decoded != "Unknown" {
+            insert_cs3_tag(
+                tags,
+                CS3_SWEEP_PANORAMA_DIR,
+                "SweepPanoramaDirection",
+                ExifValue::Ascii(decoded.to_string()),
+                ExifValue::Byte(vec![raw]),
+            );
+        }
+    }
+
+    // DriveMode (0x34) - actual drive mode used
+    if data.len() > 0x34 {
+        let raw = data[0x34];
+        let decoded = decode_cs3_drive_mode(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_DRIVE_MODE,
+            "DriveMode",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // MultiFrameNoiseReduction (0x35)
+    if data.len() > 0x35 {
+        let raw = data[0x35];
+        let decoded = decode_cs3_multi_frame_nr(raw);
+        insert_cs3_tag(
+            tags,
+            CS3_MULTI_FRAME_NR,
+            "MultiFrameNoiseReduction",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Byte(vec![raw]),
+        );
+    }
+
+    // LiveViewAFSetting (0x36) - not for NEX/A450/A500/A550
+    if data.len() > 0x36 {
+        let raw = data[0x36];
+        let decoded = decode_cs3_live_view_af(raw);
+        // Only insert if known value
+        if decoded != "Unknown" {
+            insert_cs3_tag(
+                tags,
+                CS3_LIVE_VIEW_AF_SETTING,
+                "LiveViewAFSetting",
+                ExifValue::Ascii(decoded.to_string()),
+                ExifValue::Byte(vec![raw]),
+            );
+        }
     }
 }
 
@@ -3444,6 +4456,156 @@ fn parse_mrw_info(data: &[u8], tags: &mut HashMap<u16, MakerNoteTag>) {
             break;
         }
     }
+}
+
+/// Parse Tag9400 subdirectory (tag 0x9400)
+/// Reference: exiftool/lib/Image/ExifTool/Sony.pm Tag9400a/b/c
+/// Contains sequence info, camera orientation, quality settings
+/// Note: Tag9400 data is encrypted with Sony's substitution cipher
+/// There are 3 variants with different offsets based on first decrypted byte
+fn parse_tag9400(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerNoteTag>) {
+    if data.len() < 0x30 {
+        return;
+    }
+
+    // Tag9400 is encrypted - decrypt it first
+    let decrypted = sony_decipher(data);
+    let data = &decrypted[..];
+
+    // Detect variant based on first decrypted byte
+    // Tag9400a: 40 (0x07 enc), 204 (0x09 enc), 202 (0x0a enc)
+    // Tag9400b: 27 (0x0c enc)
+    // Tag9400c: 58 (0x23 enc), 62 (0x24 enc), 48 (0x26 enc), 215 (0x28 enc), etc.
+    let first_byte = data.first().copied().unwrap_or(0);
+    let variant = match first_byte {
+        40 | 204 | 202 => 'a',
+        27 => 'b',
+        58 | 62 | 48 | 215 | 28 | 106 | 89 | 63 => 'c',
+        _ => 'a', // Default to variant a
+    };
+
+    // Helper to read u32 at offset
+    let read_u32_at = |offset: usize| -> Option<u32> {
+        if data.len() >= offset + 4 {
+            Some(match endian {
+                Endianness::Little => u32::from_le_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]),
+                Endianness::Big => u32::from_be_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]),
+            })
+        } else {
+            None
+        }
+    };
+
+    // Offsets vary by variant:
+    // Tag9400a: SeqImgNum=0x08, SeqFileNum=0x0c, SeqLen=0x22, Orient=0x28, Quality=0x29
+    // Tag9400b: SeqImgNum=0x08, SeqFileNum=0x0c, SeqLen=0x1e, Orient=0x24, Quality=0x25
+    // Tag9400c: SeqImgNum=0x12, SeqFileNum=0x1a, SeqLen=0x1e, Orient=0x29, Quality=0x2a
+    let (seq_img_off, seq_file_off, seq_len_off, orient_off, _quality_off) = match variant {
+        'b' => (0x08, 0x0c, 0x1e, 0x24, 0x25),
+        'c' => (0x12, 0x1a, 0x1e, 0x29, 0x2a),
+        _ => (0x08, 0x0c, 0x22, 0x28, 0x29), // variant a
+    };
+
+    // SequenceImageNumber (int32u)
+    // ExifTool: ValueConv => '$val + 1'
+    if let Some(v) = read_u32_at(seq_img_off) {
+        if v < 100000 {
+            // Sanity check (allow 0, which becomes 1 after adjustment)
+            tags.insert(
+                0xF408,
+                MakerNoteTag::new(
+                    0xF408,
+                    Some("SequenceImageNumber"),
+                    ExifValue::Long(vec![v + 1]),
+                ),
+            );
+        }
+    }
+
+    // SequenceFileNumber (int32u)
+    // ExifTool: ValueConv => '$val + 1'
+    if let Some(v) = read_u32_at(seq_file_off) {
+        if v < 100000 {
+            // Sanity check (allow 0, which becomes 1 after adjustment)
+            tags.insert(
+                0xF40C,
+                MakerNoteTag::new(
+                    0xF40C,
+                    Some("SequenceFileNumber"),
+                    ExifValue::Long(vec![v + 1]),
+                ),
+            );
+        }
+    }
+
+    // SequenceLength - variant c uses "file" suffix, others use "shot"
+    if data.len() > seq_len_off {
+        let v = data[seq_len_off];
+        let suffix = if variant == 'c' { "file" } else { "shot" };
+        let plural_suffix = if variant == 'c' { "files" } else { "shots" };
+        let decoded = match v {
+            0 => Some("Continuous".to_string()),
+            1 => Some(format!("1 {}", suffix)),
+            2 => Some(format!("2 {}", plural_suffix)),
+            3 => Some(format!("3 {}", plural_suffix)),
+            4 => Some(format!("4 {}", plural_suffix)),
+            5 => Some(format!("5 {}", plural_suffix)),
+            6 => Some(format!("6 {}", plural_suffix)),
+            7 => Some(format!("7 {}", plural_suffix)),
+            9 => Some(format!("9 {}", plural_suffix)),
+            10 => Some(format!("10 {}", plural_suffix)),
+            12 => Some(format!("12 {}", plural_suffix)),
+            16 => Some(format!("16 {}", plural_suffix)),
+            100 => Some("Continuous - iSweep Panorama".to_string()),
+            200 => Some("Continuous - Sweep Panorama".to_string()),
+            _ => None,
+        };
+        if let Some(s) = decoded {
+            tags.insert(
+                0xF422,
+                MakerNoteTag::new(0xF422, Some("SequenceLength"), ExifValue::Ascii(s)),
+            );
+        }
+    }
+
+    // CameraOrientation
+    if data.len() > orient_off {
+        let v = data[orient_off];
+        let decoded = match v {
+            1 => Some("Horizontal (normal)"),
+            3 => Some("Rotate 180"),
+            6 => Some("Rotate 90 CW"),
+            8 => Some("Rotate 270 CW"),
+            _ => None,
+        };
+        if let Some(s) = decoded {
+            tags.insert(
+                0xF428,
+                MakerNoteTag::new(
+                    0xF428,
+                    Some("CameraOrientation"),
+                    ExifValue::Ascii(s.to_string()),
+                ),
+            );
+        }
+    }
+
+    // Quality2 - SKIPPED for now
+    // Newer cameras (DSC-RX1RM3, ILCE-1, ILCE-1M2, ILCE-6700, ILCE-7M4, ILCE-7RM5, etc.)
+    // use a shifted mapping (1=JPEG, 2=RAW, 3=RAW+JPEG, 4=HEIF, 6=RAW+HEIF)
+    // Older cameras use standard mapping (0=JPEG, 1=RAW, 2=RAW+JPEG, 3=JPEG+MPO)
+    // Would need model parameter to determine which mapping to use
+    // TODO: Add model parameter and implement conditional decoding
 }
 
 /// Parse AFInfo subdirectory (tag 0x940e)
@@ -4455,6 +5617,20 @@ pub fn parse_sony_maker_notes(
                         value
                     }
                 }
+                SONY_PREVIEW_IMAGE_SIZE | SONY_FULL_IMAGE_SIZE => {
+                    // PreviewImageSize/FullImageSize: int32u[2]
+                    // ExifTool: reverses values (height first, then width) and formats as WxH
+                    if let ExifValue::Long(vals) = &value {
+                        if vals.len() >= 2 {
+                            // vals[0] is height, vals[1] is width - reverse them for WxH
+                            ExifValue::Ascii(format!("{}x{}", vals[1], vals[0]))
+                        } else {
+                            value
+                        }
+                    } else {
+                        value
+                    }
+                }
                 _ => value,
             };
 
@@ -4511,6 +5687,18 @@ pub fn parse_sony_maker_notes(
                     parse_afinfo(raw_data, endian, &mut tags);
                 } else if let ExifValue::Byte(ref raw_data) = decoded_value {
                     parse_afinfo(raw_data, endian, &mut tags);
+                }
+                // Don't insert the raw binary blob
+                continue;
+            }
+
+            // Handle Tag9400 subdirectory (tag 0x9400)
+            // Contains sequence info, camera orientation, quality for DSC/NEX/SLT/ILCE models
+            if tag_id == SONY_TAG_9400 {
+                if let ExifValue::Undefined(ref raw_data) = decoded_value {
+                    parse_tag9400(raw_data, endian, &mut tags);
+                } else if let ExifValue::Byte(ref raw_data) = decoded_value {
+                    parse_tag9400(raw_data, endian, &mut tags);
                 }
                 // Don't insert the raw binary blob
                 continue;

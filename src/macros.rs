@@ -184,6 +184,162 @@ macro_rules! define_tag_decoder {
     };
 }
 
+/// Decode a field from a binary array using an enum decoder
+///
+/// This macro reduces boilerplate for extracting and decoding enum fields from binary arrays.
+///
+/// # Examples
+///
+/// ```ignore
+/// use std::collections::HashMap;
+/// use crate::ExifValue;
+///
+/// fn decode_data(data: &[u16]) -> HashMap<String, ExifValue> {
+///     let mut decoded = HashMap::new();
+///
+///     // Simple decode at index 1
+///     decode_field!(decoded, data, 1, "MacroMode", decode_macro_mode_exiftool);
+///
+///     // With skip condition (skip if value == 0)
+///     decode_field!(decoded, data, 19, "AFPoint", decode_af_point_exiftool, skip_if: 0);
+///
+///     // With skip condition (skip if value == 0x7fff)
+///     decode_field!(decoded, data, 13, "Contrast", decode_contrast_exiftool, skip_if: 0x7fff);
+///
+///     // Raw numeric output (no decoder function)
+///     decode_field!(decoded, data, 5, "RawValue", raw_u16);
+///
+///     // With i16 cast before decoding
+///     decode_field!(decoded, data, 9, "RecordMode", decode_record_mode_exiftool, cast: i16);
+///
+///     decoded
+/// }
+/// ```
+#[macro_export]
+macro_rules! decode_field {
+    // Raw u16 output - just insert the numeric value (MUST be before generic $decoder:expr patterns)
+    ($map:expr, $data:expr, $index:expr, $name:expr, raw_u16) => {
+        if $data.len() > $index {
+            $map.insert($name.to_string(), ExifValue::Short(vec![$data[$index]]));
+        }
+    };
+
+    // Raw u16 with skip condition
+    ($map:expr, $data:expr, $index:expr, $name:expr, raw_u16, skip_if: $skip_val:expr) => {
+        if $data.len() > $index && $data[$index] != $skip_val {
+            $map.insert($name.to_string(), ExifValue::Short(vec![$data[$index]]));
+        }
+    };
+
+    // Raw i16 (signed) output
+    ($map:expr, $data:expr, $index:expr, $name:expr, raw_i16) => {
+        if $data.len() > $index {
+            $map.insert(
+                $name.to_string(),
+                ExifValue::SShort(vec![$data[$index] as i16]),
+            );
+        }
+    };
+
+    // With skip condition - skip if value equals skip_value
+    ($map:expr, $data:expr, $index:expr, $name:expr, $decoder:expr, skip_if: $skip_val:expr) => {
+        if $data.len() > $index && $data[$index] != $skip_val {
+            $map.insert(
+                $name.to_string(),
+                ExifValue::Ascii($decoder($data[$index]).to_string()),
+            );
+        }
+    };
+
+    // With i16 cast before decoding
+    ($map:expr, $data:expr, $index:expr, $name:expr, $decoder:expr, cast: i16) => {
+        if $data.len() > $index {
+            $map.insert(
+                $name.to_string(),
+                ExifValue::Ascii($decoder($data[$index] as i16).to_string()),
+            );
+        }
+    };
+
+    // With i16 cast and skip condition
+    ($map:expr, $data:expr, $index:expr, $name:expr, $decoder:expr, cast: i16, skip_if: $skip_val:expr) => {
+        if $data.len() > $index && $data[$index] != $skip_val {
+            $map.insert(
+                $name.to_string(),
+                ExifValue::Ascii($decoder($data[$index] as i16).to_string()),
+            );
+        }
+    };
+
+    // Simple decode - call decoder function on data[index] (MUST be last - catches everything)
+    ($map:expr, $data:expr, $index:expr, $name:expr, $decoder:expr) => {
+        if $data.len() > $index {
+            $map.insert(
+                $name.to_string(),
+                ExifValue::Ascii($decoder($data[$index]).to_string()),
+            );
+        }
+    };
+}
+
+/// Generate PictureStyle fields for Canon ColorData
+///
+/// Each picture style has 6 fields at fixed offsets:
+/// - +0x00: Contrast
+/// - +0x04: Sharpness (actually +0x02 in i16 index)
+/// - +0x08: Saturation (actually +0x04)
+/// - +0x0c: ColorTone (actually +0x06)
+/// - +0x10: FilterEffect (actually +0x08) - typically not decoded
+/// - +0x14: ToningEffect (actually +0x0a) - typically not decoded
+///
+/// # Example
+/// ```ignore
+/// decode_picture_styles!(decoded, data,
+///     0x00 => "Standard",
+///     0x0c => "Portrait",
+///     0x18 => "Landscape",
+/// );
+/// ```
+#[macro_export]
+macro_rules! decode_picture_styles {
+    ($map:expr, $data:expr, $($base_idx:expr => $style:literal),* $(,)?) => {
+        $(
+            // Contrast
+            if $data.len() > $base_idx {
+                let val = $data[$base_idx] as i16;
+                $map.insert(
+                    concat!("Contrast", $style).to_string(),
+                    ExifValue::SShort(vec![val]),
+                );
+            }
+            // Sharpness (+1 index = +2 bytes)
+            if $data.len() > $base_idx + 1 {
+                let val = $data[$base_idx + 1] as i16;
+                $map.insert(
+                    concat!("Sharpness", $style).to_string(),
+                    ExifValue::SShort(vec![val]),
+                );
+            }
+            // Saturation (+2 index = +4 bytes)
+            if $data.len() > $base_idx + 2 {
+                let val = $data[$base_idx + 2] as i16;
+                $map.insert(
+                    concat!("Saturation", $style).to_string(),
+                    ExifValue::SShort(vec![val]),
+                );
+            }
+            // ColorTone (+3 index = +6 bytes)
+            if $data.len() > $base_idx + 3 {
+                let val = $data[$base_idx + 3] as i16;
+                $map.insert(
+                    concat!("ColorTone", $style).to_string(),
+                    ExifValue::SShort(vec![val]),
+                );
+            }
+        )*
+    };
+}
+
 #[cfg(test)]
 mod tests {
     // Test with different mappings for exiftool and exiv2

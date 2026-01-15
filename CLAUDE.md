@@ -128,6 +128,91 @@ constexpr TagDetails canonFocusMode[] = {
 };
 ```
 
+### Macros for Tag Decoding (`src/macros.rs`)
+
+Use these macros to reduce boilerplate when adding new tag decoders:
+
+#### `define_tag_decoder!` - Generate dual exiftool/exiv2 decode functions
+
+```rust
+// When exiftool and exiv2 have DIFFERENT mappings:
+define_tag_decoder! {
+    white_balance,
+    exiftool: {
+        1 => "Auto",
+        2 => "Daylight",
+        4 => "Incandescent",
+    },
+    exiv2: {
+        1 => "Auto",
+        2 => "Daylight",
+        4 => "Halogen",  // Different name in exiv2
+    }
+}
+
+// When both formats use the SAME mappings:
+define_tag_decoder! {
+    focus_mode,
+    both: {
+        1 => "Auto",
+        2 => "Manual",
+        4 => "Auto, Focus button",
+    }
+}
+
+// With explicit type (default is u16):
+define_tag_decoder! {
+    adjustment,
+    type: i32,
+    both: {
+        -2 => "-2",
+        -1 => "-1",
+        0 => "0",
+        1 => "+1",
+    }
+}
+```
+
+This generates `decode_white_balance_exiftool()` and `decode_white_balance_exiv2()` functions.
+
+#### `decode_field!` - Extract fields from binary arrays
+
+Use in decode functions that process `&[u16]` arrays (like CameraSettings, ShotInfo):
+
+```rust
+pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Simple decode - call decoder function on data[index]
+    decode_field!(decoded, data, 7, "FocusMode", decode_focus_mode_exiftool);
+
+    // With skip condition - skip if value equals skip_value
+    decode_field!(decoded, data, 19, "AFPoint", decode_af_point_exiftool, skip_if: 0);
+
+    // Raw numeric output (no decoder function)
+    decode_field!(decoded, data, 5, "RawValue", raw_u16);
+    decode_field!(decoded, data, 6, "SignedValue", raw_i16);
+
+    // With i16 cast before decoding (for signed values stored as u16)
+    decode_field!(decoded, data, 9, "Contrast", decode_contrast_exiftool, cast: i16);
+
+    decoded
+}
+```
+
+#### `decode_picture_styles!` - Canon PictureStyle fields
+
+For Canon ColorData PictureStyleInfo sections (9 styles × 4 fields each):
+
+```rust
+decode_picture_styles!(decoded, data,
+    0x00 => "Standard",
+    0x06 => "Portrait",
+    0x0c => "Landscape",
+    // ... generates ContrastStandard, SharpnessStandard, SaturationStandard, ColorToneStandard, etc.
+);
+```
+
 ### Decode Function Naming Convention
 
 All value-to-string decode functions MUST have format suffixes:
