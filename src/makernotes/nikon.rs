@@ -222,6 +222,7 @@ pub const NIKON_RETOUCH_INFO: u16 = 0x00BB;
 pub const NIKON_PICTURE_CONTROL_VERSION: u16 = 0x00BC;
 pub const NIKON_SILENT_PHOTO: u16 = 0x00BD;
 pub const NIKON_SHUTTER_MODE: u16 = 0x0034;
+pub const NIKON_HDR_INFO: u16 = 0x0035;
 pub const NIKON_MECHANICAL_SHUTTER_COUNT: u16 = 0x0037;
 
 // PictureControl sub-IFD tags (indices in tag 0x0023)
@@ -714,6 +715,16 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_FACE_DETECT => Some("FaceDetect"),
         NIKON_WORLD_TIME => Some("WorldTime"),
         NIKON_ISO_INFO => Some("ISOInfo"),
+        NIKON_SHUTTER_MODE => Some("ShutterMode"),
+        NIKON_HDR_INFO => Some("HDRInfo"),
+        NIKON_MECHANICAL_SHUTTER_COUNT => Some("MechanicalShutterCount"),
+        NIKON_NEF_BIT_DEPTH => Some("NEFBitDepth"),
+        NIKON_IMAGE_PROCESSING => Some("ImageProcessing"),
+        NIKON_MULTI_EXPOSURE => Some("MultiExposure"),
+        NIKON_AF_INFO_2 => Some("AFInfo2"),
+        NIKON_FILE_INFO => Some("FileInfo"),
+        NIKON_FLASH_INFO_2 => Some("FlashInfo"),
+        NIKON_SCENE_ASSIST => Some("SceneAssist"),
         _ => None,
     }
 }
@@ -1307,6 +1318,21 @@ define_tag_decoder! {
         0 => "None",
         1 => "Auto release",
         2 => "Manual release",
+    }
+}
+
+// ShutterMode (tag 0x0034): Nikon.pm
+define_tag_decoder! {
+    shutter_mode,
+    both: {
+        0 => "Mechanical",
+        16 => "Electronic",
+        33 => "Unknown (33)",
+        48 => "Electronic Front Curtain",
+        64 => "Electronic (Movie)",
+        80 => "Auto (Mechanical)",
+        81 => "Auto (Electronic Front Curtain)",
+        96 => "Electronic (High Speed)",
     }
 }
 
@@ -2023,7 +2049,7 @@ fn format_flash_firmware(major: u8, minor: u8) -> String {
 }
 
 /// Parse FaceDetect tag data (tag 0x0021)
-/// Extracts FacesDetected count
+/// Extracts FaceDetectFrameSize and FacesDetected
 fn parse_face_detect(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
@@ -2031,6 +2057,22 @@ fn parse_face_detect(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
     // Index 0x00: unknown (bytes 0-1)
     // Index 0x01-0x02: FaceDetectFrameSize int16u[2] (bytes 2-5)
     // Index 0x03: FacesDetected int16u (bytes 6-7)
+    if data.len() >= 6 {
+        // FaceDetectFrameSize: Width x Height
+        let width = match endian {
+            Endianness::Big => u16::from_be_bytes([data[2], data[3]]),
+            Endianness::Little => u16::from_le_bytes([data[2], data[3]]),
+        };
+        let height = match endian {
+            Endianness::Big => u16::from_be_bytes([data[4], data[5]]),
+            Endianness::Little => u16::from_le_bytes([data[4], data[5]]),
+        };
+        tags.push((
+            "FaceDetectFrameSize".to_string(),
+            format!("{} {}", width, height),
+        ));
+    }
+
     if data.len() >= 8 {
         let faces = match endian {
             Endianness::Big => u16::from_be_bytes([data[6], data[7]]),
@@ -2529,6 +2571,76 @@ fn parse_multi_exposure(data: &[u8]) -> Vec<(String, String)> {
             "MultiExposureAutoGain".to_string(),
             auto_gain_str.to_string(),
         ));
+    }
+
+    tags
+}
+
+/// Parse HDRInfo tag data (tag 0x0035)
+/// Structure: HDRInfoVersion (string[4]) + HDR (byte) + HDRLevel (byte) + HDRSmoothing (byte) + HDRLevel2 (byte)
+fn parse_hdr_info(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 4 {
+        return tags;
+    }
+
+    // Offset 0x00: HDRInfoVersion (string[4])
+    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    tags.push(("HDRInfoVersion".to_string(), version.clone()));
+
+    // Offset 0x04: HDR (int8u)
+    if data.len() > 4 {
+        let hdr = data[4];
+        let hdr_str = match hdr {
+            0 => "Off",
+            1 => "On (normal)",
+            48 => "Auto",
+            _ => "Unknown",
+        };
+        tags.push(("HDR".to_string(), hdr_str.to_string()));
+    }
+
+    // Offset 0x05: HDRLevel (int8u)
+    if data.len() > 5 {
+        let level = data[5];
+        let level_str = match level {
+            0 => "Auto",
+            1 => "1 EV",
+            2 => "2 EV",
+            3 => "3 EV",
+            255 => "n/a",
+            _ => "Unknown",
+        };
+        tags.push(("HDRLevel".to_string(), level_str.to_string()));
+    }
+
+    // Offset 0x06: HDRSmoothing (int8u)
+    if data.len() > 6 {
+        let smoothing = data[6];
+        let smoothing_str = match smoothing {
+            0 => "Off",
+            1 => "Normal",
+            2 => "Low",
+            3 => "High",
+            48 => "Auto",
+            _ => "Unknown",
+        };
+        tags.push(("HDRSmoothing".to_string(), smoothing_str.to_string()));
+    }
+
+    // Offset 0x07: HDRLevel2 (int8u) - for HDRInfoVersion 0101+
+    if data.len() > 7 && version != "0100" {
+        let level2 = data[7];
+        let level2_str = match level2 {
+            0 => "Auto",
+            1 => "1 EV",
+            2 => "2 EV",
+            3 => "3 EV",
+            255 => "n/a",
+            _ => "Unknown",
+        };
+        tags.push(("HDRLevel2".to_string(), level2_str.to_string()));
     }
 
     tags
@@ -5265,6 +5377,17 @@ pub fn parse_nikon_maker_notes(
                     } else if tag_id == NIKON_SHOOTING_MODE && !bytes.is_empty() {
                         // ShootingMode can be stored as Byte on older cameras
                         ExifValue::Ascii(decode_shooting_mode_exiftool(bytes[0] as u16))
+                    } else if tag_id == NIKON_IMAGE_PROCESSING {
+                        // ImageProcessing can be stored as BYTE
+                        // If 1 byte, output as decimal; otherwise decode as ASCII
+                        if bytes.len() == 1 {
+                            ExifValue::Ascii(bytes[0].to_string())
+                        } else {
+                            let s = String::from_utf8_lossy(&bytes)
+                                .trim_end_matches('\0')
+                                .to_string();
+                            ExifValue::Ascii(decode_image_processing_exiftool(&s))
+                        }
                     } else {
                         ExifValue::Byte(bytes)
                     }
@@ -5339,6 +5462,7 @@ pub fn parse_nikon_maker_notes(
                             NIKON_SILENT_PHOTOGRAPHY => {
                                 Some(decode_silent_photography_exiftool(v).to_string())
                             }
+                            NIKON_SHUTTER_MODE => Some(decode_shutter_mode_exiftool(v).to_string()),
                             _ => None,
                         };
 
@@ -5422,6 +5546,9 @@ pub fn parse_nikon_maker_notes(
                         } else {
                             ExifValue::Long(values)
                         }
+                    } else if tag_id == NIKON_IMAGE_PROCESSING && values.len() == 1 {
+                        // ImageProcessing stored as LONG - output as decimal string
+                        ExifValue::Ascii(values[0].to_string())
                     } else {
                         ExifValue::Long(values)
                     }
@@ -5577,6 +5704,20 @@ pub fn parse_nikon_maker_notes(
                                 ExifValue::Rational(vec![(int_val, 100)])
                             } else {
                                 ExifValue::Undefined(value_bytes)
+                            }
+                        }
+                        // ImageProcessing can be stored as UNDEFINED
+                        // If 1 byte (count==1), output as decimal; otherwise decode as ASCII
+                        NIKON_IMAGE_PROCESSING => {
+                            if count == 1 {
+                                // Single byte - output as decimal (matches ExifTool)
+                                ExifValue::Ascii(value_bytes[0].to_string())
+                            } else {
+                                // Multiple bytes - decode as ASCII string
+                                let s = String::from_utf8_lossy(&value_bytes[..count as usize])
+                                    .trim_end_matches('\0')
+                                    .to_string();
+                                ExifValue::Ascii(decode_image_processing_exiftool(&s))
                             }
                         }
                         _ => ExifValue::Undefined(value_bytes),
@@ -5745,6 +5886,19 @@ pub fn parse_nikon_maker_notes(
                                     ExifValue::Ascii(val),
                                 )
                             };
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_HDR_INFO => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_hdr_info(bytes) {
+                            let tag_id = 0x9180 + tags.len() as u16;
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some(Box::leak(name.into_boxed_str())),
+                                ExifValue::Ascii(val),
+                            );
                             tags.insert(tag_id, tag);
                         }
                     }

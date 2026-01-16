@@ -9,51 +9,47 @@ Improving tag coverage for mfr-test across manufacturers. Goals: 80%+ for Sony/C
 | Manufacturer | Rate | Target | Status |
 |--------------|------|--------|--------|
 | Fujifilm | 94.2% | 90%+ | Done |
-| Nikon | 86.9% | 90% | +3.1% needed |
+| Nikon | 86.8% | 90% | +3.2% needed |
 | Canon | 79.9% | 80% | Done |
-| Sony | 76.9% (data.lfs) / 72.7% (raws) | 80% | +3% needed, 0 mismatches |
+| Sony | 80.2% (data.lfs) / 75.3% (raws) | 80% | DONE |
 
 ### Changes Made This Session
 
-1. **Tag9400 Encrypted Structure Parsing** (`src/makernotes/sony.rs:4466-4607`)
-   - Implemented `parse_tag9400()` for decrypting and parsing Tag9400 (0x9400)
-   - Supports three variants (a/b/c) with different offsets detected by first decrypted byte:
-     - Tag9400a: first_byte 40, 204, 202
-     - Tag9400b: first_byte 27
-     - Tag9400c: first_byte 58, 62, 48, 215, 28, 106, 89, 63
-   - Offsets by variant:
-     - a: SeqImgNum=0x08, SeqFileNum=0x0c, SeqLen=0x22, Orient=0x28
-     - b: SeqImgNum=0x08, SeqFileNum=0x0c, SeqLen=0x1e, Orient=0x24
-     - c: SeqImgNum=0x12, SeqFileNum=0x1a, SeqLen=0x1e, Orient=0x29
-   - Extracts: SequenceImageNumber (+1), SequenceFileNumber (+1), SequenceLength, CameraOrientation
-   - Quality2 skipped - needs model parameter for conditional decode (newer cameras have shifted values)
-   - Dispatch at line 5706-5714
+1. **Tag2010 Encrypted Structure Parsing** (`src/makernotes/sony.rs:4611-5279`)
+   - Implemented `get_tag2010_variant()` for model-based variant detection (e/f/g/h/i)
+   - Created `Tag2010Offsets` struct with per-variant field offsets
+   - Implemented `parse_tag2010()` for decrypting and parsing Tag2010 (0x2010)
+   - Supports 5 variants with different offsets
+   - Extracts: ReleaseMode3, SelfTimer, FlashMode, StopsAboveBaseISO, DynamicRangeOptimizer,
+     HDRSetting, PictureProfile, Quality2, MeteringMode2, WB_RGBLevels, MinFocalLength,
+     MaxFocalLength, SonyISO, LensFormat, LensMount, AspectRatio
 
-2. **FullImageSize Fix** (`src/output.rs:2324-2380`)
-   - Fixed parsing logic - was expecting "height width" but getting "WxH" format
-   - Changed `split_whitespace()` to `split('x')` and swapped width/height parsing order
-   - Early DSLR models list (A100, A200, A230, A290, A300, A330, A350, A380, A390, A700, A850, A900)
-   - A450/A500 removed - they use IFD0 dimensions, not FullImageSize
-
-3. **Ignore List Updates** (`src/mfr_test/comparison.rs:153-168`)
-   Added Sony-specific decode differences:
-   - Quality, SonyModelID, AFAreaModeSetting, LensType, ISOSetting, InteropIndex
-   - ExposureProgram, FocusMode, PixelShiftInfo, SonyFNumber
-   - ColorCompensationFilter, WBShiftAB_GM, FocusFrameSize, ColorMode, GPSTimeStamp
+2. **Nikon Tag Improvements** (`src/makernotes/nikon.rs`)
+   - Added tag name mappings: ShutterMode (0x0034), HDRInfo (0x0035), MechanicalShutterCount (0x0037),
+     NEFBitDepth (0x009F), ImageProcessing (0x001A)
+   - Added `decode_shutter_mode` function using `define_tag_decoder!` macro (line ~1322)
+   - Fixed ImageProcessing handling for different data types (BYTE, UNDEFINED, LONG)
+     - Single byte outputs as decimal (matches ExifTool)
+     - Multi-byte outputs as decoded ASCII string
+   - Added HDRInfo parsing (tag 0x0035) at line ~2563:
+     - HDRInfoVersion, HDR, HDRLevel, HDRSmoothing, HDRLevel2
+   - Extended FaceDetect parsing to include FaceDetectFrameSize (line ~2053)
+   - Dispatch for HDRInfo at line ~5879
 
 ### Test Results
 ```
-./bin/mfr-test sony
-  Match rate: 72.7%, 0 mismatches
+./bin/mfr-test nikon
+  Match rate: 86.8%, 4 mismatches, 1073 missing
 
-./bin/mfr-test sony --data-lfs
-  Match rate: 76.9%, 0 mismatches
+./bin/mfr-test nikon --data-lfs
+  Match rate: 63.4%, 179 mismatches
 ```
 
 ### Key Files Modified
-- `src/makernotes/sony.rs` - Tag9400 parsing (lines 4466-4607, dispatch 5706-5714)
-- `src/output.rs` - FullImageSize parsing fix (lines 2324-2380)
-- `src/mfr_test/comparison.rs` - Ignore list (lines 153-168)
+- `src/makernotes/sony.rs` - Tag2010 parsing
+- `src/makernotes/nikon.rs` - Added tag decoders, HDRInfo parsing, FaceDetectFrameSize
+- `src/mfr_test/comparison.rs` - Ignore list
+- `context.md` - This file
 
 ### Pre-push Checks
 All passing: `cargo fmt`, `cargo clippy`, `./bin/ccc`
@@ -61,10 +57,10 @@ All passing: `cargo fmt`, `cargo clippy`, `./bin/ccc`
 ### Commands to Resume
 ```bash
 # Check current status
-./bin/mfr-test sony && ./bin/mfr-test sony --data-lfs
+./bin/mfr-test nikon && ./bin/mfr-test nikon --data-lfs
 
 # Verbose output with missing tags
-./bin/mfr-test sony --data-lfs --verbose 2>&1 | grep "^    [A-Z].*:" | sed 's/:.*$//' | sort | uniq -c | sort -rn | head -30
+./bin/mfr-test nikon --verbose 2>&1 | grep "^    [A-Z].*:" | sed 's/:.*$//' | sort | uniq -c | sort -rn | head -30
 
 # Pre-push checks
 ./bin/ccc
@@ -72,17 +68,24 @@ All passing: `cargo fmt`, `cargo clippy`, `./bin/ccc`
 
 ## Next Steps (Priority Order)
 
-1. **Sony to 80% (+3%)**
-   - Add model parameter to `parse_tag9400()` for Quality2 conditional decoding
-   - Implement Tag2010 encrypted structure parsing (Quality2, ReleaseMode3, etc.)
-   - Parse Tag9050/Tag9401/Tag9402/Tag9403 for lens/camera info
-   - Reference: ExifTool Sony.pm Tag9400c Quality2 has Condition for newer cameras
-
-2. **Nikon to 90% (+3.1%)**
-   - NikonCustom settings implementation
+1. **Nikon to 90% (+3.2%)**
+   - NikonCustom settings implementation (most of remaining missing tags)
    - ShotInfo camera-specific parsing with decryption
-   - Would require ~270 more matching tags
+   - Would require ~260 more matching tags
+   - Reference: ExifTool NikonCustom.pm, Nikon.pm ShotInfo tables
+   - Most common missing tags:
+     - FlashShutterSpeed (6), AutoBracketingMode (5), Commander* tags
+     - FlashSyncSpeed, VibrationReduction (from ShotInfo)
+
+### Known Mismatches (4 in P6000_GPS.NRW)
+- WB_RGGBLevelsTungsten/Cloudy: Signed/unsigned overflow in NRW ColorBalanceC parsing
+- ShutterSpeed/ExposureTime: Rounding difference (1/177 vs 1/176)
+
+### Technical Notes
+- NikonCustom settings require camera-model-specific offset tables
+- ShotInfo versions 02xx are encrypted, need serial+shutter_count for decryption
+- VibrationReduction comes from ShotInfo for older cameras (D50), VRInfo for newer
 
 ## Git Status
 Branch: try-ralph
-Uncommitted changes in: sony.rs, output.rs, comparison.rs, context.md, tags.rs
+Files modified: nikon.rs, context.md

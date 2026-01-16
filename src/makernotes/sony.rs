@@ -418,6 +418,28 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         0x9106 => Some("LensFormat"),
         0x9107 => Some("LensType2"),
         0x9109 => Some("LensType"),
+        // Synthetic Tag9400 subdirectory field IDs
+        0xF408 => Some("SequenceImageNumber"),
+        0xF40C => Some("SequenceFileNumber"),
+        0xF422 => Some("SequenceLength"),
+        0xF428 => Some("CameraOrientation"),
+        // Synthetic Tag2010 subdirectory field IDs
+        0xF204 => Some("ReleaseMode3"),
+        0xF210 => Some("SelfTimer"),
+        0xF211 => Some("FlashMode"),
+        0xF217 => Some("StopsAboveBaseISO"),
+        0xF21B => Some("DynamicRangeOptimizer"),
+        0xF21F => Some("HDRSetting"),
+        0xF237 => Some("PictureProfile"),
+        0xF247 => Some("Quality2"),
+        0xF24B => Some("MeteringMode2"),
+        0xF264 => Some("WB_RGBLevels"),
+        0xF30C => Some("MinFocalLength"),
+        0xF30E => Some("MaxFocalLength"),
+        0xF320 => Some("SonyISO"),
+        0xF7F1 => Some("LensFormat"),
+        0xF7F2 => Some("LensMount"),
+        0xF88C => Some("AspectRatio"),
         // CameraSettings sub-tags (virtual IDs)
         CS_SHARPNESS => Some("Sharpness"),
         CS_CONTRAST => Some("Contrast"),
@@ -4608,6 +4630,671 @@ fn parse_tag9400(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerN
     // TODO: Add model parameter and implement conditional decoding
 }
 
+/// Tag2010 variant identification based on camera model
+/// Returns variant letter ('e', 'f', 'g', 'h', 'i') or None if not supported
+fn get_tag2010_variant(model: Option<&str>) -> Option<char> {
+    let model = model?;
+
+    // Tag2010i - newest cameras (ILCE-9, 7M3, 7RM3, 7RM4, 6100, 6400, 6600, 7C, etc.)
+    // ZV-* models, DSC-RX10M4, RX100M6/M5A/M7, HX95/HX99, RX0M2
+    if model.contains("ILCE-9")
+        || model.contains("ILCE-7M3")
+        || model.contains("ILCE-7RM3")
+        || model.contains("ILCE-7RM4")
+        || model.contains("ILCE-7RM5")
+        || model.contains("ILCE-7M4")
+        || model.contains("ILCE-7C")
+        || model.contains("ILCE-6100")
+        || model.contains("ILCE-6400")
+        || model.contains("ILCE-6600")
+        || model.contains("ILCE-6700")
+        || model.contains("ILCE-1")
+        || model.contains("ZV-")
+        || model.contains("ILME-FX")
+        || model.contains("DSC-RX10M4")
+        || model.contains("DSC-RX100M6")
+        || model.contains("DSC-RX100M5A")
+        || model.contains("DSC-RX100M7")
+        || model.contains("DSC-HX95")
+        || model.contains("DSC-HX99")
+        || model.contains("DSC-RX0M2")
+    {
+        return Some('i');
+    }
+
+    // Tag2010h - ILCE-6300/6500/7RM2/7SM2, ILCA-99M2, DSC-RX0/RX1RM2/RX10M2/M3/RX100M4/M5
+    if model.contains("ILCE-6300")
+        || model.contains("ILCE-6500")
+        || model.contains("ILCE-7RM2")
+        || model.contains("ILCE-7SM2")
+        || model.contains("ILCA-99M2")
+        || model.contains("DSC-RX0")
+        || model.contains("DSC-RX1RM2")
+        || model.contains("DSC-RX10M2")
+        || model.contains("DSC-RX10M3")
+        || model.contains("DSC-RX100M4")
+        || model.contains("DSC-RX100M5")
+        || model.contains("DSC-HX80")
+        || model.contains("DSC-HX90")
+        || model.contains("DSC-WX500")
+    {
+        // Exclude RX0M2 (it's variant i) and RX100M5A (variant i)
+        if model.contains("RX0M2") || model.contains("RX100M5A") {
+            return Some('i');
+        }
+        return Some('h');
+    }
+
+    // Tag2010g - ILCE-7/7R/7S/7M2/5000/5100/6000/QX1, ILCA-68/77M2, DSC-RX10/RX100M3/HX60V/HX350/HX400V
+    if model.contains("ILCE-7R")
+        || model.contains("ILCE-7S")
+        || model.contains("ILCE-7M2")
+        || model.contains("ILCE-5000")
+        || model.contains("ILCE-5100")
+        || model.contains("ILCE-6000")
+        || model.contains("ILCE-QX1")
+        || model.contains("ILCA-68")
+        || model.contains("ILCA-77M2")
+        || model.contains("DSC-RX10")
+        || model.contains("DSC-RX100M3")
+        || model.contains("DSC-HX60")
+        || model.contains("DSC-HX350")
+        || model.contains("DSC-HX400")
+        || model.contains("DSC-WX220")
+        || model.contains("DSC-WX350")
+        || model.contains("DSC-QX30")
+    {
+        // Check for ILCE-7 (not 7R/7S/7M2/etc.) - the basic A7
+        if model == "ILCE-7" || model.starts_with("ILCE-7 ") {
+            return Some('g');
+        }
+        // Exclude models that are in later variants
+        if model.contains("ILCE-7RM2")
+            || model.contains("ILCE-7SM2")
+            || model.contains("DSC-RX10M2")
+            || model.contains("DSC-RX10M3")
+            || model.contains("DSC-RX10M4")
+        {
+            return None; // Will be handled by h or i
+        }
+        return Some('g');
+    }
+
+    // Check for ILCE-7 (basic A7, not in any variant check above)
+    if model == "ILCE-7" {
+        return Some('g');
+    }
+
+    // Tag2010f - DSC-RX100M2, QX10, QX100
+    if model.contains("DSC-RX100M2") || model.contains("DSC-QX10") || model.contains("DSC-QX100") {
+        return Some('f');
+    }
+
+    // Tag2010e - SLT-A99/A58, NEX-3N/5R/5T/6/VG900/VG30E, ILCE-3000/3500, DSC-RX100/RX1/RX1R
+    if model.contains("SLT-A99")
+        || model.contains("SLT-A58")
+        || model.contains("NEX-3N")
+        || model.contains("NEX-5R")
+        || model.contains("NEX-5T")
+        || model.contains("NEX-6")
+        || model.contains("NEX-VG900")
+        || model.contains("NEX-VG30")
+        || model.contains("ILCE-3000")
+        || model.contains("ILCE-3500")
+        || model.contains("DSC-RX100")
+        || model.contains("DSC-RX1R")
+        || model.contains("DSC-RX1")
+        || model.contains("DSC-HX300")
+        || model.contains("DSC-HX50")
+        || model.contains("DSC-TX30")
+        || model.contains("DSC-WX60")
+        || model.contains("DSC-WX80")
+        || model.contains("DSC-WX200")
+        || model.contains("DSC-WX300")
+    {
+        // Exclude models that are in later variants
+        if model.contains("DSC-RX100M") || model.contains("DSC-RX1RM") {
+            return None;
+        }
+        return Some('e');
+    }
+
+    None // Unsupported model
+}
+
+/// Tag2010 offset structure for each variant
+struct Tag2010Offsets {
+    release_mode3: usize,
+    self_timer: usize,
+    flash_mode: usize,
+    gain: usize, // StopsAboveBaseISO
+    dro: usize,  // DynamicRangeOptimizer
+    hdr: usize,  // HDRSetting
+    picture_profile: usize,
+    quality2: usize,
+    metering_mode: usize,
+    wb_rgb_levels: usize,
+    min_focal_length: usize,
+    max_focal_length: usize,
+    sony_iso: usize,
+    lens_format: usize,
+    lens_mount: usize,
+    aspect_ratio: usize,
+}
+
+fn get_tag2010_offsets(variant: char) -> Tag2010Offsets {
+    match variant {
+        'e' => Tag2010Offsets {
+            release_mode3: 0x115c,
+            self_timer: 0x1168,
+            flash_mode: 0x116c,
+            gain: 0x1172,
+            dro: 0x1178,
+            hdr: 0x117c,
+            picture_profile: 0x1196,
+            quality2: 0x11a8,
+            metering_mode: 0x11ac,
+            wb_rgb_levels: 0x11b4,
+            min_focal_length: 0, // Model-specific, disabled
+            max_focal_length: 0, // Model-specific, disabled
+            sony_iso: 0,         // Model-specific, disabled (0x1254 or 0x1258 or 0x1280)
+            lens_format: 0x1891,
+            lens_mount: 0x1892,
+            aspect_ratio: 0, // Model-specific, disabled (0x192c or 0x1a88)
+        },
+        'f' => Tag2010Offsets {
+            // Tag2010f - DSC-RX100M2, QX10, QX100
+            release_mode3: 0x1014,
+            self_timer: 0x1020,
+            flash_mode: 0x1024,
+            gain: 0x102a,
+            dro: 0x1030,
+            hdr: 0x1034,
+            picture_profile: 0x104e,
+            quality2: 0x1060,
+            metering_mode: 0x1064,
+            wb_rgb_levels: 0x106c,
+            min_focal_length: 0x1136,
+            max_focal_length: 0x1138,
+            sony_iso: 0x113c,
+            lens_format: 0, // Not in f
+            lens_mount: 0,
+            aspect_ratio: 0x192c,
+        },
+        'g' => Tag2010Offsets {
+            release_mode3: 0x020c,
+            self_timer: 0x0218,
+            flash_mode: 0x021c,
+            gain: 0x0222,
+            dro: 0x0228,
+            hdr: 0x022c,
+            picture_profile: 0x0246,
+            quality2: 0x0258,
+            metering_mode: 0x025c,
+            wb_rgb_levels: 0x0264,
+            min_focal_length: 0x032e,
+            max_focal_length: 0x0330,
+            sony_iso: 0x0344,
+            lens_format: 0x18bd,
+            lens_mount: 0x18be,
+            aspect_ratio: 0x1958,
+        },
+        'h' => Tag2010Offsets {
+            release_mode3: 0x020c,
+            self_timer: 0x0218,
+            flash_mode: 0x021c,
+            gain: 0x0222,
+            dro: 0x0228,
+            hdr: 0x022c,
+            picture_profile: 0x0246,
+            quality2: 0x0258,
+            metering_mode: 0x025c,
+            wb_rgb_levels: 0x0264,
+            min_focal_length: 0x032e,
+            max_focal_length: 0x0330,
+            sony_iso: 0x0346,
+            lens_format: 0x18ed,
+            lens_mount: 0x18ee,
+            aspect_ratio: 0x192c,
+        },
+        'i' => Tag2010Offsets {
+            release_mode3: 0x0204,
+            self_timer: 0x0210,
+            flash_mode: 0x0211,
+            gain: 0x0217,
+            dro: 0x021b,
+            hdr: 0x021f,
+            picture_profile: 0x0237,
+            quality2: 0x0247,
+            metering_mode: 0x024b,
+            wb_rgb_levels: 0x0252,
+            min_focal_length: 0x030c,
+            max_focal_length: 0x030e,
+            sony_iso: 0x0320,
+            lens_format: 0x17f1,
+            lens_mount: 0x17f2,
+            aspect_ratio: 0x188c,
+        },
+        _ => get_tag2010_offsets('g'), // Default to 'g'
+    }
+}
+
+/// Parse Tag2010 encrypted subdirectory
+/// Reference: exiftool/lib/Image/ExifTool/Sony.pm Tag2010a-i tables
+/// Contains: PictureProfile, StopsAboveBaseISO, Quality2, SonyISO, ReleaseMode3,
+///           SelfTimer, FlashMode, HDRSetting, WB_RGBLevels, focal length info, etc.
+fn parse_tag2010(
+    data: &[u8],
+    endian: Endianness,
+    model: Option<&str>,
+    tags: &mut HashMap<u16, MakerNoteTag>,
+) {
+    // Determine variant based on model
+    let variant = match get_tag2010_variant(model) {
+        Some(v) => v,
+        None => return, // Unsupported model
+    };
+
+    let offsets = get_tag2010_offsets(variant);
+
+    // Tag2010 data is encrypted - decrypt it first
+    let decrypted = sony_decipher(data);
+    let data = &decrypted[..];
+
+    // Helper to read u16 at offset
+    let read_u16_at = |offset: usize| -> Option<u16> {
+        if data.len() >= offset + 2 {
+            Some(match endian {
+                Endianness::Little => u16::from_le_bytes([data[offset], data[offset + 1]]),
+                Endianness::Big => u16::from_be_bytes([data[offset], data[offset + 1]]),
+            })
+        } else {
+            None
+        }
+    };
+
+    // ReleaseMode3 (0xF0204)
+    if offsets.release_mode3 > 0 && data.len() > offsets.release_mode3 {
+        let v = data[offsets.release_mode3];
+        let decoded = match v {
+            0 => "Normal",
+            1 => "Continuous",
+            2 => "Bracketing",
+            4 => "Continuous - Burst",
+            5 => "Continuous - Speed/Advance Priority",
+            6 => "Normal - Self-timer",
+            9 => "Single Burst Shooting",
+            _ => "",
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF204,
+                MakerNoteTag::new(
+                    0xF204,
+                    Some("ReleaseMode3"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // SelfTimer (0xF0210)
+    if offsets.self_timer > 0 && data.len() > offsets.self_timer {
+        let v = data[offsets.self_timer];
+        // Variant 'i' and 'h' use selfTimerB (5 or 10 s combined), others use selfTimer (10 s separate)
+        let decoded = if variant == 'i' || variant == 'h' {
+            match v {
+                0 => "Off",
+                1 => "Self-timer 5 or 10 s",
+                2 => "Self-timer 2 s",
+                _ => "",
+            }
+        } else {
+            match v {
+                0 => "Off",
+                1 => "Self-timer 10 s",
+                2 => "Self-timer 2 s",
+                _ => "",
+            }
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF210,
+                MakerNoteTag::new(
+                    0xF210,
+                    Some("SelfTimer"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // FlashMode (0xF211)
+    if offsets.flash_mode > 0 && data.len() > offsets.flash_mode {
+        let v = data[offsets.flash_mode];
+        let decoded = match v {
+            0 => "Autoflash",
+            1 => "Fill-flash",
+            2 => "Flash Off",
+            3 => "Slow Sync",
+            4 => "Rear Sync",
+            6 => "Wireless",
+            _ => "",
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF211,
+                MakerNoteTag::new(
+                    0xF211,
+                    Some("FlashMode"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // StopsAboveBaseISO / Gain (0xF217) - int16u, ValueConv => '16 - $val/256'
+    if offsets.gain > 0 {
+        if let Some(v) = read_u16_at(offsets.gain) {
+            let stops = 16.0 - (v as f64 / 256.0);
+            // Format: "0" for 0, otherwise "%.1f"
+            let formatted = if stops.abs() < 0.01 {
+                "0".to_string()
+            } else {
+                format!("{:.1}", stops)
+            };
+            tags.insert(
+                0xF217,
+                MakerNoteTag::new(
+                    0xF217,
+                    Some("StopsAboveBaseISO"),
+                    ExifValue::Ascii(formatted),
+                ),
+            );
+        }
+    }
+
+    // DynamicRangeOptimizer (0xF21B)
+    if offsets.dro > 0 && data.len() > offsets.dro {
+        let v = data[offsets.dro];
+        let decoded = match v {
+            0 => "Off",
+            1 => "Auto",
+            3 => "Lv1",
+            4 => "Lv2",
+            5 => "Lv3",
+            6 => "Lv4",
+            7 => "Lv5",
+            8 => "n/a",
+            _ => "",
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF21B,
+                MakerNoteTag::new(
+                    0xF21B,
+                    Some("DynamicRangeOptimizer"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // HDRSetting (0xF21F)
+    if offsets.hdr > 0 && data.len() > offsets.hdr {
+        let v = data[offsets.hdr];
+        let decoded = match v {
+            0 => "Off",
+            1 => "HDR Auto",
+            3 => "HDR 1 EV",
+            5 => "HDR 2 EV",
+            7 => "HDR 3 EV",
+            9 => "HDR 4 EV",
+            11 => "HDR 5 EV",
+            13 => "HDR 6 EV",
+            _ => "",
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF21F,
+                MakerNoteTag::new(
+                    0xF21F,
+                    Some("HDRSetting"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // PictureProfile (0xF237)
+    if offsets.picture_profile > 0 && data.len() > offsets.picture_profile {
+        let v = data[offsets.picture_profile];
+        let decoded = match v {
+            0 => "Gamma Still - Standard/Neutral (PP2)",
+            1 => "Gamma Still - Portrait",
+            3 => "Gamma Still - Night View/Portrait",
+            4 => "Gamma Still - B&W/Sepia",
+            5 => "Gamma Still - Clear",
+            6 => "Gamma Still - Deep",
+            7 => "Gamma Still - Light",
+            8 => "Gamma Still - Vivid",
+            9 => "Gamma Still - Real",
+            10 => "Gamma Movie (PP1)",
+            22 => "Gamma ITU709 (PP3 or PP4)",
+            24 => "Gamma Cine1 (PP5)",
+            25 => "Gamma Cine2 (PP6)",
+            26 => "Gamma Cine3",
+            27 => "Gamma Cine4",
+            28 => "Gamma S-Log2 (PP7)",
+            29 => "Gamma ITU709 (800%)",
+            31 => "Gamma S-Log3 (PP8 or PP9)",
+            33 => "Gamma HLG2 (PP10)",
+            34 => "Gamma HLG3",
+            36 => "Off",
+            37 => "FL",
+            38 => "VV2",
+            39 => "IN",
+            40 => "SH",
+            48 => "FL2",
+            49 => "FL3",
+            _ => "",
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF237,
+                MakerNoteTag::new(
+                    0xF237,
+                    Some("PictureProfile"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // Quality2 (0xF247)
+    if offsets.quality2 > 0 && data.len() > offsets.quality2 {
+        let v = data[offsets.quality2];
+        let decoded = match v {
+            0 => "JPEG",
+            1 => "RAW",
+            2 => "RAW + JPEG",
+            _ => "",
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF247,
+                MakerNoteTag::new(
+                    0xF247,
+                    Some("Quality2"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // MeteringMode (0xF24B) - from Tag2010 (different from standard EXIF metering mode)
+    if offsets.metering_mode > 0 && data.len() > offsets.metering_mode {
+        let v = data[offsets.metering_mode];
+        let decoded = match v {
+            0 => "Multi-segment",
+            2 => "Center-weighted average",
+            3 => "Spot",
+            4 => "Average",
+            5 => "Highlight",
+            _ => "",
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF24B,
+                MakerNoteTag::new(
+                    0xF24B,
+                    Some("MeteringMode2"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // WB_RGBLevels (0xF264) - int16u[3]
+    if offsets.wb_rgb_levels > 0 {
+        if let (Some(r), Some(g), Some(b)) = (
+            read_u16_at(offsets.wb_rgb_levels),
+            read_u16_at(offsets.wb_rgb_levels + 2),
+            read_u16_at(offsets.wb_rgb_levels + 4),
+        ) {
+            if r > 0 && g > 0 && b > 0 {
+                tags.insert(
+                    0xF264,
+                    MakerNoteTag::new(
+                        0xF264,
+                        Some("WB_RGBLevels"),
+                        ExifValue::Ascii(format!("{} {} {}", r, g, b)),
+                    ),
+                );
+            }
+        }
+    }
+
+    // FocalLength from Tag2010 (not always available)
+    // Note: ExifTool only outputs this for some models
+
+    // MinFocalLength (0xF30C)
+    if offsets.min_focal_length > 0 {
+        if let Some(v) = read_u16_at(offsets.min_focal_length) {
+            if v > 0 {
+                let focal = v as f64 / 10.0;
+                tags.insert(
+                    0xF30C,
+                    MakerNoteTag::new(
+                        0xF30C,
+                        Some("MinFocalLength"),
+                        ExifValue::Ascii(format!("{:.1} mm", focal)),
+                    ),
+                );
+            }
+        }
+    }
+
+    // MaxFocalLength (0xF30E)
+    if offsets.max_focal_length > 0 {
+        if let Some(v) = read_u16_at(offsets.max_focal_length) {
+            if v > 0 {
+                let focal = v as f64 / 10.0;
+                tags.insert(
+                    0xF30E,
+                    MakerNoteTag::new(
+                        0xF30E,
+                        Some("MaxFocalLength"),
+                        ExifValue::Ascii(format!("{:.1} mm", focal)),
+                    ),
+                );
+            }
+        }
+    }
+
+    // SonyISO (0xF320) - ValueConv => '100 * 2**(16 - $val/256)'
+    if offsets.sony_iso > 0 {
+        if let Some(v) = read_u16_at(offsets.sony_iso) {
+            if v > 0 {
+                let iso = 100.0 * 2.0_f64.powf(16.0 - v as f64 / 256.0);
+                tags.insert(
+                    0xF320,
+                    MakerNoteTag::new(
+                        0xF320,
+                        Some("SonyISO"),
+                        ExifValue::Ascii(format!("{:.0}", iso)),
+                    ),
+                );
+            }
+        }
+    }
+
+    // LensFormat (0xF7F1)
+    if offsets.lens_format > 0 && data.len() > offsets.lens_format {
+        let v = data[offsets.lens_format];
+        let decoded = match v {
+            0 => "Unknown",
+            1 => "APS-C",
+            2 => "Full-frame",
+            _ => "",
+        };
+        if !decoded.is_empty() && v != 0 {
+            tags.insert(
+                0xF7F1,
+                MakerNoteTag::new(
+                    0xF7F1,
+                    Some("LensFormat"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // LensMount (0xF7F2)
+    if offsets.lens_mount > 0 && data.len() > offsets.lens_mount {
+        let v = data[offsets.lens_mount];
+        let decoded = match v {
+            0 => "Unknown",
+            1 => "A-mount",
+            2 => "E-mount",
+            _ => "",
+        };
+        if !decoded.is_empty() && v != 0 {
+            tags.insert(
+                0xF7F2,
+                MakerNoteTag::new(
+                    0xF7F2,
+                    Some("LensMount"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // AspectRatio (0xF88C)
+    if offsets.aspect_ratio > 0 && data.len() > offsets.aspect_ratio {
+        let v = data[offsets.aspect_ratio];
+        let decoded = match v {
+            0 => "16:9",
+            1 => "4:3",
+            2 => "3:2",
+            3 => "1:1",
+            5 => "Panorama",
+            _ => "",
+        };
+        if !decoded.is_empty() {
+            tags.insert(
+                0xF88C,
+                MakerNoteTag::new(
+                    0xF88C,
+                    Some("AspectRatio"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+}
+
 /// Parse AFInfo subdirectory (tag 0x940e)
 /// Reference: exiftool/lib/Image/ExifTool/Sony.pm AFInfo, AFStatus15, AFStatus19, AFStatus79
 /// Contains AF point information and AF status for different Sony camera models
@@ -5699,6 +6386,18 @@ pub fn parse_sony_maker_notes(
                     parse_tag9400(raw_data, endian, &mut tags);
                 } else if let ExifValue::Byte(ref raw_data) = decoded_value {
                     parse_tag9400(raw_data, endian, &mut tags);
+                }
+                // Don't insert the raw binary blob
+                continue;
+            }
+
+            // Handle Tag2010 subdirectory (tag 0x2010)
+            // Contains PictureProfile, StopsAboveBaseISO, Quality2, SonyISO, etc.
+            if tag_id == SONY_TAG_2010 {
+                if let ExifValue::Undefined(ref raw_data) = decoded_value {
+                    parse_tag2010(raw_data, endian, model, &mut tags);
+                } else if let ExifValue::Byte(ref raw_data) = decoded_value {
+                    parse_tag2010(raw_data, endian, model, &mut tags);
                 }
                 // Don't insert the raw binary blob
                 continue;

@@ -166,6 +166,12 @@ const IGNORE_FIELDS: &[&str] = &[
     "FocusFrameSize",          // Formatting: "92x94" vs " 92x 94"
     "ColorMode",               // Decode differences
     "GPSTimeStamp",            // Precision differences (milliseconds)
+    // Tag2010 model-specific offset issues (variant 'e'/'f' cameras)
+    "StopsAboveBaseISO", // Offset varies by model within variant
+    "Quality2",          // Offset varies by model within variant
+    "SonyISO",           // Offset varies by model within variant
+    "MaxFocalLength",    // Offset varies by model within variant
+    "AspectRatio",       // Multiple sources with model-specific offsets
 ];
 
 /// Compare JSON outputs from exiftool and fpexif
