@@ -588,12 +588,24 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
                 Value::String(format!("{:+.3}", decimal))
             }
         }
+        // Nikon ExposureDifference (0x000E) - uses decimal format "%+.1f"
+        // ExifTool: PrintConv => '$val ? sprintf("%+.1f",$val) : 0'
+        0x000E => {
+            let decimal = num as f64 / den as f64;
+            let rounded = round_half_even(decimal, 1);
+            if rounded == 0.0 {
+                Value::Number(0.into())
+            } else {
+                // Format as decimal with 1 decimal place and + sign for positive
+                Value::String(format!("{:+.1}", rounded))
+            }
+        }
         // Nikon MakerNote exposure-related tags (packed rational decode)
-        // ProgramShift (0x000D), ExposureDifference (0x000E), FlashExposureComp (0x0012),
+        // ProgramShift (0x000D), FlashExposureComp (0x0012),
         // ExternalFlashExposureComp (0x0017), FlashExposureBracketValue (0x0018), ExposureTuning (0x001C)
         // ExifTool outputs: 0 as int (except FlashExposureBracketValue which is 0.0),
         // negative as number (int for whole numbers), positive as string with "+" (fraction for 1/3 steps)
-        0x000D | 0x000E | 0x0012 | 0x0017 | 0x0018 | 0x001C => {
+        0x000D | 0x0012 | 0x0017 | 0x0018 | 0x001C => {
             let decimal = num as f64 / den as f64;
             // Round to 1 decimal place using banker's rounding to match ExifTool
             let rounded = round_half_even(decimal, 1);
@@ -631,9 +643,29 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
                 };
                 Value::String(formatted)
             } else {
-                // Negative: output as number
-                // ExposureDifference (0x000E) always uses float, others use int for whole numbers
-                if rounded.fract() == 0.0 && tag_id != 0x000E {
+                // Negative: use fraction format for common EV steps, else decimal number
+                let frac = rounded.fract().abs();
+                let whole = rounded.trunc() as i32;
+                if (frac - 0.3).abs() < 0.05 || (frac - 0.7).abs() < 0.05 {
+                    // -2/3 or -x 2/3
+                    let frac_str = if (frac - 0.3).abs() < 0.05 {
+                        "1/3"
+                    } else {
+                        "2/3"
+                    };
+                    if whole == 0 {
+                        Value::String(format!("-{}", frac_str))
+                    } else {
+                        Value::String(format!("{} {}", whole, frac_str))
+                    }
+                } else if (frac - 0.5).abs() < 0.05 {
+                    // -1/2 or -x 1/2
+                    if whole == 0 {
+                        Value::String("-1/2".to_string())
+                    } else {
+                        Value::String(format!("{} 1/2", whole))
+                    }
+                } else if rounded.fract() == 0.0 {
                     Value::Number((rounded as i64).into())
                 } else {
                     serde_json::Number::from_f64(rounded)

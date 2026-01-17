@@ -447,7 +447,7 @@ pub const LOC_TIME: u16 = 0x0008;
 pub const LOC_MAP_DATUM: u16 = 0x0009;
 
 // More extended main IFD tags
-pub const NIKON_NEF_BIT_DEPTH: u16 = 0x009F;
+pub const NIKON_NEF_BIT_DEPTH: u16 = 0x0E22;
 pub const NIKON_EXTRA_INFO: u16 = 0x00A0;
 pub const NIKON_ORIENTATION: u16 = 0x0036;
 pub const NIKON_CAPTURE_OFFSET: u16 = 0x0E02;
@@ -908,6 +908,7 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
         NIKON_FOCUS_MODE => decode_focus_mode_exiftool(value).to_string(),
         NIKON_FLASH_SETTING => decode_flash_setting_exiftool(value).to_string(),
         NIKON_SHARPNESS => decode_sharpening_exiftool(value).to_string(),
+        NIKON_TONE_COMP => decode_tone_comp_exiftool(value).to_string(),
         NIKON_COLOR_MODE => decode_color_mode_exiftool(value),
         NIKON_FLASH_TYPE => decode_flash_type_exiftool(value),
         NIKON_NOISE_REDUCTION => decode_noise_reduction_exiftool(value),
@@ -970,6 +971,7 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
             match trimmed {
                 "AUTO" => "Auto".to_string(),
                 "AUTO(FLASH OFF)" => "Auto(Flash Off)".to_string(),
+                "SCENE AUTO" => "Scene Auto".to_string(),
                 "SPORT" => "Sport".to_string(),
                 "PORTRAIT" => "Portrait".to_string(),
                 "LANDSCAPE" => "Landscape".to_string(),
@@ -987,6 +989,28 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
                 "SILHOUETTE" => "Silhouette".to_string(),
                 "HIGH KEY" => "High Key".to_string(),
                 "LOW KEY" => "Low Key".to_string(),
+                "" => "".to_string(),
+                _ => trimmed.to_string(),
+            }
+        }
+        NIKON_SCENE_MODE => {
+            // Transform AUTO -> Auto, etc.
+            let trimmed = value.trim();
+            match trimmed {
+                "AUTO" => "Auto".to_string(),
+                "SCENE AUTO" => "Scene Auto".to_string(),
+                "PORTRAIT" => "Portrait".to_string(),
+                "LANDSCAPE" => "Landscape".to_string(),
+                "SPORT" => "Sport".to_string(),
+                "CLOSE UP" | "CLOSEUP" => "Close Up".to_string(),
+                "NIGHT PORTRAIT" => "Night Portrait".to_string(),
+                "PARTY/INDOOR" => "Party/Indoor".to_string(),
+                "BEACH/SNOW" => "Beach/Snow".to_string(),
+                "SUNSET" => "Sunset".to_string(),
+                "DUSK/DAWN" => "Dusk/Dawn".to_string(),
+                "PET PORTRAIT" => "Pet Portrait".to_string(),
+                "CANDLELIGHT" => "Candlelight".to_string(),
+                "FOOD" => "Food".to_string(),
                 "" => "".to_string(),
                 _ => trimmed.to_string(),
             }
@@ -1396,8 +1420,8 @@ pub fn decode_flash_setting_exiftool(value: &str) -> String {
         "SLOW" => "Slow",
         "REAR" => "Rear",
         "REAR SLOW" => "Rear Slow",
-        "RED-EYE" | "REDEYE" => "Red-eye",
-        "RED-EYE SLOW" | "REDEYE SLOW" => "Red-eye Slow",
+        "RED-EYE" | "REDEYE" => "Red-Eye",
+        "RED-EYE SLOW" | "REDEYE SLOW" => "Red-Eye Slow",
         "SLOW REAR" => "Slow Rear",
         "" => "",                             // Keep empty as empty to match ExifTool
         _ => return value.trim().to_string(), // Return original value
@@ -1421,7 +1445,8 @@ pub fn decode_sharpening_exiftool(value: &str) -> String {
         "LOW" | "SOFT" => "Soft",
         "MED.L" | "MEDIUM LOW" | "MEDIUMLOW" => "Medium Low",
         "MED.H" | "MEDIUM HIGH" | "MEDIUMHIGH" => "Medium High",
-        "HIGH" | "HARD" => "Hard",
+        "HIGH" => "High",
+        "HARD" => "Hard",
         "NONE" => "None",
         _ => return value.trim().to_string(), // Return original value
     };
@@ -1432,6 +1457,30 @@ pub fn decode_sharpening_exiftool(value: &str) -> String {
 /// exiv2 treats this as plain ASCII string, using ExifTool interpretations
 pub fn decode_sharpening_exiv2(value: &str) -> String {
     decode_sharpening_exiftool(value)
+}
+
+/// Decode ToneComp value (tag 0x0081) - ExifTool format
+/// From Nikon.pm - tag 0x0081 is ASCII string type
+/// Values: Auto, Normal, Low, Med.L, Med.H, High, Custom
+pub fn decode_tone_comp_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "AUTO" => "Auto",
+        "NORMAL" => "Normal",
+        "LOW" => "Low",
+        "MED.L" => "Med.L",
+        "MED.H" => "Med.H",
+        "HIGH" => "High",
+        "CUSTOM" => "Custom",
+        "CS" => "Custom",
+        _ => return value.trim().to_string(), // Return original value
+    };
+    result.to_string()
+}
+
+/// Decode ToneComp value (tag 0x0081) - exiv2 format
+pub fn decode_tone_comp_exiv2(value: &str) -> String {
+    decode_tone_comp_exiftool(value)
 }
 
 /// Decode Saturation value (tag 0x0094) - ExifTool format
@@ -1824,19 +1873,7 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
             .trim_end_matches('\0')
             .to_string();
         if !name.is_empty() {
-            // Format string: capitalize first letter of each word
-            let formatted_name = name
-                .to_lowercase()
-                .split_whitespace()
-                .map(|word| {
-                    let mut chars = word.chars();
-                    match chars.next() {
-                        None => String::new(),
-                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
+            let formatted_name = format_picture_control_string(&name);
             tags.push(("PictureControlName".to_string(), formatted_name));
         }
 
@@ -1846,18 +1883,7 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
             .trim_end_matches('\0')
             .to_string();
         if !base.is_empty() {
-            let formatted_base = base
-                .to_lowercase()
-                .split_whitespace()
-                .map(|word| {
-                    let mut chars = word.chars();
-                    match chars.next() {
-                        None => String::new(),
-                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
+            let formatted_base = format_picture_control_string(&base);
             tags.push(("PictureControlBase".to_string(), formatted_base));
         }
 
@@ -2001,9 +2027,292 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
                 tags.push(("ToningSaturation".to_string(), "n/a".to_string()));
             }
         }
+    } else if version.starts_with("02") && data.len() >= 68 {
+        // Version 02xx structure (PictureControl2 - D4, D800, D5xxx, etc.)
+        // Name and Base at same offsets as 0100
+        parse_picture_control_name_base(&mut tags, data, 4, 24);
+
+        // Offset 48: PictureControlAdjust
+        if data.len() > 48 {
+            let adjust_str = match data[48] {
+                0 => "Default Settings",
+                1 => "Quick Adjust",
+                2 => "Full Control",
+                _ => "Unknown",
+            };
+            tags.push(("PictureControlAdjust".to_string(), adjust_str.to_string()));
+        }
+
+        // Offset 49: PictureControlQuickAdjust (uses "Normal" for zero value)
+        parse_pc_value(&mut tags, data, 49, "PictureControlQuickAdjust", false);
+
+        // Offset 51: Sharpness (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 51, "Sharpness", 4.0);
+
+        // Offset 53: Clarity (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 53, "Clarity", 4.0);
+
+        // Offset 55: Contrast
+        parse_pc_value(&mut tags, data, 55, "Contrast", false);
+
+        // Offset 57: Brightness
+        parse_pc_value(&mut tags, data, 57, "Brightness", false);
+
+        // Offset 59: Saturation
+        parse_pc_value(&mut tags, data, 59, "Saturation", false);
+
+        // Offset 61: Hue
+        parse_pc_value(&mut tags, data, 61, "Hue", true);
+
+        // Offset 63: FilterEffect
+        if data.len() > 63 {
+            let filter_str = match data[63] {
+                0x80 => "Off",
+                0x81 => "Yellow",
+                0x82 => "Orange",
+                0x83 => "Red",
+                0x84 => "Green",
+                0xff => "n/a",
+                _ => "Unknown",
+            };
+            tags.push(("FilterEffect".to_string(), filter_str.to_string()));
+        }
+
+        // Offset 64: ToningEffect
+        if data.len() > 64 {
+            let toning_str = decode_toning_effect(data[64]);
+            tags.push(("ToningEffect".to_string(), toning_str.to_string()));
+        }
+
+        // Offset 65: ToningSaturation
+        parse_pc_value(&mut tags, data, 65, "ToningSaturation", true);
+    } else if version.starts_with("03") && data.len() >= 74 {
+        // Version 03xx structure (PictureControl3 - Z cameras, etc.)
+        // Name at 8, Base at 28 (different from 01xx/02xx!)
+        parse_picture_control_name_base(&mut tags, data, 8, 28);
+
+        // Offset 54: PictureControlAdjust
+        if data.len() > 54 {
+            let adjust_str = match data[54] {
+                0 => "Default Settings",
+                1 => "Quick Adjust",
+                2 => "Full Control",
+                _ => "Unknown",
+            };
+            tags.push(("PictureControlAdjust".to_string(), adjust_str.to_string()));
+        }
+
+        // Offset 55: PictureControlQuickAdjust (uses "Normal" for zero value)
+        parse_pc_value(&mut tags, data, 55, "PictureControlQuickAdjust", false);
+
+        // Offset 57: Sharpness (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 57, "Sharpness", 4.0);
+
+        // Offset 59: MidRangeSharpness (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 59, "MidRangeSharpness", 4.0);
+
+        // Offset 61: Clarity (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 61, "Clarity", 4.0);
+
+        // Offset 63: Contrast
+        parse_pc_value(&mut tags, data, 63, "Contrast", false);
+
+        // Offset 65: Brightness
+        parse_pc_value(&mut tags, data, 65, "Brightness", false);
+
+        // Offset 67: Saturation
+        parse_pc_value(&mut tags, data, 67, "Saturation", false);
+
+        // Offset 69: Hue
+        parse_pc_value(&mut tags, data, 69, "Hue", true);
+
+        // Offset 71: FilterEffect
+        if data.len() > 71 {
+            let filter_str = match data[71] {
+                0x80 => "Off",
+                0x81 => "Yellow",
+                0x82 => "Orange",
+                0x83 => "Red",
+                0x84 => "Green",
+                0xff => "n/a",
+                _ => "Unknown",
+            };
+            tags.push(("FilterEffect".to_string(), filter_str.to_string()));
+        }
+
+        // Offset 73: ToningEffect
+        if data.len() > 73 {
+            let toning_str = decode_toning_effect(data[73]);
+            tags.push(("ToningEffect".to_string(), toning_str.to_string()));
+        }
     }
 
     tags
+}
+
+/// Helper to parse PictureControlName and PictureControlBase
+fn parse_picture_control_name_base(
+    tags: &mut Vec<(String, String)>,
+    data: &[u8],
+    name_offset: usize,
+    base_offset: usize,
+) {
+    // PictureControlName (string[20])
+    if data.len() >= name_offset + 20 {
+        let name = String::from_utf8_lossy(&data[name_offset..name_offset + 20])
+            .trim_end_matches('\0')
+            .to_string();
+        if !name.is_empty() {
+            tags.push((
+                "PictureControlName".to_string(),
+                format_picture_control_string(&name),
+            ));
+        }
+    }
+
+    // PictureControlBase (string[20])
+    if data.len() >= base_offset + 20 {
+        let base = String::from_utf8_lossy(&data[base_offset..base_offset + 20])
+            .trim_end_matches('\0')
+            .to_string();
+        if !base.is_empty() {
+            tags.push((
+                "PictureControlBase".to_string(),
+                format_picture_control_string(&base),
+            ));
+        }
+    }
+}
+
+/// Format PictureControl string like ExifTool's FormatString
+/// - Words with vowels: title case (Vivid, Standard, etc.)
+/// - Words without vowels: keep uppercase (KR, JP, etc.)
+fn format_picture_control_string(s: &str) -> String {
+    fn has_vowel(s: &str) -> bool {
+        s.chars()
+            .any(|c| matches!(c.to_ascii_uppercase(), 'A' | 'E' | 'I' | 'O' | 'U' | 'Y'))
+    }
+
+    fn format_segment(seg: &str) -> String {
+        if seg.is_empty() {
+            return String::new();
+        }
+        if has_vowel(seg) {
+            // Title case: first letter uppercase, rest lowercase
+            let mut chars = seg.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => {
+                    first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
+                }
+            }
+        } else {
+            // No vowels: keep uppercase
+            seg.to_uppercase()
+        }
+    }
+
+    // Split by whitespace first
+    s.split_whitespace()
+        .map(|word| {
+            // Within each word, handle hyphens
+            word.split('-')
+                .map(format_segment)
+                .collect::<Vec<_>>()
+                .join("-")
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Helper to parse a PictureControl value field (int8u with 0x80 offset)
+/// Special values: 0xff → "n/a", 0x00 → "Auto", 0x80 → "Normal" or "None"
+fn parse_pc_value(
+    tags: &mut Vec<(String, String)>,
+    data: &[u8],
+    offset: usize,
+    name: &str,
+    use_none: bool,
+) {
+    if data.len() > offset {
+        let raw = data[offset];
+        // ValueConv: raw - 0x80
+        // PrintPC special values: 0x7f (127) = n/a, -128 = Auto, -127 = User, 0 = Normal/$norm
+        let formatted = if raw == 0xff {
+            // raw 0xff → value 127 → "n/a"
+            "n/a".to_string()
+        } else if raw == 0x00 {
+            // raw 0x00 → value -128 → "Auto"
+            "Auto".to_string()
+        } else if raw == 0x01 {
+            // raw 0x01 → value -127 → "User"
+            "User".to_string()
+        } else if raw == 0x80 {
+            // raw 0x80 → value 0 → "Normal" or "None"
+            if use_none {
+                "None".to_string()
+            } else {
+                "Normal".to_string()
+            }
+        } else {
+            // Other values: output as signed integer
+            let value = raw.wrapping_sub(128) as i8;
+            value.to_string()
+        };
+        tags.push((name.to_string(), formatted));
+    }
+}
+
+/// Helper to parse a PictureControl value field with divisor (for Clarity)
+/// Uses format "%.2f" and divides by divisor
+fn parse_pc_value_div(
+    tags: &mut Vec<(String, String)>,
+    data: &[u8],
+    offset: usize,
+    name: &str,
+    divisor: f64,
+) {
+    if data.len() > offset {
+        let raw = data[offset];
+        // ValueConv: raw - 0x80
+        let formatted = if raw == 0xff {
+            // raw 0xff → value 127 → "n/a"
+            "n/a".to_string()
+        } else if raw == 0x00 {
+            // raw 0x00 → value -128 → "Auto"
+            "Auto".to_string()
+        } else if raw == 0x01 {
+            // raw 0x01 → value -127 → "User"
+            "User".to_string()
+        } else if raw == 0x80 {
+            // raw 0x80 → value 0 → "None" (Clarity uses "None" for zero)
+            "None".to_string()
+        } else {
+            // Other values: divide by divisor and format as %.2f
+            let value = raw.wrapping_sub(128) as i8;
+            let divided = f64::from(value) / divisor;
+            format!("{:+.2}", divided)
+        };
+        tags.push((name.to_string(), formatted));
+    }
+}
+
+/// Decode ToningEffect value
+fn decode_toning_effect(value: u8) -> &'static str {
+    match value {
+        0x80 => "B&W",
+        0x81 => "Sepia",
+        0x82 => "Cyanotype",
+        0x83 => "Red",
+        0x84 => "Yellow",
+        0x85 => "Green",
+        0x86 => "Blue-green",
+        0x87 => "Blue",
+        0x88 => "Purple-blue",
+        0x89 => "Red-purple",
+        0xff => "n/a",
+        _ => "Unknown",
+    }
 }
 
 /// Decode FlashControlMode value to string
@@ -2495,12 +2804,19 @@ fn parse_shot_info_basic(data: &[u8]) -> Vec<(String, String)> {
     if version.chars().all(|c| c.is_ascii_digit()) {
         tags.push(("ShotInfoVersion".to_string(), version.clone()));
 
-        // Offset 0x04: FirmwareVersion (string[5])
+        // Offset 0x04: FirmwareVersion
         // Note: FirmwareVersion is stored unencrypted at offset 0x04 for all versions
         // The encryption in 02xx versions starts after FirmwareVersion
-        if data.len() >= 9 {
-            let firmware = String::from_utf8_lossy(&data[4..9]);
-            // Check if it looks like a valid firmware version (typically like "1.00k" or "1.00 ")
+        // - Versions 0246 (D6), 0249 (Z6/Z7), 0251 (Z6_3): 8 bytes
+        // - Earlier versions: 5 bytes
+        let firmware_len = match version.as_str() {
+            "0246" | "0249" | "0250" | "0251" | "0252" | "0253" | "0254" | "0255" => 8,
+            _ => 5,
+        };
+        let firmware_end = 4 + firmware_len;
+        if data.len() >= firmware_end {
+            let firmware = String::from_utf8_lossy(&data[4..firmware_end]);
+            // Check if it looks like a valid firmware version (typically like "1.00k" or "01.11.d0")
             if firmware.chars().any(|c| c.is_ascii_digit()) {
                 tags.push((
                     "FirmwareVersion".to_string(),
@@ -3770,8 +4086,9 @@ fn get_af_point_135(point: u8) -> String {
 }
 
 /// Get AF point name for 153-point grid (D5, D500, D850)
+/// From ExifTool Nikon.pm: 9 rows (A-I) with 17 columns (1-17), center is E9
 fn get_af_point_153(point: u8) -> String {
-    // 9x17 grid (A-I rows, 1-17 columns)
+    // Lookup table from ExifTool %afPoints153
     let lookup: &[(u8, &str)] = &[
         (1, "E9"),
         (2, "D9"),
@@ -3791,24 +4108,24 @@ fn get_af_point_153(point: u8) -> String {
         (16, "G10"),
         (17, "H10"),
         (18, "I10"),
-        (19, "E8"),
-        (20, "D8"),
-        (21, "C8"),
-        (22, "B8"),
-        (23, "A8"),
-        (24, "F8"),
-        (25, "G8"),
-        (26, "H8"),
-        (27, "I8"),
-        (28, "E11"),
-        (29, "D11"),
-        (30, "C11"),
-        (31, "B11"),
-        (32, "A11"),
-        (33, "F11"),
-        (34, "G11"),
-        (35, "H11"),
-        (36, "I11"),
+        (19, "E11"),
+        (20, "D11"),
+        (21, "C11"),
+        (22, "B11"),
+        (23, "A11"),
+        (24, "F11"),
+        (25, "G11"),
+        (26, "H11"),
+        (27, "I11"),
+        (28, "E8"),
+        (29, "D8"),
+        (30, "C8"),
+        (31, "B8"),
+        (32, "A8"),
+        (33, "F8"),
+        (34, "G8"),
+        (35, "H8"),
+        (36, "I8"),
         (37, "E7"),
         (38, "D7"),
         (39, "C7"),
@@ -3827,87 +4144,87 @@ fn get_af_point_153(point: u8) -> String {
         (52, "G12"),
         (53, "H12"),
         (54, "I12"),
-        (55, "E6"),
-        (56, "D6"),
-        (57, "C6"),
-        (58, "B6"),
-        (59, "A6"),
-        (60, "F6"),
-        (61, "G6"),
-        (62, "H6"),
-        (63, "I6"),
-        (64, "E13"),
-        (65, "D13"),
-        (66, "C13"),
-        (67, "B13"),
-        (68, "A13"),
-        (69, "F13"),
-        (70, "G13"),
-        (71, "H13"),
-        (72, "I13"),
-        (73, "E14"),
-        (74, "D14"),
-        (75, "C14"),
-        (76, "B14"),
-        (77, "A14"),
-        (78, "F14"),
-        (79, "G14"),
-        (80, "H14"),
-        (81, "I14"),
-        (82, "E5"),
-        (83, "D5"),
-        (84, "C5"),
-        (85, "B5"),
-        (86, "A5"),
-        (87, "F5"),
-        (88, "G5"),
-        (89, "H5"),
-        (90, "I5"),
-        (91, "E15"),
-        (92, "D15"),
-        (93, "C15"),
-        (94, "B15"),
-        (95, "A15"),
-        (96, "F15"),
-        (97, "G15"),
-        (98, "H15"),
-        (99, "I15"),
-        (100, "E4"),
-        (101, "D4"),
-        (102, "C4"),
-        (103, "B4"),
-        (104, "A4"),
-        (105, "F4"),
-        (106, "G4"),
-        (107, "H4"),
-        (108, "I4"),
-        (109, "E16"),
-        (110, "D16"),
-        (111, "C16"),
-        (112, "B16"),
-        (113, "A16"),
-        (114, "F16"),
-        (115, "G16"),
-        (116, "H16"),
-        (117, "I16"),
-        (118, "E3"),
-        (119, "D3"),
-        (120, "C3"),
-        (121, "B3"),
-        (122, "A3"),
-        (123, "F3"),
-        (124, "G3"),
-        (125, "H3"),
-        (126, "I3"),
-        (127, "E17"),
-        (128, "D17"),
-        (129, "C17"),
-        (130, "B17"),
-        (131, "A17"),
-        (132, "F17"),
-        (133, "G17"),
-        (134, "H17"),
-        (135, "I17"),
+        (55, "E13"),
+        (56, "D13"),
+        (57, "C13"),
+        (58, "B13"),
+        (59, "A13"),
+        (60, "F13"),
+        (61, "G13"),
+        (62, "H13"),
+        (63, "I13"),
+        (64, "E14"),
+        (65, "D14"),
+        (66, "C14"),
+        (67, "B14"),
+        (68, "A14"),
+        (69, "F14"),
+        (70, "G14"),
+        (71, "H14"),
+        (72, "I14"),
+        (73, "E15"),
+        (74, "D15"),
+        (75, "C15"),
+        (76, "B15"),
+        (77, "A15"),
+        (78, "F15"),
+        (79, "G15"),
+        (80, "H15"),
+        (81, "I15"),
+        (82, "E16"),
+        (83, "D16"),
+        (84, "C16"),
+        (85, "B16"),
+        (86, "A16"),
+        (87, "F16"),
+        (88, "G16"),
+        (89, "H16"),
+        (90, "I16"),
+        (91, "E17"),
+        (92, "D17"),
+        (93, "C17"),
+        (94, "B17"),
+        (95, "A17"),
+        (96, "F17"),
+        (97, "G17"),
+        (98, "H17"),
+        (99, "I17"),
+        (100, "E6"),
+        (101, "D6"),
+        (102, "C6"),
+        (103, "B6"),
+        (104, "A6"),
+        (105, "F6"),
+        (106, "G6"),
+        (107, "H6"),
+        (108, "I6"),
+        (109, "E5"),
+        (110, "D5"),
+        (111, "C5"),
+        (112, "B5"),
+        (113, "A5"),
+        (114, "F5"),
+        (115, "G5"),
+        (116, "H5"),
+        (117, "I5"),
+        (118, "E4"),
+        (119, "D4"),
+        (120, "C4"),
+        (121, "B4"),
+        (122, "A4"),
+        (123, "F4"),
+        (124, "G4"),
+        (125, "H4"),
+        (126, "I4"),
+        (127, "E3"),
+        (128, "D3"),
+        (129, "C3"),
+        (130, "B3"),
+        (131, "A3"),
+        (132, "F3"),
+        (133, "G3"),
+        (134, "H3"),
+        (135, "I3"),
         (136, "E2"),
         (137, "D2"),
         (138, "C2"),
@@ -4511,6 +4828,8 @@ fn parse_world_time(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
     } else {
         format!("{:03}:{:02}", tz_hours, tz_mins)
     };
+    // Note: ExifTool only adds location names for Z9-era cameras via ShotInfo,
+    // not from WorldTime tag. Keep simple offset format here.
     tags.push(("TimeZone".to_string(), tz_str));
 
     // Byte 2: DaylightSavings
@@ -4741,25 +5060,41 @@ fn parse_color_balance(
         }
     }
 
-    // Check for NRW ColorBalanceC format (starts with "NRW ")
-    // Used by P1000, P7000, P7100, B700
+    // Check for NRW ColorBalance format (starts with "NRW ")
+    // ColorBalanceB (version 0100): P6000 - uses large offsets
+    // ColorBalanceC (version 0101+): P1000, P7000, P7100, B700 - uses small offsets
     if is_nrw {
-        // ColorBalanceC structure - WB_RGGBLevels at various offsets
+        // Choose offset table based on version
+        let wb_offsets: &[(&str, usize)] = if version == "0100" {
+            // ColorBalanceB for P6000
+            &[
+                ("WB_RGGBLevels", 0x13e8),
+                ("WB_RGGBLevelsDaylight", 0x13f8),
+                ("WB_RGGBLevelsCloudy", 0x1408),
+                ("WB_RGGBLevelsTungsten", 0x1428),
+                ("WB_RGGBLevelsFluorescentW", 0x1438),
+                ("WB_RGGBLevelsFlash", 0x1448),
+                ("WB_RGGBLevelsCustom", 0x1468),
+                ("WB_RGGBLevelsAuto", 0x1478),
+            ]
+        } else {
+            // ColorBalanceC for P7000, P7100, P1000, B700
+            &[
+                ("WB_RGGBLevels", 0x0038),
+                ("WB_RGGBLevelsDaylight", 0x004c),
+                ("WB_RGGBLevelsCloudy", 0x0060),
+                ("WB_RGGBLevelsTungsten", 0x0088),
+                ("WB_RGGBLevelsFluorescentW", 0x009c),
+                ("WB_RGGBLevelsFluorescentN", 0x00b0),
+                ("WB_RGGBLevelsFluorescentD", 0x00c4),
+                ("WB_RGGBLevelsHTMercury", 0x00d8),
+                ("WB_RGGBLevelsCustom", 0x0100),
+                ("WB_RGGBLevelsAuto", 0x0114),
+            ]
+        };
+
         // Format: 4 x int32u at each offset, little-endian
         // ValueConv: vals[0]*=2; vals[3]*=2
-        let wb_offsets: &[(&str, usize)] = &[
-            ("WB_RGGBLevels", 0x0038),
-            ("WB_RGGBLevelsDaylight", 0x004c),
-            ("WB_RGGBLevelsCloudy", 0x0060),
-            ("WB_RGGBLevelsTungsten", 0x0088),
-            ("WB_RGGBLevelsFluorescentW", 0x009c),
-            ("WB_RGGBLevelsFluorescentN", 0x00b0),
-            ("WB_RGGBLevelsFluorescentD", 0x00c4),
-            ("WB_RGGBLevelsHTMercury", 0x00d8),
-            ("WB_RGGBLevelsCustom", 0x0100),
-            ("WB_RGGBLevelsAuto", 0x0114),
-        ];
-
         for (name, offset) in wb_offsets {
             if data.len() >= offset + 16 {
                 let mut cursor = Cursor::new(&data[*offset..]);
@@ -4784,8 +5119,8 @@ fn parse_color_balance(
             }
         }
 
-        // BlackLevel at offset 0x0020 (int16u)
-        if data.len() >= 0x0022 {
+        // BlackLevel at offset 0x0020 (int16u) - only for ColorBalanceC
+        if version != "0100" && data.len() >= 0x0022 {
             let black_level = u16::from_le_bytes([data[0x0020], data[0x0021]]);
             tags.push(("BlackLevel".to_string(), black_level.to_string()));
         }
@@ -4973,6 +5308,8 @@ pub fn decode_flash_type_exiftool(value: &str) -> String {
         "EXTERNAL" | "STROBE" => "External",
         // Handle specific "Optional,AA" -> "Optional,Aa" case
         "OPTIONAL,AA" => "Optional,Aa",
+        // Handle "NEW_TTL" -> "New_TTL" case
+        "NEW_TTL" => "New_TTL",
         _ => return value.trim().to_string(),
     };
     result.to_string()
@@ -5126,13 +5463,46 @@ pub fn decode_lens_type_exiv2(value: u8) -> String {
     }
 }
 
-/// Format flash compensation value like ExifTool
+/// Format flash compensation value like ExifTool PrintFraction
 /// - 0 is displayed as just "0"
-/// - Non-zero values are displayed with sign and one decimal (e.g., "+1.0", "-0.7")
+/// - Values like -0.67 become "-2/3", -0.33 becomes "-1/3", etc.
 fn format_flash_compensation(ev: f64) -> String {
     if ev.abs() < 0.001 {
-        "0".to_string()
+        return "0".to_string();
+    }
+
+    let sign = if ev < 0.0 { "-" } else { "+" };
+    let abs_val = ev.abs();
+    let frac = abs_val.fract();
+    let whole = abs_val.trunc() as i32;
+
+    // Check for common EV fractions (1/3, 2/3, 1/2)
+    if (frac - 0.33).abs() < 0.05 || (frac - 0.34).abs() < 0.05 {
+        // 1/3 step
+        if whole == 0 {
+            format!("{}1/3", sign)
+        } else {
+            format!("{}{} 1/3", sign, whole)
+        }
+    } else if (frac - 0.67).abs() < 0.05 || (frac - 0.66).abs() < 0.05 {
+        // 2/3 step
+        if whole == 0 {
+            format!("{}2/3", sign)
+        } else {
+            format!("{}{} 2/3", sign, whole)
+        }
+    } else if (frac - 0.5).abs() < 0.05 {
+        // 1/2 step
+        if whole == 0 {
+            format!("{}1/2", sign)
+        } else {
+            format!("{}{} 1/2", sign, whole)
+        }
+    } else if frac < 0.05 {
+        // Whole number
+        format!("{}{}", sign, whole)
     } else {
+        // Fallback to decimal
         format!("{:+.1}", ev)
     }
 }
@@ -5217,6 +5587,9 @@ pub fn parse_nikon_maker_notes(
     data: &[u8],
     endian: Endianness,
     model: Option<&str>,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
+    makernote_file_offset: Option<usize>,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -5242,11 +5615,15 @@ pub fn parse_nikon_maker_notes(
     let base_offset;
     let ifd_offset;
     let maker_endian;
+    // Type 1/2 maker notes (no Nikon header): offsets are relative to file's TIFF header
+    // Type 3 maker notes (with "Nikon\0" header): offsets are relative to internal TIFF header
+    let is_type3;
 
     // Check for Nikon Type 3 header: "Nikon\0" + version + TIFF header
     if data.starts_with(b"Nikon\0") {
         // Structure: "Nikon\0" (6 bytes) + version (4 bytes) + TIFF header
         base_offset = 10; // Start of TIFF header (after "Nikon\0" + version)
+        is_type3 = true;
 
         // Read endianness from TIFF header
         if data.len() < base_offset + 8 {
@@ -5274,10 +5651,12 @@ pub fn parse_nikon_maker_notes(
         // IFD offset is relative to the TIFF header
         ifd_offset = base_offset + ifd_relative_offset;
     } else {
-        // No Nikon header, use the data as-is
+        // No Nikon header (Type 1/2) - use the data as-is
+        // Offsets in IFD entries are relative to file's TIFF header, not maker notes
         base_offset = 0;
         maker_endian = endian;
         ifd_offset = 0;
+        is_type3 = false;
     }
 
     if ifd_offset >= data.len() {
@@ -5350,14 +5729,35 @@ pub fn parse_nikon_maker_notes(
                     Endianness::Little => value_offset.to_le_bytes().to_vec(),
                     Endianness::Big => value_offset.to_be_bytes().to_vec(),
                 }
-            } else {
-                // Value at offset (relative to TIFF header for Nikon Type 3)
+            } else if is_type3 {
+                // Type 3: Value at offset relative to maker notes' internal TIFF header
                 let abs_offset = base_offset + value_offset as usize;
                 if abs_offset + value_size <= data.len() {
                     data[abs_offset..abs_offset + value_size].to_vec()
+                } else if let (Some(tiff), Some(mn_offset)) = (tiff_data, makernote_file_offset) {
+                    // Some Nikon cameras store tag data past the declared maker notes boundary
+                    // value_offset is still relative to maker notes' internal TIFF header (at base_offset)
+                    // So actual file offset = makernote_file_offset + base_offset + value_offset
+                    let file_offset = mn_offset + base_offset + value_offset as usize;
+                    if file_offset + value_size <= tiff.len() {
+                        tiff[file_offset..file_offset + value_size].to_vec()
+                    } else {
+                        continue;
+                    }
                 } else {
                     continue;
                 }
+            } else if let Some(tiff) = tiff_data {
+                // Type 1/2: Value at offset relative to file's TIFF header (not maker notes)
+                // tiff_data includes "Exif\0\0" prefix, so add tiff_offset to get actual position
+                let file_offset = tiff_offset + value_offset as usize;
+                if file_offset + value_size <= tiff.len() {
+                    tiff[file_offset..file_offset + value_size].to_vec()
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
             };
 
             // Parse the value based on type
@@ -5432,6 +5832,9 @@ pub fn parse_nikon_maker_notes(
                     if tag_id == NIKON_ISO_SETTING && values.len() >= 2 {
                         let iso = if values[1] > 0 { values[1] } else { values[0] };
                         ExifValue::Short(vec![iso])
+                    } else if tag_id == NIKON_NEF_BIT_DEPTH && !values.is_empty() {
+                        // NEFBitDepth: ExifTool outputs just the first value as the bit depth
+                        ExifValue::Short(vec![values[0]])
                     } else if values.len() == 1 {
                         // Apply value decoders for single SHORT values
                         let v = values[0];
@@ -5646,27 +6049,19 @@ pub fn parse_nikon_maker_notes(
 
                                 if is_binary {
                                     // Binary format: [major_tens, major_ones, minor_tens, minor_ones]
-                                    // e.g., [0, 2, 0, 0] -> version 2.0
+                                    // e.g., [0, 2, 1, 0] -> version 2.10
                                     let major = value_bytes[0] * 10 + value_bytes[1];
                                     let minor = value_bytes[2] * 10 + value_bytes[3];
-                                    // Format as "X.Y" - strip trailing zero from minor
-                                    let formatted = if minor.is_multiple_of(10) {
-                                        format!("{}.{}", major, minor / 10)
-                                    } else {
-                                        format!("{}.{}", major, minor)
-                                    };
+                                    // Format as "X.YZ" - keep two digits for minor
+                                    let formatted = format!("{}.{:02}", major, minor);
                                     ExifValue::Ascii(formatted)
                                 } else if let Ok(s) = std::str::from_utf8(&value_bytes[..4]) {
-                                    // ASCII format: "0200" -> version 2.0
+                                    // ASCII format: "0210" -> version 2.10
                                     if s.len() == 4 && s.chars().all(|c| c.is_ascii_digit()) {
                                         let major: u8 = s[0..2].parse().unwrap_or(0);
                                         let minor: u8 = s[2..4].parse().unwrap_or(0);
-                                        // Format as "X.Y" - strip trailing zero from minor
-                                        let formatted = if minor.is_multiple_of(10) {
-                                            format!("{}.{}", major, minor / 10)
-                                        } else {
-                                            format!("{}.{}", major, minor)
-                                        };
+                                        // Format as "X.YZ" - keep two digits for minor
+                                        let formatted = format!("{}.{:02}", major, minor);
                                         ExifValue::Ascii(formatted)
                                     } else {
                                         // Fallback: return trimmed string
@@ -6274,13 +6669,29 @@ pub fn parse_nikon_maker_notes(
     // Deferred ShotInfo processing - version 02xx needs serial/shutter_count for decryption
     if let Some(bytes) = shot_info_bytes {
         if let (Some(ser), Some(count)) = (serial_number, shutter_count_val) {
+            // Get version string (unencrypted)
+            let version = if bytes.len() >= 4 {
+                String::from_utf8_lossy(&bytes[0..4]).to_string()
+            } else {
+                String::new()
+            };
+
+            // Determine FirmwareVersion length based on version
+            // - Versions 0246 (D6), 0249 (Z6/Z7), 0251 (Z6_3): 8 bytes
+            // - Earlier versions: 5 bytes
+            let firmware_len = match version.as_str() {
+                "0246" | "0249" | "0250" | "0251" | "0252" | "0253" | "0254" | "0255" => 8,
+                _ => 5,
+            };
+            let firmware_end = 4 + firmware_len;
+
             // Decrypt ShotInfo starting at offset 4 (version string is unencrypted)
-            if bytes.len() > 9 {
+            if bytes.len() >= firmware_end {
                 let mut decrypted = bytes.clone();
                 nikon_decrypt(ser, count, &mut decrypted, 4);
 
-                // Extract FirmwareVersion from decrypted data (offset 4, string[5])
-                let firmware = String::from_utf8_lossy(&decrypted[4..9]);
+                // Extract FirmwareVersion from decrypted data
+                let firmware = String::from_utf8_lossy(&decrypted[4..firmware_end]);
                 if firmware.chars().any(|c| c.is_ascii_digit()) {
                     let tag_id = 0x9381_u16;
                     tags.insert(

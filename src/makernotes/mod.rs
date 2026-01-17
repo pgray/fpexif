@@ -103,7 +103,14 @@ pub fn parse_maker_notes_with_tiff_data(
     if make_str.contains("canon") {
         canon::parse_canon_maker_notes(data, endian, tiff_data, tiff_offset, model)
     } else if make_str.contains("nikon") {
-        nikon::parse_nikon_maker_notes(data, endian, model)
+        nikon::parse_nikon_maker_notes(
+            data,
+            endian,
+            model,
+            tiff_data,
+            tiff_offset,
+            makernote_file_offset,
+        )
     } else if make_str.contains("sony") {
         sony::parse_sony_maker_notes(data, endian, tiff_data, tiff_offset, model)
     } else if make_str.contains("fuji") {
