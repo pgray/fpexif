@@ -78,6 +78,14 @@ where
         exif_data.set_mrw_metadata(mrw_metadata);
     }
 
+    // Reset reader position for RW2 metadata extraction
+    reader.seek(std::io::SeekFrom::Start(0))?;
+
+    // Check for RW2-specific metadata (PanasonicRaw IFD0 data for Panasonic RAW files)
+    if let Ok(Some(rw2_metadata)) = formats::extract_rw2_metadata_if_rw2(&mut reader) {
+        exif_data.set_rw2_metadata(rw2_metadata);
+    }
+
     // Reset reader position for RW2 Compression extraction
     reader.seek(std::io::SeekFrom::Start(0))?;
 

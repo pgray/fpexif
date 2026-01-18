@@ -2503,6 +2503,56 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         }
     }
 
+    // Add RW2-specific metadata (PanasonicRaw IFD0 data)
+    if let Some(rw2_metadata) = exif_data.get_rw2_metadata() {
+        for (key, value) in &rw2_metadata.tags {
+            // Try to parse as number first, then fall back to string
+            if let Ok(n) = value.parse::<i64>() {
+                output.insert(key.clone(), Value::Number(n.into()));
+            } else if value.parse::<f64>().is_ok() {
+                // For floating point values, store as string to preserve precision
+                output.insert(key.clone(), Value::String(value.clone()));
+            } else {
+                output.insert(key.clone(), Value::String(value.clone()));
+            }
+        }
+
+        // Compute RedBalance and BlueBalance from WB levels if not already present
+        // ExifTool does: RedBalance = WBRedLevel / WBGreenLevel
+        //               BlueBalance = WBBlueLevel / WBGreenLevel
+        if !output.contains_key("RedBalance") || !output.contains_key("BlueBalance") {
+            let wb_red = rw2_metadata
+                .tags
+                .get("WBRedLevel")
+                .and_then(|v| v.parse::<f64>().ok());
+            let wb_green = rw2_metadata
+                .tags
+                .get("WBGreenLevel")
+                .and_then(|v| v.parse::<f64>().ok());
+            let wb_blue = rw2_metadata
+                .tags
+                .get("WBBlueLevel")
+                .and_then(|v| v.parse::<f64>().ok());
+
+            if let (Some(r), Some(g), Some(b)) = (wb_red, wb_green, wb_blue) {
+                if g > 0.0 {
+                    if !output.contains_key("RedBalance") {
+                        output.insert(
+                            "RedBalance".to_string(),
+                            Value::String(format!("{:.6}", r / g)),
+                        );
+                    }
+                    if !output.contains_key("BlueBalance") {
+                        output.insert(
+                            "BlueBalance".to_string(),
+                            Value::String(format!("{:.6}", b / g)),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     // Sony A100 Saturation/Contrast/Sharpness fix
     // ExifTool outputs raw numeric values (from MakerNotes) for the A100 instead of decoded text
     // A100 was the first Sony DSLR after acquiring Konica Minolta, shares similar behavior

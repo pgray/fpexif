@@ -4031,6 +4031,17 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
         decoded.insert("ExposureTime".to_string(), ExifValue::Ascii(formatted));
     }
 
+    // FlashOutput (index 33) - PowerShot/IXUS/IXY models
+    // ExifTool: "used only for PowerShot models, this has a maximum value of 500"
+    // Output as raw number (not percentage). EOS cameras use ColorData3 FlashOutput instead.
+    if data.len() > 33 {
+        let val = data[33] as i16;
+        // Only output if value seems valid (0-500 range per ExifTool notes)
+        if (0..=500).contains(&val) {
+            decoded.insert("FlashOutput".to_string(), ExifValue::Ascii(val.to_string()));
+        }
+    }
+
     decoded
 }
 
@@ -4401,10 +4412,60 @@ pub fn decode_file_info(data: &[u16]) -> HashMap<String, ExifValue> {
 pub fn decode_file_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
-    // File number (index 1) - SKIP
-    // The FileNumber at index 1 requires complex model-specific bit manipulation.
-    // It's redundant with the main FileNumber tag (0x0008) which is already decoded.
-    // See Canon.pm lines 6793-6850 for the complex conditional decoding logic.
+    // FileNumber (indices 1-2 as 32-bit value)
+    // Format is model-specific:
+    //
+    // 20D/350D/REBEL XT/Kiss Digital N bit pattern:
+    //   31....24 23....16 15.....8 7......0
+    //   00000000 ffffffff DDDDDDDD ddFFFFFF
+    //   dir = (val & 0xffc0) >> 6
+    //   file = ((val >> 16) & 0xff) + ((val & 0x3f) << 8)
+    //
+    // 30D/400D/REBEL XTi/Kiss Digital X/K236 bit pattern:
+    //   31....24 23....16 15.....8 7......0
+    //   00000000 ffff0000 ddddddFF FFFFFFFF
+    //   dir = (val & 0xffc00) >> 10, then add 0x40 while dir < 100
+    //   file = ((val & 0x3ff) << 4) + ((val >> 20) & 0x0f)
+    //
+    // We compute both formulas and pick the one with lower directory number
+    // (most cameras start with 100-200 range directories)
+    if data.len() > 2 {
+        let val = (data[1] as u32) | ((data[2] as u32) << 16);
+
+        // Try 20D/350D formula
+        let dir20 = (val & 0xffc0) >> 6;
+        let file20 = ((val >> 16) & 0xff) + ((val & 0x3f) << 8);
+        let valid20 = (100..=999).contains(&dir20) && (1..=9999).contains(&file20);
+
+        // Try 30D/400D formula
+        let mut dir30 = (val & 0xffc00) >> 10;
+        while dir30 < 100 {
+            dir30 += 0x40;
+        }
+        let file30 = ((val & 0x3ff) << 4) + ((val >> 20) & 0x0f);
+        let valid30 = (100..=999).contains(&dir30) && (1..=9999).contains(&file30);
+
+        // Choose the result with the lower directory number (more common case)
+        // or the only valid one if only one is valid
+        let (dir, file) = match (valid20, valid30) {
+            (true, true) => {
+                if dir20 <= dir30 {
+                    (dir20, file20)
+                } else {
+                    (dir30, file30)
+                }
+            }
+            (true, false) => (dir20, file20),
+            (false, true) => (dir30, file30),
+            (false, false) => (0, 0), // Neither valid
+        };
+
+        if dir >= 100 {
+            let file_number = dir * 10000 + file;
+            let formatted = format!("{}-{:04}", file_number / 10000, file_number % 10000);
+            decoded.insert("FileNumber".to_string(), ExifValue::Ascii(formatted));
+        }
+    }
 
     // Bracket mode (index 3)
     decode_field!(
@@ -4677,8 +4738,18 @@ pub fn decode_processing_info_exiftool(data: &[u16]) -> HashMap<String, ExifValu
         decoded.insert("PictureStyle".to_string(), ExifValue::Ascii(pic_style));
     }
 
-    // DigitalGain (index 11)
-    decode_field!(decoded, data, 11, "DigitalGain", raw_u16, skip_if: 0);
+    // DigitalGain (index 11) - ValueConv: $val / 10
+    if data.len() > 11 {
+        let raw = data[11] as i16;
+        let gain = raw as f64 / 10.0;
+        // Format as integer if it's a whole number, otherwise show decimal
+        let formatted = if gain.fract() == 0.0 {
+            format!("{}", gain as i32)
+        } else {
+            format!("{}", gain)
+        };
+        decoded.insert("DigitalGain".to_string(), ExifValue::Ascii(formatted));
+    }
 
     // WBShiftAB (index 12) - signed
     decode_field!(decoded, data, 12, "WBShiftAB", raw_i16);
@@ -4797,6 +4868,52 @@ pub fn decode_af_info(data: &[u16]) -> HashMap<String, ExifValue> {
     // AFImageHeight (index 5)
     if data.len() > 5 {
         decoded.insert("AFImageHeight".to_string(), ExifValue::Short(vec![data[5]]));
+    }
+
+    // PrimaryAFPoint - ExifTool has this at index 11 or 12 depending on camera
+    // For PowerShot models, it's at index 12 (after 8 unknown values at index 11)
+    // For non-EOS cameras with AFInfoCount != 36, it's at index 11
+    // Validate that value is reasonable (< NumAFPoints at index 0)
+    let num_af = if !data.is_empty() { data[0] } else { 0 };
+    if data.len() > 12 && num_af > 0 && data[12] < num_af {
+        decoded.insert(
+            "PrimaryAFPoint".to_string(),
+            ExifValue::Short(vec![data[12]]),
+        );
+    } else if data.len() > 11 && num_af > 0 && data[11] < num_af {
+        decoded.insert(
+            "PrimaryAFPoint".to_string(),
+            ExifValue::Short(vec![data[11]]),
+        );
+    }
+
+    decoded
+}
+
+/// Decode Canon FaceDetect1 array (tag 0x0024)
+///
+/// This function decodes the FaceDetect array which contains face detection information.
+pub fn decode_face_detect(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // FacesDetected (index 2)
+    if data.len() > 2 {
+        decoded.insert("FacesDetected".to_string(), ExifValue::Short(vec![data[2]]));
+    }
+
+    decoded
+}
+
+/// Decode Canon MeasuredColor (tag 0xaa) sub-fields
+///
+/// Extracts MeasuredRGGB - 4 u16 values starting at index 1 (R, G1, G2, B)
+pub fn decode_measured_color(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // MeasuredRGGB - 4 values at indices 1-4 (FIRST_ENTRY => 1 in ExifTool)
+    if data.len() > 4 {
+        let rggb = format!("{} {} {} {}", data[1], data[2], data[3], data[4]);
+        decoded.insert("MeasuredRGGB".to_string(), ExifValue::Ascii(rggb));
     }
 
     decoded
@@ -4964,6 +5081,20 @@ pub fn decode_af_info2_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
                     ExifValue::Ascii("(none)".to_string()),
                 );
             }
+        }
+    }
+
+    // PrimaryAFPoint at index 14 (for non-EOS cameras)
+    // Validate that value is reasonable (< NumAFPoints) since this index can contain garbage
+    if data.len() > 14 && data.len() > 2 {
+        let num_af = data[2];
+        let primary = data[14];
+        // Only output if it looks valid: primary < num_af_points and num_af_points > 0
+        if num_af > 0 && primary < num_af {
+            decoded.insert(
+                "PrimaryAFPoint".to_string(),
+                ExifValue::Short(vec![primary]),
+            );
         }
     }
 
@@ -5649,6 +5780,24 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
                 "ColorTempFlash".to_string(),
                 ExifValue::Short(vec![data[0x70]]),
             );
+        }
+        // FlashOutput at 0x248 (584)
+        // ValueConv: $val >= 255 ? 255 : exp(($val-200)/16*log(2))
+        // PrintConv: $val == 255 ? "Strobe or Misfire" : sprintf("%.0f%%", $val * 100)
+        if data.len() > 0x248 {
+            let raw = data[0x248] as i16;
+            if raw >= 255 {
+                decoded.insert(
+                    "FlashOutput".to_string(),
+                    ExifValue::Ascii("Strobe or Misfire".to_string()),
+                );
+            } else {
+                let converted = ((raw as f64 - 200.0) / 16.0 * 2f64.ln()).exp();
+                decoded.insert(
+                    "FlashOutput".to_string(),
+                    ExifValue::Ascii(format!("{}%", (converted * 100.0).round() as i32)),
+                );
+            }
         }
     }
     // ColorData4 (versions 2, 3, 4, 5, 6, 7, 9) - 1DmkIII, 40D, 1DSmkIII, 450D, 50D, 5DmkII, 7D, 60D, etc.
@@ -7666,6 +7815,39 @@ pub fn decode_camera_info_50d(data: &[u8]) -> HashMap<String, ExifValue> {
         );
     }
 
+    // FileIndex and DirectoryIndex (from ExifTool Canon.pm CameraInfo50D)
+    // FileIndex at 0x19b (411), DirectoryIndex at 0x1a7 (423)
+    let file_index_offset = 0x19b;
+    let dir_index_offset = 0x1a7;
+
+    if data.len() > file_index_offset + 4 {
+        let file_index = u32::from_le_bytes([
+            data[file_index_offset],
+            data[file_index_offset + 1],
+            data[file_index_offset + 2],
+            data[file_index_offset + 3],
+        ]);
+        // ExifTool adds 1 to the raw value
+        decoded.insert(
+            "FileIndex".to_string(),
+            ExifValue::Long(vec![file_index.wrapping_add(1)]),
+        );
+    }
+
+    if data.len() > dir_index_offset + 4 {
+        let dir_index = u32::from_le_bytes([
+            data[dir_index_offset],
+            data[dir_index_offset + 1],
+            data[dir_index_offset + 2],
+            data[dir_index_offset + 3],
+        ]);
+        // ExifTool subtracts 1 from the raw value for DirectoryIndex
+        decoded.insert(
+            "DirectoryIndex".to_string(),
+            ExifValue::Long(vec![dir_index.wrapping_sub(1)]),
+        );
+    }
+
     decoded
 }
 
@@ -7927,6 +8109,87 @@ pub fn decode_camera_info_psinfo_with_orientation(
 /// CameraOrientation at offset 0x7d (Canon.pm CameraInfo650D)
 pub fn decode_camera_info_650d(data: &[u8]) -> HashMap<String, ExifValue> {
     decode_camera_info_psinfo_with_orientation(data, 0x390, Some(0x7d))
+}
+
+/// Decode Canon CameraInfo for PowerShot models (CameraInfoPowerShot2)
+/// Extracts CameraTemperature based on array count
+/// From ExifTool Canon.pm %CameraInfoPowerShot2
+pub fn decode_camera_info_powershot(data: &[u8]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // CameraInfoPowerShot2 is stored as int32s array
+    // CameraTemperature is at index (count - 3) for most models
+    if data.len() < 4 {
+        return decoded;
+    }
+
+    // Count is data.len() / 4 (int32s entries)
+    let count = data.len() / 4;
+
+    // CameraTemperature offset is count - 3 for models:
+    // - Count 138: offset 135 (A450, A460, A550, A630, A640, A710)
+    // - Count 148: offset 145 (A560, A570, A650, A720, G7, G9, etc.)
+    // - Count 156: offset 153 (A470, A580, A590, SD770, SD790, SD890, SD1100)
+    // - Count 162: offset 159 (A1000, A2000, E1, G10, SD880, SD990, SX1, SX10, SX110)
+    // - Count 167: offset 164 (A480, A1100, A2100, D10, SD780, SD960, SD970, SD1200, SX200)
+    // - Count 171: offset 168 (A490, A495, A3000, A3100, G11, S90, SD940, SD980, SD1300, SD1400, SD3500, SD4000, SX20, SX120, SX210)
+    // - Count 264: offset 261 (S95, SD4500, SX130, G12, etc.)
+
+    let temp_offset = match count {
+        138 => Some(135),
+        148 => Some(145),
+        156 => Some(153),
+        162 => Some(159),
+        167 => Some(164),
+        171 => Some(168),
+        264 => Some(261),
+        _ => {
+            // For unknown counts, try count - 3 as a heuristic
+            if count > 3 {
+                Some(count - 3)
+            } else {
+                None
+            }
+        }
+    };
+
+    if let Some(offset) = temp_offset {
+        let byte_offset = offset * 4;
+        if data.len() >= byte_offset + 4 {
+            // Read as little-endian int32s
+            let temp = i32::from_le_bytes([
+                data[byte_offset],
+                data[byte_offset + 1],
+                data[byte_offset + 2],
+                data[byte_offset + 3],
+            ]);
+            // Only include if it looks like a valid temperature (-40 to 100 C)
+            if (-40..=100).contains(&temp) {
+                decoded.insert(
+                    "CameraTemperature".to_string(),
+                    ExifValue::Ascii(format!("{} C", temp)),
+                );
+            }
+        }
+    }
+
+    // Also extract Rotation at offset 0x18 (24) for CameraInfoPowerShot2
+    if data.len() >= 0x18 * 4 + 4 {
+        let rotation = i32::from_le_bytes([
+            data[0x18 * 4],
+            data[0x18 * 4 + 1],
+            data[0x18 * 4 + 2],
+            data[0x18 * 4 + 3],
+        ]);
+        if rotation == 0 || rotation == 1 || rotation == 2 || rotation == 3 {
+            decoded.insert(
+                "Rotation".to_string(),
+                ExifValue::Long(vec![rotation as u32]),
+            );
+        }
+    }
+
+    decoded
 }
 
 /// Decode Canon ColorInfo array sub-fields (tag 0x4003)
@@ -8408,6 +8671,10 @@ pub fn parse_canon_maker_notes(
                     let bytes_data: Option<Vec<u8>> = match &value {
                         ExifValue::Undefined(bytes) => Some(bytes.clone()),
                         ExifValue::Byte(bytes) => Some(bytes.clone()),
+                        ExifValue::Long(longs) => {
+                            // Convert Long array to bytes (little-endian)
+                            Some(longs.iter().flat_map(|v| v.to_le_bytes()).collect())
+                        }
                         _ => None,
                     };
 
@@ -8447,6 +8714,9 @@ pub fn parse_canon_maker_notes(
                         {
                             // 6D/100D etc: PictureStyleInfo at offset 0x3c6, CameraOrientation at 0x83
                             decode_camera_info_6d(&bytes)
+                        } else if model_str.contains("PowerShot") || model_str.contains("IXUS") {
+                            // PowerShot/IXUS: Extract CameraTemperature from CameraInfoPowerShot2
+                            decode_camera_info_powershot(&bytes)
                         } else {
                             HashMap::new()
                         };
@@ -8493,6 +8763,7 @@ pub fn parse_canon_maker_notes(
                     | CANON_CONTRAST_INFO
                     | CANON_MY_COLORS
                     | CANON_AF_INFO
+                    | CANON_FACE_DETECT
             );
 
             if should_decode {
@@ -8647,6 +8918,8 @@ pub fn parse_canon_maker_notes(
                         CANON_CONTRAST_INFO => decode_contrast_info(&shorts),
                         CANON_MY_COLORS => decode_my_colors(&shorts),
                         CANON_AF_INFO => decode_af_info(&shorts),
+                        CANON_FACE_DETECT => decode_face_detect(&shorts),
+                        CANON_MEASURED_COLOR => decode_measured_color(&shorts),
                         _ => HashMap::new(),
                     };
 

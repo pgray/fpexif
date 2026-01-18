@@ -86,6 +86,8 @@ pub struct ExifData {
     pub raf_metadata: Option<formats::RafMetadata>,
     // MRW-specific metadata (for Minolta RAW files)
     pub mrw_metadata: Option<formats::MrwMetadata>,
+    // RW2-specific metadata (for Panasonic RAW files)
+    pub rw2_metadata: Option<formats::Rw2Metadata>,
 }
 
 impl ExifData {
@@ -97,6 +99,7 @@ impl ExifData {
             maker_notes: None,
             raf_metadata: None,
             mrw_metadata: None,
+            rw2_metadata: None,
         }
     }
 
@@ -118,6 +121,16 @@ impl ExifData {
     /// Get MRW-specific metadata
     pub fn get_mrw_metadata(&self) -> Option<&formats::MrwMetadata> {
         self.mrw_metadata.as_ref()
+    }
+
+    /// Set RW2-specific metadata (PanasonicRaw IFD0 data)
+    pub fn set_rw2_metadata(&mut self, metadata: formats::Rw2Metadata) {
+        self.rw2_metadata = Some(metadata);
+    }
+
+    /// Get RW2-specific metadata
+    pub fn get_rw2_metadata(&self) -> Option<&formats::Rw2Metadata> {
+        self.rw2_metadata.as_ref()
     }
 
     /// Get a tag value by its numeric ID

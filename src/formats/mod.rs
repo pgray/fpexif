@@ -18,6 +18,7 @@ pub mod x3f;
 // Re-export metadata types
 pub use mrw::MrwMetadata;
 pub use raf::RafMetadata;
+pub use tiff::Rw2Metadata;
 
 use crate::errors::ExifResult;
 use std::io::{Read, Seek};
@@ -59,6 +60,11 @@ pub fn extract_mrw_metadata_if_mrw<R: Read + Seek>(
     } else {
         Ok(None)
     }
+}
+
+/// Check if a reader contains an RW2 file and extract RW2-specific metadata if so
+pub fn extract_rw2_metadata_if_rw2<R: Read + Seek>(reader: R) -> ExifResult<Option<Rw2Metadata>> {
+    tiff::extract_rw2_metadata_if_rw2(reader)
 }
 
 /// Extract EXIF APP1 segment data from any supported image format
