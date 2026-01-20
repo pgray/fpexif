@@ -643,28 +643,21 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
                 };
                 Value::String(formatted)
             } else {
-                // Negative: use fraction format for common EV steps, else decimal number
+                // Negative: use improper fraction format for common EV steps (ExifTool uses -5/3 not -1 2/3)
                 let frac = rounded.fract().abs();
-                let whole = rounded.trunc() as i32;
-                if (frac - 0.3).abs() < 0.05 || (frac - 0.7).abs() < 0.05 {
-                    // -2/3 or -x 2/3
-                    let frac_str = if (frac - 0.3).abs() < 0.05 {
-                        "1/3"
-                    } else {
-                        "2/3"
-                    };
-                    if whole == 0 {
-                        Value::String(format!("-{}", frac_str))
-                    } else {
-                        Value::String(format!("{} {}", whole, frac_str))
-                    }
+                let whole_abs = rounded.trunc().abs() as i32;
+                if (frac - 0.3).abs() < 0.05 {
+                    // x/3 fraction (1/3 step)
+                    let numerator = whole_abs * 3 + 1;
+                    Value::String(format!("-{}/3", numerator))
+                } else if (frac - 0.7).abs() < 0.05 {
+                    // x/3 fraction (2/3 step)
+                    let numerator = whole_abs * 3 + 2;
+                    Value::String(format!("-{}/3", numerator))
                 } else if (frac - 0.5).abs() < 0.05 {
-                    // -1/2 or -x 1/2
-                    if whole == 0 {
-                        Value::String("-1/2".to_string())
-                    } else {
-                        Value::String(format!("{} 1/2", whole))
-                    }
+                    // x/2 fraction (1/2 step)
+                    let numerator = whole_abs * 2 + 1;
+                    Value::String(format!("-{}/2", numerator))
                 } else if rounded.fract() == 0.0 {
                     Value::Number((rounded as i64).into())
                 } else {
@@ -1197,6 +1190,13 @@ pub fn format_exif_value_for_json_with_make_and_name(
                     // SRawType - ExifTool outputs raw numeric value
                     Value::Number(v[0].into())
                 }
+                // Compression and ResolutionUnit can be stored as Long in some files (e.g., NRW)
+                0x0103 => {
+                    Value::String(crate::tags::get_compression_description(v[0] as u16).to_string())
+                }
+                0x0128 => Value::String(
+                    crate::tags::get_resolution_unit_description(v[0] as u16).to_string(),
+                ),
                 _ => Value::Number(v[0].into()),
             }
         }
@@ -1564,7 +1564,10 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             continue;
         }
         // Only add if not already present from Main IFD
-        if !output.contains_key(&tag_name) {
+        // Exception: SensingMethod (0xA217) from EXIF IFD should override Main IFD's 0x9217
+        // ExifTool prefers EXIF IFD's SensingMethod over SubIFD's
+        let should_override = tag_id.id == 0xA217; // SensingMethod in EXIF IFD
+        if should_override || !output.contains_key(&tag_name) {
             let json_value = format_exif_value_for_json_with_make(value, tag_id.id, make_ref);
             output.insert(tag_name, json_value);
         }
@@ -1589,9 +1592,12 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
     }
 
     // ISO is an alias for ISOSpeedRatings (tag 0x8827)
-    if let Some(ExifValue::Short(v)) = exif_data.get_tag_by_id(0x8827) {
-        if !v.is_empty() {
-            output.insert("ISO".to_string(), Value::Number(v[0].into()));
+    // Only use if not already set from MakerNotes (which may have Hi/Lo prefix)
+    if !output.contains_key("ISO") {
+        if let Some(ExifValue::Short(v)) = exif_data.get_tag_by_id(0x8827) {
+            if !v.is_empty() {
+                output.insert("ISO".to_string(), Value::Number(v[0].into()));
+            }
         }
     }
 

@@ -1669,6 +1669,7 @@ fn parse_iso_info(data: &[u8]) -> Vec<(String, String)> {
     }
 
     // Offset 0x00: ISO (int8u)
+    // Note: ISOInfo ISO is always just a number, the Hi/Lo prefix only comes from tag 0x0002
     let iso_raw = data[0];
     if iso_raw != 0 {
         let iso = (100.0 * ((iso_raw as f64 / 12.0 - 5.0) * 2.0_f64.ln()).exp()).round() as u32;
@@ -3578,6 +3579,9 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     // Check if version 0300+ (different structure)
     let is_v0300_plus = version_str.starts_with("03") || version_str.starts_with("04");
 
+    // Check if Nikon 1 camera (version 0201) - different value mappings
+    let is_nikon1 = version_str == "0201";
+
     // Byte 4: AFDetectionMethod (also determines ContrastDetectAF)
     let af_detection = data[4];
     let af_detection_str = match af_detection {
@@ -3605,82 +3609,92 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
         contrast_detect_str.to_string(),
     ));
 
-    // Byte 5: AFAreaMode (depends on ContrastDetectAF)
+    // Byte 5: AFAreaMode (depends on ContrastDetectAF and camera type)
     if data.len() >= 6 {
-        let af_area_mode = if af_detection == 0 {
+        let af_area_val = data[5];
+        let af_area_mode = if is_nikon1 {
+            // Nikon 1 cameras only have values 128-131
+            match af_area_val {
+                128 => "Single".to_string(),
+                129 => "Auto (41 points)".to_string(),
+                130 => "Subject Tracking (41 points)".to_string(),
+                131 => "Face Priority (41 points)".to_string(),
+                _ => format!("Unknown ({})", af_area_val),
+            }
+        } else if af_detection == 0 {
             // Phase detect mode
-            match data[5] {
-                0 => "Single Area",
-                1 => "Dynamic Area",
-                2 => "Dynamic Area (closest subject)",
-                3 => "Group Dynamic",
-                4 => "Dynamic Area (9 points)",
-                5 => "Dynamic Area (21 points)",
-                6 => "Dynamic Area (51 points)",
-                7 => "Dynamic Area (51 points, 3D-tracking)",
-                8 => "Auto-area",
-                9 => "Dynamic Area (3D-tracking)",
-                10 => "Single Area (wide)",
-                11 => "Dynamic Area (wide)",
-                12 => "Dynamic Area (wide, 3D-tracking)",
-                13 => "Group Area",
-                14 => "Dynamic Area (25 points)",
-                15 => "Dynamic Area (72 points)",
-                16 => "Group Area (HL)",
-                17 => "Group Area (VL)",
-                18 => "Dynamic Area (49 points)",
+            match af_area_val {
+                0 => "Single Area".to_string(),
+                1 => "Dynamic Area".to_string(),
+                2 => "Dynamic Area (closest subject)".to_string(),
+                3 => "Group Dynamic".to_string(),
+                4 => "Dynamic Area (9 points)".to_string(),
+                5 => "Dynamic Area (21 points)".to_string(),
+                6 => "Dynamic Area (51 points)".to_string(),
+                7 => "Dynamic Area (51 points, 3D-tracking)".to_string(),
+                8 => "Auto-area".to_string(),
+                9 => "Dynamic Area (3D-tracking)".to_string(),
+                10 => "Single Area (wide)".to_string(),
+                11 => "Dynamic Area (wide)".to_string(),
+                12 => "Dynamic Area (wide, 3D-tracking)".to_string(),
+                13 => "Group Area".to_string(),
+                14 => "Dynamic Area (25 points)".to_string(),
+                15 => "Dynamic Area (72 points)".to_string(),
+                16 => "Group Area (HL)".to_string(),
+                17 => "Group Area (VL)".to_string(),
+                18 => "Dynamic Area (49 points)".to_string(),
                 // Nikon 1 cameras (1J1-1J4, 1S1-1S2, 1V1-1V3, AW1)
-                128 => "Single",
-                129 => "Auto (41 points)",
-                130 => "Subject Tracking (41 points)",
-                131 => "Face Priority (41 points)",
+                128 => "Single".to_string(),
+                129 => "Auto (41 points)".to_string(),
+                130 => "Subject Tracking (41 points)".to_string(),
+                131 => "Face Priority (41 points)".to_string(),
                 // Z cameras
-                192 => "Pinpoint",
-                193 => "Single",
-                194 => "Dynamic",
-                195 => "Wide (S)",
-                196 => "Wide (L)",
-                197 => "Auto",
-                199 => "Auto",
-                _ => "Unknown",
+                192 => "Pinpoint".to_string(),
+                193 => "Single".to_string(),
+                194 => "Dynamic".to_string(),
+                195 => "Wide (S)".to_string(),
+                196 => "Wide (L)".to_string(),
+                197 => "Auto".to_string(),
+                199 => "Auto".to_string(),
+                _ => "Unknown".to_string(),
             }
         } else {
             // Contrast detect mode
-            match data[5] {
-                0 => "Contrast-detect",
-                1 => "Contrast-detect (normal area)",
-                2 => "Contrast-detect (wide area)",
-                3 => "Contrast-detect (face priority)",
-                4 => "Contrast-detect (subject tracking)",
+            match af_area_val {
+                0 => "Contrast-detect".to_string(),
+                1 => "Contrast-detect (normal area)".to_string(),
+                2 => "Contrast-detect (wide area)".to_string(),
+                3 => "Contrast-detect (face priority)".to_string(),
+                4 => "Contrast-detect (subject tracking)".to_string(),
                 // Nikon 1 cameras
-                128 => "Single",
-                129 => "Auto (41 points)",
-                130 => "Subject Tracking (41 points)",
-                131 => "Face Priority (41 points)",
+                128 => "Single".to_string(),
+                129 => "Auto (41 points)".to_string(),
+                130 => "Subject Tracking (41 points)".to_string(),
+                131 => "Face Priority (41 points)".to_string(),
                 // Z cameras
-                192 => "Pinpoint",
-                193 => "Single",
-                194 => "Dynamic",
-                195 => "Wide (S)",
-                196 => "Wide (L)",
-                197 => "Auto",
-                198 => "Auto (People)",
-                199 => "Auto (Animal)",
+                192 => "Pinpoint".to_string(),
+                193 => "Single".to_string(),
+                194 => "Dynamic".to_string(),
+                195 => "Wide (S)".to_string(),
+                196 => "Wide (L)".to_string(),
+                197 => "Auto".to_string(),
+                198 => "Auto (People)".to_string(),
+                199 => "Auto (Animal)".to_string(),
                 // D6
-                200 => "Normal-area AF",
-                201 => "Wide-area AF",
-                202 => "Face-priority AF",
-                203 => "Subject-tracking AF",
+                200 => "Normal-area AF".to_string(),
+                201 => "Wide-area AF".to_string(),
+                202 => "Face-priority AF".to_string(),
+                203 => "Subject-tracking AF".to_string(),
                 // Z9
-                204 => "Dynamic Area (S)",
-                205 => "Dynamic Area (M)",
-                206 => "Dynamic Area (L)",
-                207 => "3D-tracking",
-                208 => "Wide-Area (C1/C2)",
-                _ => "Unknown",
+                204 => "Dynamic Area (S)".to_string(),
+                205 => "Dynamic Area (M)".to_string(),
+                206 => "Dynamic Area (L)".to_string(),
+                207 => "3D-tracking".to_string(),
+                208 => "Wide-Area (C1/C2)".to_string(),
+                _ => "Unknown".to_string(),
             }
         };
-        tags.push(("AFAreaMode".to_string(), af_area_mode.to_string()));
+        tags.push(("AFAreaMode".to_string(), af_area_mode));
     }
 
     // Byte 6: PhaseDetectAF / FocusPointSchema
@@ -3689,24 +3703,32 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     // PhaseDetectAF logic: ExifTool composite tag
     // Only report PhaseDetectAF as On when AFDetectionMethod == 0 (Phase Detect)
     // For Hybrid (2) or Contrast (1), report Off regardless of FocusPointSchema
-    let phase_detect = if af_detection != 0 {
-        "Off"
+    let phase_detect = if is_nikon1 {
+        // Nikon 1 cameras: only values 4-6 are valid
+        match focus_point_schema {
+            4 => "On (73-point)".to_string(),
+            5 => "On (5)".to_string(),
+            6 => "On (105-point)".to_string(),
+            _ => format!("Unknown ({})", focus_point_schema),
+        }
+    } else if af_detection != 0 {
+        "Off".to_string()
     } else {
         match focus_point_schema {
-            0 => "Off",
-            1 => "On (51-point)",
-            2 => "On (11-point)",
-            3 => "On (39-point)",
-            4 => "On (73-point)",
-            5 => "On (5)",
-            6 => "On (105-point)",
-            7 => "On (153-point)",
-            8 => "On (81-point)",
-            9 => "On (105-point)",
-            _ => "Unknown",
+            0 => "Off".to_string(),
+            1 => "On (51-point)".to_string(),
+            2 => "On (11-point)".to_string(),
+            3 => "On (39-point)".to_string(),
+            4 => "On (73-point)".to_string(),
+            5 => "On (5)".to_string(),
+            6 => "On (105-point)".to_string(),
+            7 => "On (153-point)".to_string(),
+            8 => "On (81-point)".to_string(),
+            9 => "On (105-point)".to_string(),
+            _ => "Unknown".to_string(),
         }
     };
-    tags.push(("PhaseDetectAF".to_string(), phase_detect.to_string()));
+    tags.push(("PhaseDetectAF".to_string(), phase_detect));
 
     // FocusPointSchema - derived from PhaseDetectAF value
     let schema_str = match focus_point_schema {
@@ -6166,9 +6188,15 @@ pub fn parse_nikon_maker_notes(
                         }
                     }
                     // Special handling for ISO tag - extract the actual ISO value
+                    // ExifTool: first value 1 means "Hi ISO" mode, prefix "Hi " to value
                     if tag_id == NIKON_ISO_SETTING && values.len() >= 2 {
                         let iso = if values[1] > 0 { values[1] } else { values[0] };
-                        ExifValue::Short(vec![iso])
+                        if values[0] == 1 && iso > 0 {
+                            // Hi ISO mode - output as "Hi XXXXX"
+                            ExifValue::Ascii(format!("Hi {}", iso))
+                        } else {
+                            ExifValue::Short(vec![iso])
+                        }
                     } else if tag_id == NIKON_NEF_BIT_DEPTH && !values.is_empty() {
                         // NEFBitDepth: ExifTool outputs just the first value as the bit depth
                         ExifValue::Short(vec![values[0]])
@@ -6530,12 +6558,15 @@ pub fn parse_nikon_maker_notes(
             // For tag 0x0002 (ISO), output as "ISO" with the extracted value
             // Older cameras (D1, D1X, D100) don't have ISOInfo tag so this is the only source
             if tag_id == NIKON_ISO_SETTING {
-                if let ExifValue::Short(ref vals) = value {
-                    if !vals.is_empty() && vals[0] > 0 {
-                        // Create synthetic ISO tag with ID 0xFFFF to avoid conflict
-                        let iso_tag = MakerNoteTag::new(0xFFFF, Some("ISO"), value.clone());
-                        tags.insert(0xFFFF, iso_tag);
-                    }
+                let should_output = match &value {
+                    ExifValue::Short(vals) => !vals.is_empty() && vals[0] > 0,
+                    ExifValue::Ascii(s) => !s.is_empty(), // Hi ISO mode
+                    _ => false,
+                };
+                if should_output {
+                    // Create synthetic ISO tag with ID 0xFFFF to avoid conflict
+                    let iso_tag = MakerNoteTag::new(0xFFFF, Some("ISO"), value.clone());
+                    tags.insert(0xFFFF, iso_tag);
                 }
                 continue;
             }
@@ -6572,7 +6603,15 @@ pub fn parse_nikon_maker_notes(
             match tag_id {
                 NIKON_ISO_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
+                        // Check if we have a "Hi" prefixed ISO from tag 0x0002
+                        let has_hi_iso = tags.get(&0xFFFF).is_some_and(
+                            |t| matches!(&t.value, ExifValue::Ascii(s) if s.starts_with("Hi ")),
+                        );
                         for (name, val) in parse_iso_info(bytes) {
+                            // Skip ISOInfo-derived ISO if we already have a "Hi" prefixed ISO
+                            if name == "ISO" && has_hi_iso {
+                                continue;
+                            }
                             let tag_id = 0x9000 + tags.len() as u16;
                             let tag = if let Some((exiv2_group, exiv2_name)) =
                                 get_exiv2_nikon_subfield(NIKON_ISO_INFO, &name)

@@ -1563,16 +1563,17 @@ pub fn get_compression_description(value: u16) -> &'static str {
 }
 
 /// Human-readable descriptions for SensingMethod values
-pub fn get_sensing_method_description(value: u16) -> &'static str {
+/// Returns "Unknown (N)" for unknown values to match ExifTool format
+pub fn get_sensing_method_description(value: u16) -> String {
     match value {
-        1 => "Not defined",
-        2 => "One-chip color area",
-        3 => "Two-chip color area",
-        4 => "Three-chip color area",
-        5 => "Color sequential area",
-        7 => "Trilinear",
-        8 => "Color sequential linear",
-        _ => "Unknown",
+        1 => "Not defined".to_string(),
+        2 => "One-chip color area".to_string(),
+        3 => "Two-chip color area".to_string(),
+        4 => "Three-chip color area".to_string(),
+        5 => "Color sequential area".to_string(),
+        7 => "Trilinear".to_string(),
+        8 => "Color sequential linear".to_string(),
+        _ => format!("Unknown ({})", value),
     }
 }
 
