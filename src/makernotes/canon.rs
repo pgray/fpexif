@@ -1315,7 +1315,7 @@ pub fn get_canon_tag_name(tag_id: u16) -> Option<&'static str> {
         CANON_MODIFIED_INFO => Some("ModifiedInfo"),
         CANON_TONE_CURVE_MATCHING => Some("ToneCurveMatching"),
         CANON_WHITE_BALANCE_MATCHING => Some("WhiteBalanceMatching"),
-        CANON_COLOR_SPACE => Some("CanonColorSpace"),
+        CANON_COLOR_SPACE => Some("ColorSpace"),
         CANON_PREVIEW_IMAGE_INFO => Some("PreviewImageInfo"),
         CANON_VRD_OFFSET => Some("VRDOffset"),
         CANON_SENSOR_INFO => Some("SensorInfo"),
@@ -2475,6 +2475,7 @@ define_tag_decoder! {
     exiftool: {
         1 => "sRGB",
         2 => "Adobe RGB",
+        65535 => "n/a",
     },
     exiv2: {
         1 => "sRGB",

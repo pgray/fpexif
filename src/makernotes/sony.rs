@@ -423,6 +423,11 @@ pub fn get_sony_tag_name(tag_id: u16) -> Option<&'static str> {
         0xF40C => Some("SequenceFileNumber"),
         0xF422 => Some("SequenceLength"),
         0xF428 => Some("CameraOrientation"),
+        // Synthetic Tag9402 subdirectory field IDs
+        0xF430 => Some("AmbientTemperature"),
+        0xF432 => Some("FocusMode"),
+        0xF434 => Some("AFAreaMode"),
+        0xF436 => Some("FocusPosition2"),
         // Synthetic Tag2010 subdirectory field IDs
         0xF204 => Some("ReleaseMode3"),
         0xF210 => Some("SelfTimer"),
@@ -4630,6 +4635,128 @@ fn parse_tag9400(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerN
     // TODO: Add model parameter and implement conditional decoding
 }
 
+/// Parse Tag9402 subdirectory (tag 0x9402)
+/// Reference: exiftool/lib/Image/ExifTool/Sony.pm Tag9402
+/// Contains AFAreaMode, FocusMode, AmbientTemperature for DSC/NEX/ILCE models
+/// Note: Tag9402 data is encrypted with Sony's substitution cipher
+fn parse_tag9402(data: &[u8], model: Option<&str>, tags: &mut HashMap<u16, MakerNoteTag>) {
+    if data.len() < 0x20 {
+        return;
+    }
+
+    // Tag9402 is encrypted - decrypt it first
+    let decrypted = sony_decipher(data);
+    let data = &decrypted[..];
+
+    // Check TempTest1 at offset 0x02 - many values only valid if this is 255
+    let temp_test1 = data.get(0x02).copied().unwrap_or(0);
+
+    // AmbientTemperature (offset 0x04) - int8s, only valid if TempTest1 == 255
+    if temp_test1 == 255 && data.len() > 0x04 {
+        let temp = data[0x04] as i8;
+        // Sanity check - reasonable temperature range
+        if (-40..=60).contains(&temp) {
+            tags.insert(
+                0xF430,
+                MakerNoteTag::new(
+                    0xF430,
+                    Some("AmbientTemperature"),
+                    ExifValue::Ascii(format!("{} C", temp)),
+                ),
+            );
+        }
+    }
+
+    // Check if this is an SLT/ILCA/HV model - AFAreaMode in Tag9402 doesn't apply to them
+    // (SLT/ILCA models get AFAreaMode from CameraSettings or AFAreaModeSetting instead)
+    let is_slt_or_ilca =
+        model.is_some_and(|m| m.contains("SLT-") || m.contains("ILCA-") || m.contains("HV"));
+
+    // FocusMode (offset 0x16) - lower 7 bits (Mask => 0x7f)
+    // Only output for non-SLT/ILCA models to avoid conflicts
+    if !is_slt_or_ilca && data.len() > 0x16 {
+        let raw = data[0x16] & 0x7f;
+        let decoded = decode_focus_mode_tag9402(raw);
+        if decoded != "Unknown" {
+            tags.insert(
+                0xF432,
+                MakerNoteTag::new(
+                    0xF432,
+                    Some("FocusMode"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // AFAreaMode (offset 0x17) - only for DSC/NEX/ILCE models
+    // SLT/ILCA models use AFAreaModeSetting (0x201C) instead
+    if !is_slt_or_ilca && data.len() > 0x17 {
+        let raw = data[0x17];
+        let decoded = decode_af_area_mode_tag9402(raw);
+        if decoded != "Unknown" {
+            tags.insert(
+                0xF434,
+                MakerNoteTag::new(
+                    0xF434,
+                    Some("AFAreaMode"),
+                    ExifValue::Ascii(decoded.to_string()),
+                ),
+            );
+        }
+    }
+
+    // FocusPosition2 (offset 0x2d) - only for non-DSC models
+    // Values from 80 to 255 (infinity)
+    // Note: Skip for SLT models as they get FocusPosition2 from CameraInfo3 instead
+    let is_dsc_or_stellar = model.is_some_and(|m| m.starts_with("DSC-") || m.contains("Stellar"));
+    if !is_dsc_or_stellar && !is_slt_or_ilca && data.len() > 0x2d {
+        let pos = data[0x2d];
+        if pos >= 80 {
+            tags.insert(
+                0xF436,
+                MakerNoteTag::new(
+                    0xF436,
+                    Some("FocusPosition2"),
+                    ExifValue::Short(vec![pos as u16]),
+                ),
+            );
+        }
+    }
+}
+
+/// Decode FocusMode from Tag9402 offset 0x16
+fn decode_focus_mode_tag9402(value: u8) -> &'static str {
+    match value {
+        0 => "Manual",
+        2 => "AF-S",
+        3 => "AF-C",
+        4 => "AF-A",
+        6 => "DMF",
+        _ => "Unknown",
+    }
+}
+
+/// Decode AFAreaMode from Tag9402 offset 0x17
+fn decode_af_area_mode_tag9402(value: u8) -> &'static str {
+    match value {
+        0 => "Multi", // Newer DSC/ILC use name 'Wide'
+        1 => "Center",
+        2 => "Spot",
+        3 => "Flexible Spot",
+        10 => "Selective (for Miniature effect)",
+        11 => "Zone",
+        12 => "Expanded Flexible Spot",
+        13 => "Custom AF Area",
+        14 => "Tracking",
+        15 => "Face Tracking",
+        20 => "Animal Eye Tracking",
+        21 => "Human Eye Tracking",
+        255 => "Manual",
+        _ => "Unknown",
+    }
+}
+
 /// Tag2010 variant identification based on camera model
 /// Returns variant letter ('e', 'f', 'g', 'h', 'i') or None if not supported
 fn get_tag2010_variant(model: Option<&str>) -> Option<char> {
@@ -6386,6 +6513,18 @@ pub fn parse_sony_maker_notes(
                     parse_tag9400(raw_data, endian, &mut tags);
                 } else if let ExifValue::Byte(ref raw_data) = decoded_value {
                     parse_tag9400(raw_data, endian, &mut tags);
+                }
+                // Don't insert the raw binary blob
+                continue;
+            }
+
+            // Handle Tag9402 subdirectory (tag 0x9402)
+            // Contains AFAreaMode, FocusMode, AmbientTemperature for DSC/NEX/ILCE models
+            if tag_id == SONY_TAG_9402 {
+                if let ExifValue::Undefined(ref raw_data) = decoded_value {
+                    parse_tag9402(raw_data, model, &mut tags);
+                } else if let ExifValue::Byte(ref raw_data) = decoded_value {
+                    parse_tag9402(raw_data, model, &mut tags);
                 }
                 // Don't insert the raw binary blob
                 continue;

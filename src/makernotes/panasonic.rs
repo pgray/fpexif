@@ -129,7 +129,7 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
         PANA_PROGRAM_ISO => Some("ProgramISO"),
         PANA_ADVANCED_SCENE_MODE => Some("AdvancedSceneMode"),
         PANA_TEXT_STAMP_2 => Some("TextStamp2"),
-        PANA_FACE_DETECTED => Some("FaceDetected"),
+        PANA_FACE_DETECTED => Some("FacesDetected"),
         PANA_IMAGE_WIDTH => Some("PanasonicImageWidth"),
         PANA_IMAGE_HEIGHT => Some("PanasonicImageHeight"),
         PANA_LENS_TYPE => Some("LensType"),

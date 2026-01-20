@@ -1248,18 +1248,23 @@ pub fn decode_packed_rational_unsigned(data: &[u8]) -> Option<f64> {
 }
 
 // FlashMode (tag 0x0087): Nikon.pm
-define_tag_decoder! {
-    flash_mode,
-    type: u8,
-    both: {
-        0 => "Did Not Fire",
-        1 => "Fired, Manual",
-        3 => "Not Ready",
-        7 => "Fired, External",
-        8 => "Fired, Commander Mode",
-        9 => "Fired, TTL Mode",
-        18 => "LED Light",
+// Note: For unknown values, ExifTool returns "Unknown (X)" format, so we use a custom function
+// instead of the macro to preserve the numeric value in the output
+pub fn decode_flash_mode_exiftool(value: u8) -> String {
+    match value {
+        0 => "Did Not Fire".to_string(),
+        1 => "Fired, Manual".to_string(),
+        3 => "Not Ready".to_string(),
+        7 => "Fired, External".to_string(),
+        8 => "Fired, Commander Mode".to_string(),
+        9 => "Fired, TTL Mode".to_string(),
+        18 => "LED Light".to_string(),
+        _ => format!("Unknown ({})", value),
     }
+}
+
+pub fn decode_flash_mode_exiv2(value: u8) -> String {
+    decode_flash_mode_exiftool(value) // Same mapping
 }
 
 /// Decode Shooting Mode bitmask (tag 0x0089) - ExifTool format
@@ -2395,7 +2400,10 @@ fn parse_face_detect(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
 
 /// Parse FlashInfo tag data (tag 0x00A8)
 /// Version-dependent structure - supports versions 0100-0108, 0200
-fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
+/// For Z cameras, FlashControlMode comes from MenuSettings (ShotInfo), not FlashInfo,
+/// so we skip outputting it here to avoid conflicting values
+fn parse_flash_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
+    let is_z_camera = is_nikon_z_series(model);
     let mut tags = Vec::new();
 
     if data.len() < 4 {
@@ -2484,11 +2492,15 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             tags.push(("FlashCommanderMode".to_string(), commander_str.to_string()));
 
             // Offset 0x09.2: FlashControlMode (bits 0-6, mask 0x7F)
-            let control_mode = data[9] & 0x7F;
-            tags.push((
-                "FlashControlMode".to_string(),
-                decode_flash_control_mode(control_mode).to_string(),
-            ));
+            // For Z cameras, FlashControlMode comes from MenuSettings with different mapping,
+            // so skip outputting from FlashInfo to avoid conflicts
+            if !is_z_camera {
+                let control_mode = data[9] & 0x7F;
+                tags.push((
+                    "FlashControlMode".to_string(),
+                    decode_flash_control_mode(control_mode).to_string(),
+                ));
+            }
         }
 
         // Offset 0x0A (10): FlashCompensation (int8s) - when FlashControlMode < 6
@@ -3551,6 +3563,7 @@ fn parse_af_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
 
 /// Parse AFInfo2 tag data (tag 0x00B7)
 /// For cameras with LiveView (D3, D300, D700, D5000, etc.)
+/// Version 0300+ (D6, D780, Z cameras) has different structure with PrimaryAFPoint at offset 0x38
 fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
@@ -3559,9 +3572,11 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     }
 
     // Bytes 0-3: AFInfo2Version
-    if let Ok(version) = std::str::from_utf8(&data[0..4]) {
-        tags.push(("AFInfo2Version".to_string(), version.to_string()));
-    }
+    let version_str = std::str::from_utf8(&data[0..4]).unwrap_or("");
+    tags.push(("AFInfo2Version".to_string(), version_str.to_string()));
+
+    // Check if version 0300+ (different structure)
+    let is_v0300_plus = version_str.starts_with("03") || version_str.starts_with("04");
 
     // Byte 4: AFDetectionMethod (also determines ContrastDetectAF)
     let af_detection = data[4];
@@ -3671,18 +3686,25 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     // Byte 6: PhaseDetectAF / FocusPointSchema
     let focus_point_schema = if data.len() >= 7 { data[6] } else { 0 };
 
-    let phase_detect = match focus_point_schema {
-        0 => "Off",
-        1 => "On (51-point)",
-        2 => "On (11-point)",
-        3 => "On (39-point)",
-        4 => "On (73-point)",
-        5 => "On (5)",
-        6 => "On (105-point)",
-        7 => "On (153-point)",
-        8 => "On (81-point)",
-        9 => "On (105-point)",
-        _ => "Unknown",
+    // PhaseDetectAF logic: ExifTool composite tag
+    // Only report PhaseDetectAF as On when AFDetectionMethod == 0 (Phase Detect)
+    // For Hybrid (2) or Contrast (1), report Off regardless of FocusPointSchema
+    let phase_detect = if af_detection != 0 {
+        "Off"
+    } else {
+        match focus_point_schema {
+            0 => "Off",
+            1 => "On (51-point)",
+            2 => "On (11-point)",
+            3 => "On (39-point)",
+            4 => "On (73-point)",
+            5 => "On (5)",
+            6 => "On (105-point)",
+            7 => "On (153-point)",
+            8 => "On (81-point)",
+            9 => "On (105-point)",
+            _ => "Unknown",
+        }
     };
     tags.push(("PhaseDetectAF".to_string(), phase_detect.to_string()));
 
@@ -3702,17 +3724,38 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     };
     tags.push(("FocusPointSchema".to_string(), schema_str.to_string()));
 
-    // Byte 7: PrimaryAFPoint
-    if data.len() >= 8 {
-        let primary_point = data[7];
-        let primary_str = decode_primary_af_point(primary_point, focus_point_schema);
-        tags.push(("PrimaryAFPoint".to_string(), primary_str));
-    }
+    // PrimaryAFPoint and AFPointsUsed offsets depend on version
+    if is_v0300_plus {
+        // Version 0300+: PrimaryAFPoint at offset 0x38 (56), AFPointsUsed at offset 0x0a (10)
+        // Byte 7 is AFCoordinatesAvailable in v0300+
+        if data.len() >= 8 {
+            let af_coords_available = data[7];
+            // Only parse PrimaryAFPoint when AFCoordinatesAvailable == 0
+            if af_coords_available == 0 && data.len() >= 57 {
+                let primary_point = data[0x38];
+                let primary_str = decode_primary_af_point(primary_point, focus_point_schema);
+                tags.push(("PrimaryAFPoint".to_string(), primary_str));
+            }
+        }
 
-    // Bytes 8+: AFPointsUsed (variable length based on schema)
-    if data.len() >= 9 {
-        let af_points_used = decode_af_points_used(&data[8..], focus_point_schema);
-        tags.push(("AFPointsUsed".to_string(), af_points_used));
+        // AFPointsUsed at offset 0x0a (10) for v0300+
+        if data.len() >= 24 {
+            let af_points_used = decode_af_points_used(&data[0x0a..], focus_point_schema);
+            tags.push(("AFPointsUsed".to_string(), af_points_used));
+        }
+    } else {
+        // Version 0100-02xx: PrimaryAFPoint at offset 7, AFPointsUsed at offset 8
+        if data.len() >= 8 {
+            let primary_point = data[7];
+            let primary_str = decode_primary_af_point(primary_point, focus_point_schema);
+            tags.push(("PrimaryAFPoint".to_string(), primary_str));
+        }
+
+        // Bytes 8+: AFPointsUsed (variable length based on schema)
+        if data.len() >= 9 {
+            let af_points_used = decode_af_points_used(&data[8..], focus_point_schema);
+            tags.push(("AFPointsUsed".to_string(), af_points_used));
+        }
     }
 
     tags
@@ -3919,6 +3962,25 @@ fn decode_primary_af_point(point: u8, schema: u8) -> String {
                 0 => "(none)",
                 1 => "E9 (Center)",
                 _ => return get_af_point_153(point),
+            };
+            name.to_string()
+        }
+        8 => {
+            // 81-point (Z6, Z7, Z50, etc.), 9x9 grid
+            // Auto-area mode, used by Z cameras
+            if point == 0 {
+                return "(none)".to_string();
+            }
+            // Use 81-point lookup table
+            get_af_point_81(point)
+        }
+        9 => {
+            // 105-point (D6), center is D8
+            // 7 rows (A-G) with 15 columns (1-15)
+            let name = match point {
+                0 => "(none)",
+                1 => "D8 (Center)",
+                _ => return get_af_point_105(point),
             };
             name.to_string()
         }
@@ -4243,6 +4305,220 @@ fn get_af_point_153(point: u8) -> String {
         (151, "G1"),
         (152, "H1"),
         (153, "I1"),
+    ];
+    for &(idx, name) in lookup {
+        if idx == point {
+            return name.to_string();
+        }
+    }
+    format!("Unknown ({})", point)
+}
+
+/// Get AF point name for 105-point grid (D6)
+/// From ExifTool Nikon.pm %afPoints105: 7 rows (A-G) with 15 columns (1-15), center is D8
+fn get_af_point_105(point: u8) -> String {
+    // Lookup table from ExifTool %afPoints105
+    let lookup: &[(u8, &str)] = &[
+        (1, "D8"),
+        (2, "C8"),
+        (3, "B8"),
+        (4, "A8"),
+        (5, "E8"),
+        (6, "F8"),
+        (7, "G8"),
+        (8, "D9"),
+        (9, "C9"),
+        (10, "B9"),
+        (11, "A9"),
+        (12, "E9"),
+        (13, "F9"),
+        (14, "G9"),
+        (15, "D10"),
+        (16, "C10"),
+        (17, "B10"),
+        (18, "A10"),
+        (19, "E10"),
+        (20, "F10"),
+        (21, "G10"),
+        (22, "D7"),
+        (23, "C7"),
+        (24, "B7"),
+        (25, "A7"),
+        (26, "E7"),
+        (27, "F7"),
+        (28, "G7"),
+        (29, "D6"),
+        (30, "C6"),
+        (31, "B6"),
+        (32, "A6"),
+        (33, "E6"),
+        (34, "F6"),
+        (35, "G6"),
+        (36, "D11"),
+        (37, "C11"),
+        (38, "B11"),
+        (39, "A11"),
+        (40, "E11"),
+        (41, "F11"),
+        (42, "G11"),
+        (43, "D12"),
+        (44, "C12"),
+        (45, "B12"),
+        (46, "A12"),
+        (47, "E12"),
+        (48, "F12"),
+        (49, "G12"),
+        (50, "D13"),
+        (51, "C13"),
+        (52, "B13"),
+        (53, "A13"),
+        (54, "E13"),
+        (55, "F13"),
+        (56, "G13"),
+        (57, "D14"),
+        (58, "C14"),
+        (59, "B14"),
+        (60, "A14"),
+        (61, "E14"),
+        (62, "F14"),
+        (63, "G14"),
+        (64, "D15"),
+        (65, "C15"),
+        (66, "B15"),
+        (67, "A15"),
+        (68, "E15"),
+        (69, "F15"),
+        (70, "G15"),
+        (71, "D5"),
+        (72, "C5"),
+        (73, "B5"),
+        (74, "A5"),
+        (75, "E5"),
+        (76, "F5"),
+        (77, "G5"),
+        (78, "D4"),
+        (79, "C4"),
+        (80, "B4"),
+        (81, "A4"),
+        (82, "E4"),
+        (83, "F4"),
+        (84, "G4"),
+        (85, "D3"),
+        (86, "C3"),
+        (87, "B3"),
+        (88, "A3"),
+        (89, "E3"),
+        (90, "F3"),
+        (91, "G3"),
+        (92, "D2"),
+        (93, "C2"),
+        (94, "B2"),
+        (95, "A2"),
+        (96, "E2"),
+        (97, "F2"),
+        (98, "G2"),
+        (99, "D1"),
+        (100, "C1"),
+        (101, "B1"),
+        (102, "A1"),
+        (103, "E1"),
+        (104, "F1"),
+        (105, "G1"),
+    ];
+    for &(idx, name) in lookup {
+        if idx == point {
+            return name.to_string();
+        }
+    }
+    format!("Unknown ({})", point)
+}
+
+/// Get AF point name for 81-point grid (Z cameras: Z5, Z6, Z7, Z50, etc.)
+/// 9x9 grid for Auto-area AF mode
+fn get_af_point_81(point: u8) -> String {
+    // From ExifTool %afPoints81 - 9 rows (A-I) with 9 columns (1-9), center is E5
+    let lookup: &[(u8, &str)] = &[
+        (1, "E5"),
+        (2, "D5"),
+        (3, "C5"),
+        (4, "B5"),
+        (5, "A5"),
+        (6, "F5"),
+        (7, "G5"),
+        (8, "H5"),
+        (9, "I5"),
+        (10, "E6"),
+        (11, "D6"),
+        (12, "C6"),
+        (13, "B6"),
+        (14, "A6"),
+        (15, "F6"),
+        (16, "G6"),
+        (17, "H6"),
+        (18, "I6"),
+        (19, "E4"),
+        (20, "D4"),
+        (21, "C4"),
+        (22, "B4"),
+        (23, "A4"),
+        (24, "F4"),
+        (25, "G4"),
+        (26, "H4"),
+        (27, "I4"),
+        (28, "E7"),
+        (29, "D7"),
+        (30, "C7"),
+        (31, "B7"),
+        (32, "A7"),
+        (33, "F7"),
+        (34, "G7"),
+        (35, "H7"),
+        (36, "I7"),
+        (37, "E3"),
+        (38, "D3"),
+        (39, "C3"),
+        (40, "B3"),
+        (41, "A3"),
+        (42, "F3"),
+        (43, "G3"),
+        (44, "H3"),
+        (45, "I3"),
+        (46, "E8"),
+        (47, "D8"),
+        (48, "C8"),
+        (49, "B8"),
+        (50, "A8"),
+        (51, "F8"),
+        (52, "G8"),
+        (53, "H8"),
+        (54, "I8"),
+        (55, "E2"),
+        (56, "D2"),
+        (57, "C2"),
+        (58, "B2"),
+        (59, "A2"),
+        (60, "F2"),
+        (61, "G2"),
+        (62, "H2"),
+        (63, "I2"),
+        (64, "E9"),
+        (65, "D9"),
+        (66, "C9"),
+        (67, "B9"),
+        (68, "A9"),
+        (69, "F9"),
+        (70, "G9"),
+        (71, "H9"),
+        (72, "I9"),
+        (73, "E1"),
+        (74, "D1"),
+        (75, "C1"),
+        (76, "B1"),
+        (77, "A1"),
+        (78, "F1"),
+        (79, "G1"),
+        (80, "H1"),
+        (81, "I1"),
     ];
     for &(idx, name) in lookup {
         if idx == point {
@@ -4808,8 +5084,60 @@ fn sort_af_points(points: &mut [&str]) {
     });
 }
 
+/// Check if camera has TimeZone location in MenuSettings.
+/// Only specific Z cameras have MenuSettings with TimeZone including location names:
+/// - Z9 (ShotInfo 0805): MenuSettingsZ9* - TimeZone at various offsets
+/// - Z8 (ShotInfo 0806): MenuSettingsZ8* - TimeZone at various offsets
+/// - Z6 III only (ShotInfo 0809): MenuSettingsZ6III - TimeZone at 2302
+///
+/// Note: Z50 II (0810) and Z5 II (0811) use ShotInfoZ6III but their MenuOffset
+/// has Condition checking for Z6_3 model only, so they don't get TimeZone from MenuSettings.
+fn has_timezone_location_in_shotinfo(model: Option<&str>) -> bool {
+    match model {
+        Some(m) => {
+            let upper = m.to_uppercase();
+            upper.contains("NIKON Z 8")
+                || upper.contains("NIKON Z 9")
+                || upper.contains("NIKON Z6_3") // Z6 III only, not Z50 II or Z5 II
+        }
+        None => false,
+    }
+}
+
+/// Get timezone location name for Z9-era cameras based on %timeZoneZ9 table
+/// Maps UTC offset to ExifTool's canonical location string
+fn get_timezone_location(tz_minutes: i16) -> Option<&'static str> {
+    match tz_minutes {
+        600 => Some("(Sydney)"),
+        540 => Some("(Tokyo)"),
+        480 => Some("(Beijing, Honk Kong, Sinapore)"), // ExifTool typo preserved
+        345 => Some("(Kathmandu)"),
+        330 => Some("(New Dehli)"), // ExifTool typo preserved
+        300 => Some("(Islamabad)"),
+        270 => Some("(Kabul)"),
+        240 => Some("(Abu Dhabi)"),
+        210 => Some("(Tehran)"),
+        180 => Some("(Moscow, Nairobi)"),
+        120 => Some("(Athens, Helsinki)"),
+        60 => Some("(Madrid, Paris, Berlin)"),
+        0 => Some("(London)"),
+        -60 => Some("(Azores)"),
+        -120 => Some("(Fernando de Noronha)"),
+        -180 => Some("(Buenos Aires, Sao Paulo)"),
+        -210 => Some("(Newfoundland)"),
+        -240 => Some("(Manaus, Caracas)"),
+        -300 => Some("(New York, Toronto, Lima)"),
+        -360 => Some("(Chicago, Mexico City)"),
+        -420 => Some("(Denver)"),
+        -480 => Some("(Los Angeles, Vancouver)"),
+        -540 => Some("(Anchorage)"),
+        -600 => Some("(Hawaii)"),
+        _ => None,
+    }
+}
+
 /// Parse WorldTime tag data (tag 0x0024)
-fn parse_world_time(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
+fn parse_world_time(data: &[u8], endian: Endianness, is_z_camera: bool) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
     if data.len() < 4 {
@@ -4828,9 +5156,18 @@ fn parse_world_time(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
     } else {
         format!("{:03}:{:02}", tz_hours, tz_mins)
     };
-    // Note: ExifTool only adds location names for Z9-era cameras via ShotInfo,
-    // not from WorldTime tag. Keep simple offset format here.
-    tags.push(("TimeZone".to_string(), tz_str));
+
+    // For Z9-era cameras, add location name suffix (per ExifTool %timeZoneZ9)
+    let tz_with_location = if is_z_camera {
+        if let Some(location) = get_timezone_location(tz_minutes) {
+            format!("{} {}", tz_str, location)
+        } else {
+            tz_str
+        }
+    } else {
+        tz_str
+    };
+    tags.push(("TimeZone".to_string(), tz_with_location));
 
     // Byte 2: DaylightSavings
     if data.len() >= 3 {
@@ -5771,7 +6108,7 @@ pub fn parse_nikon_maker_notes(
                         lens_type_raw = Some(bytes[0]);
                         ExifValue::Ascii(decode_lens_type_exiftool(bytes[0]))
                     } else if tag_id == NIKON_FLASH_MODE && !bytes.is_empty() {
-                        ExifValue::Ascii(decode_flash_mode_exiftool(bytes[0]).to_string())
+                        ExifValue::Ascii(decode_flash_mode_exiftool(bytes[0]))
                     } else if tag_id == NIKON_IMAGE_AUTHENTICATION && !bytes.is_empty() {
                         ExifValue::Ascii(decode_image_authentication_exiftool(bytes[0]).to_string())
                     } else if tag_id == NIKON_SHOOTING_MODE && !bytes.is_empty() {
@@ -6378,7 +6715,7 @@ pub fn parse_nikon_maker_notes(
                 }
                 NIKON_FLASH_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_flash_info(bytes) {
+                        for (name, val) in parse_flash_info(bytes, model) {
                             let tag_id = 0x9300 + tags.len() as u16;
                             let tag = if let Some((exiv2_group, exiv2_name)) =
                                 get_exiv2_nikon_subfield(NIKON_FLASH_INFO, &name)
@@ -6582,7 +6919,9 @@ pub fn parse_nikon_maker_notes(
                 }
                 NIKON_WORLD_TIME => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_world_time(bytes, maker_endian) {
+                        // Only Z9-era cameras (Z9, Z8, Z6III, etc.) have timezone location names
+                        let has_tz_location = has_timezone_location_in_shotinfo(model);
+                        for (name, val) in parse_world_time(bytes, maker_endian, has_tz_location) {
                             let tag_id = 0x9700 + tags.len() as u16;
                             let tag = if let Some((exiv2_group, exiv2_name)) =
                                 get_exiv2_nikon_subfield(NIKON_WORLD_TIME, &name)
