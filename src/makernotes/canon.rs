@@ -138,6 +138,30 @@ pub fn get_exiv2_canon_subfield(
             "WBShiftGM" => Some((EXIV2_GROUP_CANON_PI, "WBShiftGM")),
             _ => None,
         },
+        CANON_AF_INFO | CANON_AF_INFO_2 => match field_name {
+            "AFAreaMode" => Some((EXIV2_GROUP_CANON_AF, "AFAreaMode")),
+            "NumAFPoints" => Some((EXIV2_GROUP_CANON_AF, "NumAFPoints")),
+            "ValidAFPoints" => Some((EXIV2_GROUP_CANON_AF, "ValidAFPoints")),
+            "CanonImageWidth" => Some((EXIV2_GROUP_CANON_AF, "CanonImageWidth")),
+            "CanonImageHeight" => Some((EXIV2_GROUP_CANON_AF, "CanonImageHeight")),
+            "AFImageWidth" => Some((EXIV2_GROUP_CANON_AF, "AFImageWidth")),
+            "AFImageHeight" => Some((EXIV2_GROUP_CANON_AF, "AFImageHeight")),
+            "PrimaryAFPoint" => Some((EXIV2_GROUP_CANON, "PrimaryAFPoint")),
+            "AFAreaWidth" => Some((EXIV2_GROUP_CANON_AF, "AFAreaWidth")),
+            "AFAreaHeight" => Some((EXIV2_GROUP_CANON_AF, "AFAreaHeight")),
+            "AFAreaXPositions" => Some((EXIV2_GROUP_CANON_AF, "AFAreaXPositions")),
+            "AFAreaYPositions" => Some((EXIV2_GROUP_CANON_AF, "AFAreaYPositions")),
+            "AFPointsInFocus" => Some((EXIV2_GROUP_CANON_AF, "AFPointsInFocus")),
+            "AFPointsSelected" => Some((EXIV2_GROUP_CANON_AF, "AFPointsSelected")),
+            "AFAreaWidths" => Some((EXIV2_GROUP_CANON_AF, "AFAreaWidths")),
+            "AFAreaHeights" => Some((EXIV2_GROUP_CANON_AF, "AFAreaHeights")),
+            _ => None,
+        },
+        CANON_FACE_DETECT | CANON_FACE_DETECT_3 => match field_name {
+            "FacesDetected" => Some((EXIV2_GROUP_CANON, "FacesDetected")),
+            "FaceDetectFrameSize" => Some((EXIV2_GROUP_CANON, "FaceDetectFrameSize")),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -4905,6 +4929,25 @@ pub fn decode_face_detect(data: &[u16]) -> HashMap<String, ExifValue> {
     decoded
 }
 
+/// Decode Canon FaceDetect3 (tag 0x2f) sub-fields
+///
+/// FaceDetect3 structure (from ExifTool Canon.pm):
+/// Index 0: size (34 bytes)
+/// Index 1: 1=4:3/16:9, 2=1:1/3:2/4:5
+/// Index 2: normally 1 if faces detected, but sometimes 0
+/// Index 3: FacesDetected
+/// Index 4: 240=4:3/4:5/1:1, 180=16:9, 212=3:2
+pub fn decode_face_detect3(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // FacesDetected (index 3)
+    if data.len() > 3 {
+        decoded.insert("FacesDetected".to_string(), ExifValue::Short(vec![data[3]]));
+    }
+
+    decoded
+}
+
 /// Decode Canon MeasuredColor (tag 0xaa) sub-fields
 ///
 /// Extracts MeasuredRGGB - 4 u16 values starting at index 1 (R, G1, G2, B)
@@ -8920,6 +8963,7 @@ pub fn parse_canon_maker_notes(
                         CANON_MY_COLORS => decode_my_colors(&shorts),
                         CANON_AF_INFO => decode_af_info(&shorts),
                         CANON_FACE_DETECT => decode_face_detect(&shorts),
+                        CANON_FACE_DETECT_3 => decode_face_detect3(&shorts),
                         CANON_MEASURED_COLOR => decode_measured_color(&shorts),
                         _ => HashMap::new(),
                     };

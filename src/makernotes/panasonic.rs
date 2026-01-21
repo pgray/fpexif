@@ -93,6 +93,14 @@ pub const PANA_DARK_FOCUS_ENVIRONMENT: u16 = 0x8003;
 pub const PANA_TEXT_STAMP_3: u16 = 0x8008;
 pub const PANA_TEXT_STAMP_4: u16 = 0x8009;
 pub const PANA_BABY_AGE_2: u16 = 0x8010;
+pub const PANA_LENS_FIRMWARE_VERSION: u16 = 0x0060;
+pub const PANA_TITLE: u16 = 0x0065;
+pub const PANA_BABY_NAME: u16 = 0x0066;
+pub const PANA_LOCATION: u16 = 0x0067;
+pub const PANA_MERGED_IMAGES: u16 = 0x0076;
+pub const PANA_BURST_SPEED: u16 = 0x0077;
+pub const PANA_INTELLIGENT_D_RANGE: u16 = 0x0079;
+pub const PANA_INTERNAL_ND_FILTER: u16 = 0x009D;
 
 /// Get the name of a Panasonic MakerNote tag
 pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -127,7 +135,7 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
         PANA_WORLD_TIME_LOCATION => Some("WorldTimeLocation"),
         PANA_TEXT_STAMP => Some("TextStamp"),
         PANA_PROGRAM_ISO => Some("ProgramISO"),
-        PANA_ADVANCED_SCENE_MODE => Some("AdvancedSceneMode"),
+        PANA_ADVANCED_SCENE_MODE => Some("AdvancedSceneType"),
         PANA_TEXT_STAMP_2 => Some("TextStamp2"),
         PANA_FACE_DETECTED => Some("FacesDetected"),
         PANA_IMAGE_WIDTH => Some("PanasonicImageWidth"),
@@ -177,6 +185,14 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
         PANA_TEXT_STAMP_3 => Some("TextStamp"),
         PANA_TEXT_STAMP_4 => Some("TextStamp"),
         PANA_BABY_AGE_2 => Some("BabyAge"),
+        PANA_LENS_FIRMWARE_VERSION => Some("LensFirmwareVersion"),
+        PANA_TITLE => Some("Title"),
+        PANA_BABY_NAME => Some("BabyName"),
+        PANA_LOCATION => Some("Location"),
+        PANA_MERGED_IMAGES => Some("MergedImages"),
+        PANA_BURST_SPEED => Some("BurstSpeed"),
+        PANA_INTELLIGENT_D_RANGE => Some("IntelligentD-Range"),
+        PANA_INTERNAL_ND_FILTER => Some("InternalNDFilter"),
         _ => None,
     }
 }
@@ -1056,6 +1072,26 @@ define_tag_decoder! {
     }
 }
 
+// IntelligentD-Range (tag 0x0079): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    intelligent_d_range,
+    both: {
+        0 => "Off",
+        1 => "Low",
+        2 => "Standard",
+        3 => "High",
+    }
+}
+
+// FacesDetected (tag 0x003F): Boolean Yes/No conversion (ExifTool automatic)
+define_tag_decoder! {
+    faces_detected,
+    both: {
+        0 => "No",
+        1 => "Yes",
+    }
+}
+
 /// Parse Panasonic maker notes
 ///
 /// # Arguments
@@ -1414,6 +1450,16 @@ pub fn parse_panasonic_maker_notes(
                             PANA_DARK_FOCUS_ENVIRONMENT => {
                                 Some(decode_dark_focus_environment_exiftool(v).to_string())
                             }
+                            PANA_INTELLIGENT_D_RANGE => {
+                                Some(decode_intelligent_d_range_exiftool(v).to_string())
+                            }
+                            PANA_BURST_SPEED => {
+                                // BurstSpeed is images per second, raw value
+                                None
+                            }
+                            PANA_FACE_DETECTED => {
+                                Some(decode_faces_detected_exiftool(v).to_string())
+                            }
                             PANA_TEXT_STAMP_3 | PANA_TEXT_STAMP_4 => {
                                 // Additional TextStamp tags with same values
                                 Some(decode_text_stamp_exiftool(v).to_string())
@@ -1608,8 +1654,19 @@ pub fn parse_panasonic_maker_notes(
                             }
                         }
 
+                        // Special formatting for InternalNDFilter
+                        if tag_id == PANA_INTERNAL_ND_FILTER && values.len() == 1 {
+                            let (num, den) = values[0];
+                            if den != 0 {
+                                let nd_value = num as f64 / den as f64;
+                                // Format as decimal
+                                ExifValue::Ascii(format!("{}", nd_value))
+                            } else {
+                                ExifValue::Rational(values)
+                            }
+                        }
                         // Special formatting for AFPointPosition
-                        if tag_id == PANA_AF_POINT_POSITION && values.len() == 2 {
+                        else if tag_id == PANA_AF_POINT_POSITION && values.len() == 2 {
                             let (num1, den1) = values[0];
                             let (num2, den2) = values[1];
 
@@ -1692,6 +1749,11 @@ pub fn parse_panasonic_maker_notes(
                             let version_str =
                                 format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3]);
                             ExifValue::Ascii(version_str)
+                        } else if tag_id == PANA_LENS_FIRMWARE_VERSION && count == 4 {
+                            // LensFirmwareVersion: 4 bytes formatted as "x.x.x.x" (same as FirmwareVersion)
+                            let version_str =
+                                format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3]);
+                            ExifValue::Ascii(version_str)
                         } else if tag_id == PANA_MAKERNOTE_VERSION && count == 4 {
                             // MakerNoteVersion: ASCII bytes "0130" -> "0130"
                             if let Ok(s) = std::str::from_utf8(&bytes[..4]) {
@@ -1743,8 +1805,13 @@ pub fn parse_panasonic_maker_notes(
                                 } else {
                                     ExifValue::Undefined(value_bytes.to_vec())
                                 }
-                            } else if tag_id == PANA_LANDMARK || tag_id == PANA_CITY {
-                                // Landmark and City: string fields that show empty when all zeros or invalid
+                            } else if tag_id == PANA_LANDMARK
+                                || tag_id == PANA_CITY
+                                || tag_id == PANA_TITLE
+                                || tag_id == PANA_BABY_NAME
+                                || tag_id == PANA_LOCATION
+                            {
+                                // String fields that show empty when all zeros or invalid
                                 // ExifTool returns empty for these when they don't contain valid text
                                 let trimmed: Vec<u8> = value_bytes
                                     .iter()
@@ -1756,7 +1823,7 @@ pub fn parse_panasonic_maker_notes(
                                 } else if let Ok(s) = std::str::from_utf8(&trimmed) {
                                     ExifValue::Ascii(s.to_string())
                                 } else {
-                                    // Invalid UTF-8 in location field - treat as empty (like ExifTool)
+                                    // Invalid UTF-8 - treat as empty (like ExifTool)
                                     ExifValue::Ascii(String::new())
                                 }
                             } else if tag_id == PANA_INTERNAL_SERIAL_NUMBER {

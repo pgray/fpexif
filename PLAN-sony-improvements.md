@@ -1,9 +1,9 @@
 # Sony EXIF Improvements Plan
 
-## Current State (Updated 2026-01-18)
+## Current State (Updated 2026-01-20)
 - Match rate (raws): 75.8%
 - Match rate (data.lfs): 81.3%
-- Files tested: 1 SRF, 1 SR2, 31 ARW (raws), 195 ARW (data.lfs)
+- Files tested: 1 SRF, 1 SR2, 31 ARW (raws), 1 SRF, 1 SR2, 195 ARW (data.lfs)
 - Mismatches: 0
 
 ### Tag9402 Parsing (2026-01-18)

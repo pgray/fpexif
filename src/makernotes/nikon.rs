@@ -214,6 +214,9 @@ pub const NIKON_CAPTURE_OUTPUT: u16 = 0x0E1E;
 pub const NIKON_MULTI_EXPOSURE: u16 = 0x00B0; // Also HDRInfo for some cameras
 pub const NIKON_LOCATION_INFO: u16 = 0x00B5;
 pub const NIKON_BLACK_LEVEL: u16 = 0x003D;
+pub const NIKON_IMAGE_SIZE_RAW: u16 = 0x003E;
+pub const NIKON_WHITE_BALANCE_FINE_TUNE_2: u16 = 0x003F;
+pub const NIKON_CROP_AREA: u16 = 0x0045;
 pub const NIKON_POWER_UP_TIME_2: u16 = 0x00B6;
 pub const NIKON_AF_INFO_2: u16 = 0x00B7;
 pub const NIKON_FILE_INFO: u16 = 0x00B8;
@@ -651,6 +654,9 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_COLOR_SPACE => Some("ColorSpace"),
         NIKON_VR_INFO => Some("VRInfo"),
         NIKON_BLACK_LEVEL => Some("BlackLevel"),
+        NIKON_IMAGE_SIZE_RAW => Some("ImageSizeRAW"),
+        NIKON_WHITE_BALANCE_FINE_TUNE_2 => Some("WhiteBalanceFineTune"),
+        NIKON_CROP_AREA => Some("CropArea"),
         NIKON_ACTIVE_D_LIGHTING => Some("ActiveD-Lighting"),
         NIKON_PICTURE_CONTROL_DATA => Some("PictureControlData"),
         NIKON_PICTURE_CONTROL_DATA_2 => Some("PictureControlData"),
@@ -1088,6 +1094,16 @@ define_tag_decoder! {
     both: {
         0 => "No",
         1 => "Yes",
+    }
+}
+
+// ImageSizeRAW (tag 0x003e): Nikon.pm
+define_tag_decoder! {
+    image_size_raw,
+    both: {
+        1 => "Large",
+        2 => "Medium",
+        3 => "Small",
     }
 }
 
@@ -2449,11 +2465,35 @@ fn parse_flash_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
             }
         }
 
-        // Offset 0x08: ExternalFlashFlags (int8u)
-        // BITMASK: bit0=Fired, bit2=Bounce Flash, bit4=Wide Flash Adapter, bit5=Dome Diffuser
-        // Unknown bits are output as [N] to match ExifTool behavior
+        // Offset 0x08: Multiple tags encoded in single byte
+        // - ExternalFlashZoomOverride: bit 7 (mask 0x80)
+        // - ExternalFlashStatus: bit 0 (mask 0x01)
+        // - ExternalFlashFlags: bits 1-6 (Fired=bit0, Bounce=bit2, Wide=bit4, Dome=bit5)
         if data.len() >= 9 {
-            let flags = data[8];
+            let byte8 = data[8];
+
+            // ExternalFlashZoomOverride - bit 7
+            let zoom_override = (byte8 & 0x80) >> 7;
+            tags.push((
+                "ExternalFlashZoomOverride".to_string(),
+                if zoom_override == 0 { "No" } else { "Yes" }.to_string(),
+            ));
+
+            // ExternalFlashStatus - bit 0
+            let flash_status = byte8 & 0x01;
+            tags.push((
+                "ExternalFlashStatus".to_string(),
+                if flash_status == 0 {
+                    "Flash Not Attached"
+                } else {
+                    "Flash Attached"
+                }
+                .to_string(),
+            ));
+
+            // ExternalFlashFlags - remaining bits for flag info
+            // Note: Some bits overlap with the above, but ExifTool outputs them separately
+            let flags = byte8;
             if flags == 0 {
                 tags.push(("ExternalFlashFlags".to_string(), "(none)".to_string()));
             } else {
@@ -2476,6 +2516,7 @@ fn parse_flash_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
                     known_bits |= 0x20;
                 }
                 // Add unknown bits as [N]
+                // Note: ExifTool outputs [7] even though bit 7 is ExternalFlashZoomOverride
                 let unknown_bits = flags & !known_bits;
                 for bit in 0..8 {
                     if unknown_bits & (1 << bit) != 0 {
@@ -2484,6 +2525,18 @@ fn parse_flash_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
                 }
                 tags.push(("ExternalFlashFlags".to_string(), flag_strs.join(", ")));
             }
+        }
+
+        // Offset 0x09: ExternalFlashReadyState (bits 0-2, mask 0x07)
+        if data.len() >= 10 {
+            let ready_state = data[9] & 0x07;
+            let ready_str = match ready_state {
+                0 => "n/a".to_string(),
+                1 => "Ready".to_string(),
+                6 => "Not Ready".to_string(),
+                v => format!("Unknown ({})", v),
+            };
+            tags.push(("ExternalFlashReadyState".to_string(), ready_str));
         }
 
         // Offset 0x09.1: FlashCommanderMode (bit 7, mask 0x80)
@@ -3184,13 +3237,15 @@ fn parse_lens_data(
         // LensData01 structure
         // Offset 0x04: ExitPupilPosition
         let exit_pupil_raw = data[4];
-        if exit_pupil_raw > 0 {
-            let exit_pupil = 2048.0 / exit_pupil_raw as f64;
-            tags.push((
-                "ExitPupilPosition".to_string(),
-                format!("{:.1} mm", exit_pupil),
-            ));
-        }
+        let exit_pupil = if exit_pupil_raw > 0 {
+            2048.0 / exit_pupil_raw as f64
+        } else {
+            0.0
+        };
+        tags.push((
+            "ExitPupilPosition".to_string(),
+            format!("{:.1} mm", exit_pupil),
+        ));
 
         // Offset 0x05: AFAperture
         let af_aperture_raw = data[5];
@@ -3281,13 +3336,15 @@ fn parse_lens_data(
             // Same offsets as 0101 (LensData01)
             // Offset 0x04: ExitPupilPosition
             let exit_pupil_raw = decrypted[4];
-            if exit_pupil_raw > 0 {
-                let exit_pupil = 2048.0 / exit_pupil_raw as f64;
-                tags.push((
-                    "ExitPupilPosition".to_string(),
-                    format!("{:.1} mm", exit_pupil),
-                ));
-            }
+            let exit_pupil = if exit_pupil_raw > 0 {
+                2048.0 / exit_pupil_raw as f64
+            } else {
+                0.0
+            };
+            tags.push((
+                "ExitPupilPosition".to_string(),
+                format!("{:.1} mm", exit_pupil),
+            ));
 
             // Offset 0x05: AFAperture
             let af_aperture_raw = decrypted[5];
@@ -3377,13 +3434,15 @@ fn parse_lens_data(
             // LensData0204 structure:
             // Offset 0x04: ExitPupilPosition (same as LensData01)
             let exit_pupil_raw = decrypted[4];
-            if exit_pupil_raw > 0 {
-                let exit_pupil = 2048.0 / exit_pupil_raw as f64;
-                tags.push((
-                    "ExitPupilPosition".to_string(),
-                    format!("{:.1} mm", exit_pupil),
-                ));
-            }
+            let exit_pupil = if exit_pupil_raw > 0 {
+                2048.0 / exit_pupil_raw as f64
+            } else {
+                0.0
+            };
+            tags.push((
+                "ExitPupilPosition".to_string(),
+                format!("{:.1} mm", exit_pupil),
+            ));
 
             // Offset 0x05: AFAperture (same as LensData01)
             let af_aperture_raw = decrypted[5];
@@ -6231,6 +6290,9 @@ pub fn parse_nikon_maker_notes(
                                 Some(decode_silent_photography_exiftool(v).to_string())
                             }
                             NIKON_SHUTTER_MODE => Some(decode_shutter_mode_exiftool(v).to_string()),
+                            NIKON_IMAGE_SIZE_RAW => {
+                                Some(decode_image_size_raw_exiftool(v).to_string())
+                            }
                             _ => None,
                         };
 
@@ -6277,6 +6339,15 @@ pub fn parse_nikon_maker_notes(
                             ),
                         );
                         // Return WB_RBLevels as space-separated values
+                        ExifValue::Ascii(
+                            values
+                                .iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        )
+                    } else if tag_id == NIKON_CROP_AREA && values.len() == 4 {
+                        // CropArea: left, top, width, height
                         ExifValue::Ascii(
                             values
                                 .iter()
@@ -6497,7 +6568,13 @@ pub fn parse_nikon_maker_notes(
                             break;
                         }
                     }
-                    if values.len() == 1 {
+
+                    // Apply decoder for specific tags
+                    if tag_id == NIKON_WHITE_BALANCE_FINE && !values.is_empty() {
+                        // WhiteBalanceFineTune (0x000B): format as space-separated signed shorts
+                        let formatted: Vec<String> = values.iter().map(|v| v.to_string()).collect();
+                        ExifValue::Ascii(formatted.join(" "))
+                    } else if values.len() == 1 {
                         ExifValue::Short(vec![values[0] as u16])
                     } else {
                         // Multiple values - format as space-separated
@@ -6547,7 +6624,34 @@ pub fn parse_nikon_maker_notes(
                             break;
                         }
                     }
-                    ExifValue::SRational(values)
+
+                    // Apply decoder for specific tags
+                    if tag_id == NIKON_WHITE_BALANCE_FINE_TUNE_2 && values.len() == 2 {
+                        // WhiteBalanceFineTune (0x003F): format as space-separated rationals
+                        // ExifTool outputs as decimal values
+                        let formatted: Vec<String> = values
+                            .iter()
+                            .map(|(n, d)| {
+                                if *d != 0 {
+                                    let val = *n as f64 / *d as f64;
+                                    // Format without unnecessary decimals
+                                    if val.fract() == 0.0 {
+                                        format!("{:.0}", val)
+                                    } else {
+                                        format!("{:.6}", val)
+                                            .trim_end_matches('0')
+                                            .trim_end_matches('.')
+                                            .to_string()
+                                    }
+                                } else {
+                                    n.to_string()
+                                }
+                            })
+                            .collect();
+                        ExifValue::Ascii(formatted.join(" "))
+                    } else {
+                        ExifValue::SRational(values)
+                    }
                 }
                 _ => {
                     // Unsupported type

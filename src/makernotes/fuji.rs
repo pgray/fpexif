@@ -65,6 +65,7 @@ pub const FUJI_HIGHLIGHT_TONE: u16 = 0x1041;
 pub const FUJI_DIGITAL_ZOOM: u16 = 0x1044;
 pub const FUJI_LENS_MODULATION_OPTIMIZER: u16 = 0x1045;
 pub const FUJI_COLOR_CHROME_EFFECT: u16 = 0x1048;
+pub const FUJI_GRAIN_EFFECT_ROUGHNESS: u16 = 0x1047;
 pub const FUJI_GRAIN_EFFECT_SIZE: u16 = 0x104C;
 pub const FUJI_CROP_MODE: u16 = 0x104D;
 pub const FUJI_COLOR_CHROME_FX_BLUE: u16 = 0x104E;
@@ -75,7 +76,6 @@ pub const FUJI_COLOR_MODE: u16 = 0x1210;
 pub const FUJI_IMAGE_STABILIZATION: u16 = 0x1422;
 pub const FUJI_SCENE_RECOGNITION: u16 = 0x1425;
 pub const FUJI_IMAGE_GENERATION: u16 = 0x1436;
-pub const FUJI_GRAIN_EFFECT_ROUGHNESS: u16 = 0x104B;
 pub const FUJI_WHITE_BALANCE_FINE_TUNE: u16 = 0x100A;
 pub const FUJI_FLASH_FIRING: u16 = 0x1008;
 pub const FUJI_IMAGE_HEIGHT: u16 = 0x1009;
@@ -85,6 +85,13 @@ pub const FUJI_CONTINUOUS_DRIVE: u16 = 0x1103;
 pub const FUJI_VIDEO_MODE: u16 = 0x1303;
 pub const FUJI_LENS_MOUNT_TYPE: u16 = 0x1600;
 pub const FUJI_RATING: u16 = 0x1431;
+pub const FUJI_IMAGE_COUNT: u16 = 0x1438;
+pub const FUJI_FLICKER_REDUCTION: u16 = 0x1446;
+pub const FUJI_FUJI_MODEL: u16 = 0x1447;
+pub const FUJI_FUJI_MODEL2: u16 = 0x1448;
+pub const FUJI_COMPOSITE_IMAGE_MODE: u16 = 0x1150;
+pub const FUJI_COMPOSITE_IMAGE_COUNT1: u16 = 0x1151;
+pub const FUJI_COMPOSITE_IMAGE_COUNT2: u16 = 0x1152;
 pub const FUJI_RELATIVE_EXPOSURE: u16 = 0x9200;
 pub const FUJI_RAW_EXPOSURE_BIAS: u16 = 0x9650;
 pub const FUJI_RATINGS_INFO: u16 = 0xB211;
@@ -183,6 +190,13 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_RAW_IMAGE_ASPECT_RATIO => Some("RawImageAspectRatio"),
         FUJI_LENS_MOUNT_TYPE => Some("LensMountType"),
         FUJI_RATING => Some("Rating"),
+        FUJI_IMAGE_COUNT => Some("ImageCount"),
+        FUJI_FLICKER_REDUCTION => Some("FlickerReduction"),
+        FUJI_FUJI_MODEL => Some("FujiModel"),
+        FUJI_FUJI_MODEL2 => Some("FujiModel2"),
+        FUJI_COMPOSITE_IMAGE_MODE => Some("CompositeImageMode"),
+        FUJI_COMPOSITE_IMAGE_COUNT1 => Some("CompositeImageCount1"),
+        FUJI_COMPOSITE_IMAGE_COUNT2 => Some("CompositeImageCount2"),
         FUJI_RELATIVE_EXPOSURE => Some("RelativeExposure"),
         FUJI_RAW_EXPOSURE_BIAS => Some("RawExposureBias"),
         FUJI_RATINGS_INFO => Some("RatingsInfo"),
@@ -910,6 +924,20 @@ define_tag_decoder! {
     }
 }
 
+// CompositeImageMode (tag 0x1150): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    composite_image_mode,
+    type: u32,
+    both: {
+        0 => "n/a",
+        1 => "Pro Low-light",
+        2 => "Pro Focus",
+        32 => "Panorama",
+        128 => "HDR",
+        1024 => "Multi-exposure",
+    }
+}
+
 // ShadowTone/HighlightTone ExifTool (tags 0x1040/0x1041): FujiFilm.pm
 // For values not in the table, ExifTool calculates: -val / 16
 pub fn decode_shadow_highlight_tone_ext_exiftool(value: i32) -> String {
@@ -1200,6 +1228,14 @@ pub fn parse_fuji_maker_notes(
                             }
                             FUJI_CROP_MODE => Some(decode_crop_mode_exiftool(v).to_string()),
                             FUJI_COLOR_MODE => Some(decode_color_mode_exiftool(v).to_string()),
+                            FUJI_IMAGE_COUNT => {
+                                // Apply mask 0x7fff
+                                let count = v & 0x7fff;
+                                Some(count.to_string())
+                            }
+                            FUJI_COMPOSITE_IMAGE_COUNT1 | FUJI_COMPOSITE_IMAGE_COUNT2 => {
+                                Some(v.to_string())
+                            }
                             _ => None,
                         };
 
@@ -1227,6 +1263,10 @@ pub fn parse_fuji_maker_notes(
                         // WB_GRGBLevels tags: format as space-separated values "G R G B"
                         let formatted =
                             format!("{} {} {} {}", values[0], values[1], values[2], values[3]);
+                        ExifValue::Ascii(formatted)
+                    } else if tag_id == FUJI_RAW_IMAGE_ASPECT_RATIO && values.len() == 2 {
+                        // RawImageAspectRatio: format as "width:height" (reversed from storage order)
+                        let formatted = format!("{}:{}", values[1], values[0]);
                         ExifValue::Ascii(formatted)
                     } else {
                         ExifValue::Short(values)
@@ -1263,6 +1303,19 @@ pub fn parse_fuji_maker_notes(
                         }
                         FUJI_COLOR_CHROME_EFFECT | FUJI_COLOR_CHROME_FX_BLUE => {
                             // These can be LONG (int32s) on some cameras - use same decoder as SHORT
+                            Some(decode_off_weak_strong_exiftool(raw_value as u16).to_string())
+                        }
+                        FUJI_FLICKER_REDUCTION => {
+                            // Extract on/off from bits - ((val >> 8) & 0x0f) == 1 means On
+                            let is_on = ((raw_value >> 8) & 0x0f) == 1;
+                            let state = if is_on { "On" } else { "Off" };
+                            Some(format!("{} (0x{:04x})", state, raw_value))
+                        }
+                        FUJI_COMPOSITE_IMAGE_MODE => {
+                            Some(decode_composite_image_mode_exiftool(raw_value).to_string())
+                        }
+                        FUJI_GRAIN_EFFECT_ROUGHNESS => {
+                            // Same decoder as ColorChromeEffect - uses int32s
                             Some(decode_off_weak_strong_exiftool(raw_value as u16).to_string())
                         }
                         _ => None,

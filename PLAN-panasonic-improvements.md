@@ -1,8 +1,8 @@
 # Panasonic EXIF Improvements Plan
 
-## Current State (2026-01-18)
-- Match rate (raws): 86.5%
-- Match rate (data.lfs): 77.4% (+0.3% from FacesDetected name fix)
+## Current State (2026-01-20)
+- Match rate (raws): 87.0%
+- Match rate (data.lfs): 80.8%
 - Files tested: 20 RW2 (raws), 398 RW2 (data.lfs)
 
 ### Tag Name Fix (2026-01-18)
