@@ -373,8 +373,7 @@ fn format_rational_value(num: u32, den: u32, tag_id: u16) -> Value {
         }
         0x920A => {
             // FocalLength - add mm unit with decimal formatting
-            // ExifTool shows "55.0 mm" for CR2/standard EXIF
-            // CRW shows "400 mm" but that comes from MakerNote, not EXIF
+            // ExifTool uses "%.1f mm" format
             let focal_length = num as f64 / den as f64;
             Value::String(format!("{:.1} mm", focal_length))
         }
@@ -482,8 +481,15 @@ fn format_srational_value(num: i32, den: i32, tag_id: u16) -> Value {
             // AmbientTemperature - output with " C" suffix
             let temp = num as f64 / den as f64;
             // Use one decimal place like ExifTool (e.g., "27 C" or "27.5 C")
+            // Preserve negative sign for -0 (when num=0 but den<0, or num<0 and result rounds to 0)
             if temp.fract() == 0.0 {
-                Value::String(format!("{} C", temp as i32))
+                let int_val = temp as i32;
+                if int_val == 0 && (num < 0 || den < 0) && !(num < 0 && den < 0) {
+                    // Negative zero: one operand is negative but not both (XOR)
+                    Value::String("-0 C".to_string())
+                } else {
+                    Value::String(format!("{} C", int_val))
+                }
             } else {
                 Value::String(format!("{:.1} C", temp))
             }

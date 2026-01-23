@@ -242,6 +242,7 @@ fn get_main_tag_name(tag_id: u16) -> Option<&'static str> {
         OLYMPUS_CAMERA_TYPE => Some("CameraType"),
         OLYMPUS_CAMERA_ID => Some("CameraID"),
         OLYMPUS_PREVIEW_IMAGE => Some("PreviewImage"),
+        OLYMPUS_SCENE_MODE => Some("SceneMode"),
         OLYMPUS_SERIAL_NUMBER => Some("SerialNumber"),
         OLYMPUS_FIRMWARE => Some("Firmware"),
         OLYMPUS_RED_BALANCE => Some("RedBalance"),
@@ -779,6 +780,50 @@ pub fn decode_scene_mode_exiv2(value: u16) -> &'static str {
         48 => "Nature Macro",
         49 => "Underwater Snapshot",
         50 => "Shooting Guide",
+        _ => "Unknown",
+    }
+}
+
+/// Decode Main IFD SceneMode value (0x0403) - ExifTool format
+/// Note: This is different from CS SceneMode (0x0509) - main IFD uses 0=Normal, 1=Standard
+pub fn decode_main_scene_mode_exiftool(value: u16) -> &'static str {
+    match value {
+        0 => "Normal",
+        1 => "Standard",
+        2 => "Auto",
+        3 => "Intelligent Auto",
+        4 => "Portrait",
+        5 => "Landscape+Portrait",
+        6 => "Landscape",
+        7 => "Night Scene",
+        8 => "Night+Portrait",
+        9 => "Sport",
+        10 => "Self Portrait",
+        11 => "Indoor",
+        12 => "Beach & Snow",
+        13 => "Beach",
+        14 => "Snow",
+        15 => "Self Portrait+Self Timer",
+        16 => "Sunset",
+        17 => "Cuisine",
+        18 => "Documents",
+        19 => "Candle",
+        20 => "Fireworks",
+        21 => "Available Light",
+        22 => "Vivid",
+        23 => "Underwater Wide1",
+        24 => "Underwater Macro",
+        25 => "Museum",
+        26 => "Behind Glass",
+        27 => "Auction",
+        28 => "Shoot & Select1",
+        29 => "Shoot & Select2",
+        30 => "Underwater Wide2",
+        31 => "Smile Shot",
+        32 => "Quick Shutter",
+        43 => "Hand-held Starlight",
+        100 => "Panorama",
+        203 => "HDR",
         _ => "Unknown",
     }
 }
@@ -2517,6 +2562,21 @@ fn parse_olympus_ifd(
                             value
                         }
                     }
+                    OLYMPUS_SCENE_MODE => {
+                        // Main IFD SceneMode (0x0403) - different mapping from CS SceneMode
+                        // 0=Normal (not Standard like CS)
+                        if let ExifValue::Short(vals) = &value {
+                            if !vals.is_empty() {
+                                ExifValue::Ascii(
+                                    decode_main_scene_mode_exiftool(vals[0]).to_string(),
+                                )
+                            } else {
+                                value
+                            }
+                        } else {
+                            value
+                        }
+                    }
                     _ => value,
                 },
                 OlympusIfdType::Equipment => match tag_id {
@@ -3077,6 +3137,12 @@ fn parse_olympus_ifd(
                         }
                     }
                     CS_SCENE_MODE => {
+                        // Skip CS SceneMode if Main IFD SceneMode (0x0403) already exists
+                        // Main IFD SceneMode has different value mapping (0=Normal vs 0=Standard)
+                        // and ExifTool outputs Main IFD SceneMode when both are present
+                        if tags.contains_key(&OLYMPUS_SCENE_MODE) {
+                            continue;
+                        }
                         if let ExifValue::Short(vals) = &value {
                             if !vals.is_empty() {
                                 ExifValue::Ascii(decode_scene_mode_exiftool(vals[0]).to_string())
@@ -3947,17 +4013,34 @@ pub fn parse_olympus_maker_notes(
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
-    // Olympus maker notes have two formats:
+    // Olympus maker notes have three formats:
     // 1. New format: "OLYMPUS\0II\x03\0" or "OLYMPUS\0MM\x00\x03" (12 byte header)
     //    - Offsets are relative to maker note start
-    // 2. Old format: "OLYMP\0" (6 byte header) - used by older cameras like E-1, E-300
+    // 2. OM Digital format: "OM SYSTEM\0\0\0II\x04\0" (16 byte header)
+    //    - Used by OM Digital Solutions cameras (OM-1, OM-3, OM-5, etc.)
+    //    - Offsets are relative to maker note start
+    // 3. Old format: "OLYMP\0" (6 byte header) - used by older cameras like E-1, E-300
     //    - Offsets are relative to TIFF header (need tiff_data to resolve)
     if data.len() < 8 {
         return Ok(tags);
     }
 
     // Determine format and endianness
-    let (mn_endian, ifd_offset, is_old_format) = if data.starts_with(b"OLYMPUS\0") {
+    let (mn_endian, ifd_offset, is_old_format) = if data.starts_with(b"OM SYSTEM\0") {
+        // OM Digital format: "OM SYSTEM\0\0\0" (12 bytes) + 2-byte endian + 2-byte version
+        // IFD starts at offset 16
+        if data.len() < 18 {
+            return Ok(tags);
+        }
+        let endian = if data[12] == b'I' && data[13] == b'I' {
+            Endianness::Little
+        } else if data[12] == b'M' && data[13] == b'M' {
+            Endianness::Big
+        } else {
+            return Ok(tags);
+        };
+        (endian, 16, false)
+    } else if data.starts_with(b"OLYMPUS\0") {
         // New format: 8-byte header + 2-byte endian + 2-byte version
         if data.len() < 14 {
             return Ok(tags);

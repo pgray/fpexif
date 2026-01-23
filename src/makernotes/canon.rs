@@ -4056,13 +4056,16 @@ pub fn decode_shot_info_exiftool(data: &[u16]) -> HashMap<String, ExifValue> {
         decoded.insert("ExposureTime".to_string(), ExifValue::Ascii(formatted));
     }
 
-    // FlashOutput (index 33) - PowerShot/IXUS/IXY models
+    // FlashOutput (index 33) - PowerShot/IXUS/IXY models ONLY
     // ExifTool: "used only for PowerShot models, this has a maximum value of 500"
-    // Output as raw number (not percentage). EOS cameras use ColorData3 FlashOutput instead.
+    // EOS cameras use ColorData3 FlashOutput instead.
+    // Per ExifTool RawConv: only output if Model=PowerShot/IXUS/IXY OR value > 0
+    // Since we don't have model info here, only output non-zero values
+    // (EOS cameras will have FlashOutput from ColorData instead)
     if data.len() > 33 {
         let val = data[33] as i16;
-        // Only output if value seems valid (0-500 range per ExifTool notes)
-        if (0..=500).contains(&val) {
+        // Only output non-zero values - EOS cameras with 0 should get FlashOutput from ColorData
+        if val > 0 && val <= 500 {
             decoded.insert("FlashOutput".to_string(), ExifValue::Ascii(val.to_string()));
         }
     }

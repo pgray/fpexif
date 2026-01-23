@@ -27,7 +27,26 @@ pub const FUJI_MACRO: u16 = 0x1020;
 pub const FUJI_FOCUS_MODE: u16 = 0x1021;
 pub const FUJI_AF_MODE: u16 = 0x1022;
 pub const FUJI_FOCUS_PIXEL: u16 = 0x1023;
+pub const FUJI_PRIORITY_SETTINGS: u16 = 0x102b;
+pub const FUJI_FOCUS_SETTINGS: u16 = 0x102d;
+pub const FUJI_AFC_SETTINGS: u16 = 0x102e;
 pub const FUJI_SLOW_SYNC: u16 = 0x1030;
+
+// Virtual tag IDs for PrioritySettings sub-fields (0x102b)
+pub const FUJI_AF_S_PRIORITY: u16 = 0xf02b; // Virtual: AF-SPriority
+pub const FUJI_AF_C_PRIORITY: u16 = 0xf02c; // Virtual: AF-CPriority
+
+// Virtual tag IDs for FocusSettings sub-fields (0x102d)
+pub const FUJI_FOCUS_MODE_2: u16 = 0xf02d; // Virtual: FocusMode2
+pub const FUJI_PRE_AF: u16 = 0xf02e; // Virtual: PreAF
+pub const FUJI_AF_AREA_MODE: u16 = 0xf02f; // Virtual: AFAreaMode
+pub const FUJI_AF_AREA_POINT_SIZE: u16 = 0xf030; // Virtual: AFAreaPointSize
+pub const FUJI_AF_AREA_ZONE_SIZE: u16 = 0xf031; // Virtual: AFAreaZoneSize
+
+// Virtual tag IDs for AFCSettings sub-fields (0x102e)
+pub const FUJI_AFC_TRACKING_SENS: u16 = 0xf032; // Virtual: AF-CTrackingSensitivity
+pub const FUJI_AFC_SPEED_TRACK_SENS: u16 = 0xf033; // Virtual: AF-CSpeedTrackingSensitivity
+pub const FUJI_AFC_ZONE_AREA_SWITCHING: u16 = 0xf034; // Virtual: AF-CZoneAreaSwitching
 pub const FUJI_PICTURE_MODE: u16 = 0x1031;
 pub const FUJI_EXPOSURE_COUNT: u16 = 0x1032;
 pub const FUJI_EXR_AUTO: u16 = 0x1033;
@@ -132,6 +151,19 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_FOCUS_MODE => Some("FocusMode"),
         FUJI_AF_MODE => Some("AFMode"),
         FUJI_FOCUS_PIXEL => Some("FocusPixel"),
+        // Virtual sub-field tags from PrioritySettings (0x102b)
+        FUJI_AF_S_PRIORITY => Some("AF-SPriority"),
+        FUJI_AF_C_PRIORITY => Some("AF-CPriority"),
+        // Virtual sub-field tags from FocusSettings (0x102d)
+        FUJI_FOCUS_MODE_2 => Some("FocusMode2"),
+        FUJI_PRE_AF => Some("PreAF"),
+        FUJI_AF_AREA_MODE => Some("AFAreaMode"),
+        FUJI_AF_AREA_POINT_SIZE => Some("AFAreaPointSize"),
+        FUJI_AF_AREA_ZONE_SIZE => Some("AFAreaZoneSize"),
+        // Virtual sub-field tags from AFCSettings (0x102e)
+        FUJI_AFC_TRACKING_SENS => Some("AF-CTrackingSensitivity"),
+        FUJI_AFC_SPEED_TRACK_SENS => Some("AF-CSpeedTrackingSensitivity"),
+        FUJI_AFC_ZONE_AREA_SWITCHING => Some("AF-CZoneAreaSwitching"),
         FUJI_SLOW_SYNC => Some("SlowSync"),
         FUJI_PICTURE_MODE => Some("PictureMode"),
         FUJI_EXPOSURE_COUNT => Some("ExposureCount"),
@@ -619,6 +651,10 @@ define_tag_decoder! {
     exiftool: {
         0 => "Auto",
         1 => "Manual",
+        256 => "Standard (100%)",
+        512 => "Wide1 (230%)",
+        513 => "Wide2 (400%)",
+        32768 => "Film Simulation",
     },
     exiv2: {
         0 => "Auto",
@@ -1170,6 +1206,44 @@ pub fn parse_fuji_maker_notes(
                         }
                     }
 
+                    // Handle PrioritySettings (0x102b) which expands to multiple sub-tags
+                    if tag_id == FUJI_PRIORITY_SETTINGS && values.len() == 1 {
+                        let v = values[0];
+                        // AF-SPriority: bits 0-3 (mask 0x000f)
+                        let af_s_priority = v & 0x000f;
+                        let af_s_str = match af_s_priority {
+                            1 => "Release",
+                            2 => "Focus",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_AF_S_PRIORITY,
+                            MakerNoteTag::new(
+                                FUJI_AF_S_PRIORITY,
+                                Some("AF-SPriority"),
+                                ExifValue::Ascii(af_s_str.to_string()),
+                            ),
+                        );
+
+                        // AF-CPriority: bits 4-7 (mask 0x00f0)
+                        let af_c_priority = (v >> 4) & 0x0f;
+                        let af_c_str = match af_c_priority {
+                            1 => "Release",
+                            2 => "Focus",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_AF_C_PRIORITY,
+                            MakerNoteTag::new(
+                                FUJI_AF_C_PRIORITY,
+                                Some("AF-CPriority"),
+                                ExifValue::Ascii(af_c_str.to_string()),
+                            ),
+                        );
+
+                        continue; // Skip normal tag insertion
+                    }
+
                     // Apply value decoders for single-value SHORT tags
                     if values.len() == 1 {
                         let v = values[0];
@@ -1285,6 +1359,141 @@ pub fn parse_fuji_maker_notes(
                             continue;
                         }
                     };
+
+                    // Handle compound binary tags that expand to multiple sub-tags
+                    if tag_id == FUJI_FOCUS_SETTINGS {
+                        // FocusSettings (0x102d) - extract bit fields
+                        // FocusMode2: bits 0-3
+                        let focus_mode2 = (raw_value & 0x0000000f) as u16;
+                        let focus_mode2_str = match focus_mode2 {
+                            0 => "AF-M",
+                            1 => "AF-S",
+                            2 => "AF-C",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_FOCUS_MODE_2,
+                            MakerNoteTag::new(
+                                FUJI_FOCUS_MODE_2,
+                                Some("FocusMode2"),
+                                ExifValue::Ascii(focus_mode2_str.to_string()),
+                            ),
+                        );
+
+                        // PreAF: bits 4-7 (mask 0x00f0)
+                        let pre_af = ((raw_value >> 4) & 0x0f) as u16;
+                        let pre_af_str = match pre_af {
+                            0 => "Off",
+                            1 => "On",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_PRE_AF,
+                            MakerNoteTag::new(
+                                FUJI_PRE_AF,
+                                Some("PreAF"),
+                                ExifValue::Ascii(pre_af_str.to_string()),
+                            ),
+                        );
+
+                        // AFAreaMode: bits 8-11 (mask 0x0f00)
+                        let af_area_mode = ((raw_value >> 8) & 0x0f) as u16;
+                        let af_area_mode_str = match af_area_mode {
+                            0 => "Single Point",
+                            1 => "Zone",
+                            2 => "Wide/Tracking",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_AF_AREA_MODE,
+                            MakerNoteTag::new(
+                                FUJI_AF_AREA_MODE,
+                                Some("AFAreaMode"),
+                                ExifValue::Ascii(af_area_mode_str.to_string()),
+                            ),
+                        );
+
+                        // AFAreaPointSize: bits 12-15 (mask 0xf000)
+                        let af_point_size = ((raw_value >> 12) & 0x0f) as u16;
+                        let af_point_size_str = if af_point_size == 0 {
+                            "n/a".to_string()
+                        } else {
+                            af_point_size.to_string()
+                        };
+                        tags.insert(
+                            FUJI_AF_AREA_POINT_SIZE,
+                            MakerNoteTag::new(
+                                FUJI_AF_AREA_POINT_SIZE,
+                                Some("AFAreaPointSize"),
+                                ExifValue::Ascii(af_point_size_str),
+                            ),
+                        );
+
+                        // AFAreaZoneSize: bits 16-23 (mask 0xff0000)
+                        let af_zone_size = ((raw_value >> 16) & 0xff) as u16;
+                        let af_zone_size_str = if af_zone_size == 0 {
+                            "n/a".to_string()
+                        } else {
+                            // Decode as "width x height" per ExifTool formula
+                            let w = af_zone_size & 0x0f;
+                            let h = af_zone_size >> 5;
+                            format!("{} x {}", w, h)
+                        };
+                        tags.insert(
+                            FUJI_AF_AREA_ZONE_SIZE,
+                            MakerNoteTag::new(
+                                FUJI_AF_AREA_ZONE_SIZE,
+                                Some("AFAreaZoneSize"),
+                                ExifValue::Ascii(af_zone_size_str),
+                            ),
+                        );
+
+                        continue; // Skip normal tag insertion
+                    }
+
+                    if tag_id == FUJI_AFC_SETTINGS {
+                        // AFCSettings (0x102e) - extract bit fields
+                        // AF-CTrackingSensitivity: bits 0-3 (values 0-4)
+                        let tracking_sens = (raw_value & 0x000f) as u16;
+                        tags.insert(
+                            FUJI_AFC_TRACKING_SENS,
+                            MakerNoteTag::new(
+                                FUJI_AFC_TRACKING_SENS,
+                                Some("AF-CTrackingSensitivity"),
+                                ExifValue::Ascii(tracking_sens.to_string()),
+                            ),
+                        );
+
+                        // AF-CSpeedTrackingSensitivity: bits 4-7 (values 0-2)
+                        let speed_sens = ((raw_value >> 4) & 0x0f) as u16;
+                        tags.insert(
+                            FUJI_AFC_SPEED_TRACK_SENS,
+                            MakerNoteTag::new(
+                                FUJI_AFC_SPEED_TRACK_SENS,
+                                Some("AF-CSpeedTrackingSensitivity"),
+                                ExifValue::Ascii(speed_sens.to_string()),
+                            ),
+                        );
+
+                        // AF-CZoneAreaSwitching: bits 8-11
+                        let zone_switching = ((raw_value >> 8) & 0x0f) as u16;
+                        let zone_switching_str = match zone_switching {
+                            0 => "Front",
+                            1 => "Auto",
+                            2 => "Center",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_AFC_ZONE_AREA_SWITCHING,
+                            MakerNoteTag::new(
+                                FUJI_AFC_ZONE_AREA_SWITCHING,
+                                Some("AF-CZoneAreaSwitching"),
+                                ExifValue::Ascii(zone_switching_str.to_string()),
+                            ),
+                        );
+
+                        continue; // Skip normal tag insertion
+                    }
 
                     // Decode specific LONG tags
                     let decoded = match tag_id {

@@ -115,7 +115,7 @@ pub fn parse_maker_notes_with_tiff_data(
         sony::parse_sony_maker_notes(data, endian, tiff_data, tiff_offset, model)
     } else if make_str.contains("fuji") {
         fuji::parse_fuji_maker_notes(data, endian)
-    } else if make_str.contains("olympus") {
+    } else if make_str.contains("olympus") || make_str.contains("om digital") {
         olympus::parse_olympus_maker_notes(
             data,
             endian,

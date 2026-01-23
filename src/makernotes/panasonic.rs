@@ -1083,15 +1083,6 @@ define_tag_decoder! {
     }
 }
 
-// FacesDetected (tag 0x003F): Boolean Yes/No conversion (ExifTool automatic)
-define_tag_decoder! {
-    faces_detected,
-    both: {
-        0 => "No",
-        1 => "Yes",
-    }
-}
-
 /// Parse Panasonic maker notes
 ///
 /// # Arguments
@@ -1458,7 +1449,8 @@ pub fn parse_panasonic_maker_notes(
                                 None
                             }
                             PANA_FACE_DETECTED => {
-                                Some(decode_faces_detected_exiftool(v).to_string())
+                                // FacesDetected outputs raw numeric value (no PrintConv in ExifTool)
+                                None
                             }
                             PANA_TEXT_STAMP_3 | PANA_TEXT_STAMP_4 => {
                                 // Additional TextStamp tags with same values
@@ -1499,14 +1491,26 @@ pub fn parse_panasonic_maker_notes(
                                 }
                             }
                             PANA_FLASH_BIAS => {
-                                // FlashBias is signed, divided by 3
-                                // ExifTool shows "+2" for positive values
+                                // FlashBias is in 1/3 EV steps
+                                // Raw value -1 → "-1/3", raw value 3 → "1", raw value 0 → "0"
                                 let signed_v = v as i16;
-                                let bias = signed_v / 3;
-                                if bias > 0 {
-                                    Some(format!("+{}", bias))
+                                if signed_v == 0 {
+                                    Some("0".to_string())
+                                } else if signed_v % 3 == 0 {
+                                    // Whole EV value
+                                    let ev = signed_v / 3;
+                                    if ev > 0 {
+                                        Some(format!("+{}", ev))
+                                    } else {
+                                        Some(format!("{}", ev))
+                                    }
                                 } else {
-                                    Some(format!("{}", bias))
+                                    // Fractional value - output as "n/3"
+                                    if signed_v > 0 {
+                                        Some(format!("+{}/3", signed_v))
+                                    } else {
+                                        Some(format!("{}/3", signed_v))
+                                    }
                                 }
                             }
                             PANA_ACCELEROMETER_X | PANA_ACCELEROMETER_Y | PANA_ACCELEROMETER_Z => {

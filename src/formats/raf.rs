@@ -5,11 +5,64 @@ use std::io::{Read, Seek, SeekFrom};
 
 const RAF_SIGNATURE: &[u8] = b"FUJIFILMCCD-RAW";
 
-/// Format a float value like ExifTool does (7 decimal places)
-/// - Scientific notation for |val| < 0.0001
-/// - Otherwise decimal with trailing zeros trimmed
-fn format_float_exiftool(val: f64) -> String {
-    format_float_with_precision(val, 7)
+/// Format a float value with 10 significant figures (for distortion/vignetting params)
+/// ExifTool outputs these with 10 significant figures total
+fn format_float_10places(val: f64) -> String {
+    if val == 0.0 {
+        return "0".to_string();
+    }
+
+    // ExifTool uses scientific notation for small absolute values
+    if val.abs() > 0.0 && val.abs() < 0.0001 {
+        // Format with 10 significant figures in scientific notation
+        // The mantissa should have 9 decimal places (1 digit before + 9 after = 10 sig figs)
+        let s = format!("{:.9e}", val);
+
+        // Find the 'e' position and split
+        if let Some(e_pos) = s.find('e') {
+            let mantissa_part = &s[..e_pos];
+            let exp_part = &s[e_pos..];
+
+            // Trim trailing zeros from mantissa (but keep at least one decimal)
+            let trimmed_mantissa = mantissa_part.trim_end_matches('0').trim_end_matches('.');
+
+            // Format exponent with 2 digits
+            let formatted_exp = if let Some(neg_pos) = exp_part.find("e-") {
+                let exp_digits = &exp_part[neg_pos + 2..];
+                if exp_digits.len() == 1 {
+                    format!("e-0{}", exp_digits)
+                } else {
+                    exp_part.to_string()
+                }
+            } else if let Some(pos_pos) = exp_part.find("e+") {
+                let exp_digits = &exp_part[pos_pos + 2..];
+                if exp_digits.len() == 1 {
+                    format!("e+0{}", exp_digits)
+                } else {
+                    exp_part.to_string()
+                }
+            } else {
+                exp_part.to_string()
+            };
+
+            return format!("{}{}", trimmed_mantissa, formatted_exp);
+        }
+        return s;
+    }
+
+    // For normal values, calculate decimal places based on magnitude
+    // to achieve 10 significant figures
+    let magnitude = val.abs().log10().floor() as i32;
+    let decimal_places = (9 - magnitude).max(0) as usize;
+
+    let s = format!("{:.prec$}", val, prec = decimal_places);
+
+    // Trim trailing zeros after decimal point
+    if s.contains('.') {
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    } else {
+        s
+    }
 }
 
 /// Format a float value with 6 decimal places (for balance values)
@@ -628,7 +681,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format_float_exiftool(val)
+                                                format_float_10places(val)
                                             } else {
                                                 "0".to_string()
                                             }
@@ -647,7 +700,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format_float_exiftool(val)
+                                                format_float_10places(val)
                                             } else {
                                                 "0".to_string()
                                             }
@@ -666,7 +719,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format_float_exiftool(val)
+                                                format_float_10places(val)
                                             } else {
                                                 "0".to_string()
                                             }
