@@ -8,6 +8,9 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
+// exiv2 group name
+pub const EXIV2_GROUP_FUJIFILM: &str = "Fujifilm";
+
 // Fujifilm MakerNote tag IDs
 pub const FUJI_VERSION: u16 = 0x0000;
 pub const FUJI_SERIAL_NUMBER: u16 = 0x0010;
@@ -24,7 +27,26 @@ pub const FUJI_MACRO: u16 = 0x1020;
 pub const FUJI_FOCUS_MODE: u16 = 0x1021;
 pub const FUJI_AF_MODE: u16 = 0x1022;
 pub const FUJI_FOCUS_PIXEL: u16 = 0x1023;
+pub const FUJI_PRIORITY_SETTINGS: u16 = 0x102b;
+pub const FUJI_FOCUS_SETTINGS: u16 = 0x102d;
+pub const FUJI_AFC_SETTINGS: u16 = 0x102e;
 pub const FUJI_SLOW_SYNC: u16 = 0x1030;
+
+// Virtual tag IDs for PrioritySettings sub-fields (0x102b)
+pub const FUJI_AF_S_PRIORITY: u16 = 0xf02b; // Virtual: AF-SPriority
+pub const FUJI_AF_C_PRIORITY: u16 = 0xf02c; // Virtual: AF-CPriority
+
+// Virtual tag IDs for FocusSettings sub-fields (0x102d)
+pub const FUJI_FOCUS_MODE_2: u16 = 0xf02d; // Virtual: FocusMode2
+pub const FUJI_PRE_AF: u16 = 0xf02e; // Virtual: PreAF
+pub const FUJI_AF_AREA_MODE: u16 = 0xf02f; // Virtual: AFAreaMode
+pub const FUJI_AF_AREA_POINT_SIZE: u16 = 0xf030; // Virtual: AFAreaPointSize
+pub const FUJI_AF_AREA_ZONE_SIZE: u16 = 0xf031; // Virtual: AFAreaZoneSize
+
+// Virtual tag IDs for AFCSettings sub-fields (0x102e)
+pub const FUJI_AFC_TRACKING_SENS: u16 = 0xf032; // Virtual: AF-CTrackingSensitivity
+pub const FUJI_AFC_SPEED_TRACK_SENS: u16 = 0xf033; // Virtual: AF-CSpeedTrackingSensitivity
+pub const FUJI_AFC_ZONE_AREA_SWITCHING: u16 = 0xf034; // Virtual: AF-CZoneAreaSwitching
 pub const FUJI_PICTURE_MODE: u16 = 0x1031;
 pub const FUJI_EXPOSURE_COUNT: u16 = 0x1032;
 pub const FUJI_EXR_AUTO: u16 = 0x1033;
@@ -42,11 +64,13 @@ pub const FUJI_MIN_FOCAL_LENGTH: u16 = 0x1404;
 pub const FUJI_MAX_FOCAL_LENGTH: u16 = 0x1405;
 pub const FUJI_MAX_APERTURE_AT_MIN_FOCAL: u16 = 0x1406;
 pub const FUJI_MAX_APERTURE_AT_MAX_FOCAL: u16 = 0x1407;
+pub const FUJI_AUTO_DYNAMIC_RANGE: u16 = 0x140b;
 pub const FUJI_FILE_SOURCE: u16 = 0x8000;
 pub const FUJI_ORDER_NUMBER: u16 = 0x8002;
 pub const FUJI_FRAME_NUMBER: u16 = 0x8003;
 pub const FUJI_FACES_DETECTED: u16 = 0x4100;
 pub const FUJI_FACE_POSITIONS: u16 = 0x4103;
+pub const FUJI_NUM_FACE_ELEMENTS: u16 = 0x4200;
 pub const FUJI_FACE_REC_INFO: u16 = 0x4282;
 pub const FUJI_RAW_IMAGE_FULL_SIZE: u16 = 0x0100;
 pub const FUJI_RAW_IMAGE_CROP_TOP_LEFT: u16 = 0x0110;
@@ -60,17 +84,17 @@ pub const FUJI_HIGHLIGHT_TONE: u16 = 0x1041;
 pub const FUJI_DIGITAL_ZOOM: u16 = 0x1044;
 pub const FUJI_LENS_MODULATION_OPTIMIZER: u16 = 0x1045;
 pub const FUJI_COLOR_CHROME_EFFECT: u16 = 0x1048;
+pub const FUJI_GRAIN_EFFECT_ROUGHNESS: u16 = 0x1047;
 pub const FUJI_GRAIN_EFFECT_SIZE: u16 = 0x104C;
 pub const FUJI_CROP_MODE: u16 = 0x104D;
 pub const FUJI_COLOR_CHROME_FX_BLUE: u16 = 0x104E;
 pub const FUJI_SHUTTER_TYPE: u16 = 0x1050;
 pub const FUJI_PANORAMA_DIRECTION: u16 = 0x1154;
 pub const FUJI_ADVANCED_FILTER: u16 = 0x1201;
-pub const FUJI_FINE_PIX_COLOR: u16 = 0x1210;
+pub const FUJI_COLOR_MODE: u16 = 0x1210;
 pub const FUJI_IMAGE_STABILIZATION: u16 = 0x1422;
 pub const FUJI_SCENE_RECOGNITION: u16 = 0x1425;
 pub const FUJI_IMAGE_GENERATION: u16 = 0x1436;
-pub const FUJI_GRAIN_EFFECT_ROUGHNESS: u16 = 0x104B;
 pub const FUJI_WHITE_BALANCE_FINE_TUNE: u16 = 0x100A;
 pub const FUJI_FLASH_FIRING: u16 = 0x1008;
 pub const FUJI_IMAGE_HEIGHT: u16 = 0x1009;
@@ -80,9 +104,29 @@ pub const FUJI_CONTINUOUS_DRIVE: u16 = 0x1103;
 pub const FUJI_VIDEO_MODE: u16 = 0x1303;
 pub const FUJI_LENS_MOUNT_TYPE: u16 = 0x1600;
 pub const FUJI_RATING: u16 = 0x1431;
+pub const FUJI_IMAGE_COUNT: u16 = 0x1438;
+pub const FUJI_FLICKER_REDUCTION: u16 = 0x1446;
+pub const FUJI_FUJI_MODEL: u16 = 0x1447;
+pub const FUJI_FUJI_MODEL2: u16 = 0x1448;
+pub const FUJI_COMPOSITE_IMAGE_MODE: u16 = 0x1150;
+pub const FUJI_COMPOSITE_IMAGE_COUNT1: u16 = 0x1151;
+pub const FUJI_COMPOSITE_IMAGE_COUNT2: u16 = 0x1152;
+pub const FUJI_RELATIVE_EXPOSURE: u16 = 0x9200;
 pub const FUJI_RAW_EXPOSURE_BIAS: u16 = 0x9650;
 pub const FUJI_RATINGS_INFO: u16 = 0xB211;
 pub const FUJI_GE_IMAGE_SIZE: u16 = 0xB212;
+
+// WB_GRGBLevels tags (int16u[4] in GRGB order)
+pub const FUJI_WB_GRGB_LEVELS_AUTO: u16 = 0x2000;
+pub const FUJI_WB_GRGB_LEVELS_DAYLIGHT: u16 = 0x2100;
+pub const FUJI_WB_GRGB_LEVELS_CLOUDY: u16 = 0x2200;
+pub const FUJI_WB_GRGB_LEVELS_DAYLIGHT_FLUOR: u16 = 0x2300;
+pub const FUJI_WB_GRGB_LEVELS_DAY_WHITE_FLUOR: u16 = 0x2301;
+pub const FUJI_WB_GRGB_LEVELS_WHITE_FLUOR: u16 = 0x2302;
+pub const FUJI_WB_GRGB_LEVELS_WARM_WHITE_FLUOR: u16 = 0x2310;
+pub const FUJI_WB_GRGB_LEVELS_LIVING_ROOM_WARM_WHITE_FLUOR: u16 = 0x2311;
+pub const FUJI_WB_GRGB_LEVELS_TUNGSTEN: u16 = 0x2400;
+pub const FUJI_WB_GRGB_LEVELS: u16 = 0x2FF0;
 
 /// Get the name of a Fujifilm MakerNote tag
 pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -107,6 +151,19 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_FOCUS_MODE => Some("FocusMode"),
         FUJI_AF_MODE => Some("AFMode"),
         FUJI_FOCUS_PIXEL => Some("FocusPixel"),
+        // Virtual sub-field tags from PrioritySettings (0x102b)
+        FUJI_AF_S_PRIORITY => Some("AF-SPriority"),
+        FUJI_AF_C_PRIORITY => Some("AF-CPriority"),
+        // Virtual sub-field tags from FocusSettings (0x102d)
+        FUJI_FOCUS_MODE_2 => Some("FocusMode2"),
+        FUJI_PRE_AF => Some("PreAF"),
+        FUJI_AF_AREA_MODE => Some("AFAreaMode"),
+        FUJI_AF_AREA_POINT_SIZE => Some("AFAreaPointSize"),
+        FUJI_AF_AREA_ZONE_SIZE => Some("AFAreaZoneSize"),
+        // Virtual sub-field tags from AFCSettings (0x102e)
+        FUJI_AFC_TRACKING_SENS => Some("AF-CTrackingSensitivity"),
+        FUJI_AFC_SPEED_TRACK_SENS => Some("AF-CSpeedTrackingSensitivity"),
+        FUJI_AFC_ZONE_AREA_SWITCHING => Some("AF-CZoneAreaSwitching"),
         FUJI_SLOW_SYNC => Some("SlowSync"),
         FUJI_PICTURE_MODE => Some("PictureMode"),
         FUJI_EXPOSURE_COUNT => Some("ExposureCount"),
@@ -124,8 +181,11 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_GRAIN_EFFECT_ROUGHNESS => Some("GrainEffectRoughness"),
         FUJI_WHITE_BALANCE_FINE_TUNE => Some("WhiteBalanceFineTune"),
         FUJI_FLASH_FIRING => Some("FlashFiring"),
-        FUJI_IMAGE_HEIGHT => Some("ImageHeight"),
-        FUJI_IMAGE_WIDTH => Some("ImageWidth"),
+        // These are undocumented Fuji MakerNote tags, not standard TIFF ImageWidth/Height
+        // ExifTool outputs them as FujiFilm_0x1007 and FujiFilm_0x1009
+        // We skip naming them to avoid collision with standard tags
+        // FUJI_IMAGE_HEIGHT => Some("FujiImageHeight"),
+        // FUJI_IMAGE_WIDTH => Some("FujiImageWidth"),
         FUJI_OUTPUT_IMAGE_SIZE => Some("OutputImageSize"),
         FUJI_CONTINUOUS_DRIVE => Some("ContinuousDrive"),
         FUJI_VIDEO_MODE => Some("VideoMode"),
@@ -136,7 +196,7 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_EXPOSURE_WARNING => Some("ExposureWarning"),
         FUJI_PANORAMA_DIRECTION => Some("PanoramaDirection"),
         FUJI_ADVANCED_FILTER => Some("AdvancedFilter"),
-        FUJI_FINE_PIX_COLOR => Some("FinePixColor"),
+        FUJI_COLOR_MODE => Some("ColorMode"),
         FUJI_DYNAMIC_RANGE => Some("DynamicRange"),
         FUJI_FILM_MODE => Some("FilmMode"),
         FUJI_DYNAMIC_RANGE_SETTING => Some("DynamicRangeSetting"),
@@ -145,6 +205,7 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_MAX_FOCAL_LENGTH => Some("MaxFocalLength"),
         FUJI_MAX_APERTURE_AT_MIN_FOCAL => Some("MaxApertureAtMinFocal"),
         FUJI_MAX_APERTURE_AT_MAX_FOCAL => Some("MaxApertureAtMaxFocal"),
+        FUJI_AUTO_DYNAMIC_RANGE => Some("AutoDynamicRange"),
         FUJI_IMAGE_STABILIZATION => Some("ImageStabilization"),
         FUJI_SCENE_RECOGNITION => Some("SceneRecognition"),
         FUJI_IMAGE_GENERATION => Some("ImageGeneration"),
@@ -153,6 +214,7 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_FRAME_NUMBER => Some("FrameNumber"),
         FUJI_FACES_DETECTED => Some("FacesDetected"),
         FUJI_FACE_POSITIONS => Some("FacePositions"),
+        FUJI_NUM_FACE_ELEMENTS => Some("NumFaceElements"),
         FUJI_FACE_REC_INFO => Some("FaceRecInfo"),
         FUJI_RAW_IMAGE_FULL_SIZE => Some("RawImageFullSize"),
         FUJI_RAW_IMAGE_CROP_TOP_LEFT => Some("RawImageCropTopLeft"),
@@ -160,9 +222,30 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_RAW_IMAGE_ASPECT_RATIO => Some("RawImageAspectRatio"),
         FUJI_LENS_MOUNT_TYPE => Some("LensMountType"),
         FUJI_RATING => Some("Rating"),
+        FUJI_IMAGE_COUNT => Some("ImageCount"),
+        FUJI_FLICKER_REDUCTION => Some("FlickerReduction"),
+        FUJI_FUJI_MODEL => Some("FujiModel"),
+        FUJI_FUJI_MODEL2 => Some("FujiModel2"),
+        FUJI_COMPOSITE_IMAGE_MODE => Some("CompositeImageMode"),
+        FUJI_COMPOSITE_IMAGE_COUNT1 => Some("CompositeImageCount1"),
+        FUJI_COMPOSITE_IMAGE_COUNT2 => Some("CompositeImageCount2"),
+        FUJI_RELATIVE_EXPOSURE => Some("RelativeExposure"),
         FUJI_RAW_EXPOSURE_BIAS => Some("RawExposureBias"),
         FUJI_RATINGS_INFO => Some("RatingsInfo"),
         FUJI_GE_IMAGE_SIZE => Some("GEImageSize"),
+        // WB_GRGBLevels tags
+        FUJI_WB_GRGB_LEVELS_AUTO => Some("WB_GRGBLevelsAuto"),
+        FUJI_WB_GRGB_LEVELS_DAYLIGHT => Some("WB_GRGBLevelsDaylight"),
+        FUJI_WB_GRGB_LEVELS_CLOUDY => Some("WB_GRGBLevelsCloudy"),
+        FUJI_WB_GRGB_LEVELS_DAYLIGHT_FLUOR => Some("WB_GRGBLevelsDaylightFluor"),
+        FUJI_WB_GRGB_LEVELS_DAY_WHITE_FLUOR => Some("WB_GRGBLevelsDayWhiteFluor"),
+        FUJI_WB_GRGB_LEVELS_WHITE_FLUOR => Some("WB_GRGBLevelsWhiteFluorescent"),
+        FUJI_WB_GRGB_LEVELS_WARM_WHITE_FLUOR => Some("WB_GRGBLevelsWarmWhiteFluor"),
+        FUJI_WB_GRGB_LEVELS_LIVING_ROOM_WARM_WHITE_FLUOR => {
+            Some("WB_GRGBLevelsLivingRoomWarmWhiteFluor")
+        }
+        FUJI_WB_GRGB_LEVELS_TUNGSTEN => Some("WB_GRGBLevelsTungsten"),
+        FUJI_WB_GRGB_LEVELS => Some("WB_GRGBLevels"),
         _ => None,
     }
 }
@@ -227,8 +310,8 @@ define_tag_decoder! {
     white_balance,
     exiftool: {
         0 => "Auto",
-        1 => "Auto (White Priority)",
-        2 => "Auto (Ambience Priority)",
+        1 => "Auto (white priority)",
+        2 => "Auto (ambiance priority)",
         256 => "Daylight",
         512 => "Cloudy",
         768 => "Daylight Fluorescent",
@@ -244,7 +327,7 @@ define_tag_decoder! {
         3842 => "Custom3",
         3843 => "Custom4",
         3844 => "Custom5",
-        6144 => "Kelvin",
+        4080 => "Kelvin",
     },
     exiv2: {
         0 => "Auto",
@@ -316,13 +399,22 @@ define_tag_decoder! {
         0x0 => "0 (normal)",
         0x80 => "+1 (medium high)",
         0x100 => "+2 (high)",
-        0x180 => "+3 (very high)",
-        0x200 => "+4 (highest)",
-        0x300 => "+4.5",
-        0x301 => "Acros",
-        0x302 => "Acros+Ye Filter",
-        0x303 => "Acros+R Filter",
-        0x304 => "Acros+G Filter",
+        0xc0 => "+3 (very high)",
+        0xe0 => "+4 (highest)",
+        0x180 => "-1 (medium low)",
+        0x200 => "Low",
+        0x300 => "None (B&W)",
+        0x301 => "B&W Red Filter",
+        0x302 => "B&W Yellow Filter",
+        0x303 => "B&W Green Filter",
+        0x310 => "B&W Sepia",
+        0x400 => "-2 (low)",
+        0x4c0 => "-3 (very low)",
+        0x4e0 => "-4 (lowest)",
+        0x500 => "Acros",
+        0x501 => "Acros Red Filter",
+        0x502 => "Acros Yellow Filter",
+        0x503 => "Acros Green Filter",
         0x8000 => "Film Simulation",
         0xffff => "n/a",
     },
@@ -559,6 +651,10 @@ define_tag_decoder! {
     exiftool: {
         0 => "Auto",
         1 => "Manual",
+        256 => "Standard (100%)",
+        512 => "Wide1 (230%)",
+        513 => "Wide2 (400%)",
+        32768 => "Film Simulation",
     },
     exiv2: {
         0 => "Auto",
@@ -745,13 +841,23 @@ define_tag_decoder! {
     }
 }
 
-// ColorChromeEffect/GrainEffectSize/ColorChromeFXBlue - fujimn_int.cpp
+// ColorChromeEffect/ColorChromeFXBlue - fujimn_int.cpp
 define_tag_decoder! {
     off_weak_strong,
     both: {
         0 => "Off",
         32 => "Weak",
         64 => "Strong",
+    }
+}
+
+// GrainEffectSize (tag 0x104c): FujiFilm.pm
+define_tag_decoder! {
+    grain_effect_size,
+    both: {
+        0 => "Off",
+        16 => "Small",
+        32 => "Large",
     }
 }
 
@@ -766,10 +872,17 @@ define_tag_decoder! {
     }
 }
 
-// CropMode (tag 0x104D): fujimn_int.cpp
+// CropMode (tag 0x104D): FujiFilm.pm / fujimn_int.cpp
 define_tag_decoder! {
     crop_mode,
-    both: {
+    exiftool: {
+        0 => "n/a",
+        1 => "Full-frame on GFX",
+        2 => "Sports Finder Mode",
+        4 => "Electronic Shutter 1.25x Crop",
+        8 => "Digital Tele-Conv",
+    },
+    exiv2: {
         0 => "None",
         1 => "Full frame",
         2 => "Sports Finder Mode",
@@ -809,10 +922,15 @@ define_tag_decoder! {
     }
 }
 
-// FinePixColor (tag 0x1210): fujimn_int.cpp
+// ColorMode (tag 0x1210): FujiFilm.pm / fujimn_int.cpp
 define_tag_decoder! {
-    fine_pix_color,
-    both: {
+    color_mode,
+    exiftool: {
+        0x00 => "Standard",
+        0x10 => "Chrome",
+        0x30 => "B & W",
+    },
+    exiv2: {
         0 => "Standard",
         16 => "Chrome",
         48 => "Black & white",
@@ -842,19 +960,45 @@ define_tag_decoder! {
     }
 }
 
-// ShadowTone/HighlightTone ExifTool (tags 0x1040/0x1041): FujiFilm.pm
+// CompositeImageMode (tag 0x1150): FujiFilm.pm / fujimn_int.cpp
 define_tag_decoder! {
-    shadow_highlight_tone_ext,
-    type: i32,
+    composite_image_mode,
+    type: u32,
     both: {
-        -64 => "+4 (hardest)",
-        -48 => "+3 (very hard)",
-        -32 => "+2 (hard)",
-        -16 => "+1 (medium hard)",
-        0 => "0 (normal)",
-        16 => "-1 (medium soft)",
-        32 => "-2 (soft)",
+        0 => "n/a",
+        1 => "Pro Low-light",
+        2 => "Pro Focus",
+        32 => "Panorama",
+        128 => "HDR",
+        1024 => "Multi-exposure",
     }
+}
+
+// ShadowTone/HighlightTone ExifTool (tags 0x1040/0x1041): FujiFilm.pm
+// For values not in the table, ExifTool calculates: -val / 16
+pub fn decode_shadow_highlight_tone_ext_exiftool(value: i32) -> String {
+    match value {
+        -64 => "+4 (hardest)".to_string(),
+        -48 => "+3 (very hard)".to_string(),
+        -32 => "+2 (hard)".to_string(),
+        -16 => "+1 (medium hard)".to_string(),
+        0 => "0 (normal)".to_string(),
+        16 => "-1 (medium soft)".to_string(),
+        32 => "-2 (soft)".to_string(),
+        // For other values, calculate: -val / 16
+        _ => {
+            let result = -value as f64 / 16.0;
+            if result == result.floor() {
+                format!("{}", result as i32)
+            } else {
+                format!("{}", result)
+            }
+        }
+    }
+}
+
+pub fn decode_shadow_highlight_tone_ext_exiv2(value: i32) -> String {
+    decode_shadow_highlight_tone_ext_exiftool(value)
 }
 
 // LensModulationOptimizer (tag 0x1045): FujiFilm.pm
@@ -878,12 +1022,15 @@ pub fn decode_image_stabilization_exiftool(values: &[u32]) -> String {
             .join(" ");
     }
 
+    // First value: stabilization type
     let is_type = match values[0] {
-        0 => "None",
-        1 => "Optical",
-        2 => "Sensor-shift",
-        3 => "OIS/IBIS Combined",
-        _ => "Unknown",
+        0 => "None".to_string(),
+        1 => "Optical".to_string(),
+        2 => "Sensor-shift".to_string(),
+        3 => "OIS Lens".to_string(),
+        258 => "IBIS/OIS + DIS".to_string(),
+        512 => "Digital".to_string(),
+        v => format!("Unknown ({})", v),
     };
 
     let is_mode = match values[1] {
@@ -913,6 +1060,23 @@ define_tag_decoder! {
         0x2c0 => "-3 (very weak)",
         0x2e0 => "-4 (weakest)",
     }
+}
+
+/// Check if a tag is a WB_GRGBLevels variant
+fn is_wb_grgb_levels_tag(tag_id: u16) -> bool {
+    matches!(
+        tag_id,
+        FUJI_WB_GRGB_LEVELS_AUTO
+            | FUJI_WB_GRGB_LEVELS_DAYLIGHT
+            | FUJI_WB_GRGB_LEVELS_CLOUDY
+            | FUJI_WB_GRGB_LEVELS_DAYLIGHT_FLUOR
+            | FUJI_WB_GRGB_LEVELS_DAY_WHITE_FLUOR
+            | FUJI_WB_GRGB_LEVELS_WHITE_FLUOR
+            | FUJI_WB_GRGB_LEVELS_WARM_WHITE_FLUOR
+            | FUJI_WB_GRGB_LEVELS_LIVING_ROOM_WARM_WHITE_FLUOR
+            | FUJI_WB_GRGB_LEVELS_TUNGSTEN
+            | FUJI_WB_GRGB_LEVELS
+    )
 }
 
 /// Parse Fujifilm maker notes
@@ -1042,6 +1206,44 @@ pub fn parse_fuji_maker_notes(
                         }
                     }
 
+                    // Handle PrioritySettings (0x102b) which expands to multiple sub-tags
+                    if tag_id == FUJI_PRIORITY_SETTINGS && values.len() == 1 {
+                        let v = values[0];
+                        // AF-SPriority: bits 0-3 (mask 0x000f)
+                        let af_s_priority = v & 0x000f;
+                        let af_s_str = match af_s_priority {
+                            1 => "Release",
+                            2 => "Focus",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_AF_S_PRIORITY,
+                            MakerNoteTag::new(
+                                FUJI_AF_S_PRIORITY,
+                                Some("AF-SPriority"),
+                                ExifValue::Ascii(af_s_str.to_string()),
+                            ),
+                        );
+
+                        // AF-CPriority: bits 4-7 (mask 0x00f0)
+                        let af_c_priority = (v >> 4) & 0x0f;
+                        let af_c_str = match af_c_priority {
+                            1 => "Release",
+                            2 => "Focus",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_AF_C_PRIORITY,
+                            MakerNoteTag::new(
+                                FUJI_AF_C_PRIORITY,
+                                Some("AF-CPriority"),
+                                ExifValue::Ascii(af_c_str.to_string()),
+                            ),
+                        );
+
+                        continue; // Skip normal tag insertion
+                    }
+
                     // Apply value decoders for single-value SHORT tags
                     if values.len() == 1 {
                         let v = values[0];
@@ -1089,6 +1291,28 @@ pub fn parse_fuji_maker_notes(
                                 // Tag 0x100E - newer cameras use this, value 0 = "0 (normal)"
                                 Some(decode_noise_reduction_full_exiftool(v).to_string())
                             }
+                            FUJI_COLOR_CHROME_EFFECT => {
+                                Some(decode_off_weak_strong_exiftool(v).to_string())
+                            }
+                            FUJI_GRAIN_EFFECT_SIZE => {
+                                Some(decode_grain_effect_size_exiftool(v).to_string())
+                            }
+                            FUJI_COLOR_CHROME_FX_BLUE => {
+                                Some(decode_off_weak_strong_exiftool(v).to_string())
+                            }
+                            FUJI_CROP_MODE => Some(decode_crop_mode_exiftool(v).to_string()),
+                            FUJI_COLOR_MODE => Some(decode_color_mode_exiftool(v).to_string()),
+                            FUJI_SCENE_RECOGNITION => {
+                                Some(decode_scene_recognition_exiftool(v).to_string())
+                            }
+                            FUJI_IMAGE_COUNT => {
+                                // Apply mask 0x7fff
+                                let count = v & 0x7fff;
+                                Some(count.to_string())
+                            }
+                            FUJI_COMPOSITE_IMAGE_COUNT1 | FUJI_COMPOSITE_IMAGE_COUNT2 => {
+                                Some(v.to_string())
+                            }
                             _ => None,
                         };
 
@@ -1112,6 +1336,15 @@ pub fn parse_fuji_maker_notes(
                         // Convert shorts to u32 for the decode function
                         let long_vals: Vec<u32> = values.iter().map(|&v| v as u32).collect();
                         ExifValue::Ascii(decode_image_stabilization_exiftool(&long_vals))
+                    } else if is_wb_grgb_levels_tag(tag_id) && values.len() >= 4 {
+                        // WB_GRGBLevels tags: format as space-separated values "G R G B"
+                        let formatted =
+                            format!("{} {} {} {}", values[0], values[1], values[2], values[3]);
+                        ExifValue::Ascii(formatted)
+                    } else if tag_id == FUJI_RAW_IMAGE_ASPECT_RATIO && values.len() == 2 {
+                        // RawImageAspectRatio: format as "width:height" (reversed from storage order)
+                        let formatted = format!("{}:{}", values[1], values[0]);
+                        ExifValue::Ascii(formatted)
                     } else {
                         ExifValue::Short(values)
                     }
@@ -1130,6 +1363,141 @@ pub fn parse_fuji_maker_notes(
                         }
                     };
 
+                    // Handle compound binary tags that expand to multiple sub-tags
+                    if tag_id == FUJI_FOCUS_SETTINGS {
+                        // FocusSettings (0x102d) - extract bit fields
+                        // FocusMode2: bits 0-3
+                        let focus_mode2 = (raw_value & 0x0000000f) as u16;
+                        let focus_mode2_str = match focus_mode2 {
+                            0 => "AF-M",
+                            1 => "AF-S",
+                            2 => "AF-C",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_FOCUS_MODE_2,
+                            MakerNoteTag::new(
+                                FUJI_FOCUS_MODE_2,
+                                Some("FocusMode2"),
+                                ExifValue::Ascii(focus_mode2_str.to_string()),
+                            ),
+                        );
+
+                        // PreAF: bits 4-7 (mask 0x00f0)
+                        let pre_af = ((raw_value >> 4) & 0x0f) as u16;
+                        let pre_af_str = match pre_af {
+                            0 => "Off",
+                            1 => "On",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_PRE_AF,
+                            MakerNoteTag::new(
+                                FUJI_PRE_AF,
+                                Some("PreAF"),
+                                ExifValue::Ascii(pre_af_str.to_string()),
+                            ),
+                        );
+
+                        // AFAreaMode: bits 8-11 (mask 0x0f00)
+                        let af_area_mode = ((raw_value >> 8) & 0x0f) as u16;
+                        let af_area_mode_str = match af_area_mode {
+                            0 => "Single Point",
+                            1 => "Zone",
+                            2 => "Wide/Tracking",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_AF_AREA_MODE,
+                            MakerNoteTag::new(
+                                FUJI_AF_AREA_MODE,
+                                Some("AFAreaMode"),
+                                ExifValue::Ascii(af_area_mode_str.to_string()),
+                            ),
+                        );
+
+                        // AFAreaPointSize: bits 12-15 (mask 0xf000)
+                        let af_point_size = ((raw_value >> 12) & 0x0f) as u16;
+                        let af_point_size_str = if af_point_size == 0 {
+                            "n/a".to_string()
+                        } else {
+                            af_point_size.to_string()
+                        };
+                        tags.insert(
+                            FUJI_AF_AREA_POINT_SIZE,
+                            MakerNoteTag::new(
+                                FUJI_AF_AREA_POINT_SIZE,
+                                Some("AFAreaPointSize"),
+                                ExifValue::Ascii(af_point_size_str),
+                            ),
+                        );
+
+                        // AFAreaZoneSize: bits 16-23 (mask 0xff0000)
+                        let af_zone_size = ((raw_value >> 16) & 0xff) as u16;
+                        let af_zone_size_str = if af_zone_size == 0 {
+                            "n/a".to_string()
+                        } else {
+                            // Decode as "width x height" per ExifTool formula
+                            let w = af_zone_size & 0x0f;
+                            let h = af_zone_size >> 5;
+                            format!("{} x {}", w, h)
+                        };
+                        tags.insert(
+                            FUJI_AF_AREA_ZONE_SIZE,
+                            MakerNoteTag::new(
+                                FUJI_AF_AREA_ZONE_SIZE,
+                                Some("AFAreaZoneSize"),
+                                ExifValue::Ascii(af_zone_size_str),
+                            ),
+                        );
+
+                        continue; // Skip normal tag insertion
+                    }
+
+                    if tag_id == FUJI_AFC_SETTINGS {
+                        // AFCSettings (0x102e) - extract bit fields
+                        // AF-CTrackingSensitivity: bits 0-3 (values 0-4)
+                        let tracking_sens = (raw_value & 0x000f) as u16;
+                        tags.insert(
+                            FUJI_AFC_TRACKING_SENS,
+                            MakerNoteTag::new(
+                                FUJI_AFC_TRACKING_SENS,
+                                Some("AF-CTrackingSensitivity"),
+                                ExifValue::Ascii(tracking_sens.to_string()),
+                            ),
+                        );
+
+                        // AF-CSpeedTrackingSensitivity: bits 4-7 (values 0-2)
+                        let speed_sens = ((raw_value >> 4) & 0x0f) as u16;
+                        tags.insert(
+                            FUJI_AFC_SPEED_TRACK_SENS,
+                            MakerNoteTag::new(
+                                FUJI_AFC_SPEED_TRACK_SENS,
+                                Some("AF-CSpeedTrackingSensitivity"),
+                                ExifValue::Ascii(speed_sens.to_string()),
+                            ),
+                        );
+
+                        // AF-CZoneAreaSwitching: bits 8-11
+                        let zone_switching = ((raw_value >> 8) & 0x0f) as u16;
+                        let zone_switching_str = match zone_switching {
+                            0 => "Front",
+                            1 => "Auto",
+                            2 => "Center",
+                            _ => "Unknown",
+                        };
+                        tags.insert(
+                            FUJI_AFC_ZONE_AREA_SWITCHING,
+                            MakerNoteTag::new(
+                                FUJI_AFC_ZONE_AREA_SWITCHING,
+                                Some("AF-CZoneAreaSwitching"),
+                                ExifValue::Ascii(zone_switching_str.to_string()),
+                            ),
+                        );
+
+                        continue; // Skip normal tag insertion
+                    }
+
                     // Decode specific LONG tags
                     let decoded = match tag_id {
                         FUJI_SHADOW_TONE | FUJI_HIGHLIGHT_TONE => {
@@ -1144,6 +1512,23 @@ pub fn parse_fuji_maker_notes(
                             // DigitalZoom = value / 8
                             let zoom = raw_value as f64 / 8.0;
                             Some(format!("{}", zoom))
+                        }
+                        FUJI_COLOR_CHROME_EFFECT | FUJI_COLOR_CHROME_FX_BLUE => {
+                            // These can be LONG (int32s) on some cameras - use same decoder as SHORT
+                            Some(decode_off_weak_strong_exiftool(raw_value as u16).to_string())
+                        }
+                        FUJI_FLICKER_REDUCTION => {
+                            // Extract on/off from bits - ((val >> 8) & 0x0f) == 1 means On
+                            let is_on = ((raw_value >> 8) & 0x0f) == 1;
+                            let state = if is_on { "On" } else { "Off" };
+                            Some(format!("{} (0x{:04x})", state, raw_value))
+                        }
+                        FUJI_COMPOSITE_IMAGE_MODE => {
+                            Some(decode_composite_image_mode_exiftool(raw_value).to_string())
+                        }
+                        FUJI_GRAIN_EFFECT_ROUGHNESS => {
+                            // Same decoder as ColorChromeEffect - uses int32s
+                            Some(decode_off_weak_strong_exiftool(raw_value as u16).to_string())
                         }
                         _ => None,
                     };
@@ -1236,8 +1621,31 @@ pub fn parse_fuji_maker_notes(
                         let den = cursor.read_i32::<LittleEndian>().unwrap_or(1);
                         if den != 0 {
                             let val = num as f64 / den as f64;
+                            // RelativeExposure: apply log2 conversion like ExifTool
+                            if tag_id == FUJI_RELATIVE_EXPOSURE {
+                                let converted = if val > 0.0 {
+                                    val.ln() / 2.0_f64.ln()
+                                } else {
+                                    0.0
+                                };
+                                // Format: 0 for zero, else +/- with 1 decimal
+                                if converted == 0.0 {
+                                    ExifValue::Ascii("0".to_string())
+                                } else {
+                                    ExifValue::Ascii(format!("{:+.1}", converted))
+                                }
+                            // FlashExposureComp: format with 2 decimal places like ExifTool
+                            } else if tag_id == FUJI_FLASH_EXPOSURE_COMP {
+                                // Round to 2 decimal places
+                                let rounded = (val * 100.0).round() / 100.0;
+                                ExifValue::Ascii(
+                                    format!("{:.2}", rounded)
+                                        .trim_end_matches('0')
+                                        .trim_end_matches('.')
+                                        .to_string(),
+                                )
                             // Format as integer if it's a whole number
-                            if val == val.floor() {
+                            } else if val == val.floor() {
                                 ExifValue::Ascii(format!("{}", val as i64))
                             } else {
                                 ExifValue::Ascii(format!("{:.1}", val))
@@ -1255,14 +1663,20 @@ pub fn parse_fuji_maker_notes(
                 }
             };
 
-            tags.insert(
-                tag_id,
-                MakerNoteTag {
+            let tag_name = get_fuji_tag_name(tag_id);
+            let tag = if let Some(name) = tag_name {
+                MakerNoteTag::with_exiv2(
                     tag_id,
-                    tag_name: get_fuji_tag_name(tag_id),
+                    tag_name,
+                    value.clone(),
                     value,
-                },
-            );
+                    EXIV2_GROUP_FUJIFILM,
+                    name,
+                )
+            } else {
+                MakerNoteTag::new(tag_id, tag_name, value)
+            };
+            tags.insert(tag_id, tag);
         }
     }
 

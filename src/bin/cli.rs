@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             // Get the filename as a string
                             let filename = file.to_string_lossy().to_string();
                             let json_obj =
-                                fpexif::output::to_exiftool_json(&exif_data, Some(&filename));
+                                fpexif::output::to_exiftool_json(&exif_data, Some(&filename), None);
 
                             // Extract the single object from the array
                             if let serde_json::Value::Array(mut arr) = json_obj {
@@ -180,7 +180,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 for file in files {
                     match parser.parse_file(file) {
                         Ok(exif_data) => {
-                            print_exif_data_exiftool(&exif_data);
+                            let source = file.to_str();
+                            print_exif_data_exiftool(&exif_data, source);
                         }
                         Err(err) => {
                             eprintln!("Error parsing {}: {}", file.display(), err);
@@ -339,10 +340,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Print all EXIF data in exiftool text format: `Tag Name                        : Value`
-fn print_exif_data_exiftool(exif_data: &ExifData) {
+fn print_exif_data_exiftool(exif_data: &ExifData, source_file: Option<&str>) {
     // Use to_exiftool_json to get consistent output with JSON mode
     // This ensures tag filtering (removing duplicates, IFD pointers, raw binary) is applied
-    let json = fpexif::output::to_exiftool_json(exif_data, None);
+    // source_file is needed for format-specific overrides (e.g., Pentax DNG vs PEF)
+    let json = fpexif::output::to_exiftool_json(exif_data, source_file, None);
 
     // Extract the object from the array
     if let serde_json::Value::Array(arr) = json {
@@ -377,6 +379,7 @@ fn format_values_space<T: std::fmt::Display>(values: &[T]) -> String {
 
 /// Print all EXIF data in exiv2 format: `Exif.Image.Make  Ascii  6  Canon`
 fn print_exif_data_exiv2(exif_data: &ExifData) {
+    // First output standard EXIF tags
     for (tag_id, value) in exif_data.iter() {
         let group = match tag_id.ifd {
             tags::TagGroup::Main => "Exif.Image",
@@ -394,6 +397,70 @@ fn print_exif_data_exiv2(exif_data: &ExifData) {
             "{:<44} {:12} {:>4}  {}",
             key, type_name, count, display_value
         );
+    }
+
+    // Then output MakerNote tags
+    if let Some(maker_notes) = exif_data.get_maker_notes() {
+        // Detect manufacturer from Make tag
+        let make = exif_data
+            .get_tag_by_name("Make")
+            .and_then(|v| match v {
+                fpexif::data_types::ExifValue::Ascii(s) => Some(s.as_str()),
+                _ => None,
+            })
+            .unwrap_or("");
+        let manufacturer_prefix = get_exiv2_manufacturer_prefix(make);
+
+        let mut sorted_tags: Vec<_> = maker_notes.iter().collect();
+        sorted_tags.sort_by_key(|(id, _)| *id);
+
+        for (_tag_id, tag) in sorted_tags {
+            let tag_name = tag.tag_name.unwrap_or("Unknown");
+
+            // Use exiv2 group/name if available, otherwise generate from manufacturer
+            let key = if let (Some(group), Some(name)) = (tag.exiv2_group, tag.exiv2_name) {
+                format!("Exif.{}.{}", group, name)
+            } else {
+                format!("Exif.{}.{}", manufacturer_prefix, tag_name)
+            };
+
+            // Use raw value if available, otherwise use decoded value
+            let value_to_format = tag.raw_value.as_ref().unwrap_or(&tag.value);
+            let (type_name, count, display_value) = format_exiv2_value(value_to_format);
+
+            println!(
+                "{:<44} {:12} {:>4}  {}",
+                key, type_name, count, display_value
+            );
+        }
+    }
+}
+
+/// Get the exiv2 manufacturer prefix from the Make string
+fn get_exiv2_manufacturer_prefix(make: &str) -> &'static str {
+    let make_lower = make.to_lowercase();
+    if make_lower.contains("canon") {
+        "Canon"
+    } else if make_lower.contains("nikon") {
+        "Nikon3"
+    } else if make_lower.contains("sony") {
+        "Sony1"
+    } else if make_lower.contains("fuji") {
+        "Fujifilm"
+    } else if make_lower.contains("panasonic") {
+        "Panasonic"
+    } else if make_lower.contains("olympus") || make_lower.contains("om digital") {
+        "Olympus"
+    } else if make_lower.contains("pentax") {
+        "Pentax"
+    } else if make_lower.contains("minolta") {
+        "Minolta"
+    } else if make_lower.contains("kodak") {
+        "Kodak"
+    } else if make_lower.contains("samsung") {
+        "Samsung2"
+    } else {
+        "MakerNote"
     }
 }
 
@@ -430,7 +497,14 @@ fn format_exiv2_value(value: &fpexif::data_types::ExifValue) -> (&'static str, u
         ),
         ExifValue::Float(v) => ("Float", v.len(), format_values_space(v)),
         ExifValue::Double(v) => ("Double", v.len(), format_values_space(v)),
-        ExifValue::Undefined(v) => ("Undefined", v.len(), format!("{} bytes", v.len())),
+        ExifValue::Undefined(v) => (
+            "Undefined",
+            v.len(),
+            v.iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
     }
 }
 
@@ -442,7 +516,7 @@ fn print_exif_data_json(exif_data: &ExifData) -> Result<(), Box<dyn std::error::
     let source_file = env::args().nth(2);
 
     // Use the library's output module to format as JSON
-    let json = fpexif::output::to_exiftool_json(exif_data, source_file.as_deref());
+    let json = fpexif::output::to_exiftool_json(exif_data, source_file.as_deref(), None);
 
     println!("{}", serde_json::to_string_pretty(&json)?);
     Ok(())

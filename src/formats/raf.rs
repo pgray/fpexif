@@ -5,34 +5,114 @@ use std::io::{Read, Seek, SeekFrom};
 
 const RAF_SIGNATURE: &[u8] = b"FUJIFILMCCD-RAW";
 
-/// Format a float value like ExifTool does
-/// - Scientific notation for |val| < 0.0001
-/// - Otherwise decimal with trailing zeros trimmed
-fn format_float_exiftool(val: f64) -> String {
-    // Round to 7 decimal places
-    let rounded = (val * 10_000_000.0).round() / 10_000_000.0;
+/// Format a float value with 10 significant figures (for distortion/vignetting params)
+/// ExifTool outputs these with 10 significant figures total
+fn format_float_10places(val: f64) -> String {
+    if val == 0.0 {
+        return "0".to_string();
+    }
+
+    // ExifTool uses scientific notation for small absolute values
+    if val.abs() > 0.0 && val.abs() < 0.0001 {
+        // Format with 10 significant figures in scientific notation
+        // The mantissa should have 9 decimal places (1 digit before + 9 after = 10 sig figs)
+        let s = format!("{:.9e}", val);
+
+        // Find the 'e' position and split
+        if let Some(e_pos) = s.find('e') {
+            let mantissa_part = &s[..e_pos];
+            let exp_part = &s[e_pos..];
+
+            // Trim trailing zeros from mantissa (but keep at least one decimal)
+            let trimmed_mantissa = mantissa_part.trim_end_matches('0').trim_end_matches('.');
+
+            // Format exponent with 2 digits
+            let formatted_exp = if let Some(neg_pos) = exp_part.find("e-") {
+                let exp_digits = &exp_part[neg_pos + 2..];
+                if exp_digits.len() == 1 {
+                    format!("e-0{}", exp_digits)
+                } else {
+                    exp_part.to_string()
+                }
+            } else if let Some(pos_pos) = exp_part.find("e+") {
+                let exp_digits = &exp_part[pos_pos + 2..];
+                if exp_digits.len() == 1 {
+                    format!("e+0{}", exp_digits)
+                } else {
+                    exp_part.to_string()
+                }
+            } else {
+                exp_part.to_string()
+            };
+
+            return format!("{}{}", trimmed_mantissa, formatted_exp);
+        }
+        return s;
+    }
+
+    // For normal values, calculate decimal places based on magnitude
+    // to achieve 10 significant figures
+    let magnitude = val.abs().log10().floor() as i32;
+    let decimal_places = (9 - magnitude).max(0) as usize;
+
+    let s = format!("{:.prec$}", val, prec = decimal_places);
+
+    // Trim trailing zeros after decimal point
+    if s.contains('.') {
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    } else {
+        s
+    }
+}
+
+/// Format a float value with 6 decimal places (for balance values)
+fn format_float_6places(val: f64) -> String {
+    format_float_with_precision(val, 6)
+}
+
+/// Format a float value with specified decimal precision
+fn format_float_with_precision(val: f64, precision: u32) -> String {
+    let factor = 10f64.powi(precision as i32);
+    let rounded = (val * factor).round() / factor;
 
     // ExifTool uses scientific notation for small values
     if rounded.abs() > 0.0 && rounded.abs() < 0.0001 {
-        // Format as scientific notation (e.g., 1.6e-05 with 2-digit exponent)
-        // Rust's default is single digit, so we format manually
-        let s = format!("{:.1e}", rounded);
-        // Convert e-5 to e-05 (2-digit exponent)
-        if let Some(pos) = s.find("e-") {
-            let exp_part = &s[pos + 2..];
-            if exp_part.len() == 1 {
-                return format!("{}e-0{}", &s[..pos], exp_part);
-            }
-        } else if let Some(pos) = s.find("e") {
-            let exp_part = &s[pos + 1..];
-            if exp_part.len() == 1 {
-                return format!("{}e0{}", &s[..pos], exp_part);
-            }
+        // Format as scientific notation with 2-digit exponent
+        let s = format!("{:.prec$e}", rounded, prec = precision as usize);
+
+        // Find the 'e' position and split
+        if let Some(e_pos) = s.find('e') {
+            let mantissa_part = &s[..e_pos];
+            let exp_part = &s[e_pos..];
+
+            // Trim trailing zeros and decimal point from mantissa
+            let trimmed_mantissa = mantissa_part.trim_end_matches('0').trim_end_matches('.');
+
+            // Format exponent with 2 digits
+            let formatted_exp = if let Some(neg_pos) = exp_part.find("e-") {
+                let exp_digits = &exp_part[neg_pos + 2..];
+                if exp_digits.len() == 1 {
+                    format!("e-0{}", exp_digits)
+                } else {
+                    exp_part.to_string()
+                }
+            } else if let Some(pos_pos) = exp_part.find("e+") {
+                let exp_digits = &exp_part[pos_pos + 2..];
+                if exp_digits.len() == 1 {
+                    format!("e+0{}", exp_digits)
+                } else {
+                    exp_part.to_string()
+                }
+            } else {
+                exp_part.to_string()
+            };
+
+            return format!("{}{}", trimmed_mantissa, formatted_exp);
         }
         s
     } else {
-        // Format with up to 7 decimal places
-        let s = format!("{:.7}", rounded);
+        // Format with specified decimal places
+        let s = format!("{:.prec$}", rounded, prec = precision as usize);
 
         // Trim trailing zeros after decimal point
         if s.contains('.') {
@@ -42,6 +122,19 @@ fn format_float_exiftool(val: f64) -> String {
             s
         }
     }
+}
+
+/// Format WB_GRGBLevels as space-separated int16u values
+/// Data is big-endian, format: G R G B (4 x int16u = 8 bytes)
+fn format_wb_grgb_levels(data: &[u8]) -> String {
+    if data.len() < 8 {
+        return String::new();
+    }
+    let g1 = u16::from_be_bytes([data[0], data[1]]);
+    let r = u16::from_be_bytes([data[2], data[3]]);
+    let g2 = u16::from_be_bytes([data[4], data[5]]);
+    let b = u16::from_be_bytes([data[6], data[7]]);
+    format!("{} {} {} {}", g1, r, g2, b)
 }
 
 /// RAF-specific metadata extracted from RAF header and directory
@@ -279,6 +372,89 @@ fn parse_raf_directory(buffer: &[u8]) -> RafMetadata {
                     }
                 }
             }
+            // WB_GRGBLevels tags (0x2xxx) - int16u[4] in GRGB order
+            0x2000 => {
+                // WB_GRGBLevelsAuto
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsAuto", formatted);
+                }
+            }
+            0x2100 => {
+                // WB_GRGBLevelsDaylight
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsDaylight", formatted);
+                }
+            }
+            0x2200 => {
+                // WB_GRGBLevelsCloudy
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsCloudy", formatted);
+                }
+            }
+            0x2300 => {
+                // WB_GRGBLevelsDaylightFluor
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsDaylightFluor", formatted);
+                }
+            }
+            0x2301 => {
+                // WB_GRGBLevelsDayWhiteFluor
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsDayWhiteFluor", formatted);
+                }
+            }
+            0x2302 => {
+                // WB_GRGBLevelsWhiteFluorescent
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsWhiteFluorescent", formatted);
+                }
+            }
+            0x2310 => {
+                // WB_GRGBLevelsWarmWhiteFluor
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsWarmWhiteFluor", formatted);
+                }
+            }
+            0x2311 => {
+                // WB_GRGBLevelsLivingRoomWarmWhiteFluor
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsLivingRoomWarmWhiteFluor", formatted);
+                }
+            }
+            0x2400 => {
+                // WB_GRGBLevelsTungsten
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevelsTungsten", formatted);
+                }
+            }
+            0x2ff0 => {
+                // WB_GRGBLevels (base) - also compute RedBalance and BlueBalance
+                if len >= 8 {
+                    let formatted = format_wb_grgb_levels(value_data);
+                    metadata.insert("WB_GRGBLevels", formatted);
+
+                    // Compute RedBalance and BlueBalance from GRGB values
+                    let g1 = u16::from_be_bytes([value_data[0], value_data[1]]) as f64;
+                    let r = u16::from_be_bytes([value_data[2], value_data[3]]) as f64;
+                    let b = u16::from_be_bytes([value_data[6], value_data[7]]) as f64;
+
+                    if g1 > 0.0 {
+                        let red_balance = r / g1;
+                        let blue_balance = b / g1;
+                        metadata.insert("RedBalance", format_float_6places(red_balance));
+                        metadata.insert("BlueBalance", format_float_6places(blue_balance));
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -505,7 +681,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format_float_exiftool(val)
+                                                format_float_10places(val)
                                             } else {
                                                 "0".to_string()
                                             }
@@ -524,7 +700,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format_float_exiftool(val)
+                                                format_float_10places(val)
                                             } else {
                                                 "0".to_string()
                                             }
@@ -543,7 +719,7 @@ fn parse_fuji_ifd(data: &[u8]) -> Option<RafMetadata> {
                                             let den = read_i32(&data[offset + 4..]);
                                             if den != 0 {
                                                 let val = num as f64 / den as f64;
-                                                format_float_exiftool(val)
+                                                format_float_10places(val)
                                             } else {
                                                 "0".to_string()
                                             }

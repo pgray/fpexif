@@ -84,6 +84,12 @@ pub struct ExifData {
     maker_notes: Option<std::collections::HashMap<u16, makernotes::MakerNoteTag>>,
     // RAF-specific metadata (for Fujifilm RAF files)
     pub raf_metadata: Option<formats::RafMetadata>,
+    // MRW-specific metadata (for Minolta RAW files)
+    pub mrw_metadata: Option<formats::MrwMetadata>,
+    // RW2-specific metadata (for Panasonic RAW files)
+    pub rw2_metadata: Option<formats::Rw2Metadata>,
+    // File size in bytes (populated from WASM or file metadata)
+    file_size: Option<u64>,
 }
 
 impl ExifData {
@@ -94,6 +100,9 @@ impl ExifData {
             endian: data_types::Endianness::Little,
             maker_notes: None,
             raf_metadata: None,
+            mrw_metadata: None,
+            rw2_metadata: None,
+            file_size: None,
         }
     }
 
@@ -105,6 +114,36 @@ impl ExifData {
     /// Get RAF-specific metadata
     pub fn get_raf_metadata(&self) -> Option<&formats::RafMetadata> {
         self.raf_metadata.as_ref()
+    }
+
+    /// Set MRW-specific metadata (RIF block data)
+    pub fn set_mrw_metadata(&mut self, metadata: formats::MrwMetadata) {
+        self.mrw_metadata = Some(metadata);
+    }
+
+    /// Get MRW-specific metadata
+    pub fn get_mrw_metadata(&self) -> Option<&formats::MrwMetadata> {
+        self.mrw_metadata.as_ref()
+    }
+
+    /// Set RW2-specific metadata (PanasonicRaw IFD0 data)
+    pub fn set_rw2_metadata(&mut self, metadata: formats::Rw2Metadata) {
+        self.rw2_metadata = Some(metadata);
+    }
+
+    /// Get RW2-specific metadata
+    pub fn get_rw2_metadata(&self) -> Option<&formats::Rw2Metadata> {
+        self.rw2_metadata.as_ref()
+    }
+
+    /// Set file size in bytes
+    pub fn set_file_size(&mut self, size: u64) {
+        self.file_size = Some(size);
+    }
+
+    /// Get file size in bytes
+    pub fn get_file_size(&self) -> Option<u64> {
+        self.file_size
     }
 
     /// Get a tag value by its numeric ID

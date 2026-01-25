@@ -52,14 +52,63 @@ pub fn parse_exif(data: &[u8]) -> Result<String, JsValue> {
 #[wasm_bindgen]
 pub fn parse_exif_json(data: &[u8]) -> Result<String, JsValue> {
     let parser = crate::ExifParser::new();
+    let file_size = data.len() as u64;
 
     match parser.parse_bytes(data) {
         Ok(exif_data) => {
-            let json_value = crate::output::to_exiftool_json(&exif_data, None);
+            let json_value = crate::output::to_exiftool_json(&exif_data, None, Some(file_size));
             serde_json::to_string_pretty(&json_value)
                 .map_err(|e| JsValue::from_str(&format!("JSON serialization error: {}", e)))
         }
         Err(e) => Err(JsValue::from_str(&format!("EXIF parsing error: {}", e))),
+    }
+}
+
+/// Parse EXIF data and return a specific tag value (case-insensitive)
+///
+/// This is a convenience function for extracting single tags without parsing the full JSON.
+/// Tag names are case-insensitive and underscore-insensitive.
+///
+/// # Arguments
+/// * `data` - The image file data as a byte array
+/// * `tag_name` - The tag name to extract (e.g., "make", "Make", "shutter_speed", "ShutterSpeed")
+///
+/// # Returns
+/// The tag value as a JSON string, or an error if tag not found
+///
+/// # Examples
+/// ```javascript
+/// // All these work:
+/// parse_exif_get_tag(data, "make")
+/// parse_exif_get_tag(data, "Make")
+/// parse_exif_get_tag(data, "shutter_speed")
+/// parse_exif_get_tag(data, "ShutterSpeed")
+/// ```
+#[wasm_bindgen]
+pub fn parse_exif_get_tag(data: &[u8], tag_name: &str) -> Result<String, JsValue> {
+    let parser = crate::ExifParser::new();
+    let file_size = data.len() as u64;
+
+    match parser.parse_bytes(data) {
+        Ok(exif_data) => {
+            let json = crate::output::to_exiftool_json(&exif_data, None, Some(file_size));
+
+            match crate::output::get_tag_value(&json, tag_name) {
+                Some(value) => {
+                    // Convert JSON value to string
+                    let result = match value {
+                        serde_json::Value::String(s) => s,
+                        serde_json::Value::Number(n) => n.to_string(),
+                        serde_json::Value::Bool(b) => b.to_string(),
+                        serde_json::Value::Null => String::new(),
+                        _ => serde_json::to_string(&value).unwrap_or_default(),
+                    };
+                    Ok(result)
+                }
+                None => Err(JsValue::from_str(&format!("Tag '{}' not found", tag_name))),
+            }
+        }
+        Err(e) => Err(JsValue::from_str(&format!("Parse error: {}", e))),
     }
 }
 

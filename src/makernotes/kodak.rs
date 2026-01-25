@@ -664,11 +664,7 @@ fn parse_kodak_ifd(
 
             tags.insert(
                 tag_id,
-                MakerNoteTag {
-                    tag_id,
-                    tag_name: get_kodak_tag_name(tag_id),
-                    value,
-                },
+                MakerNoteTag::new(tag_id, get_kodak_tag_name(tag_id), value),
             );
         }
     }
@@ -730,12 +726,8 @@ fn parse_kodak_binary_format(
     if let Some(model) = read_string(KODAK_MODEL_OFFSET, 8) {
         if !model.is_empty() {
             tags.insert(
-                0xF000, // Special tag ID for binary format model
-                MakerNoteTag {
-                    tag_id: 0xF000,
-                    tag_name: Some("KodakModel"),
-                    value: ExifValue::Ascii(model),
-                },
+                0xF000,
+                MakerNoteTag::new(0xF000, Some("KodakModel"), ExifValue::Ascii(model)),
             );
         }
     }
@@ -745,11 +737,11 @@ fn parse_kodak_binary_format(
         if quality > 0 {
             tags.insert(
                 0xF001,
-                MakerNoteTag {
-                    tag_id: 0xF001,
-                    tag_name: Some("Quality"),
-                    value: ExifValue::Ascii(decode_quality_exiftool(quality).to_string()),
-                },
+                MakerNoteTag::new(
+                    0xF001,
+                    Some("Quality"),
+                    ExifValue::Ascii(decode_quality_exiftool(quality).to_string()),
+                ),
             );
         }
     }
@@ -758,11 +750,11 @@ fn parse_kodak_binary_format(
     if let Some(burst) = read_u8(KODAK_BURST_MODE_OFFSET) {
         tags.insert(
             0xF002,
-            MakerNoteTag {
-                tag_id: 0xF002,
-                tag_name: Some("BurstMode"),
-                value: ExifValue::Ascii(decode_burst_mode_exiftool(burst).to_string()),
-            },
+            MakerNoteTag::new(
+                0xF002,
+                Some("BurstMode"),
+                ExifValue::Ascii(decode_burst_mode_exiftool(burst).to_string()),
+            ),
         );
     }
 
@@ -770,11 +762,11 @@ fn parse_kodak_binary_format(
     if let Some(shutter) = read_u8(KODAK_SHUTTER_MODE_OFFSET) {
         tags.insert(
             0xF003,
-            MakerNoteTag {
-                tag_id: 0xF003,
-                tag_name: Some("ShutterMode"),
-                value: ExifValue::Ascii(decode_shutter_mode_exiftool(shutter).to_string()),
-            },
+            MakerNoteTag::new(
+                0xF003,
+                Some("ShutterMode"),
+                ExifValue::Ascii(decode_shutter_mode_exiftool(shutter).to_string()),
+            ),
         );
     }
 
@@ -782,11 +774,11 @@ fn parse_kodak_binary_format(
     if let Some(metering) = read_u8(KODAK_METERING_MODE_OFFSET) {
         tags.insert(
             0xF004,
-            MakerNoteTag {
-                tag_id: 0xF004,
-                tag_name: Some("MeteringMode"),
-                value: ExifValue::Ascii(decode_metering_mode_exiftool(metering).to_string()),
-            },
+            MakerNoteTag::new(
+                0xF004,
+                Some("MeteringMode"),
+                ExifValue::Ascii(decode_metering_mode_exiftool(metering).to_string()),
+            ),
         );
     }
 
@@ -794,11 +786,11 @@ fn parse_kodak_binary_format(
     if let Some(focus) = read_u8(KODAK_FOCUS_MODE_BINARY_OFFSET) {
         tags.insert(
             0xF005,
-            MakerNoteTag {
-                tag_id: 0xF005,
-                tag_name: Some("FocusMode"),
-                value: ExifValue::Ascii(decode_focus_mode_binary_exiftool(focus).to_string()),
-            },
+            MakerNoteTag::new(
+                0xF005,
+                Some("FocusMode"),
+                ExifValue::Ascii(decode_focus_mode_binary_exiftool(focus).to_string()),
+            ),
         );
     }
 
@@ -806,11 +798,11 @@ fn parse_kodak_binary_format(
     if let Some(wb) = read_u8(KODAK_WB_OFFSET) {
         tags.insert(
             0xF006,
-            MakerNoteTag {
-                tag_id: 0xF006,
-                tag_name: Some("WhiteBalance"),
-                value: ExifValue::Ascii(decode_white_balance_exiftool(wb).to_string()),
-            },
+            MakerNoteTag::new(
+                0xF006,
+                Some("WhiteBalance"),
+                ExifValue::Ascii(decode_white_balance_exiftool(wb).to_string()),
+            ),
         );
     }
 
@@ -818,11 +810,11 @@ fn parse_kodak_binary_format(
     if let Some(flash_mode) = read_u8(KODAK_FLASH_MODE_BINARY_OFFSET) {
         tags.insert(
             0xF007,
-            MakerNoteTag {
-                tag_id: 0xF007,
-                tag_name: Some("FlashMode"),
-                value: ExifValue::Ascii(decode_flash_mode_binary_exiftool(flash_mode).to_string()),
-            },
+            MakerNoteTag::new(
+                0xF007,
+                Some("FlashMode"),
+                ExifValue::Ascii(decode_flash_mode_binary_exiftool(flash_mode).to_string()),
+            ),
         );
     }
 
@@ -830,11 +822,11 @@ fn parse_kodak_binary_format(
     if let Some(flash_fired) = read_u8(KODAK_FLASH_FIRED_OFFSET) {
         tags.insert(
             0xF008,
-            MakerNoteTag {
-                tag_id: 0xF008,
-                tag_name: Some("FlashFired"),
-                value: ExifValue::Ascii(decode_flash_fired_exiftool(flash_fired).to_string()),
-            },
+            MakerNoteTag::new(
+                0xF008,
+                Some("FlashFired"),
+                ExifValue::Ascii(decode_flash_fired_exiftool(flash_fired).to_string()),
+            ),
         );
     }
 
@@ -847,11 +839,7 @@ fn parse_kodak_binary_format(
         };
         tags.insert(
             0xF009,
-            MakerNoteTag {
-                tag_id: 0xF009,
-                tag_name: Some("ISOSetting"),
-                value: ExifValue::Ascii(iso_str),
-            },
+            MakerNoteTag::new(0xF009, Some("ISOSetting"), ExifValue::Ascii(iso_str)),
         );
     }
 
@@ -860,11 +848,7 @@ fn parse_kodak_binary_format(
         if iso > 0 {
             tags.insert(
                 0xF00A,
-                MakerNoteTag {
-                    tag_id: 0xF00A,
-                    tag_name: Some("ISO"),
-                    value: ExifValue::Short(vec![iso]),
-                },
+                MakerNoteTag::new(0xF00A, Some("ISO"), ExifValue::Short(vec![iso])),
             );
         }
     }
@@ -874,11 +858,11 @@ fn parse_kodak_binary_format(
         if color_mode > 0 {
             tags.insert(
                 0xF00B,
-                MakerNoteTag {
-                    tag_id: 0xF00B,
-                    tag_name: Some("ColorMode"),
-                    value: ExifValue::Ascii(decode_color_mode_exiftool(color_mode).to_string()),
-                },
+                MakerNoteTag::new(
+                    0xF00B,
+                    Some("ColorMode"),
+                    ExifValue::Ascii(decode_color_mode_exiftool(color_mode).to_string()),
+                ),
             );
         }
     }
@@ -889,11 +873,11 @@ fn parse_kodak_binary_format(
         let sharpness_i8 = sharpness as i8;
         tags.insert(
             0xF00C,
-            MakerNoteTag {
-                tag_id: 0xF00C,
-                tag_name: Some("Sharpness"),
-                value: ExifValue::Ascii(sharpness_i8.to_string()),
-            },
+            MakerNoteTag::new(
+                0xF00C,
+                Some("Sharpness"),
+                ExifValue::Ascii(sharpness_i8.to_string()),
+            ),
         );
     }
 

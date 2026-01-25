@@ -5,10 +5,15 @@
 //! - Saving baseline snapshots before starting work
 //! - Comparing current state against baselines
 //! - Comparing against exiftool output (ground truth)
+//! - Comparing against exiv2 output (secondary reference)
 
 pub mod baseline;
 pub mod comparison;
 pub mod output;
+
+// Re-export commonly used types
+pub use baseline::{BaselineType, DataSet};
+pub use comparison::{exiv2_available, run_exiv2_comparison};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -16,7 +21,7 @@ use std::collections::HashMap;
 /// Supported manufacturers and their file formats
 /// Note: "dng" is a format, not a manufacturer, but is included for testing DNG-specific parsing
 pub const MANUFACTURER_FORMATS: &[(&str, &[&str])] = &[
-    ("canon", &["CR2", "CR3", "CRW"]),
+    ("canon", &["CR2", "CR3"]), // CRW excluded - uses CIFF format (not TIFF)
     ("nikon", &["NEF", "NRW"]),
     ("sony", &["ARW", "SR2", "SRF"]),
     ("fujifilm", &["RAF"]),

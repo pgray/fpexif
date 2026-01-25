@@ -1,9 +1,23 @@
 # Sony EXIF Improvements Plan
 
-## Current State (Updated 2025-12-31)
-- Match rate: 36.6% (up from 35.2%)
-- Files tested: 1 SRF, 1 SR2, 31 ARW
-- Matching: 2,457 | Mismatched: 317 | Missing: 3,940 | Extra: 1,757
+## Current State (Updated 2026-01-20)
+- Match rate (raws): 75.8%
+- Match rate (data.lfs): 81.3%
+- Files tested: 1 SRF, 1 SR2, 31 ARW (raws), 1 SRF, 1 SR2, 195 ARW (data.lfs)
+- Mismatches: 0
+
+### Tag9402 Parsing (2026-01-18)
+Added parsing for Sony's encrypted Tag9402 subdirectory which contains:
+- **AFAreaMode** (offset 0x17) - Multi, Center, Spot, Flexible Spot, Zone, Expanded Flexible Spot, Tracking, Face Tracking, etc.
+- **FocusMode** (offset 0x16) - Manual, AF-S, AF-C, AF-A, DMF
+- **AmbientTemperature** (offset 0x04) - Only when TempTest1 flag (0x02) equals 255
+- **FocusPosition2** (offset 0x2d) - For NEX/ILCE models
+
+Model-specific handling: SLT/ILCA models use AFAreaModeSetting (0x201C) instead of Tag9402 AFAreaMode.
+
+## Previous State
+- Match rate: 36.6% (2025-12-31)
+- Significant improvements came from CameraSettings parsing and other subdirectory work
 
 ## Top Mismatches by Frequency
 

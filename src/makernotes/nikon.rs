@@ -8,6 +8,119 @@ use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
+// exiv2 group names for Nikon sub-IFDs
+pub const EXIV2_GROUP_NIKON3: &str = "Nikon3";
+pub const EXIV2_GROUP_NIKON_PC: &str = "NikonPc";
+pub const EXIV2_GROUP_NIKON_LD: &str = "NikonLd3"; // Most common lens data version
+pub const EXIV2_GROUP_NIKON_VR: &str = "NikonVr";
+pub const EXIV2_GROUP_NIKON_WT: &str = "NikonWt";
+pub const EXIV2_GROUP_NIKON_II: &str = "NikonIi";
+pub const EXIV2_GROUP_NIKON_AF: &str = "NikonAf";
+pub const EXIV2_GROUP_NIKON_AF2: &str = "NikonAf2";
+pub const EXIV2_GROUP_NIKON_FI: &str = "NikonFi";
+pub const EXIV2_GROUP_NIKON_FL: &str = "NikonFl3"; // Most common flash version
+pub const EXIV2_GROUP_NIKON_ME: &str = "NikonMe";
+
+/// Map Nikon sub-IFD field names to exiv2 group and tag name
+/// Returns (exiv2_group, exiv2_name) for the given field name and parent tag
+pub fn get_exiv2_nikon_subfield(
+    parent_tag: u16,
+    field_name: &str,
+) -> Option<(&'static str, &'static str)> {
+    match parent_tag {
+        NIKON_PICTURE_CONTROL_DATA => match field_name {
+            "PictureControlVersion" => Some((EXIV2_GROUP_NIKON_PC, "Version")),
+            "PictureControlName" => Some((EXIV2_GROUP_NIKON_PC, "Name")),
+            "PictureControlBase" => Some((EXIV2_GROUP_NIKON_PC, "Base")),
+            "PictureControlAdjust" => Some((EXIV2_GROUP_NIKON_PC, "Adjust")),
+            "PictureControlQuickAdjust" => Some((EXIV2_GROUP_NIKON_PC, "QuickAdjust")),
+            "Sharpness" => Some((EXIV2_GROUP_NIKON_PC, "Sharpness")),
+            "Contrast" => Some((EXIV2_GROUP_NIKON_PC, "Contrast")),
+            "Brightness" => Some((EXIV2_GROUP_NIKON_PC, "Brightness")),
+            "Saturation" => Some((EXIV2_GROUP_NIKON_PC, "Saturation")),
+            "HueAdjustment" => Some((EXIV2_GROUP_NIKON_PC, "HueAdjustment")),
+            "FilterEffect" => Some((EXIV2_GROUP_NIKON_PC, "FilterEffect")),
+            "ToningEffect" => Some((EXIV2_GROUP_NIKON_PC, "ToningEffect")),
+            "ToningSaturation" => Some((EXIV2_GROUP_NIKON_PC, "ToningSaturation")),
+            _ => None,
+        },
+        NIKON_LENS_DATA => match field_name {
+            "LensDataVersion" => Some((EXIV2_GROUP_NIKON_LD, "Version")),
+            "LensIDNumber" => Some((EXIV2_GROUP_NIKON_LD, "LensIDNumber")),
+            "LensFStops" => Some((EXIV2_GROUP_NIKON_LD, "LensFStops")),
+            "MinFocalLength" => Some((EXIV2_GROUP_NIKON_LD, "MinFocalLength")),
+            "MaxFocalLength" => Some((EXIV2_GROUP_NIKON_LD, "MaxFocalLength")),
+            "MaxApertureAtMinFocal" => Some((EXIV2_GROUP_NIKON_LD, "MaxApertureAtMinFocal")),
+            "MaxApertureAtMaxFocal" => Some((EXIV2_GROUP_NIKON_LD, "MaxApertureAtMaxFocal")),
+            "MCUVersion" => Some((EXIV2_GROUP_NIKON_LD, "MCUVersion")),
+            "EffectiveMaxAperture" => Some((EXIV2_GROUP_NIKON_LD, "EffectiveMaxAperture")),
+            "FocalLength" => Some((EXIV2_GROUP_NIKON_LD, "FocalLength")),
+            "FocusDistance" => Some((EXIV2_GROUP_NIKON_LD, "FocusDistance")),
+            "AFAperture" => Some((EXIV2_GROUP_NIKON_LD, "AFAperture")),
+            _ => None,
+        },
+        NIKON_VR_INFO => match field_name {
+            "VRInfoVersion" => Some((EXIV2_GROUP_NIKON_VR, "Version")),
+            "VibrationReduction" => Some((EXIV2_GROUP_NIKON_VR, "VibrationReduction")),
+            "VRMode" => Some((EXIV2_GROUP_NIKON_VR, "VRMode")),
+            _ => None,
+        },
+        NIKON_WORLD_TIME => match field_name {
+            "Timezone" => Some((EXIV2_GROUP_NIKON_WT, "Timezone")),
+            "DaylightSavings" => Some((EXIV2_GROUP_NIKON_WT, "DaylightSavings")),
+            "DateDisplayFormat" => Some((EXIV2_GROUP_NIKON_WT, "DateDisplayFormat")),
+            _ => None,
+        },
+        NIKON_ISO_INFO => match field_name {
+            "ISO" => Some((EXIV2_GROUP_NIKON_II, "ISO")),
+            "ISOExpansion" => Some((EXIV2_GROUP_NIKON_II, "ISOExpansion")),
+            "ISO2" => Some((EXIV2_GROUP_NIKON_II, "ISO2")),
+            "ISOExpansion2" => Some((EXIV2_GROUP_NIKON_II, "ISOExpansion2")),
+            _ => None,
+        },
+        NIKON_AF_INFO => match field_name {
+            "AFAreaMode" => Some((EXIV2_GROUP_NIKON_AF, "AFAreaMode")),
+            "AFPoint" => Some((EXIV2_GROUP_NIKON_AF, "AFPoint")),
+            "AFPointsInFocus" => Some((EXIV2_GROUP_NIKON_AF, "AFPointsInFocus")),
+            _ => None,
+        },
+        NIKON_AF_INFO_2 => match field_name {
+            "Version" | "AFInfo2Version" => Some((EXIV2_GROUP_NIKON_AF2, "Version")),
+            "ContrastDetectAF" => Some((EXIV2_GROUP_NIKON_AF2, "ContrastDetectAF")),
+            "AFAreaMode" => Some((EXIV2_GROUP_NIKON_AF2, "AFAreaMode")),
+            "PhaseDetectAF" => Some((EXIV2_GROUP_NIKON_AF2, "PhaseDetectAF")),
+            "PrimaryAFPoint" => Some((EXIV2_GROUP_NIKON_AF2, "PrimaryAFPoint")),
+            "AFPointsUsed" => Some((EXIV2_GROUP_NIKON_AF2, "AFPointsUsed")),
+            _ => None,
+        },
+        NIKON_FLASH_INFO | NIKON_FLASH_INFO_2 => match field_name {
+            "FlashInfoVersion" => Some((EXIV2_GROUP_NIKON_FL, "Version")),
+            "FlashSource" => Some((EXIV2_GROUP_NIKON_FL, "FlashSource")),
+            "ExternalFlashFirmware" => Some((EXIV2_GROUP_NIKON_FL, "ExternalFlashFirmware")),
+            "ExternalFlashFlags" => Some((EXIV2_GROUP_NIKON_FL, "ExternalFlashFlags")),
+            "FlashCommanderMode" => Some((EXIV2_GROUP_NIKON_FL, "FlashCommanderMode")),
+            "FlashControlMode" => Some((EXIV2_GROUP_NIKON_FL, "FlashControlMode")),
+            "FlashGNDistance" => Some((EXIV2_GROUP_NIKON_FL, "FlashGNDistance")),
+            "FlashColorFilter" => Some((EXIV2_GROUP_NIKON_FL, "FlashColorFilter")),
+            _ => None,
+        },
+        NIKON_FILE_INFO => match field_name {
+            "FileInfoVersion" => Some((EXIV2_GROUP_NIKON_FI, "Version")),
+            "DirectoryNumber" => Some((EXIV2_GROUP_NIKON_FI, "DirectoryNumber")),
+            "FileNumber" => Some((EXIV2_GROUP_NIKON_FI, "FileNumber")),
+            _ => None,
+        },
+        NIKON_MULTI_EXPOSURE => match field_name {
+            "MultiExposureVersion" => Some((EXIV2_GROUP_NIKON_ME, "Version")),
+            "MultiExposureMode" => Some((EXIV2_GROUP_NIKON_ME, "MultiExposureMode")),
+            "MultiExposureShots" => Some((EXIV2_GROUP_NIKON_ME, "MultiExposureShots")),
+            "MultiExposureAutoGain" => Some((EXIV2_GROUP_NIKON_ME, "MultiExposureAutoGain")),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 // Common Nikon MakerNote tag IDs
 pub const NIKON_VERSION: u16 = 0x0001;
 pub const NIKON_ISO_SETTING: u16 = 0x0002;
@@ -43,6 +156,7 @@ pub const NIKON_FACE_DETECT: u16 = 0x0021;
 pub const NIKON_ACTIVE_D_LIGHTING: u16 = 0x0022;
 pub const NIKON_HIGH_ISO_NOISE_REDUCTION: u16 = 0x00B1;
 pub const NIKON_PICTURE_CONTROL_DATA: u16 = 0x0023;
+pub const NIKON_PICTURE_CONTROL_DATA_2: u16 = 0x00BD; // Coolpix (P6000, P7000, etc.)
 pub const NIKON_WORLD_TIME: u16 = 0x0024;
 pub const NIKON_ISO_INFO: u16 = 0x0025;
 pub const NIKON_VIGNETTE_CONTROL: u16 = 0x002A;
@@ -83,6 +197,7 @@ pub const NIKON_LENS_F_STOPS: u16 = 0x008B;
 pub const NIKON_CONTRAST_CURVE: u16 = 0x008C;
 pub const NIKON_COLOR_HUE: u16 = 0x008D;
 pub const NIKON_SCENE_MODE: u16 = 0x008F;
+pub const NIKON_IMAGE_ADJUSTMENT: u16 = 0x0080;
 pub const NIKON_TONE_COMP: u16 = 0x0081;
 pub const NIKON_SENSOR_PIXEL_SIZE: u16 = 0x009A;
 pub const NIKON_UNKNOWN_TAG_9B: u16 = 0x009B;
@@ -98,7 +213,11 @@ pub const NIKON_ICC_PROFILE: u16 = 0x0E1D;
 pub const NIKON_CAPTURE_OUTPUT: u16 = 0x0E1E;
 pub const NIKON_MULTI_EXPOSURE: u16 = 0x00B0; // Also HDRInfo for some cameras
 pub const NIKON_LOCATION_INFO: u16 = 0x00B5;
-pub const NIKON_BLACK_LEVEL: u16 = 0x00B6;
+pub const NIKON_BLACK_LEVEL: u16 = 0x003D;
+pub const NIKON_IMAGE_SIZE_RAW: u16 = 0x003E;
+pub const NIKON_WHITE_BALANCE_FINE_TUNE_2: u16 = 0x003F;
+pub const NIKON_CROP_AREA: u16 = 0x0045;
+pub const NIKON_POWER_UP_TIME_2: u16 = 0x00B6;
 pub const NIKON_AF_INFO_2: u16 = 0x00B7;
 pub const NIKON_FILE_INFO: u16 = 0x00B8;
 pub const NIKON_AF_TUNE: u16 = 0x00B9;
@@ -106,6 +225,7 @@ pub const NIKON_RETOUCH_INFO: u16 = 0x00BB;
 pub const NIKON_PICTURE_CONTROL_VERSION: u16 = 0x00BC;
 pub const NIKON_SILENT_PHOTO: u16 = 0x00BD;
 pub const NIKON_SHUTTER_MODE: u16 = 0x0034;
+pub const NIKON_HDR_INFO: u16 = 0x0035;
 pub const NIKON_MECHANICAL_SHUTTER_COUNT: u16 = 0x0037;
 
 // PictureControl sub-IFD tags (indices in tag 0x0023)
@@ -330,7 +450,7 @@ pub const LOC_TIME: u16 = 0x0008;
 pub const LOC_MAP_DATUM: u16 = 0x0009;
 
 // More extended main IFD tags
-pub const NIKON_NEF_BIT_DEPTH: u16 = 0x009F;
+pub const NIKON_NEF_BIT_DEPTH: u16 = 0x0E22;
 pub const NIKON_EXTRA_INFO: u16 = 0x00A0;
 pub const NIKON_ORIENTATION: u16 = 0x0036;
 pub const NIKON_CAPTURE_OFFSET: u16 = 0x0E02;
@@ -511,8 +631,8 @@ fn format_rational_like_exiftool(n: u32, d: u32) -> String {
     if (value.fract().abs() < 1e-10) || (value - value.round()).abs() < 1e-10 {
         return format!("{}", value.round() as i64);
     }
-    // Format with 8 decimal places and strip trailing zeros
-    let formatted = format!("{:.8}", value);
+    // Format with 9 decimal places and strip trailing zeros
+    let formatted = format!("{:.9}", value);
     let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
     trimmed.to_string()
 }
@@ -533,10 +653,17 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_SERIAL_NUMBER => Some("SerialNumber"),
         NIKON_COLOR_SPACE => Some("ColorSpace"),
         NIKON_VR_INFO => Some("VRInfo"),
+        NIKON_BLACK_LEVEL => Some("BlackLevel"),
+        NIKON_IMAGE_SIZE_RAW => Some("ImageSizeRAW"),
+        NIKON_WHITE_BALANCE_FINE_TUNE_2 => Some("WhiteBalanceFineTune"),
+        NIKON_CROP_AREA => Some("CropArea"),
         NIKON_ACTIVE_D_LIGHTING => Some("ActiveD-Lighting"),
         NIKON_PICTURE_CONTROL_DATA => Some("PictureControlData"),
+        NIKON_PICTURE_CONTROL_DATA_2 => Some("PictureControlData"),
         NIKON_VIGNETTE_CONTROL => Some("VignetteControl"),
         NIKON_DISTORTION_CONTROL => Some("DistortionControl"),
+        NIKON_AF_TUNE => Some("AFTune"),
+        NIKON_POWER_UP_TIME_2 => Some("PowerUpTime"),
         NIKON_AUXILIARY_LENS => Some("AuxiliaryLens"),
         NIKON_LENS_TYPE => Some("LensType"),
         NIKON_LENS => Some("Lens"),
@@ -547,7 +674,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_SHOT_INFO => Some("ShotInfo"),
         NIKON_HUE_ADJUSTMENT => Some("HueAdjustment"),
         NIKON_NEF_COMPRESSION => Some("NEFCompression"),
-        NIKON_SATURATION => Some("Saturation"),
+        NIKON_SATURATION => Some("SaturationAdj"),
         NIKON_NOISE_REDUCTION => Some("NoiseReduction"),
         NIKON_COLOR_BALANCE => Some("ColorBalance"),
         NIKON_LENS_DATA => Some("LensData"),
@@ -564,6 +691,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_CONTRAST_CURVE => Some("ContrastCurve"),
         NIKON_COLOR_HUE => Some("ColorHue"),
         NIKON_SCENE_MODE => Some("SceneMode"),
+        NIKON_IMAGE_ADJUSTMENT => Some("ImageAdjustment"),
         NIKON_TONE_COMP => Some("ToneComp"),
         NIKON_SERIAL_NUMBER_2 => Some("SerialNumber"),
         NIKON_IMAGE_DATA_SIZE => Some("ImageDataSize"),
@@ -582,6 +710,7 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_ISO_SELECTION => Some("ISOSelection"),
         NIKON_FLASH_EXPOSURE_COMP => Some("FlashExposureComp"),
         NIKON_ISO_SETTING_2 => Some("ISOSetting"),
+        NIKON_COLOR_BALANCE_A => Some("NRWData"),
         NIKON_IMAGE_BOUNDARY => Some("ImageBoundary"),
         NIKON_EXTERNAL_FLASH_EXPOSURE_COMP => Some("ExternalFlashExposureComp"),
         NIKON_FLASH_EXPOSURE_BRACKET_VALUE => Some("FlashExposureBracketValue"),
@@ -592,6 +721,16 @@ pub fn get_nikon_tag_name(tag_id: u16) -> Option<&'static str> {
         NIKON_FACE_DETECT => Some("FaceDetect"),
         NIKON_WORLD_TIME => Some("WorldTime"),
         NIKON_ISO_INFO => Some("ISOInfo"),
+        NIKON_SHUTTER_MODE => Some("ShutterMode"),
+        NIKON_HDR_INFO => Some("HDRInfo"),
+        NIKON_MECHANICAL_SHUTTER_COUNT => Some("MechanicalShutterCount"),
+        NIKON_NEF_BIT_DEPTH => Some("NEFBitDepth"),
+        NIKON_IMAGE_PROCESSING => Some("ImageProcessing"),
+        NIKON_MULTI_EXPOSURE => Some("MultiExposure"),
+        NIKON_AF_INFO_2 => Some("AFInfo2"),
+        NIKON_FILE_INFO => Some("FileInfo"),
+        NIKON_FLASH_INFO_2 => Some("FlashInfo"),
+        NIKON_SCENE_ASSIST => Some("SceneAssist"),
         _ => None,
     }
 }
@@ -669,12 +808,14 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "9E 40 2D 6A 2C 3C B8 0E" => Some("AF-S DX VR Zoom-Nikkor 18-105mm f/3.5-5.6G ED"),
         "9F 58 44 44 14 14 B9 06" => Some("AF-S DX Nikkor 35mm f/1.8G"),
         "A0 54 50 50 0C 0C BA 06" => Some("AF-S Nikkor 50mm f/1.4G"),
+        "A0 54 50 50 0C 0C A2 06" => Some("AF-S Nikkor 50mm f/1.4G"),
         "A1 40 18 37 2C 34 BB 06" => Some("AF-S DX Nikkor 10-24mm f/3.5-4.5G ED"),
         "A2 48 5C 80 24 24 BC 0E" => Some("AF-S Nikkor 70-200mm f/2.8G ED VR II"),
         "A3 3C 29 44 30 30 BD 0E" => Some("AF-S Nikkor 16-35mm f/4G ED VR"),
         "A4 54 37 37 0C 0C BE 06" => Some("AF-S Nikkor 24mm f/1.4G ED"),
         "A5 40 3C 8E 2C 3C BF 0E" => Some("AF-S Nikkor 28-300mm f/3.5-5.6G ED VR"),
         "A6 48 8E 8E 24 24 C0 0E" => Some("AF-S Nikkor 300mm f/2.8G ED VR II"),
+        "A8 48 8E 8E 30 30 C3 4E" => Some("AF-S Nikkor 300mm f/4E PF ED VR"),
         "A7 4C 2D 50 24 24 C1 06" => Some("AF-S DX Nikkor 18-50mm f/2.8G ED"),
         "A8 48 80 98 30 30 C2 0E" => Some("AF-S Zoom-Nikkor 200-400mm f/4G IF-ED VR"),
         "A9 54 80 80 18 18 C3 0E" => Some("AF-S Nikkor 200mm f/2G ED VR II"),
@@ -698,6 +839,8 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "7F 40 2D 5C 2C 34 84 06" => Some("AF-S DX Zoom-Nikkor 18-70mm f/3.5-4.5G IF-ED"),
         "7D 48 2B 53 24 24 82 06" => Some("AF-S DX Zoom-Nikkor 17-55mm f/2.8G IF-ED"),
         "8B 40 2D 80 2C 3C 8D 0E" => Some("AF-S DX VR Zoom-Nikkor 18-200mm f/3.5-5.6G IF-ED"),
+        "8B 40 2D 80 2C 3C FD 0E" => Some("AF-S DX VR Zoom-Nikkor 18-200mm f/3.5-5.6G IF-ED [II]"),
+        "A0 40 2D 74 2C 3C BB 0E" => Some("AF-S DX Nikkor 18-140mm f/3.5-5.6G ED VR"),
         "8D 44 5C 8E 34 3C 8F 0E" => Some("AF-S VR Zoom-Nikkor 70-300mm f/4.5-5.6G IF-ED"),
         "93 48 37 5C 24 24 95 06" => Some("AF-S Zoom-Nikkor 24-70mm f/2.8G ED"),
         "9A 40 2D 53 2C 3C 9C 0E" => Some("AF-S DX VR Zoom-Nikkor 18-55mm f/3.5-5.6G"),
@@ -706,10 +849,34 @@ pub fn get_nikon_lens_name(lens_id: &str) -> Option<&'static str> {
         "A2 40 2D 53 2C 3C BD 0E" => Some("AF-S DX Nikkor 18-55mm f/3.5-5.6G VR II"),
         "B0 4C 50 50 14 14 B2 06" => Some("AF-S Nikkor 50mm f/1.8G"),
         "B4 40 37 62 2C 34 B6 0E" => Some("AF-S Zoom-Nikkor 24-85mm f/3.5-4.5G IF-ED VR"),
+        // Additional Nikon lenses
+        "69 48 5C 8E 30 3C 6F 06" => Some("AF Zoom-Nikkor 70-300mm f/4-5.6G"),
+        "9F 58 44 44 14 14 A1 06" => Some("AF-S DX Nikkor 35mm f/1.8G"),
+        "92 48 24 37 24 24 94 06" => Some("AF-S Zoom-Nikkor 14-24mm f/2.8G ED"),
+        "A0 40 2D 53 2C 3C CA 8E" => Some("AF-P DX Nikkor 18-55mm f/3.5-5.6G"),
+        "A5 54 6A 6A 0C 0C D0 46" => Some("AF-S Nikkor 105mm f/1.4E ED"),
+        "A9 4C 31 31 14 14 C4 06" => Some("AF-S Nikkor 20mm f/1.8G ED"),
+        "99 40 29 62 2C 3C 9B 0E" => Some("AF-S DX VR Zoom-Nikkor 16-85mm f/3.5-5.6G ED"),
+        "8F 40 2D 72 2C 3C 91 06" => Some("AF-S DX Zoom-Nikkor 18-135mm f/3.5-5.6G IF-ED"),
+        "8A 54 6A 6A 24 24 8C 0E" => Some("AF-S VR Micro-Nikkor 105mm f/2.8G IF-ED"),
+        "7A 3C 1F 37 30 30 7E 06" => Some("AF-S DX Zoom-Nikkor 12-24mm f/4G IF-ED"),
         // Third-party lenses
         "26 40 2D 50 2C 3C 1C 06" => Some("Sigma 18-50mm F3.5-5.6 DC"),
         "26 40 2D 70 2B 3C 1C 06" => Some("Sigma 18-125mm F3.5-5.6 DC"),
         "A1 41 19 31 2C 2C 4B 06" => Some("Sigma 10-20mm F3.5 EX DC HSM"),
+        "91 54 44 44 0C 0C 4B 06" => Some("Sigma 35mm F1.4 DG HSM | A"),
+        "87 2C 2D 8E 2C 40 4B 0E" => Some("Sigma 18-300mm F3.5-6.3 DC Macro HSM"),
+        "92 35 2D 88 2C 40 4B 0E" => Some("Sigma 18-250mm F3.5-6.3 DC Macro OS HSM"),
+        "FA 54 3C 5E 24 24 DF 06" => {
+            Some("Tamron SP AF 28-75mm f/2.8 XR Di LD Aspherical (IF) Macro (A09NII)")
+        }
+        "FE 48 37 5C 24 24 DF 0E" => Some("Tamron SP 24-70mm f/2.8 Di VC USD (A007)"),
+        "E8 4C 44 44 14 14 DF 0E" => Some("Tamron SP 35mm f/1.8 Di VC USD (F012)"),
+        "00 40 2D 88 2C 40 62 06" => {
+            Some("Tamron AF 18-250mm f/3.5-6.3 Di II LD Aspherical (IF) Macro (A18)")
+        }
+        "8F 48 2B 50 24 24 4B 0E" => Some("Sigma 17-50mm F2.8 EX DC OS HSM"),
+        "7A 48 1C 30 24 24 7E 06" => Some("Tokina AT-X 11-20 F2.8 PRO DX (AF 11-20mm f/2.8)"),
         // Manual/no CPU lenses
         "00 00 00 00 00 00 00 01" => Some("Manual Lens No CPU"),
         // Z-mount lenses (Nikon Z)
@@ -726,6 +893,7 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
             let trimmed = value.trim();
             match trimmed {
                 "AUTO" => "Auto".to_string(),
+                "AUTO0" => "Auto0".to_string(),
                 "AUTO1" => "Auto1".to_string(),
                 "AUTO2" => "Auto2".to_string(),
                 "SUNNY" => "Sunny".to_string(),
@@ -746,6 +914,7 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
         NIKON_FOCUS_MODE => decode_focus_mode_exiftool(value).to_string(),
         NIKON_FLASH_SETTING => decode_flash_setting_exiftool(value).to_string(),
         NIKON_SHARPNESS => decode_sharpening_exiftool(value).to_string(),
+        NIKON_TONE_COMP => decode_tone_comp_exiftool(value).to_string(),
         NIKON_COLOR_MODE => decode_color_mode_exiftool(value),
         NIKON_FLASH_TYPE => decode_flash_type_exiftool(value),
         NIKON_NOISE_REDUCTION => decode_noise_reduction_exiftool(value),
@@ -808,6 +977,7 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
             match trimmed {
                 "AUTO" => "Auto".to_string(),
                 "AUTO(FLASH OFF)" => "Auto(Flash Off)".to_string(),
+                "SCENE AUTO" => "Scene Auto".to_string(),
                 "SPORT" => "Sport".to_string(),
                 "PORTRAIT" => "Portrait".to_string(),
                 "LANDSCAPE" => "Landscape".to_string(),
@@ -829,6 +999,28 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
                 _ => trimmed.to_string(),
             }
         }
+        NIKON_SCENE_MODE => {
+            // Transform AUTO -> Auto, etc.
+            let trimmed = value.trim();
+            match trimmed {
+                "AUTO" => "Auto".to_string(),
+                "SCENE AUTO" => "Scene Auto".to_string(),
+                "PORTRAIT" => "Portrait".to_string(),
+                "LANDSCAPE" => "Landscape".to_string(),
+                "SPORT" => "Sport".to_string(),
+                "CLOSE UP" | "CLOSEUP" => "Close Up".to_string(),
+                "NIGHT PORTRAIT" => "Night Portrait".to_string(),
+                "PARTY/INDOOR" => "Party/Indoor".to_string(),
+                "BEACH/SNOW" => "Beach/Snow".to_string(),
+                "SUNSET" => "Sunset".to_string(),
+                "DUSK/DAWN" => "Dusk/Dawn".to_string(),
+                "PET PORTRAIT" => "Pet Portrait".to_string(),
+                "CANDLELIGHT" => "Candlelight".to_string(),
+                "FOOD" => "Food".to_string(),
+                "" => "".to_string(),
+                _ => trimmed.to_string(),
+            }
+        }
         NIKON_SERIAL_NUMBER | NIKON_SERIAL_NUMBER_2 => {
             // Transform "NO= " -> "No= " to match ExifTool
             let trimmed = value.trim();
@@ -836,6 +1028,17 @@ fn decode_nikon_ascii_value(tag_id: u16, value: &str) -> String {
                 format!("No= {}", rest)
             } else {
                 trimmed.to_string()
+            }
+        }
+        NIKON_AF_RESPONSE => {
+            // Transform "STANDARD" -> "Standard", "FOCUS" -> "Focus", etc.
+            let trimmed = value.trim();
+            match trimmed {
+                "STANDARD" => "Standard".to_string(),
+                "FOCUS" => "Focus".to_string(),
+                "LOCK" => "Lock".to_string(),
+                "RELEASE" => "Release".to_string(),
+                _ => trimmed.to_string(),
             }
         }
         _ => value.trim().to_string(),
@@ -891,6 +1094,16 @@ define_tag_decoder! {
     both: {
         0 => "No",
         1 => "Yes",
+    }
+}
+
+// ImageSizeRAW (tag 0x003e): Nikon.pm
+define_tag_decoder! {
+    image_size_raw,
+    both: {
+        1 => "Large",
+        2 => "Medium",
+        3 => "Small",
     }
 }
 
@@ -1051,18 +1264,23 @@ pub fn decode_packed_rational_unsigned(data: &[u8]) -> Option<f64> {
 }
 
 // FlashMode (tag 0x0087): Nikon.pm
-define_tag_decoder! {
-    flash_mode,
-    type: u8,
-    both: {
-        0 => "Did Not Fire",
-        1 => "Fired, Manual",
-        3 => "Not Ready",
-        7 => "Fired, External",
-        8 => "Fired, Commander Mode",
-        9 => "Fired, TTL Mode",
-        18 => "LED Light",
+// Note: For unknown values, ExifTool returns "Unknown (X)" format, so we use a custom function
+// instead of the macro to preserve the numeric value in the output
+pub fn decode_flash_mode_exiftool(value: u8) -> String {
+    match value {
+        0 => "Did Not Fire".to_string(),
+        1 => "Fired, Manual".to_string(),
+        3 => "Not Ready".to_string(),
+        7 => "Fired, External".to_string(),
+        8 => "Fired, Commander Mode".to_string(),
+        9 => "Fired, TTL Mode".to_string(),
+        18 => "LED Light".to_string(),
+        _ => format!("Unknown ({})", value),
     }
+}
+
+pub fn decode_flash_mode_exiv2(value: u8) -> String {
+    decode_flash_mode_exiftool(value) // Same mapping
 }
 
 /// Decode Shooting Mode bitmask (tag 0x0089) - ExifTool format
@@ -1148,6 +1366,21 @@ define_tag_decoder! {
     }
 }
 
+// ShutterMode (tag 0x0034): Nikon.pm
+define_tag_decoder! {
+    shutter_mode,
+    both: {
+        0 => "Mechanical",
+        16 => "Electronic",
+        33 => "Unknown (33)",
+        48 => "Electronic Front Curtain",
+        64 => "Electronic (Movie)",
+        80 => "Auto (Mechanical)",
+        81 => "Auto (Electronic Front Curtain)",
+        96 => "Electronic (High Speed)",
+    }
+}
+
 /// Decode Quality value (tag 0x0004) - ExifTool format
 /// From Nikon.pm - tag 0x0004 is ASCII string type
 /// Note: ExifTool stores these as-is, we preserve the original for unrecognized values
@@ -1200,15 +1433,16 @@ pub fn decode_focus_mode_exiv2(value: &str) -> String {
 }
 
 /// Decode FlashSetting/FlashSyncMode value (tag 0x0008) - ExifTool format
-/// From Nikon.pm - values: "Normal", "Slow", "Rear Slow", "RED-EYE", "RED-EYE SLOW"
+/// From Nikon.pm - values: "Normal", "Slow", "Rear", "Rear Slow", "RED-EYE", "RED-EYE SLOW"
 pub fn decode_flash_setting_exiftool(value: &str) -> String {
     let val = value.trim().to_uppercase();
     let result = match val.as_str() {
         "NORMAL" => "Normal",
         "SLOW" => "Slow",
-        "REAR" | "REAR SLOW" => "Rear Slow",
-        "RED-EYE" | "REDEYE" => "Red-eye",
-        "RED-EYE SLOW" | "REDEYE SLOW" => "Red-eye Slow",
+        "REAR" => "Rear",
+        "REAR SLOW" => "Rear Slow",
+        "RED-EYE" | "REDEYE" => "Red-Eye",
+        "RED-EYE SLOW" | "REDEYE SLOW" => "Red-Eye Slow",
         "SLOW REAR" => "Slow Rear",
         "" => "",                             // Keep empty as empty to match ExifTool
         _ => return value.trim().to_string(), // Return original value
@@ -1232,7 +1466,8 @@ pub fn decode_sharpening_exiftool(value: &str) -> String {
         "LOW" | "SOFT" => "Soft",
         "MED.L" | "MEDIUM LOW" | "MEDIUMLOW" => "Medium Low",
         "MED.H" | "MEDIUM HIGH" | "MEDIUMHIGH" => "Medium High",
-        "HIGH" | "HARD" => "Hard",
+        "HIGH" => "High",
+        "HARD" => "Hard",
         "NONE" => "None",
         _ => return value.trim().to_string(), // Return original value
     };
@@ -1243,6 +1478,30 @@ pub fn decode_sharpening_exiftool(value: &str) -> String {
 /// exiv2 treats this as plain ASCII string, using ExifTool interpretations
 pub fn decode_sharpening_exiv2(value: &str) -> String {
     decode_sharpening_exiftool(value)
+}
+
+/// Decode ToneComp value (tag 0x0081) - ExifTool format
+/// From Nikon.pm - tag 0x0081 is ASCII string type
+/// Values: Auto, Normal, Low, Med.L, Med.H, High, Custom
+pub fn decode_tone_comp_exiftool(value: &str) -> String {
+    let val = value.trim().to_uppercase();
+    let result = match val.as_str() {
+        "AUTO" => "Auto",
+        "NORMAL" => "Normal",
+        "LOW" => "Low",
+        "MED.L" => "Med.L",
+        "MED.H" => "Med.H",
+        "HIGH" => "High",
+        "CUSTOM" => "Custom",
+        "CS" => "Custom",
+        _ => return value.trim().to_string(), // Return original value
+    };
+    result.to_string()
+}
+
+/// Decode ToneComp value (tag 0x0081) - exiv2 format
+pub fn decode_tone_comp_exiv2(value: &str) -> String {
+    decode_tone_comp_exiftool(value)
 }
 
 /// Decode Saturation value (tag 0x0094) - ExifTool format
@@ -1426,6 +1685,7 @@ fn parse_iso_info(data: &[u8]) -> Vec<(String, String)> {
     }
 
     // Offset 0x00: ISO (int8u)
+    // Note: ISOInfo ISO is always just a number, the Hi/Lo prefix only comes from tag 0x0002
     let iso_raw = data[0];
     if iso_raw != 0 {
         let iso = (100.0 * ((iso_raw as f64 / 12.0 - 5.0) * 2.0_f64.ln()).exp()).round() as u32;
@@ -1458,8 +1718,35 @@ fn parse_iso_info(data: &[u8]) -> Vec<(String, String)> {
     tags
 }
 
+/// Check if model is a Nikon Z-series camera
+/// Based on ExifTool's %infoZSeries condition
+fn is_nikon_z_series(model: Option<&str>) -> bool {
+    match model {
+        Some(m) => {
+            let upper = m.to_uppercase();
+            // Pattern: "NIKON Z " followed by model number (with space)
+            // or "NIKON Z" directly followed by model (no space, Oct 2023+)
+            upper.contains("NIKON Z 30")
+                || upper.contains("NIKON Z 5")
+                || upper.contains("NIKON Z 50")
+                || upper.contains("NIKON Z 6")
+                || upper.contains("NIKON Z 7")
+                || upper.contains("NIKON Z 8")
+                || upper.contains("NIKON Z 9")
+                || upper.contains("NIKON Z F")
+                || upper.contains("NIKON Z FC")
+                || upper.contains("NIKON Z5_2")
+                || upper.contains("NIKON Z50_2")
+                || upper.contains("NIKON Z6_2")
+                || upper.contains("NIKON Z6_3")
+                || upper.contains("NIKON Z7_2")
+        }
+        None => false,
+    }
+}
+
 /// Parse VRInfo tag data (tag 0x001F)
-fn parse_vr_info(data: &[u8], _endian: Endianness) -> Vec<(String, String)> {
+fn parse_vr_info(data: &[u8], _endian: Endianness, model: Option<&str>) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
     if data.len() < 8 {
@@ -1478,20 +1765,111 @@ fn parse_vr_info(data: &[u8], _endian: Endianness) -> Vec<(String, String)> {
         2 => "Off",
         _ => "Unknown",
     };
-    if vr != 0 {
-        tags.push(("VibrationReduction".to_string(), vr_str.to_string()));
-    }
+    tags.push(("VibrationReduction".to_string(), vr_str.to_string()));
 
     // Offset 0x06: VRMode (int8u)
+    // Z-series cameras use different mapping than older cameras
     let vr_mode = data[6];
-    let vr_mode_str = match vr_mode {
-        0 => "Normal",
-        1 => "On (1)",
-        2 => "Active",
-        3 => "Sport",
-        _ => "Unknown",
+    let is_z_series = is_nikon_z_series(model);
+    let vr_mode_str = if is_z_series {
+        // Z-series mapping (vRModeZ9 in ExifTool)
+        match vr_mode {
+            0 => "Off",
+            1 => "Normal",
+            2 => "Sport",
+            _ => "Unknown",
+        }
+    } else {
+        // Non-Z-series mapping
+        match vr_mode {
+            0 => "Normal",
+            1 => "On (1)",
+            2 => "Active",
+            3 => "Sport",
+            _ => "Unknown",
+        }
     };
     tags.push(("VRMode".to_string(), vr_mode_str.to_string()));
+
+    tags
+}
+
+/// Parse DistortInfo tag data (tag 0x002B)
+fn parse_distort_info(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 5 {
+        return tags;
+    }
+
+    // Offset 0x00: DistortionVersion (undef[4])
+    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    tags.push(("DistortionVersion".to_string(), version));
+
+    // Offset 0x04: AutoDistortionControl (int8u)
+    let adc = data[4];
+    let adc_str = match adc {
+        0 => "Off",
+        1 => "On",
+        2 => "On (underwater)",
+        _ => "Unknown",
+    };
+    tags.push(("AutoDistortionControl".to_string(), adc_str.to_string()));
+
+    tags
+}
+
+/// Parse AFTune tag data (tag 0x00B9)
+fn parse_af_tune(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.is_empty() {
+        return tags;
+    }
+
+    // Offset 0x00: AFFineTune (int8u)
+    let af_fine_tune = data[0];
+    let af_str = match af_fine_tune {
+        0 => "Off",
+        1 => "On (1)",
+        2 => "On (2)",
+        3 => "On (Zoom)",
+        _ => "Unknown",
+    };
+    tags.push(("AFFineTune".to_string(), af_str.to_string()));
+
+    // Offset 0x01: AFFineTuneIndex (int8u)
+    if data.len() > 1 {
+        let index = data[1];
+        let index_str = if index == 255 {
+            "n/a".to_string()
+        } else {
+            index.to_string()
+        };
+        tags.push(("AFFineTuneIndex".to_string(), index_str));
+    }
+
+    // Offset 0x02: AFFineTuneAdj (int8s)
+    if data.len() > 2 {
+        let adj = data[2] as i8;
+        let adj_str = if adj > 0 {
+            format!("+{}", adj)
+        } else {
+            adj.to_string()
+        };
+        tags.push(("AFFineTuneAdj".to_string(), adj_str));
+    }
+
+    // Offset 0x03: AFFineTuneAdjTele (int8s)
+    if data.len() > 3 {
+        let adj_tele = data[3] as i8;
+        let adj_str = if adj_tele > 0 {
+            format!("+{}", adj_tele)
+        } else {
+            adj_tele.to_string()
+        };
+        tags.push(("AFFineTuneAdjTele".to_string(), adj_str));
+    }
 
     tags
 }
@@ -1517,19 +1895,7 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
             .trim_end_matches('\0')
             .to_string();
         if !name.is_empty() {
-            // Format string: capitalize first letter of each word
-            let formatted_name = name
-                .to_lowercase()
-                .split_whitespace()
-                .map(|word| {
-                    let mut chars = word.chars();
-                    match chars.next() {
-                        None => String::new(),
-                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
+            let formatted_name = format_picture_control_string(&name);
             tags.push(("PictureControlName".to_string(), formatted_name));
         }
 
@@ -1539,18 +1905,7 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
             .trim_end_matches('\0')
             .to_string();
         if !base.is_empty() {
-            let formatted_base = base
-                .to_lowercase()
-                .split_whitespace()
-                .map(|word| {
-                    let mut chars = word.chars();
-                    match chars.next() {
-                        None => String::new(),
-                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
+            let formatted_base = format_picture_control_string(&base);
             tags.push(("PictureControlBase".to_string(), formatted_base));
         }
 
@@ -1569,7 +1924,9 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
         // Offset 0x31: PictureControlQuickAdjust (int8u)
         if data.len() > 0x31 {
             let quick = data[0x31];
-            if quick != 0xff {
+            if quick == 0xff {
+                tags.push(("PictureControlQuickAdjust".to_string(), "n/a".to_string()));
+            } else {
                 let value = quick.wrapping_sub(128) as i8;
                 if value == 0 {
                     tags.push((
@@ -1607,11 +1964,15 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
         // Offset 0x34: Brightness (int8u)
         if data.len() > 0x34 {
             let bright = data[0x34];
-            let value = bright.wrapping_sub(128) as i8;
-            if value == 0 {
-                tags.push(("Brightness".to_string(), "Normal".to_string()));
+            if bright == 0xff {
+                tags.push(("Brightness".to_string(), "n/a".to_string()));
             } else {
-                tags.push(("Brightness".to_string(), value.to_string()));
+                let value = bright.wrapping_sub(128) as i8;
+                if value == 0 {
+                    tags.push(("Brightness".to_string(), "Normal".to_string()));
+                } else {
+                    tags.push(("Brightness".to_string(), value.to_string()));
+                }
             }
         }
 
@@ -1688,9 +2049,292 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
                 tags.push(("ToningSaturation".to_string(), "n/a".to_string()));
             }
         }
+    } else if version.starts_with("02") && data.len() >= 68 {
+        // Version 02xx structure (PictureControl2 - D4, D800, D5xxx, etc.)
+        // Name and Base at same offsets as 0100
+        parse_picture_control_name_base(&mut tags, data, 4, 24);
+
+        // Offset 48: PictureControlAdjust
+        if data.len() > 48 {
+            let adjust_str = match data[48] {
+                0 => "Default Settings",
+                1 => "Quick Adjust",
+                2 => "Full Control",
+                _ => "Unknown",
+            };
+            tags.push(("PictureControlAdjust".to_string(), adjust_str.to_string()));
+        }
+
+        // Offset 49: PictureControlQuickAdjust (uses "Normal" for zero value)
+        parse_pc_value(&mut tags, data, 49, "PictureControlQuickAdjust", false);
+
+        // Offset 51: Sharpness (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 51, "Sharpness", 4.0);
+
+        // Offset 53: Clarity (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 53, "Clarity", 4.0);
+
+        // Offset 55: Contrast
+        parse_pc_value(&mut tags, data, 55, "Contrast", false);
+
+        // Offset 57: Brightness
+        parse_pc_value(&mut tags, data, 57, "Brightness", false);
+
+        // Offset 59: Saturation
+        parse_pc_value(&mut tags, data, 59, "Saturation", false);
+
+        // Offset 61: Hue
+        parse_pc_value(&mut tags, data, 61, "Hue", true);
+
+        // Offset 63: FilterEffect
+        if data.len() > 63 {
+            let filter_str = match data[63] {
+                0x80 => "Off",
+                0x81 => "Yellow",
+                0x82 => "Orange",
+                0x83 => "Red",
+                0x84 => "Green",
+                0xff => "n/a",
+                _ => "Unknown",
+            };
+            tags.push(("FilterEffect".to_string(), filter_str.to_string()));
+        }
+
+        // Offset 64: ToningEffect
+        if data.len() > 64 {
+            let toning_str = decode_toning_effect(data[64]);
+            tags.push(("ToningEffect".to_string(), toning_str.to_string()));
+        }
+
+        // Offset 65: ToningSaturation
+        parse_pc_value(&mut tags, data, 65, "ToningSaturation", true);
+    } else if version.starts_with("03") && data.len() >= 74 {
+        // Version 03xx structure (PictureControl3 - Z cameras, etc.)
+        // Name at 8, Base at 28 (different from 01xx/02xx!)
+        parse_picture_control_name_base(&mut tags, data, 8, 28);
+
+        // Offset 54: PictureControlAdjust
+        if data.len() > 54 {
+            let adjust_str = match data[54] {
+                0 => "Default Settings",
+                1 => "Quick Adjust",
+                2 => "Full Control",
+                _ => "Unknown",
+            };
+            tags.push(("PictureControlAdjust".to_string(), adjust_str.to_string()));
+        }
+
+        // Offset 55: PictureControlQuickAdjust (uses "Normal" for zero value)
+        parse_pc_value(&mut tags, data, 55, "PictureControlQuickAdjust", false);
+
+        // Offset 57: Sharpness (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 57, "Sharpness", 4.0);
+
+        // Offset 59: MidRangeSharpness (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 59, "MidRangeSharpness", 4.0);
+
+        // Offset 61: Clarity (uses "None" for zero, divisor 4, format %.2f)
+        parse_pc_value_div(&mut tags, data, 61, "Clarity", 4.0);
+
+        // Offset 63: Contrast
+        parse_pc_value(&mut tags, data, 63, "Contrast", false);
+
+        // Offset 65: Brightness
+        parse_pc_value(&mut tags, data, 65, "Brightness", false);
+
+        // Offset 67: Saturation
+        parse_pc_value(&mut tags, data, 67, "Saturation", false);
+
+        // Offset 69: Hue
+        parse_pc_value(&mut tags, data, 69, "Hue", true);
+
+        // Offset 71: FilterEffect
+        if data.len() > 71 {
+            let filter_str = match data[71] {
+                0x80 => "Off",
+                0x81 => "Yellow",
+                0x82 => "Orange",
+                0x83 => "Red",
+                0x84 => "Green",
+                0xff => "n/a",
+                _ => "Unknown",
+            };
+            tags.push(("FilterEffect".to_string(), filter_str.to_string()));
+        }
+
+        // Offset 73: ToningEffect
+        if data.len() > 73 {
+            let toning_str = decode_toning_effect(data[73]);
+            tags.push(("ToningEffect".to_string(), toning_str.to_string()));
+        }
     }
 
     tags
+}
+
+/// Helper to parse PictureControlName and PictureControlBase
+fn parse_picture_control_name_base(
+    tags: &mut Vec<(String, String)>,
+    data: &[u8],
+    name_offset: usize,
+    base_offset: usize,
+) {
+    // PictureControlName (string[20])
+    if data.len() >= name_offset + 20 {
+        let name = String::from_utf8_lossy(&data[name_offset..name_offset + 20])
+            .trim_end_matches('\0')
+            .to_string();
+        if !name.is_empty() {
+            tags.push((
+                "PictureControlName".to_string(),
+                format_picture_control_string(&name),
+            ));
+        }
+    }
+
+    // PictureControlBase (string[20])
+    if data.len() >= base_offset + 20 {
+        let base = String::from_utf8_lossy(&data[base_offset..base_offset + 20])
+            .trim_end_matches('\0')
+            .to_string();
+        if !base.is_empty() {
+            tags.push((
+                "PictureControlBase".to_string(),
+                format_picture_control_string(&base),
+            ));
+        }
+    }
+}
+
+/// Format PictureControl string like ExifTool's FormatString
+/// - Words with vowels: title case (Vivid, Standard, etc.)
+/// - Words without vowels: keep uppercase (KR, JP, etc.)
+fn format_picture_control_string(s: &str) -> String {
+    fn has_vowel(s: &str) -> bool {
+        s.chars()
+            .any(|c| matches!(c.to_ascii_uppercase(), 'A' | 'E' | 'I' | 'O' | 'U' | 'Y'))
+    }
+
+    fn format_segment(seg: &str) -> String {
+        if seg.is_empty() {
+            return String::new();
+        }
+        if has_vowel(seg) {
+            // Title case: first letter uppercase, rest lowercase
+            let mut chars = seg.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => {
+                    first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
+                }
+            }
+        } else {
+            // No vowels: keep uppercase
+            seg.to_uppercase()
+        }
+    }
+
+    // Split by whitespace first
+    s.split_whitespace()
+        .map(|word| {
+            // Within each word, handle hyphens
+            word.split('-')
+                .map(format_segment)
+                .collect::<Vec<_>>()
+                .join("-")
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Helper to parse a PictureControl value field (int8u with 0x80 offset)
+/// Special values: 0xff → "n/a", 0x00 → "Auto", 0x80 → "Normal" or "None"
+fn parse_pc_value(
+    tags: &mut Vec<(String, String)>,
+    data: &[u8],
+    offset: usize,
+    name: &str,
+    use_none: bool,
+) {
+    if data.len() > offset {
+        let raw = data[offset];
+        // ValueConv: raw - 0x80
+        // PrintPC special values: 0x7f (127) = n/a, -128 = Auto, -127 = User, 0 = Normal/$norm
+        let formatted = if raw == 0xff {
+            // raw 0xff → value 127 → "n/a"
+            "n/a".to_string()
+        } else if raw == 0x00 {
+            // raw 0x00 → value -128 → "Auto"
+            "Auto".to_string()
+        } else if raw == 0x01 {
+            // raw 0x01 → value -127 → "User"
+            "User".to_string()
+        } else if raw == 0x80 {
+            // raw 0x80 → value 0 → "Normal" or "None"
+            if use_none {
+                "None".to_string()
+            } else {
+                "Normal".to_string()
+            }
+        } else {
+            // Other values: output as signed integer
+            let value = raw.wrapping_sub(128) as i8;
+            value.to_string()
+        };
+        tags.push((name.to_string(), formatted));
+    }
+}
+
+/// Helper to parse a PictureControl value field with divisor (for Clarity)
+/// Uses format "%.2f" and divides by divisor
+fn parse_pc_value_div(
+    tags: &mut Vec<(String, String)>,
+    data: &[u8],
+    offset: usize,
+    name: &str,
+    divisor: f64,
+) {
+    if data.len() > offset {
+        let raw = data[offset];
+        // ValueConv: raw - 0x80
+        let formatted = if raw == 0xff {
+            // raw 0xff → value 127 → "n/a"
+            "n/a".to_string()
+        } else if raw == 0x00 {
+            // raw 0x00 → value -128 → "Auto"
+            "Auto".to_string()
+        } else if raw == 0x01 {
+            // raw 0x01 → value -127 → "User"
+            "User".to_string()
+        } else if raw == 0x80 {
+            // raw 0x80 → value 0 → "None" (Clarity uses "None" for zero)
+            "None".to_string()
+        } else {
+            // Other values: divide by divisor and format as %.2f
+            let value = raw.wrapping_sub(128) as i8;
+            let divided = f64::from(value) / divisor;
+            format!("{:+.2}", divided)
+        };
+        tags.push((name.to_string(), formatted));
+    }
+}
+
+/// Decode ToningEffect value
+fn decode_toning_effect(value: u8) -> &'static str {
+    match value {
+        0x80 => "B&W",
+        0x81 => "Sepia",
+        0x82 => "Cyanotype",
+        0x83 => "Red",
+        0x84 => "Yellow",
+        0x85 => "Green",
+        0x86 => "Blue-green",
+        0x87 => "Blue",
+        0x88 => "Purple-blue",
+        0x89 => "Red-purple",
+        0xff => "n/a",
+        _ => "Unknown",
+    }
 }
 
 /// Decode FlashControlMode value to string
@@ -1708,9 +2352,75 @@ fn decode_flash_control_mode(value: u8) -> &'static str {
     }
 }
 
+/// Format ExternalFlashFirmware with model name lookup
+/// From ExifTool Nikon.pm %flashFirmware hash
+fn format_flash_firmware(major: u8, minor: u8) -> String {
+    let model = match (major, minor) {
+        (1, 1) => Some("SB-800 or Metz 58 AF-1"),
+        (1, 3) => Some("SB-800"),
+        (2, 1) => Some("SB-800"),
+        (2, 4) => Some("SB-600"),
+        (2, 5) => Some("SB-600"),
+        (3, 1) => Some("SU-800 Remote Commander"),
+        (4, 1) => Some("SB-400"),
+        (4, 2) => Some("SB-400"),
+        (4, 4) => Some("SB-400"),
+        (5, 1) => Some("SB-900"),
+        (5, 2) => Some("SB-900"),
+        (6, 1) => Some("SB-700"),
+        (7, 1) => Some("SB-910"),
+        (14, 3) => Some("SB-5000"),
+        _ => None,
+    };
+
+    match model {
+        Some(name) => format!("{}.{:02} ({})", major, minor, name),
+        None => format!("{}.{:02} (Unknown model)", major, minor),
+    }
+}
+
+/// Parse FaceDetect tag data (tag 0x0021)
+/// Extracts FaceDetectFrameSize and FacesDetected
+fn parse_face_detect(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    // FaceDetect structure (FORMAT => 'int16u' in ExifTool):
+    // Index 0x00: unknown (bytes 0-1)
+    // Index 0x01-0x02: FaceDetectFrameSize int16u[2] (bytes 2-5)
+    // Index 0x03: FacesDetected int16u (bytes 6-7)
+    if data.len() >= 6 {
+        // FaceDetectFrameSize: Width x Height
+        let width = match endian {
+            Endianness::Big => u16::from_be_bytes([data[2], data[3]]),
+            Endianness::Little => u16::from_le_bytes([data[2], data[3]]),
+        };
+        let height = match endian {
+            Endianness::Big => u16::from_be_bytes([data[4], data[5]]),
+            Endianness::Little => u16::from_le_bytes([data[4], data[5]]),
+        };
+        tags.push((
+            "FaceDetectFrameSize".to_string(),
+            format!("{} {}", width, height),
+        ));
+    }
+
+    if data.len() >= 8 {
+        let faces = match endian {
+            Endianness::Big => u16::from_be_bytes([data[6], data[7]]),
+            Endianness::Little => u16::from_le_bytes([data[6], data[7]]),
+        };
+        tags.push(("FacesDetected".to_string(), faces.to_string()));
+    }
+
+    tags
+}
+
 /// Parse FlashInfo tag data (tag 0x00A8)
 /// Version-dependent structure - supports versions 0100-0108, 0200
-fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
+/// For Z cameras, FlashControlMode comes from MenuSettings (ShotInfo), not FlashInfo,
+/// so we skip outputting it here to avoid conflicting values
+fn parse_flash_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
+    let is_z_camera = is_nikon_z_series(model);
     let mut tags = Vec::new();
 
     if data.len() < 4 {
@@ -1750,32 +2460,83 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             } else {
                 tags.push((
                     "ExternalFlashFirmware".to_string(),
-                    format!("{}.{:02}", data[6], data[7]),
+                    format_flash_firmware(data[6], data[7]),
                 ));
             }
         }
 
-        // Offset 0x08: ExternalFlashFlags (int8u)
+        // Offset 0x08: Multiple tags encoded in single byte
+        // - ExternalFlashZoomOverride: bit 7 (mask 0x80)
+        // - ExternalFlashStatus: bit 0 (mask 0x01)
+        // - ExternalFlashFlags: bits 1-6 (Fired=bit0, Bounce=bit2, Wide=bit4, Dome=bit5)
         if data.len() >= 9 {
-            let flags = data[8];
+            let byte8 = data[8];
+
+            // ExternalFlashZoomOverride - bit 7
+            let zoom_override = (byte8 & 0x80) >> 7;
+            tags.push((
+                "ExternalFlashZoomOverride".to_string(),
+                if zoom_override == 0 { "No" } else { "Yes" }.to_string(),
+            ));
+
+            // ExternalFlashStatus - bit 0
+            let flash_status = byte8 & 0x01;
+            tags.push((
+                "ExternalFlashStatus".to_string(),
+                if flash_status == 0 {
+                    "Flash Not Attached"
+                } else {
+                    "Flash Attached"
+                }
+                .to_string(),
+            ));
+
+            // ExternalFlashFlags - remaining bits for flag info
+            // Note: Some bits overlap with the above, but ExifTool outputs them separately
+            let flags = byte8;
             if flags == 0 {
                 tags.push(("ExternalFlashFlags".to_string(), "(none)".to_string()));
             } else {
-                let mut flag_strs = Vec::new();
+                let mut flag_strs: Vec<String> = Vec::new();
+                let mut known_bits: u8 = 0;
                 if flags & 0x01 != 0 {
-                    flag_strs.push("Fired");
+                    flag_strs.push("Fired".to_string());
+                    known_bits |= 0x01;
                 }
                 if flags & 0x04 != 0 {
-                    flag_strs.push("Bounce Flash");
+                    flag_strs.push("Bounce Flash".to_string());
+                    known_bits |= 0x04;
                 }
                 if flags & 0x10 != 0 {
-                    flag_strs.push("Wide Flash Adapter");
+                    flag_strs.push("Wide Flash Adapter".to_string());
+                    known_bits |= 0x10;
                 }
                 if flags & 0x20 != 0 {
-                    flag_strs.push("Dome Diffuser");
+                    flag_strs.push("Dome Diffuser".to_string());
+                    known_bits |= 0x20;
+                }
+                // Add unknown bits as [N]
+                // Note: ExifTool outputs [7] even though bit 7 is ExternalFlashZoomOverride
+                let unknown_bits = flags & !known_bits;
+                for bit in 0..8 {
+                    if unknown_bits & (1 << bit) != 0 {
+                        flag_strs.push(format!("[{}]", bit));
+                    }
                 }
                 tags.push(("ExternalFlashFlags".to_string(), flag_strs.join(", ")));
             }
+        }
+
+        // Offset 0x09: ExternalFlashReadyState (bits 0-2, mask 0x07)
+        if data.len() >= 10 {
+            let ready_state = data[9] & 0x07;
+            let ready_str = match ready_state {
+                0 => "n/a".to_string(),
+                1 => "Ready".to_string(),
+                6 => "Not Ready".to_string(),
+                v => format!("Unknown ({})", v),
+            };
+            tags.push(("ExternalFlashReadyState".to_string(), ready_str));
         }
 
         // Offset 0x09.1: FlashCommanderMode (bit 7, mask 0x80)
@@ -1785,11 +2546,15 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             tags.push(("FlashCommanderMode".to_string(), commander_str.to_string()));
 
             // Offset 0x09.2: FlashControlMode (bits 0-6, mask 0x7F)
-            let control_mode = data[9] & 0x7F;
-            tags.push((
-                "FlashControlMode".to_string(),
-                decode_flash_control_mode(control_mode).to_string(),
-            ));
+            // For Z cameras, FlashControlMode comes from MenuSettings with different mapping,
+            // so skip outputting from FlashInfo to avoid conflicts
+            if !is_z_camera {
+                let control_mode = data[9] & 0x7F;
+                tags.push((
+                    "FlashControlMode".to_string(),
+                    decode_flash_control_mode(control_mode).to_string(),
+                ));
+            }
         }
 
         // Offset 0x0A (10): FlashCompensation (int8s) - when FlashControlMode < 6
@@ -1815,15 +2580,80 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
             || version == "0108";
 
         if is_extended_version {
+            // Offset 0x0C (12): FlashFocalLength (int8u)
+            if data.len() > 12 {
+                let fl = data[12];
+                if fl != 0 && fl != 255 {
+                    tags.push(("FlashFocalLength".to_string(), format!("{} mm", fl)));
+                }
+            }
+
+            // Offset 0x0D (13): RepeatingFlashRate (int8u)
+            if data.len() > 13 {
+                let rate = data[13];
+                if rate != 0 && rate != 255 {
+                    tags.push(("RepeatingFlashRate".to_string(), format!("{} Hz", rate)));
+                }
+            }
+
+            // Offset 0x0E (14): RepeatingFlashCount (int8u)
+            if data.len() > 14 {
+                let count = data[14];
+                if count != 0 && count != 255 {
+                    tags.push(("RepeatingFlashCount".to_string(), count.to_string()));
+                }
+            }
+
             // Offset 0x0F (15): FlashGNDistance (int8u)
             if data.len() > 15 {
                 let gn = data[15];
-                tags.push(("FlashGNDistance".to_string(), gn.to_string()));
+                // Convert to distance string (direct lookup, no +3 adjustment)
+                let gn_str = match gn {
+                    0 => "0".to_string(),
+                    1 => "0.1 m".to_string(),
+                    2 => "0.2 m".to_string(),
+                    3 => "0.3 m".to_string(),
+                    4 => "0.4 m".to_string(),
+                    5 => "0.5 m".to_string(),
+                    6 => "0.6 m".to_string(),
+                    7 => "0.7 m".to_string(),
+                    8 => "0.8 m".to_string(),
+                    9 => "0.9 m".to_string(),
+                    10 => "1.0 m".to_string(),
+                    11 => "1.1 m".to_string(),
+                    12 => "1.3 m".to_string(),
+                    13 => "1.4 m".to_string(),
+                    14 => "1.6 m".to_string(),
+                    15 => "1.8 m".to_string(),
+                    16 => "2.0 m".to_string(),
+                    17 => "2.2 m".to_string(),
+                    18 => "2.5 m".to_string(),
+                    19 => "2.8 m".to_string(),
+                    20 => "3.2 m".to_string(),
+                    21 => "3.6 m".to_string(),
+                    22 => "4.0 m".to_string(),
+                    23 => "4.5 m".to_string(),
+                    24 => "5.0 m".to_string(),
+                    25 => "5.6 m".to_string(),
+                    26 => "6.3 m".to_string(),
+                    27 => "7.1 m".to_string(),
+                    28 => "8.0 m".to_string(),
+                    29 => "9.0 m".to_string(),
+                    30 => "10.0 m".to_string(),
+                    31 => "11.0 m".to_string(),
+                    32 => "13.0 m".to_string(),
+                    33 => "14.0 m".to_string(),
+                    34 => "16.0 m".to_string(),
+                    35 => "18.0 m".to_string(),
+                    36 => "20.0 m".to_string(),
+                    255 => "n/a".to_string(),
+                    _ => gn.to_string(), // Unknown values pass through
+                };
+                tags.push(("FlashGNDistance".to_string(), gn_str));
             }
 
-            // FlashColorFilter at offset 0x10 (16) for versions 0106+
-            let is_v106_plus = version == "0106" || version == "0107" || version == "0108";
-            if is_v106_plus && data.len() > 16 {
+            // FlashColorFilter at offset 0x10 (16) for versions 0103+
+            if data.len() > 16 {
                 let color_filter = data[16];
                 let color_str = match color_filter {
                     0x00 => "None",
@@ -1902,6 +2732,123 @@ fn parse_flash_info(data: &[u8]) -> Vec<(String, String)> {
                     format_flash_compensation(ev),
                 ));
             }
+
+            // ExternalFlashCompensation at offset 0x1b (27) - versions 0103+
+            if version != "0102" && data.len() > 0x1b {
+                let comp = data[0x1b] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "ExternalFlashCompensation".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
+
+            // FlashExposureComp3 at offset 0x1d (29) - does not include bracketing
+            if version != "0102" && data.len() > 0x1d {
+                let comp = data[0x1d] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "FlashExposureComp3".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
+
+            // FlashExposureComp4 at offset 0x27 (39) - includes flash bracketing effect
+            // Available in versions 0103+ (not 0102)
+            if version != "0102" && data.len() > 0x27 {
+                let comp = data[0x27] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "FlashExposureComp4".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
+        } else if (version == "0100" || version == "0101") && data.len() >= 19 {
+            // FlashInfo 0100/0101 structure (D200, D50, D70, D80, etc.)
+            // FlashGNDistance at offset 14
+            if data.len() > 14 {
+                let gn = data[14];
+                let gn_str = match gn {
+                    0 => "0".to_string(),
+                    1 => "0.1 m".to_string(),
+                    2 => "0.2 m".to_string(),
+                    3 => "0.3 m".to_string(),
+                    4 => "0.4 m".to_string(),
+                    5 => "0.5 m".to_string(),
+                    6 => "0.6 m".to_string(),
+                    7 => "0.7 m".to_string(),
+                    8 => "0.8 m".to_string(),
+                    9 => "0.9 m".to_string(),
+                    10 => "1.0 m".to_string(),
+                    11 => "1.1 m".to_string(),
+                    12 => "1.3 m".to_string(),
+                    13 => "1.4 m".to_string(),
+                    14 => "1.6 m".to_string(),
+                    15 => "1.8 m".to_string(),
+                    16 => "2.0 m".to_string(),
+                    17 => "2.2 m".to_string(),
+                    18 => "2.5 m".to_string(),
+                    19 => "2.8 m".to_string(),
+                    20 => "3.2 m".to_string(),
+                    21 => "3.6 m".to_string(),
+                    22 => "4.0 m".to_string(),
+                    23 => "4.5 m".to_string(),
+                    24 => "5.0 m".to_string(),
+                    25 => "5.6 m".to_string(),
+                    26 => "6.3 m".to_string(),
+                    27 => "7.1 m".to_string(),
+                    28 => "8.0 m".to_string(),
+                    29 => "9.0 m".to_string(),
+                    30 => "10.0 m".to_string(),
+                    31 => "11.0 m".to_string(),
+                    32 => "13.0 m".to_string(),
+                    33 => "14.0 m".to_string(),
+                    34 => "16.0 m".to_string(),
+                    35 => "18.0 m".to_string(),
+                    36 => "20.0 m".to_string(),
+                    255 => "n/a".to_string(),
+                    _ => gn.to_string(),
+                };
+                tags.push(("FlashGNDistance".to_string(), gn_str));
+            }
+
+            // FlashGroupAControlMode at offset 15 (mask 0x0f)
+            if data.len() > 15 {
+                let group_a = data[15] & 0x0F;
+                tags.push((
+                    "FlashGroupAControlMode".to_string(),
+                    decode_flash_control_mode(group_a).to_string(),
+                ));
+            }
+
+            // FlashGroupBControlMode at offset 16 (mask 0x0f)
+            if data.len() > 16 {
+                let group_b = data[16] & 0x0F;
+                tags.push((
+                    "FlashGroupBControlMode".to_string(),
+                    decode_flash_control_mode(group_b).to_string(),
+                ));
+            }
+
+            // FlashGroupACompensation at offset 17
+            if data.len() > 17 {
+                let comp = data[17] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "FlashGroupACompensation".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
+
+            // FlashGroupBCompensation at offset 18
+            if data.len() > 18 {
+                let comp = data[18] as i8;
+                let ev = -(comp as f64) / 6.0;
+                tags.push((
+                    "FlashGroupBCompensation".to_string(),
+                    format_flash_compensation(ev),
+                ));
+            }
         }
     }
 
@@ -1923,17 +2870,23 @@ fn parse_shot_info_basic(data: &[u8]) -> Vec<(String, String)> {
     if version.chars().all(|c| c.is_ascii_digit()) {
         tags.push(("ShotInfoVersion".to_string(), version.clone()));
 
-        // Offset 0x04: FirmwareVersion (string[5]) - NOT encrypted for some versions
-        // Note: The first 4 bytes of ShotInfo are unencrypted (version string)
-        // After that, data is encrypted for ShotInfoVersion 02xx
-        // Only parse FirmwareVersion if we have unencrypted data
-        if !version.starts_with("02") && data.len() >= 9 {
-            let firmware = String::from_utf8_lossy(&data[4..9]);
-            // Check if it looks like a valid firmware version (typically like "1.00 ")
+        // Offset 0x04: FirmwareVersion
+        // Note: FirmwareVersion is stored unencrypted at offset 0x04 for all versions
+        // The encryption in 02xx versions starts after FirmwareVersion
+        // - Versions 0246 (D6), 0249 (Z6/Z7), 0251 (Z6_3): 8 bytes
+        // - Earlier versions: 5 bytes
+        let firmware_len = match version.as_str() {
+            "0246" | "0249" | "0250" | "0251" | "0252" | "0253" | "0254" | "0255" => 8,
+            _ => 5,
+        };
+        let firmware_end = 4 + firmware_len;
+        if data.len() >= firmware_end {
+            let firmware = String::from_utf8_lossy(&data[4..firmware_end]);
+            // Check if it looks like a valid firmware version (typically like "1.00k" or "01.11.d0")
             if firmware.chars().any(|c| c.is_ascii_digit()) {
                 tags.push((
                     "FirmwareVersion".to_string(),
-                    firmware.trim_end().to_string(),
+                    firmware.trim_end_matches('\0').trim_end().to_string(),
                 ));
             }
         }
@@ -2000,6 +2953,76 @@ fn parse_multi_exposure(data: &[u8]) -> Vec<(String, String)> {
             "MultiExposureAutoGain".to_string(),
             auto_gain_str.to_string(),
         ));
+    }
+
+    tags
+}
+
+/// Parse HDRInfo tag data (tag 0x0035)
+/// Structure: HDRInfoVersion (string[4]) + HDR (byte) + HDRLevel (byte) + HDRSmoothing (byte) + HDRLevel2 (byte)
+fn parse_hdr_info(data: &[u8]) -> Vec<(String, String)> {
+    let mut tags = Vec::new();
+
+    if data.len() < 4 {
+        return tags;
+    }
+
+    // Offset 0x00: HDRInfoVersion (string[4])
+    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    tags.push(("HDRInfoVersion".to_string(), version.clone()));
+
+    // Offset 0x04: HDR (int8u)
+    if data.len() > 4 {
+        let hdr = data[4];
+        let hdr_str = match hdr {
+            0 => "Off",
+            1 => "On (normal)",
+            48 => "Auto",
+            _ => "Unknown",
+        };
+        tags.push(("HDR".to_string(), hdr_str.to_string()));
+    }
+
+    // Offset 0x05: HDRLevel (int8u)
+    if data.len() > 5 {
+        let level = data[5];
+        let level_str = match level {
+            0 => "Auto",
+            1 => "1 EV",
+            2 => "2 EV",
+            3 => "3 EV",
+            255 => "n/a",
+            _ => "Unknown",
+        };
+        tags.push(("HDRLevel".to_string(), level_str.to_string()));
+    }
+
+    // Offset 0x06: HDRSmoothing (int8u)
+    if data.len() > 6 {
+        let smoothing = data[6];
+        let smoothing_str = match smoothing {
+            0 => "Off",
+            1 => "Normal",
+            2 => "Low",
+            3 => "High",
+            48 => "Auto",
+            _ => "Unknown",
+        };
+        tags.push(("HDRSmoothing".to_string(), smoothing_str.to_string()));
+    }
+
+    // Offset 0x07: HDRLevel2 (int8u) - for HDRInfoVersion 0101+
+    if data.len() > 7 && version != "0100" {
+        let level2 = data[7];
+        let level2_str = match level2 {
+            0 => "Auto",
+            1 => "1 EV",
+            2 => "2 EV",
+            3 => "3 EV",
+            255 => "n/a",
+            _ => "Unknown",
+        };
+        tags.push(("HDRLevel2".to_string(), level2_str.to_string()));
     }
 
     tags
@@ -2214,13 +3237,15 @@ fn parse_lens_data(
         // LensData01 structure
         // Offset 0x04: ExitPupilPosition
         let exit_pupil_raw = data[4];
-        if exit_pupil_raw > 0 {
-            let exit_pupil = 2048.0 / exit_pupil_raw as f64;
-            tags.push((
-                "ExitPupilPosition".to_string(),
-                format!("{:.1} mm", exit_pupil),
-            ));
-        }
+        let exit_pupil = if exit_pupil_raw > 0 {
+            2048.0 / exit_pupil_raw as f64
+        } else {
+            0.0
+        };
+        tags.push((
+            "ExitPupilPosition".to_string(),
+            format!("{:.1} mm", exit_pupil),
+        ));
 
         // Offset 0x05: AFAperture
         let af_aperture_raw = data[5];
@@ -2234,6 +3259,7 @@ fn parse_lens_data(
         // Offset 0x09: FocusDistance
         // Formula: 0.01 * 10^(val/40) meters
         // ExifTool: raw=0 gives 0.01m, not infinity
+        // Store with high precision; reformatting to %.2f for display is done in output.rs
         let focus_dist_raw = data[9];
         let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
         tags.push(("FocusDistance".to_string(), format!("{:.6} m", focus_dist)));
@@ -2310,13 +3336,15 @@ fn parse_lens_data(
             // Same offsets as 0101 (LensData01)
             // Offset 0x04: ExitPupilPosition
             let exit_pupil_raw = decrypted[4];
-            if exit_pupil_raw > 0 {
-                let exit_pupil = 2048.0 / exit_pupil_raw as f64;
-                tags.push((
-                    "ExitPupilPosition".to_string(),
-                    format!("{:.1} mm", exit_pupil),
-                ));
-            }
+            let exit_pupil = if exit_pupil_raw > 0 {
+                2048.0 / exit_pupil_raw as f64
+            } else {
+                0.0
+            };
+            tags.push((
+                "ExitPupilPosition".to_string(),
+                format!("{:.1} mm", exit_pupil),
+            ));
 
             // Offset 0x05: AFAperture
             let af_aperture_raw = decrypted[5];
@@ -2329,6 +3357,7 @@ fn parse_lens_data(
 
             // Offset 0x09: FocusDistance
             // Formula: 0.01 * 10^(val/40) meters
+            // Store with high precision; reformatting to %.2f for display is done in output.rs
             let focus_dist_raw = decrypted[9];
             let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
             tags.push(("FocusDistance".to_string(), format!("{:.6} m", focus_dist)));
@@ -2405,13 +3434,15 @@ fn parse_lens_data(
             // LensData0204 structure:
             // Offset 0x04: ExitPupilPosition (same as LensData01)
             let exit_pupil_raw = decrypted[4];
-            if exit_pupil_raw > 0 {
-                let exit_pupil = 2048.0 / exit_pupil_raw as f64;
-                tags.push((
-                    "ExitPupilPosition".to_string(),
-                    format!("{:.1} mm", exit_pupil),
-                ));
-            }
+            let exit_pupil = if exit_pupil_raw > 0 {
+                2048.0 / exit_pupil_raw as f64
+            } else {
+                0.0
+            };
+            tags.push((
+                "ExitPupilPosition".to_string(),
+                format!("{:.1} mm", exit_pupil),
+            ));
 
             // Offset 0x05: AFAperture (same as LensData01)
             let af_aperture_raw = decrypted[5];
@@ -2424,6 +3455,7 @@ fn parse_lens_data(
 
             // Offset 0x0a (10): FocusDistance (extra byte at 0x09 in this version)
             // Formula: 0.01 * 10^(val/40) meters
+            // Store with high precision; reformatting to %.2f for display is done in output.rs
             let focus_dist_raw = decrypted[10];
             let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
             tags.push(("FocusDistance".to_string(), format!("{:.6} m", focus_dist)));
@@ -2581,7 +3613,7 @@ fn parse_af_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
             if points.is_empty() {
                 tags.push(("AFPointsInFocus".to_string(), "(none)".to_string()));
             } else {
-                tags.push(("AFPointsInFocus".to_string(), points.join(", ")));
+                tags.push(("AFPointsInFocus".to_string(), points.join(",")));
             }
         }
     }
@@ -2591,6 +3623,7 @@ fn parse_af_info(data: &[u8], model: Option<&str>) -> Vec<(String, String)> {
 
 /// Parse AFInfo2 tag data (tag 0x00B7)
 /// For cameras with LiveView (D3, D300, D700, D5000, etc.)
+/// Version 0300+ (D6, D780, Z cameras) has different structure with PrimaryAFPoint at offset 0x38
 fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
@@ -2599,9 +3632,14 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     }
 
     // Bytes 0-3: AFInfo2Version
-    if let Ok(version) = std::str::from_utf8(&data[0..4]) {
-        tags.push(("AFInfo2Version".to_string(), version.to_string()));
-    }
+    let version_str = std::str::from_utf8(&data[0..4]).unwrap_or("");
+    tags.push(("AFInfo2Version".to_string(), version_str.to_string()));
+
+    // Check if version 0300+ (different structure)
+    let is_v0300_plus = version_str.starts_with("03") || version_str.starts_with("04");
+
+    // Check if Nikon 1 camera (version 0201) - different value mappings
+    let is_nikon1 = version_str == "0201";
 
     // Byte 4: AFDetectionMethod (also determines ContrastDetectAF)
     let af_detection = data[4];
@@ -2617,112 +3655,139 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     ));
 
     // ContrastDetectAF - derived from AFDetectionMethod
+    // ExifTool composite tag: On only if FocusMode is not Manual AND AFDetectionMethod == 1
+    // For AFDetectionMethod == 2 (Hybrid), ExifTool returns "Off"
     let contrast_detect_str = match af_detection {
-        0 => "Off",
-        1 => "On",
-        2 => "On (2)",
-        _ => "Unknown",
+        0 => "Off", // Phase Detect
+        1 => "On",  // Contrast Detect
+        2 => "Off", // Hybrid - treated as Off by ExifTool
+        _ => "Off",
     };
     tags.push((
         "ContrastDetectAF".to_string(),
         contrast_detect_str.to_string(),
     ));
 
-    // Byte 5: AFAreaMode (depends on ContrastDetectAF)
+    // Byte 5: AFAreaMode (depends on ContrastDetectAF and camera type)
     if data.len() >= 6 {
-        let af_area_mode = if af_detection == 0 {
+        let af_area_val = data[5];
+        let af_area_mode = if is_nikon1 {
+            // Nikon 1 cameras only have values 128-131
+            match af_area_val {
+                128 => "Single".to_string(),
+                129 => "Auto (41 points)".to_string(),
+                130 => "Subject Tracking (41 points)".to_string(),
+                131 => "Face Priority (41 points)".to_string(),
+                _ => format!("Unknown ({})", af_area_val),
+            }
+        } else if af_detection == 0 {
             // Phase detect mode
-            match data[5] {
-                0 => "Single Area",
-                1 => "Dynamic Area",
-                2 => "Dynamic Area (closest subject)",
-                3 => "Group Dynamic",
-                4 => "Dynamic Area (9 points)",
-                5 => "Dynamic Area (21 points)",
-                6 => "Dynamic Area (51 points)",
-                7 => "Dynamic Area (51 points, 3D-tracking)",
-                8 => "Auto-area",
-                9 => "Dynamic Area (3D-tracking)",
-                10 => "Single Area (wide)",
-                11 => "Dynamic Area (wide)",
-                12 => "Dynamic Area (wide, 3D-tracking)",
-                13 => "Group Area",
-                14 => "Dynamic Area (25 points)",
-                15 => "Dynamic Area (72 points)",
-                16 => "Group Area (HL)",
-                17 => "Group Area (VL)",
-                18 => "Dynamic Area (49 points)",
+            match af_area_val {
+                0 => "Single Area".to_string(),
+                1 => "Dynamic Area".to_string(),
+                2 => "Dynamic Area (closest subject)".to_string(),
+                3 => "Group Dynamic".to_string(),
+                4 => "Dynamic Area (9 points)".to_string(),
+                5 => "Dynamic Area (21 points)".to_string(),
+                6 => "Dynamic Area (51 points)".to_string(),
+                7 => "Dynamic Area (51 points, 3D-tracking)".to_string(),
+                8 => "Auto-area".to_string(),
+                9 => "Dynamic Area (3D-tracking)".to_string(),
+                10 => "Single Area (wide)".to_string(),
+                11 => "Dynamic Area (wide)".to_string(),
+                12 => "Dynamic Area (wide, 3D-tracking)".to_string(),
+                13 => "Group Area".to_string(),
+                14 => "Dynamic Area (25 points)".to_string(),
+                15 => "Dynamic Area (72 points)".to_string(),
+                16 => "Group Area (HL)".to_string(),
+                17 => "Group Area (VL)".to_string(),
+                18 => "Dynamic Area (49 points)".to_string(),
                 // Nikon 1 cameras (1J1-1J4, 1S1-1S2, 1V1-1V3, AW1)
-                128 => "Single",
-                129 => "Auto (41 points)",
-                130 => "Subject Tracking (41 points)",
-                131 => "Face Priority (41 points)",
+                128 => "Single".to_string(),
+                129 => "Auto (41 points)".to_string(),
+                130 => "Subject Tracking (41 points)".to_string(),
+                131 => "Face Priority (41 points)".to_string(),
                 // Z cameras
-                192 => "Pinpoint",
-                193 => "Single",
-                194 => "Dynamic",
-                195 => "Wide (S)",
-                196 => "Wide (L)",
-                197 => "Auto",
-                199 => "Auto",
-                _ => "Unknown",
+                192 => "Pinpoint".to_string(),
+                193 => "Single".to_string(),
+                194 => "Dynamic".to_string(),
+                195 => "Wide (S)".to_string(),
+                196 => "Wide (L)".to_string(),
+                197 => "Auto".to_string(),
+                199 => "Auto".to_string(),
+                _ => "Unknown".to_string(),
             }
         } else {
             // Contrast detect mode
-            match data[5] {
-                0 => "Contrast-detect",
-                1 => "Contrast-detect (normal area)",
-                2 => "Contrast-detect (wide area)",
-                3 => "Contrast-detect (face priority)",
-                4 => "Contrast-detect (subject tracking)",
+            match af_area_val {
+                0 => "Contrast-detect".to_string(),
+                1 => "Contrast-detect (normal area)".to_string(),
+                2 => "Contrast-detect (wide area)".to_string(),
+                3 => "Contrast-detect (face priority)".to_string(),
+                4 => "Contrast-detect (subject tracking)".to_string(),
                 // Nikon 1 cameras
-                128 => "Single",
-                129 => "Auto (41 points)",
-                130 => "Subject Tracking (41 points)",
-                131 => "Face Priority (41 points)",
+                128 => "Single".to_string(),
+                129 => "Auto (41 points)".to_string(),
+                130 => "Subject Tracking (41 points)".to_string(),
+                131 => "Face Priority (41 points)".to_string(),
                 // Z cameras
-                192 => "Pinpoint",
-                193 => "Single",
-                194 => "Dynamic",
-                195 => "Wide (S)",
-                196 => "Wide (L)",
-                197 => "Auto",
-                198 => "Auto (People)",
-                199 => "Auto (Animal)",
+                192 => "Pinpoint".to_string(),
+                193 => "Single".to_string(),
+                194 => "Dynamic".to_string(),
+                195 => "Wide (S)".to_string(),
+                196 => "Wide (L)".to_string(),
+                197 => "Auto".to_string(),
+                198 => "Auto (People)".to_string(),
+                199 => "Auto (Animal)".to_string(),
                 // D6
-                200 => "Normal-area AF",
-                201 => "Wide-area AF",
-                202 => "Face-priority AF",
-                203 => "Subject-tracking AF",
+                200 => "Normal-area AF".to_string(),
+                201 => "Wide-area AF".to_string(),
+                202 => "Face-priority AF".to_string(),
+                203 => "Subject-tracking AF".to_string(),
                 // Z9
-                204 => "Dynamic Area (S)",
-                205 => "Dynamic Area (M)",
-                206 => "Dynamic Area (L)",
-                207 => "3D-tracking",
-                208 => "Wide-Area (C1/C2)",
-                _ => "Unknown",
+                204 => "Dynamic Area (S)".to_string(),
+                205 => "Dynamic Area (M)".to_string(),
+                206 => "Dynamic Area (L)".to_string(),
+                207 => "3D-tracking".to_string(),
+                208 => "Wide-Area (C1/C2)".to_string(),
+                _ => "Unknown".to_string(),
             }
         };
-        tags.push(("AFAreaMode".to_string(), af_area_mode.to_string()));
+        tags.push(("AFAreaMode".to_string(), af_area_mode));
     }
 
     // Byte 6: PhaseDetectAF / FocusPointSchema
     let focus_point_schema = if data.len() >= 7 { data[6] } else { 0 };
 
-    let phase_detect = match focus_point_schema {
-        0 => "Off",
-        1 => "On (51-point)",
-        2 => "On (11-point)",
-        3 => "On (39-point)",
-        4 => "On (73-point)",
-        5 => "On (5)",
-        6 => "On (105-point)",
-        7 => "On (153-point)",
-        8 => "On (81-point)",
-        9 => "On (105-point)",
-        _ => "Unknown",
+    // PhaseDetectAF logic: ExifTool composite tag
+    // Only report PhaseDetectAF as On when AFDetectionMethod == 0 (Phase Detect)
+    // For Hybrid (2) or Contrast (1), report Off regardless of FocusPointSchema
+    let phase_detect = if is_nikon1 {
+        // Nikon 1 cameras: only values 4-6 are valid
+        match focus_point_schema {
+            4 => "On (73-point)".to_string(),
+            5 => "On (5)".to_string(),
+            6 => "On (105-point)".to_string(),
+            _ => format!("Unknown ({})", focus_point_schema),
+        }
+    } else if af_detection != 0 {
+        "Off".to_string()
+    } else {
+        match focus_point_schema {
+            0 => "Off".to_string(),
+            1 => "On (51-point)".to_string(),
+            2 => "On (11-point)".to_string(),
+            3 => "On (39-point)".to_string(),
+            4 => "On (73-point)".to_string(),
+            5 => "On (5)".to_string(),
+            6 => "On (105-point)".to_string(),
+            7 => "On (153-point)".to_string(),
+            8 => "On (81-point)".to_string(),
+            9 => "On (105-point)".to_string(),
+            _ => "Unknown".to_string(),
+        }
     };
-    tags.push(("PhaseDetectAF".to_string(), phase_detect.to_string()));
+    tags.push(("PhaseDetectAF".to_string(), phase_detect));
 
     // FocusPointSchema - derived from PhaseDetectAF value
     let schema_str = match focus_point_schema {
@@ -2740,17 +3805,38 @@ fn parse_af_info2(data: &[u8]) -> Vec<(String, String)> {
     };
     tags.push(("FocusPointSchema".to_string(), schema_str.to_string()));
 
-    // Byte 7: PrimaryAFPoint
-    if data.len() >= 8 {
-        let primary_point = data[7];
-        let primary_str = decode_primary_af_point(primary_point, focus_point_schema);
-        tags.push(("PrimaryAFPoint".to_string(), primary_str));
-    }
+    // PrimaryAFPoint and AFPointsUsed offsets depend on version
+    if is_v0300_plus {
+        // Version 0300+: PrimaryAFPoint at offset 0x38 (56), AFPointsUsed at offset 0x0a (10)
+        // Byte 7 is AFCoordinatesAvailable in v0300+
+        if data.len() >= 8 {
+            let af_coords_available = data[7];
+            // Only parse PrimaryAFPoint when AFCoordinatesAvailable == 0
+            if af_coords_available == 0 && data.len() >= 57 {
+                let primary_point = data[0x38];
+                let primary_str = decode_primary_af_point(primary_point, focus_point_schema);
+                tags.push(("PrimaryAFPoint".to_string(), primary_str));
+            }
+        }
 
-    // Bytes 8+: AFPointsUsed (variable length based on schema)
-    if data.len() >= 9 {
-        let af_points_used = decode_af_points_used(&data[8..], focus_point_schema);
-        tags.push(("AFPointsUsed".to_string(), af_points_used));
+        // AFPointsUsed at offset 0x0a (10) for v0300+
+        if data.len() >= 24 {
+            let af_points_used = decode_af_points_used(&data[0x0a..], focus_point_schema);
+            tags.push(("AFPointsUsed".to_string(), af_points_used));
+        }
+    } else {
+        // Version 0100-02xx: PrimaryAFPoint at offset 7, AFPointsUsed at offset 8
+        if data.len() >= 8 {
+            let primary_point = data[7];
+            let primary_str = decode_primary_af_point(primary_point, focus_point_schema);
+            tags.push(("PrimaryAFPoint".to_string(), primary_str));
+        }
+
+        // Bytes 8+: AFPointsUsed (variable length based on schema)
+        if data.len() >= 9 {
+            let af_points_used = decode_af_points_used(&data[8..], focus_point_schema);
+            tags.push(("AFPointsUsed".to_string(), af_points_used));
+        }
     }
 
     tags
@@ -2928,6 +4014,29 @@ fn decode_primary_af_point(point: u8, schema: u8) -> String {
             };
             name.to_string()
         }
+        5 => {
+            // Nikon 1 S2 and newer with 135-point grid, 15 columns
+            // 9 rows (B-J) and 15 columns (1-15), F8 is center
+            if point == 0 {
+                return "(none)".to_string();
+            }
+            if point == 82 {
+                return "F8 (Center)".to_string();
+            }
+            // Grid calculation: row = int((val + 0.5) / ncol), col = val - ncol * row + 1
+            get_af_point_grid(point, 15)
+        }
+        6 => {
+            // Nikon 1 J4/V3 with 171-point AF, 105-point phase-detect, 21 columns
+            // 9 rows (B-J) and 19 columns (2-20), F11 is center
+            if point == 0 {
+                return "(none)".to_string();
+            }
+            if point == 115 {
+                return "F11 (Center)".to_string();
+            }
+            get_af_point_grid(point, 21)
+        }
         7 => {
             // 153-point (D5, D500, D850), center is E9
             let name = match point {
@@ -2937,8 +4046,38 @@ fn decode_primary_af_point(point: u8, schema: u8) -> String {
             };
             name.to_string()
         }
+        8 => {
+            // 81-point (Z6, Z7, Z50, etc.), 9x9 grid
+            // Auto-area mode, used by Z cameras
+            if point == 0 {
+                return "(none)".to_string();
+            }
+            // Use 81-point lookup table
+            get_af_point_81(point)
+        }
+        9 => {
+            // 105-point (D6), center is D8
+            // 7 rows (A-G) with 15 columns (1-15)
+            let name = match point {
+                0 => "(none)",
+                1 => "D8 (Center)",
+                _ => return get_af_point_105(point),
+            };
+            name.to_string()
+        }
         _ => format!("{}", point),
     }
+}
+
+/// Get AF point name using grid calculation (for Nikon 1 cameras)
+/// Uses same algorithm as ExifTool's GetAFPointGrid
+fn get_af_point_grid(point: u8, ncol: u8) -> String {
+    let val = point as f32;
+    let ncol_f = ncol as f32;
+    let row = ((val + 0.5) / ncol_f) as u8;
+    let col = point - ncol * row + 1;
+    let row_char = (b'A' + row) as char;
+    format!("{}{}", row_char, col)
 }
 
 /// Get AF point name for 135-point grid (Nikon 1)
@@ -3090,8 +4229,9 @@ fn get_af_point_135(point: u8) -> String {
 }
 
 /// Get AF point name for 153-point grid (D5, D500, D850)
+/// From ExifTool Nikon.pm: 9 rows (A-I) with 17 columns (1-17), center is E9
 fn get_af_point_153(point: u8) -> String {
-    // 9x17 grid (A-I rows, 1-17 columns)
+    // Lookup table from ExifTool %afPoints153
     let lookup: &[(u8, &str)] = &[
         (1, "E9"),
         (2, "D9"),
@@ -3111,24 +4251,24 @@ fn get_af_point_153(point: u8) -> String {
         (16, "G10"),
         (17, "H10"),
         (18, "I10"),
-        (19, "E8"),
-        (20, "D8"),
-        (21, "C8"),
-        (22, "B8"),
-        (23, "A8"),
-        (24, "F8"),
-        (25, "G8"),
-        (26, "H8"),
-        (27, "I8"),
-        (28, "E11"),
-        (29, "D11"),
-        (30, "C11"),
-        (31, "B11"),
-        (32, "A11"),
-        (33, "F11"),
-        (34, "G11"),
-        (35, "H11"),
-        (36, "I11"),
+        (19, "E11"),
+        (20, "D11"),
+        (21, "C11"),
+        (22, "B11"),
+        (23, "A11"),
+        (24, "F11"),
+        (25, "G11"),
+        (26, "H11"),
+        (27, "I11"),
+        (28, "E8"),
+        (29, "D8"),
+        (30, "C8"),
+        (31, "B8"),
+        (32, "A8"),
+        (33, "F8"),
+        (34, "G8"),
+        (35, "H8"),
+        (36, "I8"),
         (37, "E7"),
         (38, "D7"),
         (39, "C7"),
@@ -3147,87 +4287,87 @@ fn get_af_point_153(point: u8) -> String {
         (52, "G12"),
         (53, "H12"),
         (54, "I12"),
-        (55, "E6"),
-        (56, "D6"),
-        (57, "C6"),
-        (58, "B6"),
-        (59, "A6"),
-        (60, "F6"),
-        (61, "G6"),
-        (62, "H6"),
-        (63, "I6"),
-        (64, "E13"),
-        (65, "D13"),
-        (66, "C13"),
-        (67, "B13"),
-        (68, "A13"),
-        (69, "F13"),
-        (70, "G13"),
-        (71, "H13"),
-        (72, "I13"),
-        (73, "E14"),
-        (74, "D14"),
-        (75, "C14"),
-        (76, "B14"),
-        (77, "A14"),
-        (78, "F14"),
-        (79, "G14"),
-        (80, "H14"),
-        (81, "I14"),
-        (82, "E5"),
-        (83, "D5"),
-        (84, "C5"),
-        (85, "B5"),
-        (86, "A5"),
-        (87, "F5"),
-        (88, "G5"),
-        (89, "H5"),
-        (90, "I5"),
-        (91, "E15"),
-        (92, "D15"),
-        (93, "C15"),
-        (94, "B15"),
-        (95, "A15"),
-        (96, "F15"),
-        (97, "G15"),
-        (98, "H15"),
-        (99, "I15"),
-        (100, "E4"),
-        (101, "D4"),
-        (102, "C4"),
-        (103, "B4"),
-        (104, "A4"),
-        (105, "F4"),
-        (106, "G4"),
-        (107, "H4"),
-        (108, "I4"),
-        (109, "E16"),
-        (110, "D16"),
-        (111, "C16"),
-        (112, "B16"),
-        (113, "A16"),
-        (114, "F16"),
-        (115, "G16"),
-        (116, "H16"),
-        (117, "I16"),
-        (118, "E3"),
-        (119, "D3"),
-        (120, "C3"),
-        (121, "B3"),
-        (122, "A3"),
-        (123, "F3"),
-        (124, "G3"),
-        (125, "H3"),
-        (126, "I3"),
-        (127, "E17"),
-        (128, "D17"),
-        (129, "C17"),
-        (130, "B17"),
-        (131, "A17"),
-        (132, "F17"),
-        (133, "G17"),
-        (134, "H17"),
-        (135, "I17"),
+        (55, "E13"),
+        (56, "D13"),
+        (57, "C13"),
+        (58, "B13"),
+        (59, "A13"),
+        (60, "F13"),
+        (61, "G13"),
+        (62, "H13"),
+        (63, "I13"),
+        (64, "E14"),
+        (65, "D14"),
+        (66, "C14"),
+        (67, "B14"),
+        (68, "A14"),
+        (69, "F14"),
+        (70, "G14"),
+        (71, "H14"),
+        (72, "I14"),
+        (73, "E15"),
+        (74, "D15"),
+        (75, "C15"),
+        (76, "B15"),
+        (77, "A15"),
+        (78, "F15"),
+        (79, "G15"),
+        (80, "H15"),
+        (81, "I15"),
+        (82, "E16"),
+        (83, "D16"),
+        (84, "C16"),
+        (85, "B16"),
+        (86, "A16"),
+        (87, "F16"),
+        (88, "G16"),
+        (89, "H16"),
+        (90, "I16"),
+        (91, "E17"),
+        (92, "D17"),
+        (93, "C17"),
+        (94, "B17"),
+        (95, "A17"),
+        (96, "F17"),
+        (97, "G17"),
+        (98, "H17"),
+        (99, "I17"),
+        (100, "E6"),
+        (101, "D6"),
+        (102, "C6"),
+        (103, "B6"),
+        (104, "A6"),
+        (105, "F6"),
+        (106, "G6"),
+        (107, "H6"),
+        (108, "I6"),
+        (109, "E5"),
+        (110, "D5"),
+        (111, "C5"),
+        (112, "B5"),
+        (113, "A5"),
+        (114, "F5"),
+        (115, "G5"),
+        (116, "H5"),
+        (117, "I5"),
+        (118, "E4"),
+        (119, "D4"),
+        (120, "C4"),
+        (121, "B4"),
+        (122, "A4"),
+        (123, "F4"),
+        (124, "G4"),
+        (125, "H4"),
+        (126, "I4"),
+        (127, "E3"),
+        (128, "D3"),
+        (129, "C3"),
+        (130, "B3"),
+        (131, "A3"),
+        (132, "F3"),
+        (133, "G3"),
+        (134, "H3"),
+        (135, "I3"),
         (136, "E2"),
         (137, "D2"),
         (138, "C2"),
@@ -3246,6 +4386,220 @@ fn get_af_point_153(point: u8) -> String {
         (151, "G1"),
         (152, "H1"),
         (153, "I1"),
+    ];
+    for &(idx, name) in lookup {
+        if idx == point {
+            return name.to_string();
+        }
+    }
+    format!("Unknown ({})", point)
+}
+
+/// Get AF point name for 105-point grid (D6)
+/// From ExifTool Nikon.pm %afPoints105: 7 rows (A-G) with 15 columns (1-15), center is D8
+fn get_af_point_105(point: u8) -> String {
+    // Lookup table from ExifTool %afPoints105
+    let lookup: &[(u8, &str)] = &[
+        (1, "D8"),
+        (2, "C8"),
+        (3, "B8"),
+        (4, "A8"),
+        (5, "E8"),
+        (6, "F8"),
+        (7, "G8"),
+        (8, "D9"),
+        (9, "C9"),
+        (10, "B9"),
+        (11, "A9"),
+        (12, "E9"),
+        (13, "F9"),
+        (14, "G9"),
+        (15, "D10"),
+        (16, "C10"),
+        (17, "B10"),
+        (18, "A10"),
+        (19, "E10"),
+        (20, "F10"),
+        (21, "G10"),
+        (22, "D7"),
+        (23, "C7"),
+        (24, "B7"),
+        (25, "A7"),
+        (26, "E7"),
+        (27, "F7"),
+        (28, "G7"),
+        (29, "D6"),
+        (30, "C6"),
+        (31, "B6"),
+        (32, "A6"),
+        (33, "E6"),
+        (34, "F6"),
+        (35, "G6"),
+        (36, "D11"),
+        (37, "C11"),
+        (38, "B11"),
+        (39, "A11"),
+        (40, "E11"),
+        (41, "F11"),
+        (42, "G11"),
+        (43, "D12"),
+        (44, "C12"),
+        (45, "B12"),
+        (46, "A12"),
+        (47, "E12"),
+        (48, "F12"),
+        (49, "G12"),
+        (50, "D13"),
+        (51, "C13"),
+        (52, "B13"),
+        (53, "A13"),
+        (54, "E13"),
+        (55, "F13"),
+        (56, "G13"),
+        (57, "D14"),
+        (58, "C14"),
+        (59, "B14"),
+        (60, "A14"),
+        (61, "E14"),
+        (62, "F14"),
+        (63, "G14"),
+        (64, "D15"),
+        (65, "C15"),
+        (66, "B15"),
+        (67, "A15"),
+        (68, "E15"),
+        (69, "F15"),
+        (70, "G15"),
+        (71, "D5"),
+        (72, "C5"),
+        (73, "B5"),
+        (74, "A5"),
+        (75, "E5"),
+        (76, "F5"),
+        (77, "G5"),
+        (78, "D4"),
+        (79, "C4"),
+        (80, "B4"),
+        (81, "A4"),
+        (82, "E4"),
+        (83, "F4"),
+        (84, "G4"),
+        (85, "D3"),
+        (86, "C3"),
+        (87, "B3"),
+        (88, "A3"),
+        (89, "E3"),
+        (90, "F3"),
+        (91, "G3"),
+        (92, "D2"),
+        (93, "C2"),
+        (94, "B2"),
+        (95, "A2"),
+        (96, "E2"),
+        (97, "F2"),
+        (98, "G2"),
+        (99, "D1"),
+        (100, "C1"),
+        (101, "B1"),
+        (102, "A1"),
+        (103, "E1"),
+        (104, "F1"),
+        (105, "G1"),
+    ];
+    for &(idx, name) in lookup {
+        if idx == point {
+            return name.to_string();
+        }
+    }
+    format!("Unknown ({})", point)
+}
+
+/// Get AF point name for 81-point grid (Z cameras: Z5, Z6, Z7, Z50, etc.)
+/// 9x9 grid for Auto-area AF mode
+fn get_af_point_81(point: u8) -> String {
+    // From ExifTool %afPoints81 - 9 rows (A-I) with 9 columns (1-9), center is E5
+    let lookup: &[(u8, &str)] = &[
+        (1, "E5"),
+        (2, "D5"),
+        (3, "C5"),
+        (4, "B5"),
+        (5, "A5"),
+        (6, "F5"),
+        (7, "G5"),
+        (8, "H5"),
+        (9, "I5"),
+        (10, "E6"),
+        (11, "D6"),
+        (12, "C6"),
+        (13, "B6"),
+        (14, "A6"),
+        (15, "F6"),
+        (16, "G6"),
+        (17, "H6"),
+        (18, "I6"),
+        (19, "E4"),
+        (20, "D4"),
+        (21, "C4"),
+        (22, "B4"),
+        (23, "A4"),
+        (24, "F4"),
+        (25, "G4"),
+        (26, "H4"),
+        (27, "I4"),
+        (28, "E7"),
+        (29, "D7"),
+        (30, "C7"),
+        (31, "B7"),
+        (32, "A7"),
+        (33, "F7"),
+        (34, "G7"),
+        (35, "H7"),
+        (36, "I7"),
+        (37, "E3"),
+        (38, "D3"),
+        (39, "C3"),
+        (40, "B3"),
+        (41, "A3"),
+        (42, "F3"),
+        (43, "G3"),
+        (44, "H3"),
+        (45, "I3"),
+        (46, "E8"),
+        (47, "D8"),
+        (48, "C8"),
+        (49, "B8"),
+        (50, "A8"),
+        (51, "F8"),
+        (52, "G8"),
+        (53, "H8"),
+        (54, "I8"),
+        (55, "E2"),
+        (56, "D2"),
+        (57, "C2"),
+        (58, "B2"),
+        (59, "A2"),
+        (60, "F2"),
+        (61, "G2"),
+        (62, "H2"),
+        (63, "I2"),
+        (64, "E9"),
+        (65, "D9"),
+        (66, "C9"),
+        (67, "B9"),
+        (68, "A9"),
+        (69, "F9"),
+        (70, "G9"),
+        (71, "H9"),
+        (72, "I9"),
+        (73, "E1"),
+        (74, "D1"),
+        (75, "C1"),
+        (76, "B1"),
+        (77, "A1"),
+        (78, "F1"),
+        (79, "G1"),
+        (80, "H1"),
+        (81, "I1"),
     ];
     for &(idx, name) in lookup {
         if idx == point {
@@ -3296,6 +4650,22 @@ fn decode_af_points_used(data: &[u8], schema: u8) -> String {
                 return "(none)".to_string();
             }
             decode_af_points_135(data)
+        }
+        5 => {
+            // Nikon 1 S2 with 135-point grid, 15 columns
+            // 21 bytes bitmask
+            if data.len() < 21 {
+                return "(none)".to_string();
+            }
+            decode_af_points_grid(data, 15, 21)
+        }
+        6 => {
+            // Nikon 1 J4/V3 with 171-point grid, 21 columns
+            // 29 bytes bitmask
+            if data.len() < 29 {
+                return "(none)".to_string();
+            }
+            decode_af_points_grid(data, 21, 29)
         }
         7 => {
             // 153-point: 20 bytes bitmask
@@ -3351,17 +4721,20 @@ fn decode_af_points_51(data: &[u8]) -> String {
 
 /// Decode 11-point AF bitmask
 fn decode_af_points_11(bits: u16) -> String {
+    // ExifTool bit mapping from Nikon.pm:
+    // 0=Center, 1=Top, 2=Bottom, 3=Mid-left, 4=Upper-left, 5=Lower-left,
+    // 6=Far Left, 7=Mid-right, 8=Upper-right, 9=Lower-right, 10=Far Right
     let point_names: &[&str] = &[
         "Center",
         "Top",
         "Bottom",
         "Mid-left",
-        "Mid-right",
         "Upper-left",
-        "Upper-right",
         "Lower-left",
-        "Lower-right",
         "Far Left",
+        "Mid-right",
+        "Upper-right",
+        "Lower-right",
         "Far Right",
     ];
 
@@ -3375,7 +4748,8 @@ fn decode_af_points_11(bits: u16) -> String {
     if points.is_empty() {
         "(none)".to_string()
     } else {
-        points.join(",")
+        // ExifTool uses comma-space for 11-point text labels
+        points.join(", ")
     }
 }
 
@@ -3563,6 +4937,31 @@ fn decode_af_points_135(data: &[u8]) -> String {
         "(none)".to_string()
     } else {
         sort_af_points(&mut points);
+        points.join(",")
+    }
+}
+
+/// Decode AF points using grid calculation (for Nikon 1 cameras with newer firmware)
+/// Uses the same algorithm as ExifTool's PrintAFPointsGrid
+fn decode_af_points_grid(data: &[u8], ncol: u8, size: usize) -> String {
+    let mut points = Vec::new();
+
+    for (byte_idx, &byte) in data.iter().take(size).enumerate() {
+        if byte == 0 {
+            continue;
+        }
+        for bit in 0..8 {
+            if (byte & (1 << bit)) != 0 {
+                let point_num = byte_idx * 8 + bit;
+                let point_name = get_af_point_grid(point_num as u8, ncol);
+                points.push(point_name);
+            }
+        }
+    }
+
+    if points.is_empty() {
+        "(none)".to_string()
+    } else {
         points.join(",")
     }
 }
@@ -3766,8 +5165,60 @@ fn sort_af_points(points: &mut [&str]) {
     });
 }
 
+/// Check if camera has TimeZone location in MenuSettings.
+/// Only specific Z cameras have MenuSettings with TimeZone including location names:
+/// - Z9 (ShotInfo 0805): MenuSettingsZ9* - TimeZone at various offsets
+/// - Z8 (ShotInfo 0806): MenuSettingsZ8* - TimeZone at various offsets
+/// - Z6 III only (ShotInfo 0809): MenuSettingsZ6III - TimeZone at 2302
+///
+/// Note: Z50 II (0810) and Z5 II (0811) use ShotInfoZ6III but their MenuOffset
+/// has Condition checking for Z6_3 model only, so they don't get TimeZone from MenuSettings.
+fn has_timezone_location_in_shotinfo(model: Option<&str>) -> bool {
+    match model {
+        Some(m) => {
+            let upper = m.to_uppercase();
+            upper.contains("NIKON Z 8")
+                || upper.contains("NIKON Z 9")
+                || upper.contains("NIKON Z6_3") // Z6 III only, not Z50 II or Z5 II
+        }
+        None => false,
+    }
+}
+
+/// Get timezone location name for Z9-era cameras based on %timeZoneZ9 table
+/// Maps UTC offset to ExifTool's canonical location string
+fn get_timezone_location(tz_minutes: i16) -> Option<&'static str> {
+    match tz_minutes {
+        600 => Some("(Sydney)"),
+        540 => Some("(Tokyo)"),
+        480 => Some("(Beijing, Honk Kong, Sinapore)"), // ExifTool typo preserved
+        345 => Some("(Kathmandu)"),
+        330 => Some("(New Dehli)"), // ExifTool typo preserved
+        300 => Some("(Islamabad)"),
+        270 => Some("(Kabul)"),
+        240 => Some("(Abu Dhabi)"),
+        210 => Some("(Tehran)"),
+        180 => Some("(Moscow, Nairobi)"),
+        120 => Some("(Athens, Helsinki)"),
+        60 => Some("(Madrid, Paris, Berlin)"),
+        0 => Some("(London)"),
+        -60 => Some("(Azores)"),
+        -120 => Some("(Fernando de Noronha)"),
+        -180 => Some("(Buenos Aires, Sao Paulo)"),
+        -210 => Some("(Newfoundland)"),
+        -240 => Some("(Manaus, Caracas)"),
+        -300 => Some("(New York, Toronto, Lima)"),
+        -360 => Some("(Chicago, Mexico City)"),
+        -420 => Some("(Denver)"),
+        -480 => Some("(Los Angeles, Vancouver)"),
+        -540 => Some("(Anchorage)"),
+        -600 => Some("(Hawaii)"),
+        _ => None,
+    }
+}
+
 /// Parse WorldTime tag data (tag 0x0024)
-fn parse_world_time(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
+fn parse_world_time(data: &[u8], endian: Endianness, is_z_camera: bool) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
     if data.len() < 4 {
@@ -3786,7 +5237,18 @@ fn parse_world_time(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
     } else {
         format!("{:03}:{:02}", tz_hours, tz_mins)
     };
-    tags.push(("TimeZone".to_string(), tz_str));
+
+    // For Z9-era cameras, add location name suffix (per ExifTool %timeZoneZ9)
+    let tz_with_location = if is_z_camera {
+        if let Some(location) = get_timezone_location(tz_minutes) {
+            format!("{} {}", tz_str, location)
+        } else {
+            tz_str
+        }
+    } else {
+        tz_str
+    };
+    tags.push(("TimeZone".to_string(), tz_with_location));
 
     // Byte 2: DaylightSavings
     if data.len() >= 3 {
@@ -3810,24 +5272,52 @@ fn parse_world_time(data: &[u8], endian: Endianness) -> Vec<(String, String)> {
 
 /// Parse ColorBalance tag data (tag 0x0097)
 /// Extracts white balance levels
-fn parse_color_balance(data: &[u8], _endian: Endianness) -> Vec<(String, String)> {
+/// serial/shutter_count needed for version 02xx decryption
+fn parse_color_balance(
+    data: &[u8],
+    endian: Endianness,
+    serial: Option<u32>,
+    shutter_count: Option<u32>,
+) -> Vec<(String, String)> {
     let mut tags = Vec::new();
 
     if data.len() < 8 {
         return tags;
     }
 
-    // First 4 bytes: version
-    let version = match std::str::from_utf8(&data[0..4]) {
-        Ok(v) => v,
-        Err(_) => return tags,
+    // Check for NRW format first (starts with "NRW ")
+    let is_nrw = data.len() >= 4 && &data[0..4] == b"NRW ";
+
+    // First 4 bytes: version (or "NRW " for NRW files)
+    let version = if is_nrw {
+        // For NRW files, version is at offset 0x0004
+        if data.len() >= 8 {
+            match std::str::from_utf8(&data[4..8]) {
+                Ok(v) => v,
+                Err(_) => return tags,
+            }
+        } else {
+            return tags;
+        }
+    } else {
+        match std::str::from_utf8(&data[0..4]) {
+            Ok(v) => v,
+            Err(_) => return tags,
+        }
     };
 
+    // Output version string
+    tags.push(("ColorBalanceVersion".to_string(), version.to_string()));
+
     // ColorBalance structures have WB levels at different offsets
-    // Version 0100: RBGG at offset 72 (0x48), big-endian, NOT encrypted
-    // Version 02xx: Encrypted - require decryption which we don't have keys for here
-    // Only handle version 0100 which is unencrypted
-    if version == "0100" && data.len() >= 72 + 8 {
+    // For non-NRW files:
+    //   Version 0100: RBGG at offset 72 (0x48), big-endian, NOT encrypted (D100, Coolpix)
+    //   Version 0102: RGGB at offset 10, NOT encrypted (D2H)
+    //   Version 0103: RGBG at offset 20, NOT encrypted (D70/D70s)
+    //   Version 02xx (others): Encrypted - require decryption which we don't have keys for
+    // For NRW files (handled below with is_nrw check):
+    //   Uses ColorBalanceC structure with int32u values at different offsets
+    if !is_nrw && version == "0100" && data.len() >= 72 + 8 {
         // Version 0100: RBGG at offset 72, big-endian
         let mut cursor = Cursor::new(&data[72..]);
         let vals: [u16; 4] = [
@@ -3855,7 +5345,205 @@ fn parse_color_balance(data: &[u8], _endian: Endianness) -> Vec<(String, String)
                 tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
             }
         }
+    } else if !is_nrw && version == "0102" && data.len() >= 10 + 8 {
+        // Version 0102: RGGB at offset 10 (D2H) - non-NRW only
+        let mut cursor = Cursor::new(&data[10..]);
+        let vals: [u16; 4] = [
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+        ];
+
+        if !vals.iter().all(|&v| v == 0) {
+            tags.push((
+                "WB_RGGBLevels".to_string(),
+                format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+            ));
+
+            // RGGB: R=vals[0], G1=vals[1], G2=vals[2], B=vals[3]
+            let g = ((vals[1] as f64) + (vals[2] as f64)) / 2.0;
+            if g > 0.0 {
+                let red = (vals[0] as f64) / g;
+                let blue = (vals[3] as f64) / g;
+                tags.push(("RedBalance".to_string(), format!("{:.6}", red)));
+                tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
+            }
+        }
+    } else if !is_nrw && version == "0103" && data.len() >= 20 + 8 {
+        // Version 0103: RGBG at offset 20 (D70/D70s) - non-NRW only
+        let mut cursor = Cursor::new(&data[20..]);
+        let vals: [u16; 4] = [
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+            cursor.read_u16::<BigEndian>().unwrap_or(0),
+        ];
+
+        if !vals.iter().all(|&v| v == 0) {
+            tags.push((
+                "WB_RGBGLevels".to_string(),
+                format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+            ));
+
+            // RGBG: R=vals[0], G1=vals[1], B=vals[2], G2=vals[3]
+            let g = ((vals[1] as f64) + (vals[3] as f64)) / 2.0;
+            if g > 0.0 {
+                let red = (vals[0] as f64) / g;
+                let blue = (vals[2] as f64) / g;
+                tags.push(("RedBalance".to_string(), format!("{:.6}", red)));
+                tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
+            }
+        }
+    } else if !is_nrw && version.starts_with("02") {
+        // Version 02xx: Various encrypted ColorBalance structures
+        // Different versions have different DecryptStart, DirOffset, and WB channel orders
+        // Byte order follows the makernote's byte order (passed as endian parameter)
+        if let (Some(ser), Some(count)) = (serial, shutter_count) {
+            // Determine decrypt_start, dir_offset, wb_name, is_grbg based on version
+            let (decrypt_start, dir_offset, wb_name, is_grbg): (usize, usize, &str, bool) =
+                match version {
+                    // ColorBalance0205: D50
+                    "0205" => (4, 14, "WB_RGGBLevels", false),
+                    // ColorBalance02: D2X/D2Xs(0204), D2Hs(0206), D200(0207), D40/D40X/D80(0208), D60(0210)
+                    "0204" | "0206" | "0207" | "0208" | "0210" => (284, 6, "WB_RGGBLevels", false),
+                    // ColorBalance0209: D3/D3X/D300/D700(0209), D300S(0212), D3S(0214)
+                    "0209" | "0212" | "0214" => (284, 10, "WB_GRBGLevels", true),
+                    // ColorBalance0211: D90, D5000
+                    "0211" => (284, 16, "WB_GRBGLevels", true),
+                    // ColorBalance0213: D3000
+                    "0213" => (284, 10, "WB_RGGBLevels", false),
+                    // ColorBalance0215: D3100(0215), D7000/D5100(0216), D4/D600/D800/D3200(0217)
+                    "0215" | "0216" | "0217" => (284, 4, "WB_GRBGLevels", true),
+                    // ColorBalance0219: D5300(0219), D3300(0221), D4S(0222), D750/D810(0223), D3400-D7200(0224)
+                    "0219" | "0221" | "0222" | "0223" | "0224" => (4, 0x7c, "WB_RGGBLevels", false),
+                    // Unknown versions - skip WB extraction
+                    _ => return tags,
+                };
+
+            let wb_offset = decrypt_start + dir_offset;
+            if data.len() < wb_offset + 8 {
+                return tags;
+            }
+
+            // Make mutable copy for decryption
+            let mut decrypted = data.to_vec();
+
+            // Decrypt starting at DecryptStart
+            nikon_decrypt(ser, count, &mut decrypted, decrypt_start);
+
+            // Read WB levels at DirOffset from DecryptStart
+            // Format: 4 x int16u, follows makernote byte order
+            let mut cursor = Cursor::new(&decrypted[wb_offset..]);
+            let vals: [u16; 4] = match endian {
+                Endianness::Little => [
+                    cursor.read_u16::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u16::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u16::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u16::<LittleEndian>().unwrap_or(0),
+                ],
+                Endianness::Big => [
+                    cursor.read_u16::<BigEndian>().unwrap_or(0),
+                    cursor.read_u16::<BigEndian>().unwrap_or(0),
+                    cursor.read_u16::<BigEndian>().unwrap_or(0),
+                    cursor.read_u16::<BigEndian>().unwrap_or(0),
+                ],
+            };
+
+            // Skip if all zeros
+            if !vals.iter().all(|&v| v == 0) {
+                tags.push((
+                    wb_name.to_string(),
+                    format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+                ));
+
+                // Compute RedBalance and BlueBalance
+                // Channel order varies: RGGB vs GRBG
+                let (r, g1, g2, b) = if is_grbg {
+                    // GRBG: G=vals[0], R=vals[1], B=vals[2], G=vals[3]
+                    (vals[1], vals[0], vals[3], vals[2])
+                } else {
+                    // RGGB: R=vals[0], G1=vals[1], G2=vals[2], B=vals[3]
+                    (vals[0], vals[1], vals[2], vals[3])
+                };
+
+                let g = ((g1 as f64) + (g2 as f64)) / 2.0;
+                if g > 0.0 {
+                    let red = (r as f64) / g;
+                    let blue = (b as f64) / g;
+                    tags.push(("RedBalance".to_string(), format!("{:.6}", red)));
+                    tags.push(("BlueBalance".to_string(), format!("{:.6}", blue)));
+                }
+            }
+        }
     }
+
+    // Check for NRW ColorBalance format (starts with "NRW ")
+    // ColorBalanceB (version 0100): P6000 - uses large offsets
+    // ColorBalanceC (version 0101+): P1000, P7000, P7100, B700 - uses small offsets
+    if is_nrw {
+        // Choose offset table based on version
+        let wb_offsets: &[(&str, usize)] = if version == "0100" {
+            // ColorBalanceB for P6000
+            &[
+                ("WB_RGGBLevels", 0x13e8),
+                ("WB_RGGBLevelsDaylight", 0x13f8),
+                ("WB_RGGBLevelsCloudy", 0x1408),
+                ("WB_RGGBLevelsTungsten", 0x1428),
+                ("WB_RGGBLevelsFluorescentW", 0x1438),
+                ("WB_RGGBLevelsFlash", 0x1448),
+                ("WB_RGGBLevelsCustom", 0x1468),
+                ("WB_RGGBLevelsAuto", 0x1478),
+            ]
+        } else {
+            // ColorBalanceC for P7000, P7100, P1000, B700
+            &[
+                ("WB_RGGBLevels", 0x0038),
+                ("WB_RGGBLevelsDaylight", 0x004c),
+                ("WB_RGGBLevelsCloudy", 0x0060),
+                ("WB_RGGBLevelsTungsten", 0x0088),
+                ("WB_RGGBLevelsFluorescentW", 0x009c),
+                ("WB_RGGBLevelsFluorescentN", 0x00b0),
+                ("WB_RGGBLevelsFluorescentD", 0x00c4),
+                ("WB_RGGBLevelsHTMercury", 0x00d8),
+                ("WB_RGGBLevelsCustom", 0x0100),
+                ("WB_RGGBLevelsAuto", 0x0114),
+            ]
+        };
+
+        // Format: 4 x int32u at each offset, little-endian
+        // ValueConv: vals[0]*=2; vals[3]*=2
+        for (name, offset) in wb_offsets {
+            if data.len() >= offset + 16 {
+                let mut cursor = Cursor::new(&data[*offset..]);
+                let mut vals: [u32; 4] = [
+                    cursor.read_u32::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u32::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u32::<LittleEndian>().unwrap_or(0),
+                    cursor.read_u32::<LittleEndian>().unwrap_or(0),
+                ];
+
+                // Apply ValueConv: vals[0] *= 2; vals[3] *= 2
+                vals[0] = vals[0].saturating_mul(2);
+                vals[3] = vals[3].saturating_mul(2);
+
+                // Skip if all zeros (custom preset not used)
+                if !vals.iter().all(|&v| v == 0) {
+                    tags.push((
+                        name.to_string(),
+                        format!("{} {} {} {}", vals[0], vals[1], vals[2], vals[3]),
+                    ));
+                }
+            }
+        }
+
+        // BlackLevel at offset 0x0020 (int16u) - only for ColorBalanceC
+        if version != "0100" && data.len() >= 0x0022 {
+            let black_level = u16::from_le_bytes([data[0x0020], data[0x0021]]);
+            tags.push(("BlackLevel".to_string(), black_level.to_string()));
+        }
+    }
+
     // Note: For encrypted versions (02xx), RedBalance/BlueBalance should come from
     // WB_RBLevels (0x000C) which already contains the correct R/G and B/G ratios
 
@@ -4036,6 +5724,10 @@ pub fn decode_flash_type_exiftool(value: &str) -> String {
         "NEW" => "New",
         "NORMAL" => "Built-in",
         "EXTERNAL" | "STROBE" => "External",
+        // Handle specific "Optional,AA" -> "Optional,Aa" case
+        "OPTIONAL,AA" => "Optional,Aa",
+        // Handle "NEW_TTL" -> "New_TTL" case
+        "NEW_TTL" => "New_TTL",
         _ => return value.trim().to_string(),
     };
     result.to_string()
@@ -4189,13 +5881,46 @@ pub fn decode_lens_type_exiv2(value: u8) -> String {
     }
 }
 
-/// Format flash compensation value like ExifTool
+/// Format flash compensation value like ExifTool PrintFraction
 /// - 0 is displayed as just "0"
-/// - Non-zero values are displayed with sign and one decimal (e.g., "+1.0", "-0.7")
+/// - Values like -0.67 become "-2/3", -0.33 becomes "-1/3", etc.
 fn format_flash_compensation(ev: f64) -> String {
     if ev.abs() < 0.001 {
-        "0".to_string()
+        return "0".to_string();
+    }
+
+    let sign = if ev < 0.0 { "-" } else { "+" };
+    let abs_val = ev.abs();
+    let frac = abs_val.fract();
+    let whole = abs_val.trunc() as i32;
+
+    // Check for common EV fractions (1/3, 2/3, 1/2)
+    if (frac - 0.33).abs() < 0.05 || (frac - 0.34).abs() < 0.05 {
+        // 1/3 step
+        if whole == 0 {
+            format!("{}1/3", sign)
+        } else {
+            format!("{}{} 1/3", sign, whole)
+        }
+    } else if (frac - 0.67).abs() < 0.05 || (frac - 0.66).abs() < 0.05 {
+        // 2/3 step
+        if whole == 0 {
+            format!("{}2/3", sign)
+        } else {
+            format!("{}{} 2/3", sign, whole)
+        }
+    } else if (frac - 0.5).abs() < 0.05 {
+        // 1/2 step
+        if whole == 0 {
+            format!("{}1/2", sign)
+        } else {
+            format!("{}{} 1/2", sign, whole)
+        }
+    } else if frac < 0.05 {
+        // Whole number
+        format!("{}{}", sign, whole)
     } else {
+        // Fallback to decimal
         format!("{:+.1}", ev)
     }
 }
@@ -4280,6 +6005,9 @@ pub fn parse_nikon_maker_notes(
     data: &[u8],
     endian: Endianness,
     model: Option<&str>,
+    tiff_data: Option<&[u8]>,
+    tiff_offset: usize,
+    makernote_file_offset: Option<usize>,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
 
@@ -4292,6 +6020,10 @@ pub fn parse_nikon_maker_notes(
     let mut shutter_count_val: Option<u32> = None;
     // Store LensData for deferred processing (needs serial/shutter_count which come later)
     let mut lens_data_bytes: Option<Vec<u8>> = None;
+    // Store ColorBalance for deferred processing (version 02xx needs serial/shutter_count for decryption)
+    let mut color_balance_bytes: Option<Vec<u8>> = None;
+    // Store ShotInfo for deferred processing (version 02xx needs serial/shutter_count for decryption)
+    let mut shot_info_bytes: Option<Vec<u8>> = None;
 
     // Nikon maker notes often start with "Nikon\0" header
     if data.len() < 18 {
@@ -4301,11 +6033,15 @@ pub fn parse_nikon_maker_notes(
     let base_offset;
     let ifd_offset;
     let maker_endian;
+    // Type 1/2 maker notes (no Nikon header): offsets are relative to file's TIFF header
+    // Type 3 maker notes (with "Nikon\0" header): offsets are relative to internal TIFF header
+    let is_type3;
 
     // Check for Nikon Type 3 header: "Nikon\0" + version + TIFF header
     if data.starts_with(b"Nikon\0") {
         // Structure: "Nikon\0" (6 bytes) + version (4 bytes) + TIFF header
         base_offset = 10; // Start of TIFF header (after "Nikon\0" + version)
+        is_type3 = true;
 
         // Read endianness from TIFF header
         if data.len() < base_offset + 8 {
@@ -4333,10 +6069,12 @@ pub fn parse_nikon_maker_notes(
         // IFD offset is relative to the TIFF header
         ifd_offset = base_offset + ifd_relative_offset;
     } else {
-        // No Nikon header, use the data as-is
+        // No Nikon header (Type 1/2) - use the data as-is
+        // Offsets in IFD entries are relative to file's TIFF header, not maker notes
         base_offset = 0;
         maker_endian = endian;
         ifd_offset = 0;
+        is_type3 = false;
     }
 
     if ifd_offset >= data.len() {
@@ -4409,14 +6147,35 @@ pub fn parse_nikon_maker_notes(
                     Endianness::Little => value_offset.to_le_bytes().to_vec(),
                     Endianness::Big => value_offset.to_be_bytes().to_vec(),
                 }
-            } else {
-                // Value at offset (relative to TIFF header for Nikon Type 3)
+            } else if is_type3 {
+                // Type 3: Value at offset relative to maker notes' internal TIFF header
                 let abs_offset = base_offset + value_offset as usize;
                 if abs_offset + value_size <= data.len() {
                     data[abs_offset..abs_offset + value_size].to_vec()
+                } else if let (Some(tiff), Some(mn_offset)) = (tiff_data, makernote_file_offset) {
+                    // Some Nikon cameras store tag data past the declared maker notes boundary
+                    // value_offset is still relative to maker notes' internal TIFF header (at base_offset)
+                    // So actual file offset = makernote_file_offset + base_offset + value_offset
+                    let file_offset = mn_offset + base_offset + value_offset as usize;
+                    if file_offset + value_size <= tiff.len() {
+                        tiff[file_offset..file_offset + value_size].to_vec()
+                    } else {
+                        continue;
+                    }
                 } else {
                     continue;
                 }
+            } else if let Some(tiff) = tiff_data {
+                // Type 1/2: Value at offset relative to file's TIFF header (not maker notes)
+                // tiff_data includes "Exif\0\0" prefix, so add tiff_offset to get actual position
+                let file_offset = tiff_offset + value_offset as usize;
+                if file_offset + value_size <= tiff.len() {
+                    tiff[file_offset..file_offset + value_size].to_vec()
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
             };
 
             // Parse the value based on type
@@ -4430,12 +6189,23 @@ pub fn parse_nikon_maker_notes(
                         lens_type_raw = Some(bytes[0]);
                         ExifValue::Ascii(decode_lens_type_exiftool(bytes[0]))
                     } else if tag_id == NIKON_FLASH_MODE && !bytes.is_empty() {
-                        ExifValue::Ascii(decode_flash_mode_exiftool(bytes[0]).to_string())
+                        ExifValue::Ascii(decode_flash_mode_exiftool(bytes[0]))
                     } else if tag_id == NIKON_IMAGE_AUTHENTICATION && !bytes.is_empty() {
                         ExifValue::Ascii(decode_image_authentication_exiftool(bytes[0]).to_string())
                     } else if tag_id == NIKON_SHOOTING_MODE && !bytes.is_empty() {
                         // ShootingMode can be stored as Byte on older cameras
                         ExifValue::Ascii(decode_shooting_mode_exiftool(bytes[0] as u16))
+                    } else if tag_id == NIKON_IMAGE_PROCESSING {
+                        // ImageProcessing can be stored as BYTE
+                        // If 1 byte, output as decimal; otherwise decode as ASCII
+                        if bytes.len() == 1 {
+                            ExifValue::Ascii(bytes[0].to_string())
+                        } else {
+                            let s = String::from_utf8_lossy(&bytes)
+                                .trim_end_matches('\0')
+                                .to_string();
+                            ExifValue::Ascii(decode_image_processing_exiftool(&s))
+                        }
                     } else {
                         ExifValue::Byte(bytes)
                     }
@@ -4477,9 +6247,18 @@ pub fn parse_nikon_maker_notes(
                         }
                     }
                     // Special handling for ISO tag - extract the actual ISO value
+                    // ExifTool: first value 1 means "Hi ISO" mode, prefix "Hi " to value
                     if tag_id == NIKON_ISO_SETTING && values.len() >= 2 {
                         let iso = if values[1] > 0 { values[1] } else { values[0] };
-                        ExifValue::Short(vec![iso])
+                        if values[0] == 1 && iso > 0 {
+                            // Hi ISO mode - output as "Hi XXXXX"
+                            ExifValue::Ascii(format!("Hi {}", iso))
+                        } else {
+                            ExifValue::Short(vec![iso])
+                        }
+                    } else if tag_id == NIKON_NEF_BIT_DEPTH && !values.is_empty() {
+                        // NEFBitDepth: ExifTool outputs just the first value as the bit depth
+                        ExifValue::Short(vec![values[0]])
                     } else if values.len() == 1 {
                         // Apply value decoders for single SHORT values
                         let v = values[0];
@@ -4509,6 +6288,10 @@ pub fn parse_nikon_maker_notes(
                             }
                             NIKON_SILENT_PHOTOGRAPHY => {
                                 Some(decode_silent_photography_exiftool(v).to_string())
+                            }
+                            NIKON_SHUTTER_MODE => Some(decode_shutter_mode_exiftool(v).to_string()),
+                            NIKON_IMAGE_SIZE_RAW => {
+                                Some(decode_image_size_raw_exiftool(v).to_string())
                             }
                             _ => None,
                         };
@@ -4540,22 +6323,31 @@ pub fn parse_nikon_maker_notes(
                         let blue = values[1] as f64 / 256.0;
                         // Add RedBalance and BlueBalance as separate tags
                         tags.insert(
-                            0xFE00, // Pseudo tag ID for RedBalance
-                            MakerNoteTag {
-                                tag_id: 0xFE00,
-                                value: ExifValue::Ascii(format!("{:.6}", red)),
-                                tag_name: Some("RedBalance"),
-                            },
+                            0xFE00,
+                            MakerNoteTag::new(
+                                0xFE00,
+                                Some("RedBalance"),
+                                ExifValue::Ascii(format!("{:.6}", red)),
+                            ),
                         );
                         tags.insert(
-                            0xFE01, // Pseudo tag ID for BlueBalance
-                            MakerNoteTag {
-                                tag_id: 0xFE01,
-                                value: ExifValue::Ascii(format!("{:.6}", blue)),
-                                tag_name: Some("BlueBalance"),
-                            },
+                            0xFE01,
+                            MakerNoteTag::new(
+                                0xFE01,
+                                Some("BlueBalance"),
+                                ExifValue::Ascii(format!("{:.6}", blue)),
+                            ),
                         );
                         // Return WB_RBLevels as space-separated values
+                        ExifValue::Ascii(
+                            values
+                                .iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        )
+                    } else if tag_id == NIKON_CROP_AREA && values.len() == 4 {
+                        // CropArea: left, top, width, height
                         ExifValue::Ascii(
                             values
                                 .iter()
@@ -4593,6 +6385,9 @@ pub fn parse_nikon_maker_notes(
                         } else {
                             ExifValue::Long(values)
                         }
+                    } else if tag_id == NIKON_IMAGE_PROCESSING && values.len() == 1 {
+                        // ImageProcessing stored as LONG - output as decimal string
+                        ExifValue::Ascii(values[0].to_string())
                     } else {
                         ExifValue::Long(values)
                     }
@@ -4653,20 +6448,20 @@ pub fn parse_nikon_maker_notes(
                         };
                         // Add RedBalance and BlueBalance as separate tags
                         tags.insert(
-                            0xFE00, // Pseudo tag ID for RedBalance
-                            MakerNoteTag {
-                                tag_id: 0xFE00,
-                                value: ExifValue::Ascii(format!("{:.6}", red)),
-                                tag_name: Some("RedBalance"),
-                            },
+                            0xFE00,
+                            MakerNoteTag::new(
+                                0xFE00,
+                                Some("RedBalance"),
+                                ExifValue::Ascii(format!("{:.6}", red)),
+                            ),
                         );
                         tags.insert(
-                            0xFE01, // Pseudo tag ID for BlueBalance
-                            MakerNoteTag {
-                                tag_id: 0xFE01,
-                                value: ExifValue::Ascii(format!("{:.6}", blue)),
-                                tag_name: Some("BlueBalance"),
-                            },
+                            0xFE01,
+                            MakerNoteTag::new(
+                                0xFE01,
+                                Some("BlueBalance"),
+                                ExifValue::Ascii(format!("{:.6}", blue)),
+                            ),
                         );
                         // Also return the WB_RBLevels as formatted string
                         let formatted: Vec<String> = values
@@ -4690,27 +6485,19 @@ pub fn parse_nikon_maker_notes(
 
                                 if is_binary {
                                     // Binary format: [major_tens, major_ones, minor_tens, minor_ones]
-                                    // e.g., [0, 2, 0, 0] -> version 2.0
+                                    // e.g., [0, 2, 1, 0] -> version 2.10
                                     let major = value_bytes[0] * 10 + value_bytes[1];
                                     let minor = value_bytes[2] * 10 + value_bytes[3];
-                                    // Format as "X.Y" - strip trailing zero from minor
-                                    let formatted = if minor.is_multiple_of(10) {
-                                        format!("{}.{}", major, minor / 10)
-                                    } else {
-                                        format!("{}.{}", major, minor)
-                                    };
+                                    // Format as "X.YZ" - keep two digits for minor
+                                    let formatted = format!("{}.{:02}", major, minor);
                                     ExifValue::Ascii(formatted)
                                 } else if let Ok(s) = std::str::from_utf8(&value_bytes[..4]) {
-                                    // ASCII format: "0200" -> version 2.0
+                                    // ASCII format: "0210" -> version 2.10
                                     if s.len() == 4 && s.chars().all(|c| c.is_ascii_digit()) {
                                         let major: u8 = s[0..2].parse().unwrap_or(0);
                                         let minor: u8 = s[2..4].parse().unwrap_or(0);
-                                        // Format as "X.Y" - strip trailing zero from minor
-                                        let formatted = if minor.is_multiple_of(10) {
-                                            format!("{}.{}", major, minor / 10)
-                                        } else {
-                                            format!("{}.{}", major, minor)
-                                        };
+                                        // Format as "X.YZ" - keep two digits for minor
+                                        let formatted = format!("{}.{:02}", major, minor);
                                         ExifValue::Ascii(formatted)
                                     } else {
                                         // Fallback: return trimmed string
@@ -4750,6 +6537,20 @@ pub fn parse_nikon_maker_notes(
                                 ExifValue::Undefined(value_bytes)
                             }
                         }
+                        // ImageProcessing can be stored as UNDEFINED
+                        // If 1 byte (count==1), output as decimal; otherwise decode as ASCII
+                        NIKON_IMAGE_PROCESSING => {
+                            if count == 1 {
+                                // Single byte - output as decimal (matches ExifTool)
+                                ExifValue::Ascii(value_bytes[0].to_string())
+                            } else {
+                                // Multiple bytes - decode as ASCII string
+                                let s = String::from_utf8_lossy(&value_bytes[..count as usize])
+                                    .trim_end_matches('\0')
+                                    .to_string();
+                                ExifValue::Ascii(decode_image_processing_exiftool(&s))
+                            }
+                        }
                         _ => ExifValue::Undefined(value_bytes),
                     }
                 }
@@ -4767,7 +6568,13 @@ pub fn parse_nikon_maker_notes(
                             break;
                         }
                     }
-                    if values.len() == 1 {
+
+                    // Apply decoder for specific tags
+                    if tag_id == NIKON_WHITE_BALANCE_FINE && !values.is_empty() {
+                        // WhiteBalanceFineTune (0x000B): format as space-separated signed shorts
+                        let formatted: Vec<String> = values.iter().map(|v| v.to_string()).collect();
+                        ExifValue::Ascii(formatted.join(" "))
+                    } else if values.len() == 1 {
                         ExifValue::Short(vec![values[0] as u16])
                     } else {
                         // Multiple values - format as space-separated
@@ -4817,7 +6624,34 @@ pub fn parse_nikon_maker_notes(
                             break;
                         }
                     }
-                    ExifValue::SRational(values)
+
+                    // Apply decoder for specific tags
+                    if tag_id == NIKON_WHITE_BALANCE_FINE_TUNE_2 && values.len() == 2 {
+                        // WhiteBalanceFineTune (0x003F): format as space-separated rationals
+                        // ExifTool outputs as decimal values
+                        let formatted: Vec<String> = values
+                            .iter()
+                            .map(|(n, d)| {
+                                if *d != 0 {
+                                    let val = *n as f64 / *d as f64;
+                                    // Format without unnecessary decimals
+                                    if val.fract() == 0.0 {
+                                        format!("{:.0}", val)
+                                    } else {
+                                        format!("{:.6}", val)
+                                            .trim_end_matches('0')
+                                            .trim_end_matches('.')
+                                            .to_string()
+                                    }
+                                } else {
+                                    n.to_string()
+                                }
+                            })
+                            .collect();
+                        ExifValue::Ascii(formatted.join(" "))
+                    } else {
+                        ExifValue::SRational(values)
+                    }
                 }
                 _ => {
                     // Unsupported type
@@ -4825,9 +6659,19 @@ pub fn parse_nikon_maker_notes(
                 }
             };
 
-            // Skip tags that are better represented by their parsed sub-structure values
-            // These tags contain raw/binary data that's decoded from ISOInfo structure
-            if matches!(tag_id, NIKON_ISO_SETTING) {
+            // For tag 0x0002 (ISO), output as "ISO" with the extracted value
+            // Older cameras (D1, D1X, D100) don't have ISOInfo tag so this is the only source
+            if tag_id == NIKON_ISO_SETTING {
+                let should_output = match &value {
+                    ExifValue::Short(vals) => !vals.is_empty() && vals[0] > 0,
+                    ExifValue::Ascii(s) => !s.is_empty(), // Hi ISO mode
+                    _ => false,
+                };
+                if should_output {
+                    // Create synthetic ISO tag with ID 0xFFFF to avoid conflict
+                    let iso_tag = MakerNoteTag::new(0xFFFF, Some("ISO"), value.clone());
+                    tags.insert(0xFFFF, iso_tag);
+                }
                 continue;
             }
 
@@ -4838,11 +6682,11 @@ pub fn parse_nikon_maker_notes(
                     if vals.len() >= 2 && vals[1] != 0 {
                         tags.insert(
                             tag_id,
-                            MakerNoteTag {
+                            MakerNoteTag::new(
                                 tag_id,
-                                tag_name: get_nikon_tag_name(tag_id),
-                                value: ExifValue::Short(vec![vals[1]]),
-                            },
+                                get_nikon_tag_name(tag_id),
+                                ExifValue::Short(vec![vals[1]]),
+                            ),
                         );
                     }
                     // Skip if values are 0 0 (ExifTool outputs empty string)
@@ -4856,67 +6700,199 @@ pub fn parse_nikon_maker_notes(
 
             tags.insert(
                 tag_id,
-                MakerNoteTag {
-                    tag_id,
-                    tag_name: get_nikon_tag_name(tag_id),
-                    value: value.clone(),
-                },
+                MakerNoteTag::new(tag_id, get_nikon_tag_name(tag_id), value.clone()),
             );
 
             // Parse sub-structures and insert extracted fields as separate tags
             match tag_id {
                 NIKON_ISO_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
+                        // Check if we have a "Hi" prefixed ISO from tag 0x0002
+                        let has_hi_iso = tags.get(&0xFFFF).is_some_and(
+                            |t| matches!(&t.value, ExifValue::Ascii(s) if s.starts_with("Hi ")),
+                        );
                         for (name, val) in parse_iso_info(bytes) {
-                            tags.insert(
-                                0x9000 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9000 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            // Skip ISOInfo-derived ISO if we already have a "Hi" prefixed ISO
+                            if name == "ISO" && has_hi_iso {
+                                continue;
+                            }
+                            let tag_id = 0x9000 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_ISO_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_VR_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_vr_info(bytes, maker_endian) {
-                            tags.insert(
-                                0x9100 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9100 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                        for (name, val) in parse_vr_info(bytes, maker_endian, model) {
+                            let tag_id = 0x9100 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_VR_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
-                NIKON_PICTURE_CONTROL_DATA => {
+                NIKON_HDR_INFO => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_hdr_info(bytes) {
+                            let tag_id = 0x9180 + tags.len() as u16;
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some(Box::leak(name.into_boxed_str())),
+                                ExifValue::Ascii(val),
+                            );
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_PICTURE_CONTROL_DATA | NIKON_PICTURE_CONTROL_DATA_2 => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_picture_control(bytes) {
-                            tags.insert(
-                                0x9200 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9200 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                            let tag_id = 0x9200 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_PICTURE_CONTROL_DATA, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_DISTORTION_CONTROL => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_distort_info(bytes) {
+                            let tag_id = 0x9150 + tags.len() as u16;
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some(Box::leak(name.into_boxed_str())),
+                                ExifValue::Ascii(val),
                             );
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_AF_TUNE => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_af_tune(bytes) {
+                            let tag_id = 0x9160 + tags.len() as u16;
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some(Box::leak(name.into_boxed_str())),
+                                ExifValue::Ascii(val),
+                            );
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_POWER_UP_TIME_2 => {
+                    // PowerUpTime: 7 bytes = year(2) + month + day + hour + min + sec
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        if bytes.len() >= 7 {
+                            let year = match maker_endian {
+                                Endianness::Little => u16::from_le_bytes([bytes[0], bytes[1]]),
+                                Endianness::Big => u16::from_be_bytes([bytes[0], bytes[1]]),
+                            };
+                            let month = bytes[2];
+                            let day = bytes[3];
+                            let hour = bytes[4];
+                            let min = bytes[5];
+                            let sec = bytes[6];
+                            let formatted = format!(
+                                "{:04}:{:02}:{:02} {:02}:{:02}:{:02}",
+                                year, month, day, hour, min, sec
+                            );
+                            let tag = MakerNoteTag::new(
+                                tag_id,
+                                Some("PowerUpTime"),
+                                ExifValue::Ascii(formatted),
+                            );
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_FLASH_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_flash_info(bytes) {
+                        for (name, val) in parse_flash_info(bytes, model) {
+                            let tag_id = 0x9300 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_FLASH_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
+                        }
+                    }
+                }
+                NIKON_FACE_DETECT => {
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_face_detect(bytes, endian) {
+                            let tag_id = 0x9340 + tags.len() as u16;
                             tags.insert(
-                                0x9300 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9300 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                                tag_id,
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                ),
                             );
                         }
                     }
@@ -4924,42 +6900,91 @@ pub fn parse_nikon_maker_notes(
                 NIKON_MULTI_EXPOSURE => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_multi_exposure(bytes) {
-                            tags.insert(
-                                0x9350 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9350 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9350 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_MULTI_EXPOSURE, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_SHOT_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_shot_info_basic(bytes) {
-                            tags.insert(
-                                0x9380 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9380 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                        // Check version to determine if we need decryption
+                        let version = if bytes.len() >= 4 {
+                            String::from_utf8_lossy(&bytes[0..4]).to_string()
+                        } else {
+                            String::new()
+                        };
+
+                        // Version 02xx needs decryption - defer processing
+                        if version.starts_with("02") {
+                            // Parse basic info (version) immediately since it's unencrypted
+                            if version.chars().all(|c| c.is_ascii_digit()) {
+                                let tag_id = 0x9380_u16;
+                                tags.insert(
+                                    tag_id,
+                                    MakerNoteTag::new(
+                                        tag_id,
+                                        Some("ShotInfoVersion"),
+                                        ExifValue::Ascii(version),
+                                    ),
+                                );
+                            }
+                            // Store for deferred decryption processing
+                            shot_info_bytes = Some(bytes.clone());
+                        } else {
+                            // Version 01xx or other - not encrypted, parse directly
+                            for (name, val) in parse_shot_info_basic(bytes) {
+                                let tag_id = 0x9380 + tags.len() as u16;
+                                let tag = MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                );
+                                tags.insert(tag_id, tag);
+                            }
                         }
                     }
                 }
                 NIKON_FILE_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_file_info(bytes) {
-                            tags.insert(
-                                0x9390 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x9390 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9390 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_FILE_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
@@ -4968,11 +6993,11 @@ pub fn parse_nikon_maker_notes(
                         for (name, val) in parse_retouch_info(bytes) {
                             tags.insert(
                                 0x93A0 + tags.len() as u16, // Pseudo tag ID
-                                MakerNoteTag {
-                                    tag_id: 0x93A0 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                                MakerNoteTag::new(
+                                    0x93A0 + tags.len() as u16,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                ),
                             );
                         }
                     }
@@ -4986,55 +7011,101 @@ pub fn parse_nikon_maker_notes(
                 NIKON_AF_INFO => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_af_info(bytes, model) {
-                            tags.insert(
-                                0x9500 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9500 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9500 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_AF_INFO, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_AF_INFO_2 => {
                     if let ExifValue::Undefined(ref bytes) = value {
                         for (name, val) in parse_af_info2(bytes) {
-                            tags.insert(
-                                0x9600 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9600 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                            let tag_id = 0x9600 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_AF_INFO_2, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_WORLD_TIME => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_world_time(bytes, maker_endian) {
-                            tags.insert(
-                                0x9700 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9700 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
-                            );
+                        // Only Z9-era cameras (Z9, Z8, Z6III, etc.) have timezone location names
+                        let has_tz_location = has_timezone_location_in_shotinfo(model);
+                        for (name, val) in parse_world_time(bytes, maker_endian, has_tz_location) {
+                            let tag_id = 0x9700 + tags.len() as u16;
+                            let tag = if let Some((exiv2_group, exiv2_name)) =
+                                get_exiv2_nikon_subfield(NIKON_WORLD_TIME, &name)
+                            {
+                                MakerNoteTag::with_exiv2(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val.clone()),
+                                    ExifValue::Ascii(val),
+                                    exiv2_group,
+                                    exiv2_name,
+                                )
+                            } else {
+                                MakerNoteTag::new(
+                                    tag_id,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                )
+                            };
+                            tags.insert(tag_id, tag);
                         }
                     }
                 }
                 NIKON_COLOR_BALANCE => {
                     if let ExifValue::Undefined(ref bytes) = value {
-                        for (name, val) in parse_color_balance(bytes, maker_endian) {
+                        // Defer processing - version 02xx needs serial/shutter_count for decryption
+                        color_balance_bytes = Some(bytes.clone());
+                    }
+                }
+                NIKON_COLOR_BALANCE_A => {
+                    // NRWData for P1000, P7000, P7100, B700 - uses ColorBalanceC structure
+                    // NRW files don't need decryption
+                    if let ExifValue::Undefined(ref bytes) = value {
+                        for (name, val) in parse_color_balance(bytes, maker_endian, None, None) {
                             tags.insert(
-                                0x9800 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9800 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                                0x9A00 + tags.len() as u16,
+                                MakerNoteTag::new(
+                                    0x9A00 + tags.len() as u16,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                ),
                             );
                         }
                     }
@@ -5047,16 +7118,75 @@ pub fn parse_nikon_maker_notes(
                         for (name, val) in parse_crop_hi_speed(&bytes, maker_endian) {
                             tags.insert(
                                 0x9900 + tags.len() as u16,
-                                MakerNoteTag {
-                                    tag_id: 0x9900 + tags.len() as u16,
-                                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                                    value: ExifValue::Ascii(val),
-                                },
+                                MakerNoteTag::new(
+                                    0x9900 + tags.len() as u16,
+                                    Some(Box::leak(name.into_boxed_str())),
+                                    ExifValue::Ascii(val),
+                                ),
                             );
                         }
                     }
                 }
                 _ => {}
+            }
+        }
+    }
+
+    // Deferred ColorBalance processing - version 02xx needs serial/shutter_count for decryption
+    if let Some(bytes) = color_balance_bytes {
+        for (name, val) in
+            parse_color_balance(&bytes, maker_endian, serial_number, shutter_count_val)
+        {
+            tags.insert(
+                0x9800 + tags.len() as u16,
+                MakerNoteTag::new(
+                    0x9800 + tags.len() as u16,
+                    Some(Box::leak(name.into_boxed_str())),
+                    ExifValue::Ascii(val),
+                ),
+            );
+        }
+    }
+
+    // Deferred ShotInfo processing - version 02xx needs serial/shutter_count for decryption
+    if let Some(bytes) = shot_info_bytes {
+        if let (Some(ser), Some(count)) = (serial_number, shutter_count_val) {
+            // Get version string (unencrypted)
+            let version = if bytes.len() >= 4 {
+                String::from_utf8_lossy(&bytes[0..4]).to_string()
+            } else {
+                String::new()
+            };
+
+            // Determine FirmwareVersion length based on version
+            // - Versions 0246 (D6), 0249 (Z6/Z7), 0251 (Z6_3): 8 bytes
+            // - Earlier versions: 5 bytes
+            let firmware_len = match version.as_str() {
+                "0246" | "0249" | "0250" | "0251" | "0252" | "0253" | "0254" | "0255" => 8,
+                _ => 5,
+            };
+            let firmware_end = 4 + firmware_len;
+
+            // Decrypt ShotInfo starting at offset 4 (version string is unencrypted)
+            if bytes.len() >= firmware_end {
+                let mut decrypted = bytes.clone();
+                nikon_decrypt(ser, count, &mut decrypted, 4);
+
+                // Extract FirmwareVersion from decrypted data
+                let firmware = String::from_utf8_lossy(&decrypted[4..firmware_end]);
+                if firmware.chars().any(|c| c.is_ascii_digit()) {
+                    let tag_id = 0x9381_u16;
+                    tags.insert(
+                        tag_id,
+                        MakerNoteTag::new(
+                            tag_id,
+                            Some("FirmwareVersion"),
+                            ExifValue::Ascii(
+                                firmware.trim_end_matches('\0').trim_end().to_string(),
+                            ),
+                        ),
+                    );
+                }
             }
         }
     }
@@ -5067,14 +7197,26 @@ pub fn parse_nikon_maker_notes(
         let (parsed_tags, id_bytes) = parse_lens_data(&data, serial_number, shutter_count_val);
         lens_id_bytes = id_bytes;
         for (name, val) in parsed_tags {
-            tags.insert(
-                0x9400 + tags.len() as u16,
-                MakerNoteTag {
-                    tag_id: 0x9400 + tags.len() as u16,
-                    tag_name: Some(Box::leak(name.into_boxed_str())),
-                    value: ExifValue::Ascii(val),
-                },
-            );
+            let tag_id = 0x9400 + tags.len() as u16;
+            let tag = if let Some((exiv2_group, exiv2_name)) =
+                get_exiv2_nikon_subfield(NIKON_LENS_DATA, &name)
+            {
+                MakerNoteTag::with_exiv2(
+                    tag_id,
+                    Some(Box::leak(name.into_boxed_str())),
+                    ExifValue::Ascii(val.clone()),
+                    ExifValue::Ascii(val),
+                    exiv2_group,
+                    exiv2_name,
+                )
+            } else {
+                MakerNoteTag::new(
+                    tag_id,
+                    Some(Box::leak(name.into_boxed_str())),
+                    ExifValue::Ascii(val),
+                )
+            };
+            tags.insert(tag_id, tag);
         }
     }
 
@@ -5089,11 +7231,11 @@ pub fn parse_nikon_maker_notes(
             };
             tags.insert(
                 0xA000, // Pseudo tag ID for AutoFocus
-                MakerNoteTag {
-                    tag_id: 0xA000,
-                    tag_name: Some("AutoFocus"),
-                    value: ExifValue::Ascii(auto_focus.to_string()),
-                },
+                MakerNoteTag::new(
+                    0xA000,
+                    Some("AutoFocus"),
+                    ExifValue::Ascii(auto_focus.to_string()),
+                ),
             );
         }
     }
@@ -5119,21 +7261,21 @@ pub fn parse_nikon_maker_notes(
         if let Some(lens_name) = lookup_result {
             tags.insert(
                 0xA003, // Pseudo tag ID for LensID (avoiding 0xA001 ColorSpace conflict)
-                MakerNoteTag {
-                    tag_id: 0xA003,
-                    tag_name: Some("LensID"),
-                    value: ExifValue::Ascii(lens_name.to_string()),
-                },
+                MakerNoteTag::new(
+                    0xA003,
+                    Some("LensID"),
+                    ExifValue::Ascii(lens_name.to_string()),
+                ),
             );
         } else {
             // If not found in database, output as "Unknown (hex)" to match ExifTool
             tags.insert(
                 0xA003,
-                MakerNoteTag {
-                    tag_id: 0xA003,
-                    tag_name: Some("LensID"),
-                    value: ExifValue::Ascii(format!("Unknown ({})", lens_id)),
-                },
+                MakerNoteTag::new(
+                    0xA003,
+                    Some("LensID"),
+                    ExifValue::Ascii(format!("Unknown ({})", lens_id)),
+                ),
             );
         }
     }

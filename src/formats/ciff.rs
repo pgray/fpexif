@@ -150,7 +150,7 @@ pub struct CiffMetadata {
     pub direct_iso: Option<u32>,
     pub measured_ev: Option<i16>,
     pub target_aperture: Option<u16>,
-    pub target_exposure_time: Option<u16>,
+    pub target_exposure_time: Option<i16>,
     pub exposure_compensation: Option<i16>,
     pub white_balance: Option<u16>,
     pub slow_shutter: Option<u16>,
@@ -164,7 +164,7 @@ pub struct CiffMetadata {
     pub focus_distance_upper: Option<u16>,
     pub focus_distance_lower: Option<u16>,
     pub f_number: Option<u16>,
-    pub exposure_time: Option<u16>,
+    pub exposure_time: Option<i16>,
     pub measured_ev2: Option<i16>,
     pub bulb_duration: Option<u16>,
     pub camera_type: Option<u16>,
@@ -618,7 +618,7 @@ impl<R: Read + Seek> CiffParser<R> {
         metadata.base_iso_value = read_u16(4);
         metadata.measured_ev = read_i16(6);
         metadata.target_aperture = read_u16(8);
-        metadata.target_exposure_time = read_u16(10);
+        metadata.target_exposure_time = read_i16(10);
         metadata.exposure_compensation = read_i16(12);
         metadata.white_balance = read_u16(14);
         metadata.slow_shutter = read_u16(16);
@@ -633,7 +633,7 @@ impl<R: Read + Seek> CiffParser<R> {
         metadata.focus_distance_lower = read_u16(38);
         // Index 21-24 per ExifTool Canon.pm
         metadata.f_number = read_u16(42); // Index 21
-        metadata.exposure_time = read_u16(44); // Index 22
+        metadata.exposure_time = read_i16(44); // Index 22
         metadata.measured_ev2 = read_i16(46); // Index 23
         metadata.bulb_duration = read_u16(48); // Index 24
         metadata.camera_type = read_u16(52); // Index 26
@@ -753,31 +753,38 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
     }
 
     // Add ExposureTime (tag 0x829A) - RATIONAL
-    // Canon stores as APEX value, convert: time = 2^(-value/32)
-    if let Some(apex_time) = metadata.exposure_time {
-        if apex_time > 0 {
-            let time_secs = 2.0_f64.powf(-(apex_time as f64) / 32.0);
-            // Express as rational: 1/x for short exposures, x/1 for long
-            let (num, denom) = if time_secs >= 1.0 {
-                ((time_secs * 10.0) as u32, 10u32)
-            } else {
-                (1u32, (1.0 / time_secs).round() as u32)
-            };
-            let mut rational = Vec::new();
-            rational.extend_from_slice(&num.to_le_bytes());
-            rational.extend_from_slice(&denom.to_le_bytes());
-            ifd_entries.push((0x829A, 5, 1, rational));
-        }
+    // Canon stores as APEX value (signed), convert: time = 2^(-value/32)
+    // Negative values = long exposures (> 1s), positive = short exposures (< 1s)
+    // ExifTool uses ExposureTime (index 22) as primary source, with TargetExposureTime
+    // (index 5) as fallback for older cameras where index 22 is zero/invalid
+    // ExifTool accepts values > -1000 and non-zero (0 would mean 1 second but is often invalid)
+    let apex_time = metadata
+        .exposure_time
+        .filter(|&v| v != 0 && v > -1000)
+        .or_else(|| metadata.target_exposure_time.filter(|&v| v > -1000));
+    if let Some(apex_val) = apex_time {
+        let time_secs = 2.0_f64.powf(-(apex_val as f64) / 32.0);
+        // Express as rational: 1/x for short exposures, x/1 for long
+        let (num, denom) = if time_secs >= 1.0 {
+            ((time_secs * 10.0) as u32, 10u32)
+        } else {
+            (1u32, (1.0 / time_secs).round() as u32)
+        };
+        let mut rational = Vec::new();
+        rational.extend_from_slice(&num.to_le_bytes());
+        rational.extend_from_slice(&denom.to_le_bytes());
+        ifd_entries.push((0x829A, 5, 1, rational));
     }
 
     // Add FNumber (tag 0x829D) - RATIONAL
     // Canon stores as APEX value, convert: fnumber = 2^(value/64)
+    // Store with high precision; formatting (%.2g for CRW) is done in output.rs
     if let Some(apex_fnum) = metadata.f_number {
         if apex_fnum > 0 {
             let fnum = 2.0_f64.powf((apex_fnum as f64) / 64.0);
-            // Express as rational with denominator 10 for one decimal place
-            let num = (fnum * 10.0).round() as u32;
-            let denom = 10u32;
+            // Express as rational with denominator 1000 for precision
+            let num = (fnum * 1000.0).round() as u32;
+            let denom = 1000u32;
             let mut rational = Vec::new();
             rational.extend_from_slice(&num.to_le_bytes());
             rational.extend_from_slice(&denom.to_le_bytes());

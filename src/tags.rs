@@ -414,11 +414,11 @@ pub const TAG_WHITE_LEVEL: ExifTagId = ExifTagId {
     id: 0xC61D,
     ifd: TagGroup::Main,
 };
-pub const TAG_ORIGINAL_RAW_FILE_NAME: ExifTagId = ExifTagId {
+pub const TAG_DEFAULT_SCALE: ExifTagId = ExifTagId {
     id: 0xC61E,
     ifd: TagGroup::Main,
 };
-pub const TAG_ORIGINAL_RAW_FILE_DATA: ExifTagId = ExifTagId {
+pub const TAG_DEFAULT_CROP_ORIGIN: ExifTagId = ExifTagId {
     id: 0xC61F,
     ifd: TagGroup::Main,
 };
@@ -471,7 +471,7 @@ pub const TAG_LENS_INFO: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 pub const TAG_RAW_DATA_UNIQUE_ID: ExifTagId = ExifTagId {
-    id: 0xC65C,
+    id: 0xC65D,
     ifd: TagGroup::Main,
 };
 pub const TAG_MASKED_AREAS: ExifTagId = ExifTagId {
@@ -479,7 +479,7 @@ pub const TAG_MASKED_AREAS: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 pub const TAG_SHADOW_SCALE: ExifTagId = ExifTagId {
-    id: 0xC634,
+    id: 0xC633,
     ifd: TagGroup::Main,
 };
 pub const TAG_CALIBRATION_ILLUMINANT1: ExifTagId = ExifTagId {
@@ -491,7 +491,7 @@ pub const TAG_CALIBRATION_ILLUMINANT2: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 pub const TAG_BEST_QUALITY_SCALE: ExifTagId = ExifTagId {
-    id: 0xC65D,
+    id: 0xC65C,
     ifd: TagGroup::Main,
 };
 pub const TAG_ACTIVE_AREA: ExifTagId = ExifTagId {
@@ -500,6 +500,16 @@ pub const TAG_ACTIVE_AREA: ExifTagId = ExifTagId {
 };
 pub const TAG_RAW_IMAGE_DIGEST: ExifTagId = ExifTagId {
     id: 0xC71C,
+    ifd: TagGroup::Main,
+};
+
+// CR2-specific tags
+pub const TAG_CR2_CFA_PATTERN: ExifTagId = ExifTagId {
+    id: 0xC5E0,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SRAW_TYPE: ExifTagId = ExifTagId {
+    id: 0xC6C5,
     ifd: TagGroup::Main,
 };
 
@@ -513,17 +523,49 @@ pub const TAG_FOCAL_PLANE_Y_SIZE: ExifTagId = ExifTagId {
     ifd: TagGroup::Main,
 };
 
-// Sony ARW SubIFD tags (0x7030-0x7040 range)
+// Sony ARW SubIFD tags (0x7000-0x7040 range)
+pub const TAG_SONY_RAW_FILE_TYPE: ExifTagId = ExifTagId {
+    id: 0x7000,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_TONE_CURVE: ExifTagId = ExifTagId {
+    id: 0x7010,
+    ifd: TagGroup::Main,
+};
 pub const TAG_SONY_VIGNETTING_CORRECTION: ExifTagId = ExifTagId {
     id: 0x7030,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_VIGNETTING_CORR_PARAMS: ExifTagId = ExifTagId {
+    id: 0x7032,
     ifd: TagGroup::Main,
 };
 pub const TAG_SONY_CHROMATIC_ABERRATION_CORRECTION: ExifTagId = ExifTagId {
     id: 0x7034,
     ifd: TagGroup::Main,
 };
+pub const TAG_SONY_CHROMATIC_ABERRATION_CORR_PARAMS: ExifTagId = ExifTagId {
+    id: 0x7035,
+    ifd: TagGroup::Main,
+};
 pub const TAG_SONY_DISTORTION_CORRECTION: ExifTagId = ExifTagId {
     id: 0x7036,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_DISTORTION_CORR_PARAMS: ExifTagId = ExifTagId {
+    id: 0x7037,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_RAW_IMAGE_SIZE: ExifTagId = ExifTagId {
+    id: 0x7038,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_CROP_TOP_LEFT: ExifTagId = ExifTagId {
+    id: 0x74C7,
+    ifd: TagGroup::Main,
+};
+pub const TAG_SONY_CROP_SIZE: ExifTagId = ExifTagId {
+    id: 0x74C8,
     ifd: TagGroup::Main,
 };
 
@@ -548,7 +590,7 @@ pub const TAG_SENSITIVITY_TYPE: ExifTagId = ExifTagId {
     id: 0x8830,
     ifd: TagGroup::Exif,
 };
-pub const TAG_SPECTRAL_SENSITIVITY: ExifTagId = ExifTagId {
+pub const TAG_RECOMMENDED_EXPOSURE_INDEX: ExifTagId = ExifTagId {
     id: 0x8832,
     ifd: TagGroup::Exif,
 };
@@ -562,6 +604,18 @@ pub const TAG_DATE_TIME_ORIGINAL: ExifTagId = ExifTagId {
 };
 pub const TAG_DATE_TIME_DIGITIZED: ExifTagId = ExifTagId {
     id: 0x9004,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_OFFSET_TIME: ExifTagId = ExifTagId {
+    id: 0x9010,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_OFFSET_TIME_ORIGINAL: ExifTagId = ExifTagId {
+    id: 0x9011,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_OFFSET_TIME_DIGITIZED: ExifTagId = ExifTagId {
+    id: 0x9012,
     ifd: TagGroup::Exif,
 };
 pub const TAG_COMPONENTS_CONFIGURATION: ExifTagId = ExifTagId {
@@ -642,6 +696,32 @@ pub const TAG_SUB_SEC_TIME_ORIGINAL: ExifTagId = ExifTagId {
 };
 pub const TAG_SUB_SEC_TIME_DIGITIZED: ExifTagId = ExifTagId {
     id: 0x9292,
+    ifd: TagGroup::Exif,
+};
+
+// EXIF 2.31 temperature/humidity/pressure tags
+pub const TAG_AMBIENT_TEMPERATURE: ExifTagId = ExifTagId {
+    id: 0x9400,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_HUMIDITY: ExifTagId = ExifTagId {
+    id: 0x9401,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_PRESSURE: ExifTagId = ExifTagId {
+    id: 0x9402,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_WATER_DEPTH: ExifTagId = ExifTagId {
+    id: 0x9403,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_ACCELERATION: ExifTagId = ExifTagId {
+    id: 0x9404,
+    ifd: TagGroup::Exif,
+};
+pub const TAG_CAMERA_ELEVATION_ANGLE: ExifTagId = ExifTagId {
+    id: 0x9405,
     ifd: TagGroup::Exif,
 };
 
@@ -862,6 +942,14 @@ pub const TAG_INTEROP_VERSION: ExifTagId = ExifTagId {
     id: 0x0002,
     ifd: TagGroup::Interop,
 };
+pub const TAG_RELATED_IMAGE_WIDTH: ExifTagId = ExifTagId {
+    id: 0x1001,
+    ifd: TagGroup::Interop,
+};
+pub const TAG_RELATED_IMAGE_HEIGHT: ExifTagId = ExifTagId {
+    id: 0x1002,
+    ifd: TagGroup::Interop,
+};
 
 // A static mapping of tag IDs to names
 static TAG_NAMES: OnceLock<HashMap<ExifTagId, &'static str>> = OnceLock::new();
@@ -973,8 +1061,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_BLACK_LEVEL_REPEAT_DIM, "BlackLevelRepeatDim");
     map.insert(TAG_BLACK_LEVEL, "BlackLevel");
     map.insert(TAG_WHITE_LEVEL, "WhiteLevel");
-    map.insert(TAG_ORIGINAL_RAW_FILE_NAME, "OriginalRawFileName");
-    map.insert(TAG_ORIGINAL_RAW_FILE_DATA, "OriginalRawFileData");
+    map.insert(TAG_DEFAULT_SCALE, "DefaultScale");
+    map.insert(TAG_DEFAULT_CROP_ORIGIN, "DefaultCropOrigin");
     map.insert(TAG_DEFAULT_CROP_SIZE, "DefaultCropSize");
     map.insert(TAG_COLOR_MATRIX1, "ColorMatrix1");
     map.insert(TAG_COLOR_MATRIX2, "ColorMatrix2");
@@ -986,7 +1074,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_PREVIEW_COLOR_SPACE, "PreviewColorSpace");
     map.insert(TAG_LINEAR_RESPONSE_LIMIT, "LinearResponseLimit");
     map.insert(TAG_CAMERA_SERIAL_NUMBER, "CameraSerialNumber");
-    map.insert(TAG_LENS_INFO, "LensInfo");
+    // ExifTool calls DNG tag 0xC630 "DNGLensInfo" to distinguish from EXIF LensInfo (0xA432)
+    map.insert(TAG_LENS_INFO, "DNGLensInfo");
     map.insert(TAG_RAW_DATA_UNIQUE_ID, "RawDataUniqueID");
     map.insert(TAG_MASKED_AREAS, "MaskedAreas");
     map.insert(TAG_SHADOW_SCALE, "ShadowScale");
@@ -996,13 +1085,28 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_ACTIVE_AREA, "ActiveArea");
     map.insert(TAG_RAW_IMAGE_DIGEST, "RawImageDigest");
 
+    // CR2-specific tags
+    map.insert(TAG_CR2_CFA_PATTERN, "CR2CFAPattern");
+    map.insert(TAG_SRAW_TYPE, "SRawType");
+
     // Sony ARW SubIFD tags
+    map.insert(TAG_SONY_RAW_FILE_TYPE, "SonyRawFileType");
+    map.insert(TAG_SONY_TONE_CURVE, "SonyToneCurve");
     map.insert(TAG_SONY_VIGNETTING_CORRECTION, "VignettingCorrection");
+    map.insert(TAG_SONY_VIGNETTING_CORR_PARAMS, "VignettingCorrParams");
     map.insert(
         TAG_SONY_CHROMATIC_ABERRATION_CORRECTION,
         "ChromaticAberrationCorrection",
     );
+    map.insert(
+        TAG_SONY_CHROMATIC_ABERRATION_CORR_PARAMS,
+        "ChromaticAberrationCorrParams",
+    );
     map.insert(TAG_SONY_DISTORTION_CORRECTION, "DistortionCorrection");
+    map.insert(TAG_SONY_DISTORTION_CORR_PARAMS, "DistortionCorrParams");
+    map.insert(TAG_SONY_RAW_IMAGE_SIZE, "SonyRawImageSize");
+    map.insert(TAG_SONY_CROP_TOP_LEFT, "SonyCropTopLeft");
+    map.insert(TAG_SONY_CROP_SIZE, "SonyCropSize");
 
     // EXIF SubIFD tags
     map.insert(TAG_EXPOSURE_TIME, "ExposureTime");
@@ -1010,10 +1114,13 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_EXPOSURE_PROGRAM, "ExposureProgram");
     map.insert(TAG_ISO_SPEED_RATINGS, "ISOSpeedRatings");
     map.insert(TAG_SENSITIVITY_TYPE, "SensitivityType");
-    map.insert(TAG_SPECTRAL_SENSITIVITY, "SpectralSensitivity");
+    map.insert(TAG_RECOMMENDED_EXPOSURE_INDEX, "RecommendedExposureIndex");
     map.insert(TAG_EXIF_VERSION, "ExifVersion");
     map.insert(TAG_DATE_TIME_ORIGINAL, "DateTimeOriginal");
     map.insert(TAG_DATE_TIME_DIGITIZED, "DateTimeDigitized");
+    map.insert(TAG_OFFSET_TIME, "OffsetTime");
+    map.insert(TAG_OFFSET_TIME_ORIGINAL, "OffsetTimeOriginal");
+    map.insert(TAG_OFFSET_TIME_DIGITIZED, "OffsetTimeDigitized");
     map.insert(TAG_COMPONENTS_CONFIGURATION, "ComponentsConfiguration");
     map.insert(TAG_COMPRESSED_BITS_PER_PIXEL, "CompressedBitsPerPixel");
     map.insert(TAG_SHUTTER_SPEED_VALUE, "ShutterSpeedValue");
@@ -1035,6 +1142,13 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_SUB_SEC_TIME, "SubSecTime");
     map.insert(TAG_SUB_SEC_TIME_ORIGINAL, "SubSecTimeOriginal");
     map.insert(TAG_SUB_SEC_TIME_DIGITIZED, "SubSecTimeDigitized");
+    // EXIF 2.31 environmental tags
+    map.insert(TAG_AMBIENT_TEMPERATURE, "AmbientTemperature");
+    map.insert(TAG_HUMIDITY, "Humidity");
+    map.insert(TAG_PRESSURE, "Pressure");
+    map.insert(TAG_WATER_DEPTH, "WaterDepth");
+    map.insert(TAG_ACCELERATION, "Acceleration");
+    map.insert(TAG_CAMERA_ELEVATION_ANGLE, "CameraElevationAngle");
     map.insert(TAG_FLASHPIX_VERSION, "FlashpixVersion");
     map.insert(TAG_COLOR_SPACE, "ColorSpace");
     map.insert(TAG_PIXEL_X_DIMENSION, "PixelXDimension");
@@ -1068,7 +1182,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     map.insert(TAG_IMAGE_UNIQUE_ID, "ImageUniqueID");
     map.insert(TAG_CAMERA_OWNER_NAME, "CameraOwnerName");
     map.insert(TAG_BODY_SERIAL_NUMBER, "BodySerialNumber");
-    map.insert(TAG_LENS_SPECIFICATION, "LensSpecification");
+    // ExifTool calls this "LensInfo" (official EXIF name is LensSpecification)
+    map.insert(TAG_LENS_SPECIFICATION, "LensInfo");
     map.insert(TAG_LENS_MAKE, "LensMake");
     map.insert(TAG_LENS_MODEL, "LensModel");
     map.insert(TAG_LENS_SERIAL_NUMBER, "LensSerialNumber");
@@ -1092,6 +1207,8 @@ fn init_tag_names() -> HashMap<ExifTagId, &'static str> {
     // Interoperability tags
     map.insert(TAG_INTEROP_INDEX, "InteropIndex");
     map.insert(TAG_INTEROP_VERSION, "InteropVersion");
+    map.insert(TAG_RELATED_IMAGE_WIDTH, "RelatedImageWidth");
+    map.insert(TAG_RELATED_IMAGE_HEIGHT, "RelatedImageHeight");
 
     map
 }
@@ -1331,6 +1448,20 @@ pub fn get_sharpness_description(value: u16) -> &'static str {
     }
 }
 
+/// Sony ARW SubIFD SonyRawFileType (tag 0x7000) values
+/// From ExifTool Exif.pm
+pub fn get_sony_raw_file_type_description(value: u16) -> &'static str {
+    match value {
+        0 => "Sony Uncompressed 14-bit RAW",
+        1 => "Sony Uncompressed 12-bit RAW",
+        2 => "Sony Compressed RAW",
+        3 => "Sony Lossless Compressed RAW",
+        4 => "Sony Lossless Compressed RAW 2",
+        6 => "Sony Compressed RAW HQ",
+        _ => "Unknown",
+    }
+}
+
 /// Sony ARW SubIFD VignettingCorrection (tag 0x7030) values
 /// From ExifTool Exif.pm
 pub fn get_sony_vignetting_correction_description(value: u16) -> &'static str {
@@ -1432,16 +1563,17 @@ pub fn get_compression_description(value: u16) -> &'static str {
 }
 
 /// Human-readable descriptions for SensingMethod values
-pub fn get_sensing_method_description(value: u16) -> &'static str {
+/// Returns "Unknown (N)" for unknown values to match ExifTool format
+pub fn get_sensing_method_description(value: u16) -> String {
     match value {
-        1 => "Not defined",
-        2 => "One-chip color area",
-        3 => "Two-chip color area",
-        4 => "Three-chip color area",
-        5 => "Color sequential area",
-        7 => "Trilinear",
-        8 => "Color sequential linear",
-        _ => "Unknown",
+        1 => "Not defined".to_string(),
+        2 => "One-chip color area".to_string(),
+        3 => "Two-chip color area".to_string(),
+        4 => "Three-chip color area".to_string(),
+        5 => "Color sequential area".to_string(),
+        7 => "Trilinear".to_string(),
+        8 => "Color sequential linear".to_string(),
+        _ => format!("Unknown ({})", value),
     }
 }
 
@@ -1461,20 +1593,22 @@ pub fn get_sensitivity_type_description(value: u16) -> &'static str {
 }
 
 /// Human-readable descriptions for FileSource values
-pub fn get_file_source_description(value: u8) -> &'static str {
+/// Returns "Unknown (N)" for unknown values to match ExifTool format
+pub fn get_file_source_description(value: u8) -> String {
     match value {
-        1 => "Film Scanner",
-        2 => "Reflection Print Scanner",
-        3 => "Digital Camera",
-        _ => "Unknown",
+        1 => "Film Scanner".to_string(),
+        2 => "Reflection Print Scanner".to_string(),
+        3 => "Digital Camera".to_string(),
+        _ => format!("Unknown ({})", value),
     }
 }
 
 /// Human-readable descriptions for SceneType values
-pub fn get_scene_type_description(value: u8) -> &'static str {
+/// Returns "Unknown (N)" for unknown values to match ExifTool format
+pub fn get_scene_type_description(value: u8) -> String {
     match value {
-        1 => "Directly photographed",
-        _ => "Unknown",
+        1 => "Directly photographed".to_string(),
+        _ => format!("Unknown ({})", value),
     }
 }
 

@@ -69,7 +69,7 @@ pub const PENTAX_LENS_DATA: u16 = 0x0043;
 pub const PENTAX_SENSITIVITY_STEPS: u16 = 0x0044;
 pub const PENTAX_CAMERAS_ORIENTATION: u16 = 0x0047;
 pub const PENTAX_NR_LEVEL: u16 = 0x0048;
-pub const PENTAX_SERIAL_NUMBER: u16 = 0x0049;
+pub const PENTAX_NOISE_REDUCTION: u16 = 0x0049;
 pub const PENTAX_DATA_DUMP: u16 = 0x0050;
 pub const PENTAX_SHAKE_REDUCTION_INFO: u16 = 0x005C;
 pub const PENTAX_SHUTTER_COUNT: u16 = 0x005D;
@@ -86,7 +86,7 @@ pub const PENTAX_BATTERY_INFO: u16 = 0x0217;
 pub const PENTAX_SHOT_INFO: u16 = 0x021F;
 pub const PENTAX_HOMTOWN_CITY_CODE: u16 = 0x0227;
 pub const PENTAX_DESTINATION_CITY_CODE: u16 = 0x0228;
-pub const PENTAX_K_DC_AF_INFO: u16 = 0x0229;
+pub const PENTAX_SERIAL_NUMBER: u16 = 0x0229;
 pub const PENTAX_PIXEL_SHIFT_INFO: u16 = 0x022A;
 pub const PENTAX_AF_POINT_INFO: u16 = 0x022B;
 pub const PENTAX_HDR_INFO: u16 = 0x022E;
@@ -152,7 +152,7 @@ pub fn get_pentax_tag_name(tag_id: u16) -> Option<&'static str> {
         PENTAX_SENSITIVITY_STEPS => Some("SensitivitySteps"),
         PENTAX_CAMERAS_ORIENTATION => Some("CameraOrientation"),
         PENTAX_NR_LEVEL => Some("NoiseReductionLevel"),
-        PENTAX_SERIAL_NUMBER => Some("SerialNumber"),
+        PENTAX_NOISE_REDUCTION => Some("NoiseReduction"),
         PENTAX_DATA_DUMP => Some("DataDump"),
         PENTAX_SHAKE_REDUCTION_INFO => Some("ShakeReductionInfo"),
         PENTAX_SHUTTER_COUNT => Some("ShutterCount"),
@@ -169,7 +169,7 @@ pub fn get_pentax_tag_name(tag_id: u16) -> Option<&'static str> {
         PENTAX_SHOT_INFO => Some("ShotInfo"),
         PENTAX_HOMTOWN_CITY_CODE => Some("HometownCityCode"),
         PENTAX_DESTINATION_CITY_CODE => Some("DestinationCityCode"),
-        PENTAX_K_DC_AF_INFO => Some("KDCAFInfo"),
+        PENTAX_SERIAL_NUMBER => Some("SerialNumber"),
         PENTAX_PIXEL_SHIFT_INFO => Some("PixelShiftInfo"),
         PENTAX_AF_POINT_INFO => Some("AFPointInfo"),
         PENTAX_HDR_INFO => Some("HDRInfo"),
@@ -1490,7 +1490,8 @@ pub fn decode_af_point_selected_multi(data: &[u16]) -> String {
     };
 
     // If there's a second value, it's the AF area mode
-    if data.len() > 1 && data[1] != 0 {
+    // Value 0 is "Single Point", 1 is "Expanded Area"
+    if data.len() > 1 {
         let area = match data[1] {
             0 => "Single Point",
             1 => "Expanded Area",
@@ -1559,6 +1560,41 @@ pub fn decode_image_size(values: &[u16]) -> Option<String> {
     Some(size.to_string())
 }
 
+/// Decrypt Pentax ShutterCount using Date and Time values
+/// Algorithm from ExifTool Pentax.pm CryptShutterCount
+/// The encryption is: value XOR date XOR (0xFFFFFFFF - time)
+fn decrypt_shutter_count(encrypted: &[u8], date_bytes: &[u8], time_bytes: &[u8]) -> Option<u32> {
+    // Need exactly 4 bytes for encrypted value
+    if encrypted.len() != 4 {
+        return None;
+    }
+    // Need at least 4 bytes for date
+    if date_bytes.len() < 4 {
+        return None;
+    }
+    // Need at least 3 bytes for time (padded to 4 with null)
+    if time_bytes.len() < 3 {
+        return None;
+    }
+
+    // Get encrypted value as big-endian u32
+    let val = u32::from_be_bytes([encrypted[0], encrypted[1], encrypted[2], encrypted[3]]);
+
+    // Get date as big-endian u32
+    let date = u32::from_be_bytes([date_bytes[0], date_bytes[1], date_bytes[2], date_bytes[3]]);
+
+    // Get time as big-endian u32 (pad with null byte if only 3 bytes)
+    let time = if time_bytes.len() >= 4 {
+        u32::from_be_bytes([time_bytes[0], time_bytes[1], time_bytes[2], time_bytes[3]])
+    } else {
+        u32::from_be_bytes([time_bytes[0], time_bytes[1], time_bytes[2], 0])
+    };
+
+    // Decrypt: val XOR date XOR (0xFFFFFFFF - time)
+    let decrypted = val ^ date ^ (0xFFFFFFFF_u32.wrapping_sub(time));
+    Some(decrypted)
+}
+
 /// Parse Pentax maker notes
 ///
 /// # Arguments
@@ -1573,6 +1609,11 @@ pub fn parse_pentax_maker_notes(
     tiff_offset: usize,
 ) -> Result<HashMap<u16, MakerNoteTag>, ExifError> {
     let mut tags = HashMap::new();
+
+    // Store raw Date and Time bytes for ShutterCount decryption
+    let mut raw_date_bytes: Option<Vec<u8>> = None;
+    let mut raw_time_bytes: Option<Vec<u8>> = None;
+    let mut raw_shutter_count_bytes: Option<Vec<u8>> = None;
 
     if data.len() < 10 {
         return Ok(tags);
@@ -1898,6 +1939,8 @@ pub fn parse_pentax_maker_notes(
                     {
                         ExifValue::Ascii(decode_firmware_version(&value_bytes))
                     } else if tag_id == PENTAX_DATE && value_bytes.len() >= 4 {
+                        // Store raw bytes for ShutterCount decryption
+                        raw_date_bytes = Some(value_bytes.clone());
                         // Date is stored as big-endian year (2 bytes) + month + day
                         if let Some(date_str) = decode_date_from_bytes(&value_bytes) {
                             ExifValue::Ascii(date_str)
@@ -1905,12 +1948,19 @@ pub fn parse_pentax_maker_notes(
                             ExifValue::Undefined(value_bytes)
                         }
                     } else if tag_id == PENTAX_TIME && value_bytes.len() >= 3 {
+                        // Store raw bytes for ShutterCount decryption
+                        raw_time_bytes = Some(value_bytes.clone());
                         // Time is stored as hour + minute + second
                         if let Some(time_str) = decode_time_from_bytes(&value_bytes) {
                             ExifValue::Ascii(time_str)
                         } else {
                             ExifValue::Undefined(value_bytes)
                         }
+                    } else if tag_id == PENTAX_SHUTTER_COUNT && value_bytes.len() == 4 {
+                        // Store for later decryption (needs Date and Time)
+                        raw_shutter_count_bytes = Some(value_bytes.clone());
+                        // Temporarily store as undefined, will be decrypted later
+                        ExifValue::Undefined(value_bytes)
                     } else {
                         ExifValue::Undefined(value_bytes)
                     }
@@ -1923,11 +1973,23 @@ pub fn parse_pentax_maker_notes(
 
             tags.insert(
                 tag_id,
-                MakerNoteTag {
-                    tag_id,
-                    tag_name: get_pentax_tag_name(tag_id),
-                    value,
-                },
+                MakerNoteTag::new(tag_id, get_pentax_tag_name(tag_id), value),
+            );
+        }
+    }
+
+    // Post-process: Decrypt ShutterCount if we have Date and Time
+    if let (Some(shutter_bytes), Some(date_bytes), Some(time_bytes)) =
+        (&raw_shutter_count_bytes, &raw_date_bytes, &raw_time_bytes)
+    {
+        if let Some(decrypted) = decrypt_shutter_count(shutter_bytes, date_bytes, time_bytes) {
+            tags.insert(
+                PENTAX_SHUTTER_COUNT,
+                MakerNoteTag::new(
+                    PENTAX_SHUTTER_COUNT,
+                    Some("ShutterCount"),
+                    ExifValue::Ascii(decrypted.to_string()),
+                ),
             );
         }
     }

@@ -128,6 +128,91 @@ constexpr TagDetails canonFocusMode[] = {
 };
 ```
 
+### Macros for Tag Decoding (`src/macros.rs`)
+
+Use these macros to reduce boilerplate when adding new tag decoders:
+
+#### `define_tag_decoder!` - Generate dual exiftool/exiv2 decode functions
+
+```rust
+// When exiftool and exiv2 have DIFFERENT mappings:
+define_tag_decoder! {
+    white_balance,
+    exiftool: {
+        1 => "Auto",
+        2 => "Daylight",
+        4 => "Incandescent",
+    },
+    exiv2: {
+        1 => "Auto",
+        2 => "Daylight",
+        4 => "Halogen",  // Different name in exiv2
+    }
+}
+
+// When both formats use the SAME mappings:
+define_tag_decoder! {
+    focus_mode,
+    both: {
+        1 => "Auto",
+        2 => "Manual",
+        4 => "Auto, Focus button",
+    }
+}
+
+// With explicit type (default is u16):
+define_tag_decoder! {
+    adjustment,
+    type: i32,
+    both: {
+        -2 => "-2",
+        -1 => "-1",
+        0 => "0",
+        1 => "+1",
+    }
+}
+```
+
+This generates `decode_white_balance_exiftool()` and `decode_white_balance_exiv2()` functions.
+
+#### `decode_field!` - Extract fields from binary arrays
+
+Use in decode functions that process `&[u16]` arrays (like CameraSettings, ShotInfo):
+
+```rust
+pub fn decode_camera_settings(data: &[u16]) -> HashMap<String, ExifValue> {
+    let mut decoded = HashMap::new();
+
+    // Simple decode - call decoder function on data[index]
+    decode_field!(decoded, data, 7, "FocusMode", decode_focus_mode_exiftool);
+
+    // With skip condition - skip if value equals skip_value
+    decode_field!(decoded, data, 19, "AFPoint", decode_af_point_exiftool, skip_if: 0);
+
+    // Raw numeric output (no decoder function)
+    decode_field!(decoded, data, 5, "RawValue", raw_u16);
+    decode_field!(decoded, data, 6, "SignedValue", raw_i16);
+
+    // With i16 cast before decoding (for signed values stored as u16)
+    decode_field!(decoded, data, 9, "Contrast", decode_contrast_exiftool, cast: i16);
+
+    decoded
+}
+```
+
+#### `decode_picture_styles!` - Canon PictureStyle fields
+
+For Canon ColorData PictureStyleInfo sections (9 styles × 4 fields each):
+
+```rust
+decode_picture_styles!(decoded, data,
+    0x00 => "Standard",
+    0x06 => "Portrait",
+    0x0c => "Landscape",
+    // ... generates ContrastStandard, SharpnessStandard, SaturationStandard, ColorToneStandard, etc.
+);
+```
+
 ### Decode Function Naming Convention
 
 All value-to-string decode functions MUST have format suffixes:
@@ -215,7 +300,29 @@ Use `./bin/mfr-test` to track progress and prevent regressions when working on M
 ./bin/mfr-test --list-baselines
 ```
 
-Supported manufacturers: `canon`, `nikon`, `sony`, `fujifilm`, `panasonic`, `olympus`, `minolta`, `kodak`, `dng`
+Supported manufacturers: `canon`, `nikon`, `sony`, `fujifilm`, `panasonic`, `olympus`, `pentax`, `minolta`, `kodak`, `sigma`, `samsung`, `ricoh`, `leica`, `dng`
+
+### Test Data Directories
+
+There are two test data directories:
+
+| Directory | Flag | Description |
+|-----------|------|-------------|
+| `/fpexif/raws/` | (default) | Small curated set of RAW files for quick testing |
+| `/fpexif/data.lfs/` | `--data-lfs` | Large dataset with more camera models and edge cases |
+
+```bash
+# Test against default /fpexif/raws directory
+./bin/mfr-test fujifilm
+
+# Test against larger /fpexif/data.lfs directory
+./bin/mfr-test fujifilm --data-lfs
+
+# Verbose output shows per-file details and specific mismatches
+./bin/mfr-test fujifilm --data-lfs --verbose
+```
+
+Always test against both directories when making significant changes. The `data.lfs` directory often reveals edge cases not present in the smaller `raws` set.
 
 The `--check` flag shows:
 - **Matching/Mismatched/Missing/Extra** counts with delta from baseline
@@ -226,5 +333,6 @@ The `--check` flag shows:
 1. Save baseline before starting: `./bin/mfr-test olympus --save-baseline`
 2. Make changes to the makernote parser
 3. Check for regressions: `./bin/mfr-test olympus --check`
-4. If regressions appear, investigate and fix before committing
-5. Run `./bin/ccc` before pushing
+4. Test against larger dataset: `./bin/mfr-test olympus --data-lfs`
+5. If regressions appear, investigate and fix before committing
+6. Run `./bin/ccc` before pushing
