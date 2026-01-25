@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             // Get the filename as a string
                             let filename = file.to_string_lossy().to_string();
                             let json_obj =
-                                fpexif::output::to_exiftool_json(&exif_data, Some(&filename));
+                                fpexif::output::to_exiftool_json(&exif_data, Some(&filename), None);
 
                             // Extract the single object from the array
                             if let serde_json::Value::Array(mut arr) = json_obj {
@@ -344,7 +344,7 @@ fn print_exif_data_exiftool(exif_data: &ExifData, source_file: Option<&str>) {
     // Use to_exiftool_json to get consistent output with JSON mode
     // This ensures tag filtering (removing duplicates, IFD pointers, raw binary) is applied
     // source_file is needed for format-specific overrides (e.g., Pentax DNG vs PEF)
-    let json = fpexif::output::to_exiftool_json(exif_data, source_file);
+    let json = fpexif::output::to_exiftool_json(exif_data, source_file, None);
 
     // Extract the object from the array
     if let serde_json::Value::Array(arr) = json {
@@ -516,7 +516,7 @@ fn print_exif_data_json(exif_data: &ExifData) -> Result<(), Box<dyn std::error::
     let source_file = env::args().nth(2);
 
     // Use the library's output module to format as JSON
-    let json = fpexif::output::to_exiftool_json(exif_data, source_file.as_deref());
+    let json = fpexif::output::to_exiftool_json(exif_data, source_file.as_deref(), None);
 
     println!("{}", serde_json::to_string_pretty(&json)?);
     Ok(())

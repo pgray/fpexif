@@ -88,6 +88,8 @@ pub struct ExifData {
     pub mrw_metadata: Option<formats::MrwMetadata>,
     // RW2-specific metadata (for Panasonic RAW files)
     pub rw2_metadata: Option<formats::Rw2Metadata>,
+    // File size in bytes (populated from WASM or file metadata)
+    file_size: Option<u64>,
 }
 
 impl ExifData {
@@ -100,6 +102,7 @@ impl ExifData {
             raf_metadata: None,
             mrw_metadata: None,
             rw2_metadata: None,
+            file_size: None,
         }
     }
 
@@ -131,6 +134,16 @@ impl ExifData {
     /// Get RW2-specific metadata
     pub fn get_rw2_metadata(&self) -> Option<&formats::Rw2Metadata> {
         self.rw2_metadata.as_ref()
+    }
+
+    /// Set file size in bytes
+    pub fn set_file_size(&mut self, size: u64) {
+        self.file_size = Some(size);
+    }
+
+    /// Get file size in bytes
+    pub fn get_file_size(&self) -> Option<u64> {
+        self.file_size
     }
 
     /// Get a tag value by its numeric ID

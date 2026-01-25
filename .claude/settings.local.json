@@ -42,7 +42,8 @@
       "Bash(for f in /fpexif/raws/RAW_FUJIFILM*.RAF /fpexif/raws/RAW_FUJI*.RAF)",
       "Bash(do echo '=== $f ===')",
       "Bash(ffmpeg:*)",
-      "Bash(paplay:*)"
+      "Bash(paplay:*)",
+      "Bash(./bin/beep:*)"
     ],
     "deny": [],
     "ask": []

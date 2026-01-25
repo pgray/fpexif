@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>fpexif - Essential EXIF Tags Demo</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+          Arial, sans-serif;
+        line-height: 1.6;
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        background: #f5f5f5;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 0.5rem;
+      }
+
+      .subtitle {
+        color: #666;
+        margin-bottom: 2rem;
+      }
+
+      .upload-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+      }
+
+      .file-input-wrapper {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+      }
+
+      input[type='file'] {
+        position: absolute;
+        left: -9999px;
+      }
+
+      .file-input-label {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background: #007bff;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .file-input-label:hover {
+        background: #0056b3;
+      }
+
+      .file-name {
+        margin-left: 1rem;
+        color: #666;
+      }
+
+      .loading {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 4px;
+        color: #856404;
+      }
+
+      .results {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        display: none;
+      }
+
+      .results.visible {
+        display: block;
+      }
+
+      .camera-info {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #eee;
+      }
+
+      .camera-info h2 {
+        color: #333;
+        margin-bottom: 0.5rem;
+      }
+
+      .camera-info .model {
+        color: #666;
+        font-size: 1.1rem;
+      }
+
+      .exif-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+
+      .exif-item {
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border-left: 3px solid #007bff;
+      }
+
+      .exif-item .label {
+        font-size: 0.85rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.25rem;
+      }
+
+      .exif-item .value {
+        font-size: 1.25rem;
+        color: #333;
+        font-weight: 600;
+      }
+
+      .formatted-output {
+        margin-top: 2rem;
+        padding: 1.5rem;
+        background: #2d2d2d;
+        color: #f8f8f2;
+        border-radius: 4px;
+        font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+        font-size: 0.9rem;
+        line-height: 1.8;
+        white-space: pre-wrap;
+      }
+
+      .error {
+        padding: 1rem;
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        color: #721c24;
+        margin-top: 1rem;
+      }
+
+      .note {
+        margin-top: 2rem;
+        padding: 1rem;
+        background: #e7f3ff;
+        border-left: 4px solid #2196f3;
+        border-radius: 4px;
+      }
+
+      .note strong {
+        color: #1976d2;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>fpexif - Essential EXIF Tags Extractor</h1>
+    <p class="subtitle">Extract the 8 most important photography metadata tags from RAW and JPEG files</p>
+
+    <div class="upload-section">
+      <div class="file-input-wrapper">
+        <input type="file" id="fileInput" accept="image/*,.cr2,.cr3,.nef,.arw,.raf,.dng,.orf,.rw2,.pef" />
+        <label for="fileInput" class="file-input-label">Choose Photo</label>
+        <span class="file-name" id="fileName">No file selected</span>
+      </div>
+
+      <div id="loading" class="loading" style="display: none">
+        Extracting EXIF data...
+      </div>
+
+      <div id="error" class="error" style="display: none"></div>
+    </div>
+
+    <div id="results" class="results">
+      <div class="camera-info">
+        <h2 id="cameraMake">—</h2>
+        <div class="model" id="cameraModel">—</div>
+      </div>
+
+      <div class="exif-grid">
+        <div class="exif-item">
+          <div class="label">ISO</div>
+          <div class="value" id="iso">—</div>
+        </div>
+        <div class="exif-item">
+          <div class="label">Aperture</div>
+          <div class="value" id="aperture">—</div>
+        </div>
+        <div class="exif-item">
+          <div class="label">Shutter Speed</div>
+          <div class="value" id="shutterSpeed">—</div>
+        </div>
+        <div class="exif-item">
+          <div class="label">Focal Length</div>
+          <div class="value" id="focalLength">—</div>
+        </div>
+        <div class="exif-item">
+          <div class="label">Date Taken</div>
+          <div class="value" id="createDate">—</div>
+        </div>
+        <div class="exif-item">
+          <div class="label">File Size</div>
+          <div class="value" id="fileSize">—</div>
+        </div>
+      </div>
+
+      <h3>Formatted Output</h3>
+      <div class="formatted-output" id="formattedOutput"></div>
+    </div>
+
+    <div class="note">
+      <strong>Note:</strong> All tag names are case-insensitive. You can use "make", "Make", or "MAKE".
+      Snake_case like "shutter_speed" also works!
+    </div>
+
+    <script type="module">
+      // Import the WASM module and helper functions
+      import init, { parse_exif_json } from '../pkg/fpexif.js';
+
+      let wasmInitialized = false;
+
+      // Initialize WASM on page load
+      async function initWasm() {
+        if (!wasmInitialized) {
+          await init();
+          wasmInitialized = true;
+          console.log('fpexif WASM initialized');
+        }
+      }
+
+      // Helper to format essential tags as a string
+      function formatEssentialTags(tags) {
+        const lines = [];
+
+        if (tags.make || tags.model) {
+          const camera = [tags.make, tags.model].filter(Boolean).join(' ');
+          lines.push(camera);
+        }
+
+        const params = [];
+        if (tags.iso !== undefined) params.push(`ISO ${tags.iso}`);
+        if (tags.aperture !== undefined) params.push(`f/${tags.aperture}`);
+        if (tags.shutter_speed) params.push(tags.shutter_speed + 's');
+        if (tags.focal_length) params.push(tags.focal_length);
+
+        if (params.length > 0) {
+          lines.push(params.join(' • '));
+        }
+
+        const metadata = [];
+        if (tags.create_date) metadata.push(tags.create_date);
+        if (tags.file_size) metadata.push(tags.file_size);
+
+        if (metadata.length > 0) {
+          lines.push(metadata.join(' • '));
+        }
+
+        return lines.join('\n');
+      }
+
+      // Extract essential EXIF tags from image data
+      async function extractEssentialTags(imageData) {
+        if (!wasmInitialized) {
+          throw new Error('WASM not initialized');
+        }
+
+        const bytes = new Uint8Array(imageData);
+        const jsonString = parse_exif_json(bytes);
+        const exifArray = JSON.parse(jsonString);
+
+        if (!exifArray || exifArray.length === 0) {
+          throw new Error('No EXIF data found');
+        }
+
+        const exifData = exifArray[0];
+
+        return {
+          make: exifData.Make,
+          model: exifData.Model,
+          iso: exifData.ISO,
+          aperture: exifData.Aperture,
+          shutter_speed: exifData.ShutterSpeed,
+          focal_length: exifData.FocalLength,
+          create_date: exifData.CreateDate || exifData.DateTimeOriginal,
+          file_size: exifData.FileSize,
+        };
+      }
+
+      // Handle file selection
+      document.getElementById('fileInput').addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Update file name display
+        document.getElementById('fileName').textContent = file.name;
+
+        // Show loading, hide error and results
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('error').style.display = 'none';
+        document.getElementById('results').classList.remove('visible');
+
+        try {
+          // Initialize WASM if needed
+          await initWasm();
+
+          // Read file
+          const arrayBuffer = await file.arrayBuffer();
+
+          // Extract EXIF data
+          const tags = await extractEssentialTags(arrayBuffer);
+
+          // Update UI
+          document.getElementById('cameraMake').textContent = tags.make || '—';
+          document.getElementById('cameraModel').textContent = tags.model || '—';
+          document.getElementById('iso').textContent = tags.iso || '—';
+          document.getElementById('aperture').textContent = tags.aperture ? `f/${tags.aperture}` : '—';
+          document.getElementById('shutterSpeed').textContent = tags.shutter_speed || '—';
+          document.getElementById('focalLength').textContent = tags.focal_length || '—';
+          document.getElementById('createDate').textContent = tags.create_date || '—';
+          document.getElementById('fileSize').textContent = tags.file_size || '—';
+
+          // Show formatted output
+          const formatted = formatEssentialTags(tags);
+          document.getElementById('formattedOutput').textContent = formatted;
+
+          // Show results
+          document.getElementById('results').classList.add('visible');
+        } catch (error) {
+          console.error('Error extracting EXIF data:', error);
+          document.getElementById('error').textContent = `Error: ${error.message}`;
+          document.getElementById('error').style.display = 'block';
+        } finally {
+          document.getElementById('loading').style.display = 'none';
+        }
+      });
+
+      // Initialize WASM on page load
+      initWasm();
+    </script>
+  </body>
+</html>

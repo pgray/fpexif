@@ -1302,6 +1302,9 @@ pub fn parse_fuji_maker_notes(
                             }
                             FUJI_CROP_MODE => Some(decode_crop_mode_exiftool(v).to_string()),
                             FUJI_COLOR_MODE => Some(decode_color_mode_exiftool(v).to_string()),
+                            FUJI_SCENE_RECOGNITION => {
+                                Some(decode_scene_recognition_exiftool(v).to_string())
+                            }
                             FUJI_IMAGE_COUNT => {
                                 // Apply mask 0x7fff
                                 let count = v & 0x7fff;
@@ -1631,6 +1634,16 @@ pub fn parse_fuji_maker_notes(
                                 } else {
                                     ExifValue::Ascii(format!("{:+.1}", converted))
                                 }
+                            // FlashExposureComp: format with 2 decimal places like ExifTool
+                            } else if tag_id == FUJI_FLASH_EXPOSURE_COMP {
+                                // Round to 2 decimal places
+                                let rounded = (val * 100.0).round() / 100.0;
+                                ExifValue::Ascii(
+                                    format!("{:.2}", rounded)
+                                        .trim_end_matches('0')
+                                        .trim_end_matches('.')
+                                        .to_string(),
+                                )
                             // Format as integer if it's a whole number
                             } else if val == val.floor() {
                                 ExifValue::Ascii(format!("{}", val as i64))

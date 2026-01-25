@@ -37,6 +37,25 @@ fn to_title_case(s: &str) -> String {
         .join(" ")
 }
 
+/// Format file size in human-readable format matching exiftool's output
+/// Examples: "512 bytes", "1.5 kB", "34 MB", "1.5 GB"
+#[cfg(feature = "serde")]
+fn format_file_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{} MB", bytes / MB) // exiftool uses integer MB
+    } else if bytes >= KB {
+        format!("{:.1} kB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} bytes", bytes)
+    }
+}
+
 /// Round to specified decimal places using banker's rounding (round half to even)
 /// This matches Perl's default rounding behavior used by ExifTool
 fn round_half_even(x: f64, decimals: i32) -> f64 {
@@ -1509,12 +1528,27 @@ pub fn format_exif_value_for_json_with_make_and_name(
 
 /// Convert ExifData to exiftool-compatible JSON
 #[cfg(feature = "serde")]
-pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Value {
+pub fn to_exiftool_json(
+    exif_data: &ExifData,
+    source_file: Option<&str>,
+    file_size: Option<u64>,
+) -> Value {
     let mut output = Map::new();
 
     // Add SourceFile field if provided
     if let Some(file) = source_file {
         output.insert("SourceFile".to_string(), Value::String(file.to_string()));
+    }
+
+    // Add FileSize fields if provided
+    if let Some(size) = file_size.or_else(|| exif_data.get_file_size()) {
+        // Human-readable format (matches exiftool)
+        output.insert(
+            "FileSize".to_string(),
+            Value::String(format_file_size(size)),
+        );
+        // Raw bytes as number (for programmatic use)
+        output.insert("FileSizeBytes".to_string(), Value::Number(size.into()));
     }
 
     // Extract Make for manufacturer-specific formatting (tag 0x010F)
@@ -1897,19 +1931,6 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         output.insert("GPSDestDistanceRef".to_string(), Value::String(expanded));
     }
 
-    // Add derived date fields for ExifTool compatibility
-    // ModifyDate is an alias for DateTime (0x0132)
-    if let Some(ExifValue::Ascii(s)) = exif_data.get_tag_by_id(0x0132) {
-        let cleaned = s.trim_end_matches('\0').trim();
-        output.insert("ModifyDate".to_string(), Value::String(cleaned.to_string()));
-    }
-
-    // CreateDate is an alias for DateTimeDigitized (0x9004)
-    if let Some(ExifValue::Ascii(s)) = exif_data.get_tag_by_id(0x9004) {
-        let cleaned = s.trim_end_matches('\0').trim();
-        output.insert("CreateDate".to_string(), Value::String(cleaned.to_string()));
-    }
-
     // SubSec composite date tags - date + subsec
     // SubSecModifyDate = ModifyDate + SubSecTime
     let subsec_time = exif_data.get_tag_by_id(0x9290).and_then(|v| match v {
@@ -1925,22 +1946,94 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
         _ => None,
     });
 
+    // Helper to validate and sanitize timezone offset strings
+    // Valid format: [+|-]HH:MM or empty
+    // Olympus cameras sometimes write malformed offsets like "   :  "
+    let sanitize_offset = |s: &str| -> Option<String> {
+        let trimmed = s.trim_end_matches('\0').trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        // Check if it matches the pattern: optional +/-, 2 digits, :, 2 digits
+        if trimmed.len() == 6 {
+            let bytes = trimmed.as_bytes();
+            if (bytes[0] == b'+' || bytes[0] == b'-')
+                && bytes[1].is_ascii_digit()
+                && bytes[2].is_ascii_digit()
+                && bytes[3] == b':'
+                && bytes[4].is_ascii_digit()
+                && bytes[5].is_ascii_digit()
+            {
+                return Some(trimmed.to_string());
+            }
+        }
+        // Invalid format - treat as empty
+        None
+    };
+
     // OffsetTime tags for timezone info (EXIF 2.31+)
     // 0x9010: OffsetTime (for ModifyDate)
     // 0x9011: OffsetTimeOriginal (for DateTimeOriginal)
     // 0x9012: OffsetTimeDigitized (for CreateDate/DateTimeDigitized)
     let offset_time = exif_data.get_tag_by_id(0x9010).and_then(|v| match v {
-        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        ExifValue::Ascii(s) => sanitize_offset(s),
         _ => None,
     });
     let offset_time_original = exif_data.get_tag_by_id(0x9011).and_then(|v| match v {
-        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        ExifValue::Ascii(s) => sanitize_offset(s),
         _ => None,
     });
     let offset_time_digitized = exif_data.get_tag_by_id(0x9012).and_then(|v| match v {
-        ExifValue::Ascii(s) => Some(s.trim_end_matches('\0').trim().to_string()),
+        ExifValue::Ascii(s) => sanitize_offset(s),
         _ => None,
     });
+
+    // Add derived date fields for ExifTool compatibility
+    // Timezone offset behavior varies by format:
+    // - RAF, ORF files: Do NOT include offset in ModifyDate/CreateDate (output OffsetTime separately)
+    // - CR2/NEF/etc: Do NOT include offset (no OffsetTime tags typically)
+    // - Other formats: Check case-by-case
+    let is_raf = source_file
+        .map(|f| f.to_uppercase().ends_with(".RAF"))
+        .unwrap_or(false);
+    let is_orf = source_file
+        .map(|f| f.to_uppercase().ends_with(".ORF"))
+        .unwrap_or(false);
+    let is_nef = source_file
+        .map(|f| {
+            let upper = f.to_uppercase();
+            upper.ends_with(".NEF") || upper.ends_with(".NRW")
+        })
+        .unwrap_or(false);
+    let include_tz = !is_raf && !is_orf && !is_nef; // Exclude timezone for RAF, ORF, and NEF/NRW files
+
+    // ModifyDate is an alias for DateTime (0x0132)
+    if let Some(ExifValue::Ascii(s)) = exif_data.get_tag_by_id(0x0132) {
+        let cleaned = s.trim_end_matches('\0').trim();
+        let tz = if include_tz {
+            offset_time.as_deref().unwrap_or("")
+        } else {
+            ""
+        };
+        output.insert(
+            "ModifyDate".to_string(),
+            Value::String(format!("{}{}", cleaned, tz)),
+        );
+    }
+
+    // CreateDate is an alias for DateTimeDigitized (0x9004)
+    if let Some(ExifValue::Ascii(s)) = exif_data.get_tag_by_id(0x9004) {
+        let cleaned = s.trim_end_matches('\0').trim();
+        let tz = if include_tz {
+            offset_time_digitized.as_deref().unwrap_or("")
+        } else {
+            ""
+        };
+        output.insert(
+            "CreateDate".to_string(),
+            Value::String(format!("{}{}", cleaned, tz)),
+        );
+    }
 
     // SubSecModifyDate = ModifyDate (0x0132) + SubSecTime (0x9290) + OffsetTime (0x9010)
     if let (Some(ExifValue::Ascii(date)), Some(subsec)) =
@@ -2052,25 +2145,41 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
             let is_kodak = make_ref.is_some_and(|m| m.to_uppercase().contains("KODAK"));
             let is_kodak_metering_skip = is_kodak && tag_name == "MeteringMode";
 
+            // For Canon cameras, ColorSpace behavior depends on file format:
+            // CR3 files: Canon MakerNote ColorSpace overrides EXIF ColorSpace
+            // CR2 files: Use EXIF ColorSpace, skip Canon MakerNote ColorSpace
+            let is_canon = make_ref.is_some_and(|m| m.to_uppercase().contains("CANON"));
+            let is_cr3_file = source_file
+                .map(|f| f.to_uppercase().ends_with(".CR3"))
+                .unwrap_or(false);
+            let is_cr2_file = source_file
+                .map(|f| f.to_uppercase().ends_with(".CR2"))
+                .unwrap_or(false);
+            let is_canon_colorspace_skip = is_canon && is_cr2_file && tag_name == "ColorSpace";
+            let is_canon_colorspace_override = is_canon && is_cr3_file && tag_name == "ColorSpace";
+
             // For Nikon, SerialNumber tag 0x00A0 should override 0x001D because
             // 0x001D often contains model name on older cameras, not serial number
             let is_nikon = make_ref.is_some_and(|m| m.to_uppercase().contains("NIKON"));
             let is_nikon_serial_override =
                 is_nikon && tag_name == "SerialNumber" && *tag_id == 0x00A0;
 
-            let should_insert = if is_minolta_metering_skip || is_kodak_metering_skip {
-                false // Skip MakerNote MeteringMode, use EXIF instead
-            } else if is_nikon_serial_override
-                || MAKERNOTE_PRIORITY_TAGS.contains(&tag_name)
-                || is_sony_subtag
-                || is_pentax_dng_override
-            {
-                // Nikon SerialNumber 0x00A0 always overrides 0x001D
-                // Priority tags always use MakerNote value
-                true
-            } else {
-                !output.contains_key(tag_name) // Only add if not already present
-            };
+            let should_insert =
+                if is_minolta_metering_skip || is_kodak_metering_skip || is_canon_colorspace_skip {
+                    false // Skip MakerNote tag, use EXIF instead
+                } else if is_nikon_serial_override
+                    || is_canon_colorspace_override
+                    || MAKERNOTE_PRIORITY_TAGS.contains(&tag_name)
+                    || is_sony_subtag
+                    || is_pentax_dng_override
+                {
+                    // Nikon SerialNumber 0x00A0 always overrides 0x001D
+                    // Canon ColorSpace in CR3 files overrides EXIF
+                    // Priority tags always use MakerNote value
+                    true
+                } else {
+                    !output.contains_key(tag_name) // Only add if not already present
+                };
 
             if should_insert {
                 let json_value = format_exif_value_for_json_with_make_and_name(
@@ -3470,4 +3579,53 @@ pub fn to_exiftool_json(exif_data: &ExifData, source_file: Option<&str>) -> Valu
 
     // Wrap in an array like exiftool does
     Value::Array(vec![Value::Object(output)])
+}
+
+/// Normalize tag name for case-insensitive comparison
+/// Converts to lowercase and removes underscores
+/// Examples: "ShutterSpeed" -> "shutterspeed", "shutter_speed" -> "shutterspeed"
+#[cfg(feature = "serde")]
+fn normalize_tag_name(name: &str) -> String {
+    name.to_lowercase().replace('_', "")
+}
+
+/// Case-insensitive tag lookup from exiftool JSON output
+/// Normalizes input tag name and searches for matches
+///
+/// # Arguments
+/// * `json` - The JSON value returned from `to_exiftool_json()`
+/// * `tag_name` - The tag name to search for (case-insensitive)
+///
+/// # Returns
+/// The tag value if found, None otherwise
+///
+/// # Examples
+/// ```ignore
+/// // All these work:
+/// get_tag_value(&json, "make")
+/// get_tag_value(&json, "Make")
+/// get_tag_value(&json, "MAKE")
+/// get_tag_value(&json, "shutter_speed")
+/// get_tag_value(&json, "ShutterSpeed")
+/// ```
+#[cfg(feature = "serde")]
+pub fn get_tag_value(json: &Value, tag_name: &str) -> Option<Value> {
+    let normalized = normalize_tag_name(tag_name);
+
+    if let Value::Array(arr) = json {
+        if let Some(Value::Object(map)) = arr.first() {
+            // Try exact match first
+            if let Some(value) = map.get(tag_name) {
+                return Some(value.clone());
+            }
+
+            // Try case-insensitive match
+            for (key, value) in map {
+                if normalize_tag_name(key) == normalized {
+                    return Some(value.clone());
+                }
+            }
+        }
+    }
+    None
 }
