@@ -12,6 +12,7 @@ It aims to be a complete alternative to libraries like libexiv2 and ExifTool, wi
 - Zero dependencies for the core functionality
 - Fast and memory-efficient parsing
 - Support for all standard EXIF tags
+- **WebAssembly support** for browser and Node.js
 - Support for 23+ image formats including:
   - **Web formats**: JPEG, PNG, WebP, AVIF, HEIC/HEIF, JPEG XL
   - **RAW formats**: CR2, CR3, CRW, NEF, NRW, DNG, ARW, PEF, RWL, ORF, SRW, RW2, RAF, MRW, X3F
@@ -70,6 +71,53 @@ fpexif list path/to/image.jpg
 # Extract a specific tag
 fpexif extract path/to/image.jpg DateTimeOriginal
 ```
+
+### WebAssembly Support
+
+Use fpexif directly in the browser with WebAssembly:
+
+#### Installation
+
+1. Install wasm-pack:
+   ```bash
+   cargo install wasm-pack
+   ```
+
+2. Build the WASM package:
+   ```bash
+   wasm-pack build --target web
+   ```
+
+   This creates a `pkg/` directory with the WASM module and JavaScript bindings.
+
+#### Quick Example
+
+```javascript
+import { initWasm, extractEssentialTags } from './pkg/fpexif.js';
+
+// Initialize WASM module
+await initWasm();
+
+// Extract essential tags from an image file
+const file = document.querySelector('input[type="file"]').files[0];
+const arrayBuffer = await file.arrayBuffer();
+const bytes = new Uint8Array(arrayBuffer);
+
+const tags = await extractEssentialTags(bytes);
+console.log(tags);
+// {
+//   make: "Canon",
+//   model: "Canon EOS 5D Mark IV",
+//   iso: 100,
+//   aperture: 5.6,
+//   shutter_speed: "1/800",
+//   focal_length: "50.0 mm",
+//   create_date: "2024:01:15 14:30:22",
+//   file_size: "34 MB"
+// }
+```
+
+See the [examples/](examples/) directory for comprehensive usage examples including React integration, batch processing, and Node.js support.
 
 ## Building from Source
 
