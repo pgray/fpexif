@@ -7657,6 +7657,21 @@ pub fn decode_camera_info_50d(data: &[u8]) -> HashMap<String, ExifValue> {
         return decoded;
     }
 
+    // FirmwareVersion at offset 0x15e (Canon.pm CameraInfo50D)
+    if data.len() > 0x15e + 6 {
+        // Format: string[6] - extract null-terminated or space-padded string
+        let fw_bytes = &data[0x15e..0x15e + 6];
+        if let Ok(fw_str) = std::str::from_utf8(fw_bytes) {
+            let trimmed = fw_str.trim_end_matches('\0').trim_end();
+            if !trimmed.is_empty() {
+                decoded.insert(
+                    "FirmwareVersion".to_string(),
+                    ExifValue::Ascii(trimmed.to_string()),
+                );
+            }
+        }
+    }
+
     // CameraOrientation at offset 0x31 (Canon.pm CameraInfo50D)
     if data.len() > 0x31 {
         let value = data[0x31];
@@ -7902,43 +7917,64 @@ pub fn decode_camera_info_50d(data: &[u8]) -> HashMap<String, ExifValue> {
 /// PictureStyleInfo starts at offset 0x3b0 (944) within CameraInfo
 /// CameraOrientation at offset 0x7d (Canon.pm CameraInfo5DmkIII)
 pub fn decode_camera_info_5dmkiii(data: &[u8]) -> HashMap<String, ExifValue> {
-    decode_camera_info_psinfo_with_orientation(data, 0x3b0, Some(0x7d))
+    decode_camera_info_psinfo_with_orientation(data, 0x3b0, Some(0x7d), Some(0x23c))
 }
 
 /// Decode Canon CameraInfo for 70D
 /// PictureStyleInfo starts at offset 0x3cf (975) within CameraInfo
 /// CameraOrientation at offset 0x84 (Canon.pm CameraInfo70D)
 pub fn decode_camera_info_70d(data: &[u8]) -> HashMap<String, ExifValue> {
-    decode_camera_info_psinfo_with_orientation(data, 0x3cf, Some(0x84))
+    decode_camera_info_psinfo_with_orientation(data, 0x3cf, Some(0x84), Some(0x25e))
 }
 
 /// Decode Canon CameraInfo for 6D, 100D, M, M2, etc.
 /// PictureStyleInfo starts at offset 0x3c6 (966) within CameraInfo
 /// CameraOrientation at offset 0x83 (Canon.pm CameraInfo6D)
+/// FirmwareVersion at offset 0x256 (Canon.pm CameraInfo6D)
 pub fn decode_camera_info_6d(data: &[u8]) -> HashMap<String, ExifValue> {
-    decode_camera_info_psinfo_with_orientation(data, 0x3c6, Some(0x83))
+    decode_camera_info_psinfo_with_orientation(data, 0x3c6, Some(0x83), Some(0x256))
 }
 
 /// Decode Canon CameraInfo for 750D/760D
 /// PictureStyleInfo starts at offset 0x3c6 (966) within CameraInfo
 /// CameraOrientation at offset 0x96 (Canon.pm CameraInfo750D)
+/// FirmwareVersion at offset 0x43d (Canon.pm CameraInfo750D)
 pub fn decode_camera_info_750d(data: &[u8]) -> HashMap<String, ExifValue> {
-    decode_camera_info_psinfo_with_orientation(data, 0x3c6, Some(0x96))
+    decode_camera_info_psinfo_with_orientation(data, 0x3c6, Some(0x96), Some(0x43d))
 }
 
 /// Generic decoder for CameraInfo with PictureStyleInfo at a given offset
 /// Uses PSInfo2 structure format
 /// camera_orientation_offset: Model-specific offset for CameraOrientation field
+/// firmware_version_offset: Model-specific offset for FirmwareVersion field
 pub fn decode_camera_info_psinfo_with_orientation(
     data: &[u8],
     ps_info_offset: usize,
     camera_orientation_offset: Option<usize>,
+    firmware_version_offset: Option<usize>,
 ) -> HashMap<String, ExifValue> {
     let mut decoded = HashMap::new();
 
     // Check if we have enough data
     if data.len() < ps_info_offset + 0xdc {
         return decoded;
+    }
+
+    // FirmwareVersion at model-specific offset
+    if let Some(offset) = firmware_version_offset {
+        if data.len() > offset + 6 {
+            // Format: string[6] - extract null-terminated or space-padded string
+            let fw_bytes = &data[offset..offset + 6];
+            if let Ok(fw_str) = std::str::from_utf8(fw_bytes) {
+                let trimmed = fw_str.trim_end_matches('\0').trim_end();
+                if !trimmed.is_empty() {
+                    decoded.insert(
+                        "FirmwareVersion".to_string(),
+                        ExifValue::Ascii(trimmed.to_string()),
+                    );
+                }
+            }
+        }
     }
 
     // CameraOrientation at model-specific offset
@@ -8151,11 +8187,20 @@ pub fn decode_camera_info_psinfo_with_orientation(
     decoded
 }
 
-/// Decode Canon CameraInfo for 650D/700D
+/// Decode Canon CameraInfo for 650D
 /// PictureStyleInfo starts at offset 0x390 (912) within CameraInfo
 /// CameraOrientation at offset 0x7d (Canon.pm CameraInfo650D)
+/// FirmwareVersion at offset 0x21b (Canon.pm CameraInfo650D)
 pub fn decode_camera_info_650d(data: &[u8]) -> HashMap<String, ExifValue> {
-    decode_camera_info_psinfo_with_orientation(data, 0x390, Some(0x7d))
+    decode_camera_info_psinfo_with_orientation(data, 0x390, Some(0x7d), Some(0x21b))
+}
+
+/// Decode Canon CameraInfo for 700D
+/// PictureStyleInfo starts at offset 0x390 (912) within CameraInfo
+/// CameraOrientation at offset 0x7d (Canon.pm CameraInfo650D table)
+/// FirmwareVersion at offset 0x220 (Canon.pm CameraInfo650D, 700D-specific)
+pub fn decode_camera_info_700d(data: &[u8]) -> HashMap<String, ExifValue> {
+    decode_camera_info_psinfo_with_orientation(data, 0x390, Some(0x7d), Some(0x220))
 }
 
 /// Decode Canon CameraInfo for PowerShot models (CameraInfoPowerShot2)
@@ -8731,14 +8776,17 @@ pub fn parse_canon_maker_notes(
                         let decoded = if model_str.contains("EOS 50D") {
                             decode_camera_info_50d(&bytes)
                         } else if model_str.contains("650D")
-                            || model_str.contains("700D")
                             || model_str.contains("Kiss X6i")
-                            || model_str.contains("Kiss X7i")
                             || model_str.contains("Rebel T4i")
+                        {
+                            // 650D: PictureStyleInfo at offset 0x390, FirmwareVersion at 0x21b
+                            decode_camera_info_650d(&bytes)
+                        } else if model_str.contains("700D")
+                            || model_str.contains("Kiss X7i")
                             || model_str.contains("Rebel T5i")
                         {
-                            // 650D/700D: PictureStyleInfo at offset 0x390
-                            decode_camera_info_650d(&bytes)
+                            // 700D: PictureStyleInfo at offset 0x390, FirmwareVersion at 0x220
+                            decode_camera_info_700d(&bytes)
                         // Note: 5D Mark III has firmware-dependent offsets that we don't support yet
                         } else if model_str.contains("EOS 70D") {
                             // 70D: PictureStyleInfo at offset 0x3cf

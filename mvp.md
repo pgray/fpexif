@@ -5,12 +5,12 @@ Critical tags that should be implemented across all manufacturers before open so
 ## Camera/Lens Identification
 
 ### Camera Body
-- [ ] Canon: ModelID, SerialNumber, FirmwareVersion
-- [ ] Nikon: ModelID, SerialNumber, FirmwareVersion
-- [ ] Sony: ModelID, SerialNumber, FirmwareVersion
-- [ ] Fuji: ModelID, SerialNumber, FirmwareVersion
-- [ ] Panasonic: ModelID, SerialNumber, FirmwareVersion
-- [ ] Olympus: ModelID, SerialNumber, FirmwareVersion
+- [x] Canon: ModelID, SerialNumber, FirmwareVersion
+- [x] Nikon: ModelID, SerialNumber, FirmwareVersion
+- [x] Sony: ModelID, SerialNumber, FirmwareVersion
+- [x] Fuji: ModelID, SerialNumber, FirmwareVersion
+- [x] Panasonic: ModelID, SerialNumber, FirmwareVersion
+- [x] Olympus: ModelID, SerialNumber, FirmwareVersion
 - [ ] Pentax: ModelID, SerialNumber, FirmwareVersion
 - [ ] Samsung: ModelID, SerialNumber, FirmwareVersion
 - [ ] Sigma: ModelID, SerialNumber, FirmwareVersion
@@ -24,12 +24,12 @@ Critical tags that should be implemented across all manufacturers before open so
 - [ ] Leaf: ModelID, SerialNumber, FirmwareVersion
 
 ### Lens
-- [ ] Canon: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Nikon: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Sony: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Fuji: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Panasonic: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Olympus: LensType/LensID, LensModel, LensSerialNumber
+- [x] Canon: LensType/LensID, LensModel, LensSerialNumber
+- [x] Nikon: LensType/LensID, LensModel, LensSerialNumber
+- [x] Sony: LensType/LensID, LensModel, LensSerialNumber
+- [x] Fuji: LensType/LensID, LensModel, LensSerialNumber
+- [x] Panasonic: LensType/LensID, LensModel, LensSerialNumber
+- [x] Olympus: LensType/LensID, LensModel, LensSerialNumber
 - [ ] Pentax: LensType/LensID, LensModel, LensSerialNumber
 - [ ] Samsung: LensType/LensID, LensModel, LensSerialNumber
 - [ ] Sigma: LensType/LensID, LensModel, LensSerialNumber
@@ -45,12 +45,12 @@ Critical tags that should be implemented across all manufacturers before open so
 ## Core Shooting Settings
 
 ### Focus System
-- [ ] Canon: FocusMode, AFAreaMode, AFPoint
-- [ ] Nikon: FocusMode, AFAreaMode, AFPoint
-- [ ] Sony: FocusMode, AFAreaMode, AFPoint
-- [ ] Fuji: FocusMode, AFAreaMode, AFPoint
-- [ ] Panasonic: FocusMode, AFAreaMode, AFPoint
-- [ ] Olympus: FocusMode, AFAreaMode, AFPoint
+- [x] Canon: FocusMode, AFAreaMode, AFPoint
+- [x] Nikon: FocusMode, AFAreaMode, AFPoint
+- [x] Sony: FocusMode, AFAreaMode, AFPoint
+- [x] Fuji: FocusMode, AFAreaMode, AFPoint
+- [x] Panasonic: FocusMode, AFAreaMode, AFPoint
+- [x] Olympus: FocusMode, AFAreaMode, AFPoint
 - [ ] Pentax: FocusMode, AFAreaMode, AFPoint
 - [ ] Samsung: FocusMode, AFAreaMode, AFPoint
 - [ ] Sigma: FocusMode, AFAreaMode, AFPoint
@@ -64,12 +64,12 @@ Critical tags that should be implemented across all manufacturers before open so
 - [ ] Leaf: FocusMode, AFAreaMode, AFPoint
 
 ### Exposure & Metering
-- [ ] Canon: ExposureMode, MeteringMode, DriveMode
-- [ ] Nikon: ExposureMode, MeteringMode, DriveMode
-- [ ] Sony: ExposureMode, MeteringMode, DriveMode
-- [ ] Fuji: ExposureMode, MeteringMode, DriveMode
-- [ ] Panasonic: ExposureMode, MeteringMode, DriveMode
-- [ ] Olympus: ExposureMode, MeteringMode, DriveMode
+- [x] Canon: ExposureMode, MeteringMode, DriveMode
+- [x] Nikon: ExposureMode, MeteringMode, DriveMode
+- [x] Sony: ExposureMode, MeteringMode, DriveMode
+- [x] Fuji: ExposureMode, MeteringMode, DriveMode
+- [x] Panasonic: ExposureMode, MeteringMode, DriveMode
+- [x] Olympus: ExposureMode, MeteringMode, DriveMode
 - [ ] Pentax: ExposureMode, MeteringMode, DriveMode
 - [ ] Samsung: ExposureMode, MeteringMode, DriveMode
 - [ ] Sigma: ExposureMode, MeteringMode, DriveMode
@@ -83,12 +83,12 @@ Critical tags that should be implemented across all manufacturers before open so
 - [ ] Leaf: ExposureMode, MeteringMode, DriveMode
 
 ### Image Processing
-- [ ] Canon: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureStyle
-- [ ] Nikon: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureControl
-- [ ] Sony: WhiteBalance, WhiteBalanceShift, ColorSpace, CreativeStyle
-- [ ] Fuji: WhiteBalance, WhiteBalanceShift, ColorSpace, FilmMode
-- [ ] Panasonic: WhiteBalance, WhiteBalanceShift, ColorSpace, PhotoStyle
-- [ ] Olympus: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureMode
+- [x] Canon: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureStyle
+- [x] Nikon: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureControl
+- [x] Sony: WhiteBalance, WhiteBalanceShift, ColorSpace, CreativeStyle
+- [x] Fuji: WhiteBalance, WhiteBalanceShift, ColorSpace, FilmMode
+- [x] Panasonic: WhiteBalance, WhiteBalanceShift, ColorSpace, PhotoStyle
+- [x] Olympus: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureMode
 - [ ] Pentax: WhiteBalance, WhiteBalanceShift, ColorSpace, CustomImage
 - [ ] Samsung: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureWizard
 - [ ] Sigma: WhiteBalance, WhiteBalanceShift, ColorSpace, ColorMode
@@ -102,12 +102,12 @@ Critical tags that should be implemented across all manufacturers before open so
 - [ ] Leaf: WhiteBalance, WhiteBalanceShift, ColorSpace
 
 ### Image Quality Settings
-- [ ] Canon: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Nikon: Sharpness, Contrast, Saturation, Hue, ImageQuality
-- [ ] Sony: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Fuji: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Panasonic: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Olympus: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Canon: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Nikon: Sharpness, Contrast, Saturation, Hue, ImageQuality
+- [x] Sony: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Fuji: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Panasonic: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Olympus: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 - [ ] Pentax: Sharpness, Contrast, Saturation, Hue, ImageQuality
 - [ ] Samsung: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 - [ ] Sigma: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
@@ -121,12 +121,12 @@ Critical tags that should be implemented across all manufacturers before open so
 - [ ] Leaf: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 
 ### Flash
-- [ ] Canon: FlashMode, FlashExposureComp
-- [ ] Nikon: FlashMode, FlashExposureComp
-- [ ] Sony: FlashMode, FlashExposureComp
-- [ ] Fuji: FlashMode, FlashExposureComp
-- [ ] Panasonic: FlashMode, FlashExposureComp
-- [ ] Olympus: FlashMode, FlashExposureComp
+- [x] Canon: FlashMode, FlashExposureComp
+- [x] Nikon: FlashMode, FlashExposureComp
+- [x] Sony: FlashMode, FlashExposureComp
+- [x] Fuji: FlashMode, FlashExposureComp
+- [x] Panasonic: FlashMode, FlashExposureComp
+- [x] Olympus: FlashMode, FlashExposureComp
 - [ ] Pentax: FlashMode, FlashExposureComp
 - [ ] Samsung: FlashMode, FlashExposureComp
 - [ ] Sigma: FlashMode, FlashExposureComp

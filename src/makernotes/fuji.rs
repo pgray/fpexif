@@ -47,6 +47,10 @@ pub const FUJI_AF_AREA_ZONE_SIZE: u16 = 0xf031; // Virtual: AFAreaZoneSize
 pub const FUJI_AFC_TRACKING_SENS: u16 = 0xf032; // Virtual: AF-CTrackingSensitivity
 pub const FUJI_AFC_SPEED_TRACK_SENS: u16 = 0xf033; // Virtual: AF-CSpeedTrackingSensitivity
 pub const FUJI_AFC_ZONE_AREA_SWITCHING: u16 = 0xf034; // Virtual: AF-CZoneAreaSwitching
+
+// Virtual tag ID for ContinuousDrive/DriveSettings sub-field (0x1103)
+pub const FUJI_DRIVE_MODE: u16 = 0xf035; // Virtual: DriveMode
+
 pub const FUJI_PICTURE_MODE: u16 = 0x1031;
 pub const FUJI_EXPOSURE_COUNT: u16 = 0x1032;
 pub const FUJI_EXR_AUTO: u16 = 0x1033;
@@ -164,6 +168,8 @@ pub fn get_fuji_tag_name(tag_id: u16) -> Option<&'static str> {
         FUJI_AFC_TRACKING_SENS => Some("AF-CTrackingSensitivity"),
         FUJI_AFC_SPEED_TRACK_SENS => Some("AF-CSpeedTrackingSensitivity"),
         FUJI_AFC_ZONE_AREA_SWITCHING => Some("AF-CZoneAreaSwitching"),
+        // Virtual sub-field tag from ContinuousDrive (0x1103)
+        FUJI_DRIVE_MODE => Some("DriveMode"),
         FUJI_SLOW_SYNC => Some("SlowSync"),
         FUJI_PICTURE_MODE => Some("PictureMode"),
         FUJI_EXPOSURE_COUNT => Some("ExposureCount"),
@@ -1062,6 +1068,16 @@ define_tag_decoder! {
     }
 }
 
+// DriveMode (from tag 0x1103 ContinuousDrive, byte 0): FujiFilm.pm / fujimn_int.cpp
+define_tag_decoder! {
+    drive_mode,
+    both: {
+        0 => "Single",
+        1 => "Continuous Low",
+        2 => "Continuous High",
+    }
+}
+
 /// Check if a tag is a WB_GRGBLevels variant
 fn is_wb_grgb_levels_tag(tag_id: u16) -> bool {
     matches!(
@@ -1492,6 +1508,23 @@ pub fn parse_fuji_maker_notes(
                                 FUJI_AFC_ZONE_AREA_SWITCHING,
                                 Some("AF-CZoneAreaSwitching"),
                                 ExifValue::Ascii(zone_switching_str.to_string()),
+                            ),
+                        );
+
+                        continue; // Skip normal tag insertion
+                    }
+
+                    if tag_id == FUJI_CONTINUOUS_DRIVE {
+                        // ContinuousDrive/DriveSettings (0x1103) - extract DriveMode from byte 0
+                        // DriveMode: bits 0-7 (mask 0x000000ff)
+                        let drive_mode = (raw_value & 0x000000ff) as u16;
+                        let drive_mode_str = decode_drive_mode_exiftool(drive_mode);
+                        tags.insert(
+                            FUJI_DRIVE_MODE,
+                            MakerNoteTag::new(
+                                FUJI_DRIVE_MODE,
+                                Some("DriveMode"),
+                                ExifValue::Ascii(drive_mode_str.to_string()),
                             ),
                         );
 
