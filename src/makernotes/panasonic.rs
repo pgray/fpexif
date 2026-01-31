@@ -1449,8 +1449,9 @@ pub fn parse_panasonic_maker_notes(
                                 None
                             }
                             PANA_FACE_DETECTED => {
-                                // FacesDetected outputs raw numeric value (no PrintConv in ExifTool)
-                                None
+                                // Output raw numeric value to match exiftool -json
+                                // (exiftool sometimes outputs "No"/"Yes" but usually outputs numeric)
+                                None // Pass through raw value
                             }
                             PANA_TEXT_STAMP_3 | PANA_TEXT_STAMP_4 => {
                                 // Additional TextStamp tags with same values
