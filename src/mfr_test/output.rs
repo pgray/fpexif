@@ -313,7 +313,18 @@ pub fn print_full_report(
 }
 
 /// Print verbose output with per-file details
+/// NOTE: This function is deprecated in favor of streaming verbose output
+/// during file processing (see comparison.rs). This is kept for backwards
+/// compatibility but should only be called when tags data is actually present.
 pub fn print_verbose(result: &ManufacturerTestResult) {
+    // Check if this is a streaming-mode result (tags are empty because
+    // they were already printed during processing)
+    if result.file_results.iter().all(|f| f.tags.is_empty()) {
+        // Already printed during processing, just print summary
+        print_exiftool_summary(result);
+        return;
+    }
+
     println!("{}", "=".repeat(LINE_WIDTH));
     println!(
         "  {} EXIF Testing Report - VERBOSE",

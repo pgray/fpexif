@@ -8,6 +8,7 @@
 //!   mfr-test <manufacturer> --check-exiv2         # Compare against exiv2 baseline
 //!   mfr-test <manufacturer> --vs-exiv2            # Compare against exiv2
 //!   mfr-test <manufacturer> --full-report         # Full comparison report
+//!   mfr-test <manufacturer> --limit 5             # Test only 5 evenly-spaced files
 //!   mfr-test --list-baselines                     # List exiftool baselines
 //!   mfr-test --list-baselines-exiv2               # List exiv2 baselines
 
@@ -76,6 +77,10 @@ struct Cli {
     /// Use /fpexif/data.lfs directory (large test dataset)
     #[arg(long)]
     data_lfs: bool,
+
+    /// Limit the number of files tested per manufacturer
+    #[arg(long)]
+    limit: Option<usize>,
 }
 
 fn main() {
@@ -210,14 +215,18 @@ fn main() {
     // Handle exiv2-specific commands
     if cli.vs_exiv2 || cli.save_baseline_exiv2 || cli.check_exiv2 {
         // Run exiv2 comparison
-        let current_result =
-            match comparison::run_exiv2_comparison(&manufacturer, formats, cli.verbose) {
-                Ok(r) => r,
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
-            };
+        let current_result = match comparison::run_exiv2_comparison(
+            &manufacturer,
+            formats,
+            cli.verbose,
+            cli.limit,
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        };
 
         // Handle --save-baseline-exiv2
         if cli.save_baseline_exiv2 {
@@ -267,7 +276,7 @@ fn main() {
 
     // Run exiftool comparison
     let current_result =
-        match comparison::run_exiftool_comparison(&manufacturer, formats, cli.verbose) {
+        match comparison::run_exiftool_comparison(&manufacturer, formats, cli.verbose, cli.limit) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("Error: {}", e);

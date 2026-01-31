@@ -314,8 +314,17 @@ fn parse_phaseone_value(
 ) -> Option<ExifValue> {
     match format {
         "string" => {
-            let s = String::from_utf8_lossy(bytes)
-                .trim_end_matches('\0')
+            // Clean up string by filtering out null bytes and non-printable characters
+            // Find the first null byte or control character (except tab, newline, carriage return)
+            let end = bytes
+                .iter()
+                .position(|&b| {
+                    b == 0 || (b < 0x20 && b != b'\t' && b != b'\n' && b != b'\r') || b >= 0x7F
+                })
+                .unwrap_or(bytes.len());
+
+            let s = String::from_utf8_lossy(&bytes[..end])
+                .trim_end()
                 .to_string();
             Some(ExifValue::Ascii(s))
         }
@@ -371,6 +380,11 @@ fn parse_phaseone_value(
                             decode_sequence_kind_exiftool(v as u32).to_string(),
                         ));
                     }
+                    PHASEONE_SENSOR_TEMPERATURE | PHASEONE_SENSOR_TEMPERATURE2 => {
+                        // Convert IEEE 754 float to temperature in Celsius
+                        let temp_f32 = f32::from_bits(v as u32);
+                        return Some(ExifValue::Ascii(format!("{:.2} C", temp_f32)));
+                    }
                     PHASEONE_ISO
                     | PHASEONE_SENSOR_WIDTH
                     | PHASEONE_SENSOR_HEIGHT
@@ -388,6 +402,40 @@ fn parse_phaseone_value(
                     }
                     _ => {}
                 }
+            }
+
+            // Handle float arrays (ColorMatrix1, ColorMatrix2, WB_RGBLevels, etc.)
+            match tag_id {
+                PHASEONE_COLOR_MATRIX1 | PHASEONE_COLOR_MATRIX2 => {
+                    // Convert int32 values to IEEE 754 floats and format with 3 decimal places
+                    let floats: Vec<String> = values
+                        .iter()
+                        .map(|&v| format!("{:.3}", f32::from_bits(v as u32)))
+                        .collect();
+                    return Some(ExifValue::Ascii(floats.join(" ")));
+                }
+                PHASEONE_WB_RGB_LEVELS => {
+                    // Convert int32 values to IEEE 754 floats (full precision for WB)
+                    let floats: Vec<String> = values
+                        .iter()
+                        .map(|&v| f32::from_bits(v as u32).to_string())
+                        .collect();
+                    return Some(ExifValue::Ascii(floats.join(" ")));
+                }
+                PHASEONE_AF_ADJUSTMENT
+                | PHASEONE_SHUTTER_SPEED_VALUE
+                | PHASEONE_APERTURE_VALUE
+                | PHASEONE_EXPOSURE_COMPENSATION
+                | PHASEONE_FOCAL_LENGTH
+                | PHASEONE_MAX_APERTURE_VALUE
+                | PHASEONE_MIN_APERTURE_VALUE => {
+                    // Single float value
+                    if values.len() == 1 {
+                        let f_val = f32::from_bits(values[0] as u32);
+                        return Some(ExifValue::Ascii(f_val.to_string()));
+                    }
+                }
+                _ => {}
             }
 
             if values.is_empty() {

@@ -347,7 +347,8 @@ fn values_match(a: &serde_json::Value, b: &serde_json::Value) -> bool {
 }
 
 /// Find all test files for given formats (searches recursively)
-fn find_test_files(formats: &[&str]) -> Vec<String> {
+/// If limit is specified, takes evenly-spaced samples to maintain diversity
+fn find_test_files(formats: &[&str], limit: Option<usize>) -> Vec<String> {
     let test_dir = get_test_files_dir();
     let mut files = Vec::new();
 
@@ -373,6 +374,17 @@ fn find_test_files(formats: &[&str]) -> Vec<String> {
 
     walk_dir(Path::new(&test_dir), formats, &mut files);
     files.sort();
+
+    // Apply limit by taking evenly-spaced samples for diversity
+    if let Some(n) = limit {
+        if files.len() > n {
+            let step = files.len() as f64 / n as f64;
+            files = (0..n)
+                .map(|i| files[(i as f64 * step) as usize].clone())
+                .collect();
+        }
+    }
+
     files
 }
 
@@ -381,6 +393,7 @@ pub fn run_exiftool_comparison(
     manufacturer: &str,
     formats: &[&str],
     verbose: bool,
+    limit: Option<usize>,
 ) -> Result<ManufacturerTestResult, String> {
     if !test_files_exist() {
         return Err(format!(
@@ -396,17 +409,29 @@ pub fn run_exiftool_comparison(
     let format_strings: Vec<String> = formats.iter().map(|s| s.to_string()).collect();
     let mut result = ManufacturerTestResult::new(manufacturer, format_strings);
 
-    let test_files = find_test_files(formats);
+    let test_files = find_test_files(formats, limit);
 
     if test_files.is_empty() {
         return Err(format!("No test files found for formats: {:?}", formats));
     }
 
     if verbose {
+        println!("{}", "=".repeat(80));
+        println!(
+            "  {} EXIF Testing Report - VERBOSE",
+            manufacturer.to_uppercase()
+        );
+        println!("{}", "=".repeat(80));
+        println!();
         eprintln!(
-            "Found {} files to test for {}",
+            "Found {} files to test for {}{}",
             test_files.len(),
-            manufacturer
+            manufacturer,
+            if limit.is_some() {
+                format!(" (limited to {})", test_files.len())
+            } else {
+                String::new()
+            }
         );
     }
 
@@ -441,6 +466,9 @@ pub fn run_exiftool_comparison(
         let fpexif_json = match get_fpexif_json(&file_path) {
             Ok(j) => j,
             Err(e) => {
+                if verbose {
+                    eprintln!("  ERROR: fpexif failed: {}", e);
+                }
                 let file_result = FileTestResult {
                     file_path: file_path.clone(),
                     file_name,
@@ -485,6 +513,11 @@ pub fn run_exiftool_comparison(
             .map(|m| m.len())
             .unwrap_or(0);
 
+        // If verbose, print immediately and then discard tag details to save memory
+        if verbose {
+            print_file_verbose(&file_name, &tags, matching, mismatched, missing);
+        }
+
         let file_result = FileTestResult {
             file_path: file_path.clone(),
             file_name,
@@ -498,14 +531,79 @@ pub fn run_exiftool_comparison(
             mismatched_tags: mismatched,
             missing_tags: missing,
             extra_tags: extra,
-            tags,
-            issues,
+            // In verbose mode, skip storing tags/issues to save memory (already printed)
+            tags: if verbose { HashMap::new() } else { tags },
+            issues: if verbose { Vec::new() } else { issues },
         };
 
         result.add_file_result(file_result);
     }
 
+    if verbose {
+        println!("{}", "=".repeat(80));
+    }
+
     Ok(result)
+}
+
+/// Print verbose output for a single file (called immediately during processing)
+fn print_file_verbose(
+    file_name: &str,
+    tags: &HashMap<String, super::TagComparison>,
+    matching: usize,
+    mismatched: usize,
+    missing: usize,
+) {
+    println!("FILE: {}", file_name);
+    println!("{}", "-".repeat(50));
+
+    // Mismatches
+    let mismatches: Vec<_> = tags
+        .values()
+        .filter(|t| !t.matches && t.fpexif_value.is_some() && t.exiftool_value.is_some())
+        .collect();
+
+    if !mismatches.is_empty() {
+        println!("  Mismatches ({}):", mismatches.len());
+        for tag in mismatches.iter().take(5) {
+            println!(
+                "    {}: fpexif=\"{}\" exiftool=\"{}\"",
+                tag.tag_name,
+                tag.fpexif_value.as_deref().unwrap_or("?"),
+                tag.exiftool_value.as_deref().unwrap_or("?")
+            );
+        }
+        if mismatches.len() > 5 {
+            println!("    ... and {} more", mismatches.len() - 5);
+        }
+    }
+
+    // Missing
+    let missing_tags: Vec<_> = tags
+        .values()
+        .filter(|t| t.fpexif_value.is_none() && t.exiftool_value.is_some())
+        .collect();
+
+    if !missing_tags.is_empty() {
+        println!("  Missing ({}):", missing_tags.len());
+        for tag in missing_tags.iter().take(5) {
+            println!(
+                "    {}: \"{}\"",
+                tag.tag_name,
+                tag.exiftool_value.as_deref().unwrap_or("?")
+            );
+        }
+        if missing_tags.len() > 5 {
+            println!("    ... and {} more", missing_tags.len() - 5);
+        }
+    }
+
+    // Summary
+    println!(
+        "  Summary: {} matching, {} mismatch, {} missing",
+        matching, mismatched, missing
+    );
+    println!();
 }
 
 /// Compare current results against a baseline
@@ -819,6 +917,7 @@ pub fn run_exiv2_comparison(
     manufacturer: &str,
     formats: &[&str],
     verbose: bool,
+    limit: Option<usize>,
 ) -> Result<ManufacturerTestResult, String> {
     if !test_files_exist() {
         return Err(format!(
@@ -834,17 +933,29 @@ pub fn run_exiv2_comparison(
     let format_strings: Vec<String> = formats.iter().map(|s| s.to_string()).collect();
     let mut result = ManufacturerTestResult::new(manufacturer, format_strings);
 
-    let test_files = find_test_files(formats);
+    let test_files = find_test_files(formats, limit);
 
     if test_files.is_empty() {
         return Err(format!("No test files found for formats: {:?}", formats));
     }
 
     if verbose {
+        println!("{}", "=".repeat(80));
+        println!(
+            "  {} EXIV2 Testing Report - VERBOSE",
+            manufacturer.to_uppercase()
+        );
+        println!("{}", "=".repeat(80));
+        println!();
         eprintln!(
-            "Found {} files to test for {} (vs exiv2)",
+            "Found {} files to test for {} (vs exiv2){}",
             test_files.len(),
-            manufacturer
+            manufacturer,
+            if limit.is_some() {
+                format!(" (limited to {})", test_files.len())
+            } else {
+                String::new()
+            }
         );
     }
 
@@ -879,6 +990,9 @@ pub fn run_exiv2_comparison(
         let fpexif_output = match get_fpexif_exiv2_output(&file_path) {
             Ok(o) => o,
             Err(e) => {
+                if verbose {
+                    eprintln!("  ERROR: fpexif failed: {}", e);
+                }
                 let file_result = FileTestResult {
                     file_path: file_path.clone(),
                     file_name,
@@ -908,6 +1022,11 @@ pub fn run_exiv2_comparison(
         let (tags, issues, matching, mismatched, missing, extra) =
             compare_exiv2_outputs(&exiv2_output, &fpexif_output);
 
+        // If verbose, print immediately and then discard tag details to save memory
+        if verbose {
+            print_file_verbose(&file_name, &tags, matching, mismatched, missing);
+        }
+
         let file_result = FileTestResult {
             file_path: file_path.clone(),
             file_name,
@@ -921,11 +1040,16 @@ pub fn run_exiv2_comparison(
             mismatched_tags: mismatched,
             missing_tags: missing,
             extra_tags: extra,
-            tags,
-            issues,
+            // In verbose mode, skip storing tags/issues to save memory (already printed)
+            tags: if verbose { HashMap::new() } else { tags },
+            issues: if verbose { Vec::new() } else { issues },
         };
 
         result.add_file_result(file_result);
+    }
+
+    if verbose {
+        println!("{}", "=".repeat(80));
     }
 
     Ok(result)

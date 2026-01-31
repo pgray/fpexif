@@ -52,6 +52,18 @@ impl ExifParser {
 
     /// Parse EXIF data from a file path
     pub fn parse_file<P: AsRef<Path>>(&self, path: P) -> Result<ExifData, errors::ExifError> {
+        let path = path.as_ref();
+
+        // Check for unsupported file formats
+        if let Some(ext) = path.extension() {
+            let ext_str = ext.to_string_lossy().to_lowercase();
+            if ext_str == "cam" {
+                return Err(errors::ExifError::UnsupportedFormat(
+                    "Casio .cam files use a proprietary format and are not supported. Please convert to JPEG or another standard format.".to_string()
+                ));
+            }
+        }
+
         let file = File::open(path)?;
         let reader = BufReader::new(file);
         self.parse_reader(reader)

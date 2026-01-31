@@ -154,7 +154,13 @@ pub fn parse_maker_notes_with_tiff_data(
     } else if make_str.contains("sigma") || make_str.contains("foveon") {
         sigma::parse_sigma_maker_notes(data, endian)
     } else if make_str.contains("leaf") || make_str.contains("creo") {
-        leaf::parse_leaf_maker_notes(data, endian)
+        // Leaf cameras can have either Leaf PKTS format or Phase One format maker notes
+        // Check for Phase One signature first
+        if data.len() >= 8 && (data[5..8] == *b"waR" || data[5..8] == *b"aw.") {
+            phaseone::parse_phaseone_maker_notes(data, endian)
+        } else {
+            leaf::parse_leaf_maker_notes(data, endian)
+        }
     } else if make_str.contains("hasselblad") {
         hasselblad::parse_hasselblad_maker_notes(data, endian, tiff_data, tiff_offset, model)
     } else if make_str.contains("phase one") || make_str.contains("phaseone") {
