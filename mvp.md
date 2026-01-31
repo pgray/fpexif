@@ -11,17 +11,17 @@ Critical tags that should be implemented across all manufacturers before open so
 - [x] Fuji: ModelID, SerialNumber, FirmwareVersion
 - [x] Panasonic: ModelID, SerialNumber, FirmwareVersion
 - [x] Olympus: ModelID, SerialNumber, FirmwareVersion
-- [ ] Pentax: ModelID, SerialNumber, FirmwareVersion
-- [ ] Samsung: ModelID, SerialNumber, FirmwareVersion
-- [ ] Sigma: ModelID, SerialNumber, FirmwareVersion
-- [ ] Minolta: ModelID, SerialNumber, FirmwareVersion
+- [x] Pentax: ModelID, SerialNumber, FirmwareVersion
+- [x] Samsung: ModelID, SerialNumber, FirmwareVersion
+- [x] Sigma: ModelID, SerialNumber, FirmwareVersion
+- [x] Minolta: ModelID, SerialNumber, FirmwareVersion
 - [ ] Casio: ModelID, SerialNumber, FirmwareVersion
-- [ ] Kodak: ModelID, SerialNumber, FirmwareVersion
-- [ ] Leica: ModelID, SerialNumber, FirmwareVersion
-- [ ] Ricoh: ModelID, SerialNumber, FirmwareVersion
+- [x] Kodak: ModelID, SerialNumber, FirmwareVersion
+- [x] Leica: ModelID, SerialNumber, FirmwareVersion
+- [x] Ricoh: ModelID, SerialNumber, FirmwareVersion
 - [ ] Phase One: ModelID, SerialNumber, FirmwareVersion
 - [ ] Hasselblad: ModelID, SerialNumber, FirmwareVersion
-- [ ] Leaf: ModelID, SerialNumber, FirmwareVersion
+- [x] Leaf: ModelID, SerialNumber, FirmwareVersion
 
 ### Lens
 - [x] Canon: LensType/LensID, LensModel, LensSerialNumber
@@ -30,17 +30,17 @@ Critical tags that should be implemented across all manufacturers before open so
 - [x] Fuji: LensType/LensID, LensModel, LensSerialNumber
 - [x] Panasonic: LensType/LensID, LensModel, LensSerialNumber
 - [x] Olympus: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Pentax: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Samsung: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Sigma: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Minolta: LensType/LensID, LensModel, LensSerialNumber
+- [x] Pentax: LensType/LensID, LensModel, LensSerialNumber
+- [x] Samsung: LensType/LensID, LensModel, LensSerialNumber
+- [x] Sigma: LensType/LensID, LensModel, LensSerialNumber
+- [x] Minolta: LensType/LensID, LensModel, LensSerialNumber
 - [ ] Casio: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Kodak: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Leica: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Ricoh: LensType/LensID, LensModel, LensSerialNumber
+- [x] Kodak: LensType/LensID, LensModel, LensSerialNumber
+- [x] Leica: LensType/LensID, LensModel, LensSerialNumber
+- [x] Ricoh: LensType/LensID, LensModel, LensSerialNumber
 - [ ] Phase One: LensType/LensID, LensModel, LensSerialNumber
 - [ ] Hasselblad: LensType/LensID, LensModel, LensSerialNumber
-- [ ] Leaf: LensType/LensID, LensModel, LensSerialNumber
+- [x] Leaf: LensType/LensID, LensModel, LensSerialNumber
 
 ## Core Shooting Settings
 
@@ -51,17 +51,17 @@ Critical tags that should be implemented across all manufacturers before open so
 - [x] Fuji: FocusMode, AFAreaMode, AFPoint
 - [x] Panasonic: FocusMode, AFAreaMode, AFPoint
 - [x] Olympus: FocusMode, AFAreaMode, AFPoint
-- [ ] Pentax: FocusMode, AFAreaMode, AFPoint
-- [ ] Samsung: FocusMode, AFAreaMode, AFPoint
-- [ ] Sigma: FocusMode, AFAreaMode, AFPoint
-- [ ] Minolta: FocusMode, AFAreaMode, AFPoint
+- [x] Pentax: FocusMode, AFAreaMode, AFPoint
+- [x] Samsung: FocusMode, AFAreaMode, AFPoint
+- [x] Sigma: FocusMode, AFAreaMode, AFPoint
+- [x] Minolta: FocusMode, AFAreaMode, AFPoint
 - [ ] Casio: FocusMode, AFAreaMode, AFPoint
-- [ ] Kodak: FocusMode, AFAreaMode, AFPoint
-- [ ] Leica: FocusMode, AFAreaMode, AFPoint
-- [ ] Ricoh: FocusMode, AFAreaMode, AFPoint
+- [x] Kodak: FocusMode, AFAreaMode, AFPoint
+- [x] Leica: FocusMode, AFAreaMode, AFPoint
+- [x] Ricoh: FocusMode, AFAreaMode, AFPoint
 - [ ] Phase One: FocusMode, AFAreaMode, AFPoint
 - [ ] Hasselblad: FocusMode, AFAreaMode, AFPoint
-- [ ] Leaf: FocusMode, AFAreaMode, AFPoint
+- [x] Leaf: FocusMode, AFAreaMode, AFPoint
 
 ### Exposure & Metering
 - [x] Canon: ExposureMode, MeteringMode, DriveMode
@@ -70,17 +70,17 @@ Critical tags that should be implemented across all manufacturers before open so
 - [x] Fuji: ExposureMode, MeteringMode, DriveMode
 - [x] Panasonic: ExposureMode, MeteringMode, DriveMode
 - [x] Olympus: ExposureMode, MeteringMode, DriveMode
-- [ ] Pentax: ExposureMode, MeteringMode, DriveMode
-- [ ] Samsung: ExposureMode, MeteringMode, DriveMode
-- [ ] Sigma: ExposureMode, MeteringMode, DriveMode
-- [ ] Minolta: ExposureMode, MeteringMode, DriveMode
+- [x] Pentax: ExposureMode, MeteringMode, DriveMode
+- [x] Samsung: ExposureMode, MeteringMode, DriveMode
+- [x] Sigma: ExposureMode, MeteringMode, DriveMode
+- [x] Minolta: ExposureMode, MeteringMode, DriveMode
 - [ ] Casio: ExposureMode, MeteringMode, DriveMode
-- [ ] Kodak: ExposureMode, MeteringMode, DriveMode
-- [ ] Leica: ExposureMode, MeteringMode, DriveMode
-- [ ] Ricoh: ExposureMode, MeteringMode, DriveMode
+- [x] Kodak: ExposureMode, MeteringMode, DriveMode
+- [x] Leica: ExposureMode, MeteringMode, DriveMode
+- [x] Ricoh: ExposureMode, MeteringMode, DriveMode
 - [ ] Phase One: ExposureMode, MeteringMode, DriveMode
 - [ ] Hasselblad: ExposureMode, MeteringMode, DriveMode
-- [ ] Leaf: ExposureMode, MeteringMode, DriveMode
+- [x] Leaf: ExposureMode, MeteringMode, DriveMode
 
 ### Image Processing
 - [x] Canon: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureStyle
@@ -89,17 +89,17 @@ Critical tags that should be implemented across all manufacturers before open so
 - [x] Fuji: WhiteBalance, WhiteBalanceShift, ColorSpace, FilmMode
 - [x] Panasonic: WhiteBalance, WhiteBalanceShift, ColorSpace, PhotoStyle
 - [x] Olympus: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureMode
-- [ ] Pentax: WhiteBalance, WhiteBalanceShift, ColorSpace, CustomImage
-- [ ] Samsung: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureWizard
-- [ ] Sigma: WhiteBalance, WhiteBalanceShift, ColorSpace, ColorMode
-- [ ] Minolta: WhiteBalance, WhiteBalanceShift, ColorSpace, ColorMode
+- [x] Pentax: WhiteBalance, WhiteBalanceShift, ColorSpace, CustomImage
+- [x] Samsung: WhiteBalance, WhiteBalanceShift, ColorSpace, PictureWizard
+- [x] Sigma: WhiteBalance, WhiteBalanceShift, ColorSpace, ColorMode
+- [x] Minolta: WhiteBalance, WhiteBalanceShift, ColorSpace, ColorMode
 - [ ] Casio: WhiteBalance, WhiteBalanceShift, ColorSpace, Enhancement
-- [ ] Kodak: WhiteBalance, WhiteBalanceShift, ColorSpace
-- [ ] Leica: WhiteBalance, WhiteBalanceShift, ColorSpace, FilmMode
-- [ ] Ricoh: WhiteBalance, WhiteBalanceShift, ColorSpace, ImageTone
+- [x] Kodak: WhiteBalance, WhiteBalanceShift, ColorSpace
+- [x] Leica: WhiteBalance, WhiteBalanceShift, ColorSpace, FilmMode
+- [x] Ricoh: WhiteBalance, WhiteBalanceShift, ColorSpace, ImageTone
 - [ ] Phase One: WhiteBalance, WhiteBalanceShift, ColorSpace
 - [ ] Hasselblad: WhiteBalance, WhiteBalanceShift, ColorSpace
-- [ ] Leaf: WhiteBalance, WhiteBalanceShift, ColorSpace
+- [x] Leaf: WhiteBalance, WhiteBalanceShift, ColorSpace
 
 ### Image Quality Settings
 - [x] Canon: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
@@ -108,17 +108,17 @@ Critical tags that should be implemented across all manufacturers before open so
 - [x] Fuji: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 - [x] Panasonic: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 - [x] Olympus: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Pentax: Sharpness, Contrast, Saturation, Hue, ImageQuality
-- [ ] Samsung: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Sigma: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Minolta: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Pentax: Sharpness, Contrast, Saturation, Hue, ImageQuality
+- [x] Samsung: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Sigma: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Minolta: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 - [ ] Casio: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Kodak: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Leica: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Ricoh: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Kodak: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Leica: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Ricoh: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 - [ ] Phase One: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 - [ ] Hasselblad: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
-- [ ] Leaf: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
+- [x] Leaf: Sharpness, Contrast, Saturation, ColorTone, ImageQuality
 
 ### Flash
 - [x] Canon: FlashMode, FlashExposureComp
@@ -127,17 +127,17 @@ Critical tags that should be implemented across all manufacturers before open so
 - [x] Fuji: FlashMode, FlashExposureComp
 - [x] Panasonic: FlashMode, FlashExposureComp
 - [x] Olympus: FlashMode, FlashExposureComp
-- [ ] Pentax: FlashMode, FlashExposureComp
-- [ ] Samsung: FlashMode, FlashExposureComp
-- [ ] Sigma: FlashMode, FlashExposureComp
-- [ ] Minolta: FlashMode, FlashExposureComp
+- [x] Pentax: FlashMode, FlashExposureComp
+- [x] Samsung: FlashMode, FlashExposureComp
+- [x] Sigma: FlashMode, FlashExposureComp
+- [x] Minolta: FlashMode, FlashExposureComp
 - [ ] Casio: FlashMode, FlashExposureComp
-- [ ] Kodak: FlashMode, FlashExposureComp
-- [ ] Leica: FlashMode, FlashExposureComp
-- [ ] Ricoh: FlashMode, FlashExposureComp
+- [x] Kodak: FlashMode, FlashExposureComp
+- [x] Leica: FlashMode, FlashExposureComp
+- [x] Ricoh: FlashMode, FlashExposureComp
 - [ ] Phase One: FlashMode, FlashExposureComp
 - [ ] Hasselblad: FlashMode, FlashExposureComp
-- [ ] Leaf: FlashMode, FlashExposureComp
+- [x] Leaf: FlashMode, FlashExposureComp
 
 ## Verification
 

@@ -22,7 +22,7 @@ use fpexif::mfr_test::{
 #[command(about = "Manufacturer-specific EXIF tag testing tool")]
 #[command(version)]
 struct Cli {
-    /// Manufacturer to test (canon, nikon, sony, fujifilm, panasonic, olympus, pentax, minolta, kodak, sigma, samsung, ricoh, leica, dng)
+    /// Manufacturer to test (canon, nikon, sony, fujifilm, panasonic, olympus, pentax, minolta, kodak, sigma, samsung, ricoh, leica, hasselblad, dng)
     manufacturer: Option<String>,
 
     /// Save current fpexif state as baseline
