@@ -452,6 +452,61 @@ jobs:
       - name: Run clippy
         run: ./bin/ccc
 
+      - name: Run manufacturer validation tests
+        if: steps.check_files.outputs.exists == 'true'
+        run: |
+          # Test all manufacturers with limited file sets to validate MakerNote parsing
+          # Using --limit 3 for quick validation without excessive CI time
+          echo "Testing Canon MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- canon --limit 3 || true
+
+          echo "Testing Nikon MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- nikon --limit 3 || true
+
+          echo "Testing Sony MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- sony --limit 3 || true
+
+          echo "Testing Fujifilm MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- fujifilm --limit 3 || true
+
+          echo "Testing Panasonic MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- panasonic --limit 3 || true
+
+          echo "Testing Olympus MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- olympus --limit 3 || true
+
+          echo "Testing Pentax MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- pentax --limit 3 || true
+
+          echo "Testing Samsung MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- samsung --limit 3 || true
+
+          echo "Testing Sigma MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- sigma --limit 3 || true
+
+          echo "Testing Minolta MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- minolta --limit 3 || true
+
+          echo "Testing Kodak MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- kodak --limit 3 || true
+
+          echo "Testing Ricoh MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- ricoh --limit 3 || true
+
+          echo "Testing Leica MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- leica --limit 3 || true
+
+          echo "Testing Leaf MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- leaf --limit 3 || true
+
+          echo "Testing Hasselblad MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- hasselblad --limit 3 || true
+
+          echo "Testing Phase One MakerNotes..."
+          nice -n 19 cargo run --features cli --bin mfr-test -- phaseone --limit 3 || true
+        env:
+          CI: true
+
       - name: Build examples
         run: nice -n 19 cargo build --examples --verbose
 

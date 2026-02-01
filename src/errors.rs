@@ -16,6 +16,10 @@ pub enum ExifError {
     #[error("Unsupported feature: {0}")]
     Unsupported(String),
 
+    /// Unsupported file format
+    #[error("Unsupported file format: {0}")]
+    UnsupportedFormat(String),
+
     /// Invalid value for a tag
     #[error("Invalid value: {0}")]
     InvalidValue(String),

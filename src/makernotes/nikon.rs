@@ -6932,8 +6932,8 @@ pub fn parse_nikon_maker_notes(
                             String::new()
                         };
 
-                        // Version 02xx needs decryption - defer processing
-                        if version.starts_with("02") {
+                        // Version 02xx and 08xx need decryption - defer processing
+                        if version.starts_with("02") || version.starts_with("08") {
                             // Parse basic info (version) immediately since it's unencrypted
                             if version.chars().all(|c| c.is_ascii_digit()) {
                                 let tag_id = 0x9380_u16;
@@ -7159,9 +7159,11 @@ pub fn parse_nikon_maker_notes(
             };
 
             // Determine FirmwareVersion length based on version
-            // - Versions 0246 (D6), 0249 (Z6/Z7), 0251 (Z6_3): 8 bytes
-            // - Earlier versions: 5 bytes
+            // - Versions 0246-0255 (D6, Z6/Z7, Z6_3): 8 bytes
+            // - Versions 08xx (Z series - Z6III, Z7II, Z50ii, etc.): 8 bytes
+            // - Earlier versions (02xx): 5 bytes
             let firmware_len = match version.as_str() {
+                v if v.starts_with("08") => 8, // All 08xx versions
                 "0246" | "0249" | "0250" | "0251" | "0252" | "0253" | "0254" | "0255" => 8,
                 _ => 5,
             };

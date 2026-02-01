@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+# Setup /fpexif directory with test RAW files from raw.pixls.us and rawsamples.ch
+#
+# This script downloads RAW files for testing fpexif's MakerNote parsing
+# against ExifTool and exiv2 reference implementations.
+#
+# Usage:
+#   ./bin/setup-fpexif-dir [--small|--large|--both]
+#
+# Options:
+#   --small    Setup /fpexif/raws (curated set for quick testing)
+#   --large    Setup /fpexif/data.lfs (comprehensive dataset)
+#   --both     Setup both directories (default)
+
+set -euo pipefail
+
+SMALL_DIR="/fpexif/raws"
+LARGE_DIR="/fpexif/data.lfs"
+
+# Parse arguments
+SETUP_SMALL=true
+SETUP_LARGE=true
+
+if [[ $# -gt 0 ]]; then
+    case "$1" in
+        --small)
+            SETUP_LARGE=false
+            ;;
+        --large)
+            SETUP_SMALL=false
+            ;;
+        --both)
+            # Default, both enabled
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--small|--large|--both]"
+            exit 1
+            ;;
+    esac
+fi
+
+# Check for required tools
+check_dependencies() {
+    local missing=()
+
+    for cmd in git wget p7zip; do
+        if ! command -v "$cmd" &> /dev/null; then
+            missing+=("$cmd")
+        fi
+    done
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        echo "Error: Missing required dependencies: ${missing[*]}"
+        echo ""
+        echo "Install them with:"
+        echo "  sudo apt-get install git wget p7zip-full  # Debian/Ubuntu"
+        echo "  brew install git wget p7zip               # macOS"
+        exit 1
+    fi
+}
+
+setup_small_dataset() {
+    echo "Setting up small curated dataset in $SMALL_DIR"
+    echo ""
+
+    if [[ -d "$SMALL_DIR" ]]; then
+        echo "$SMALL_DIR already exists. Skipping."
+        return 0
+    fi
+
+    echo "Downloading rawsamples.ch archive..."
+    local tmp_dir=$(mktemp -d)
+    trap "rm -rf $tmp_dir" EXIT
+
+    wget -O "$tmp_dir/all_raws_rawsamples_ch.7z" \
+        https://rawsamples.ch/download/all_raws_rawsamples_ch.7z
+
+    echo "Extracting archive..."
+    7z x "$tmp_dir/all_raws_rawsamples_ch.7z" -o"$tmp_dir/extracted"
+
+    echo "Creating curated subset in $SMALL_DIR..."
+    sudo mkdir -p "$SMALL_DIR"
+
+    # Select one representative file per manufacturer
+    # Adjust these paths based on actual archive structure
+    echo "Organizing files by manufacturer..."
+
+    # You may need to adjust these paths based on the actual structure
+    # of the extracted archive
+    if [[ -d "$tmp_dir/extracted" ]]; then
+        sudo cp -r "$tmp_dir/extracted" "$SMALL_DIR/"
+        sudo chmod -R 755 "$SMALL_DIR"
+    fi
+
+    echo ""
+    echo "Small dataset setup complete!"
+    echo "Note: You may want to manually curate $SMALL_DIR to keep only"
+    echo "representative samples for faster testing."
+}
+
+setup_large_dataset() {
+    echo "Setting up large comprehensive dataset in $LARGE_DIR"
+    echo ""
+    echo "NOTE: This will download several GB of data via git LFS"
+    echo "Press Ctrl+C within 5 seconds to cancel..."
+    sleep 5
+
+    if [[ -d "$LARGE_DIR" ]]; then
+        echo "$LARGE_DIR already exists. Pulling latest changes..."
+        cd "$LARGE_DIR"
+        sudo git pull
+        return 0
+    fi
+
+    echo "Cloning raw.pixls.us git LFS repository..."
+    sudo git clone https://raw.pixls.us/data.lfs.git "$LARGE_DIR"
+    sudo chmod -R 755 "$LARGE_DIR"
+
+    echo ""
+    echo "Large dataset setup complete!"
+}
+
+generate_exiftool_references() {
+    local dir="$1"
+
+    if ! command -v exiftool &> /dev/null; then
+        echo "Skipping ExifTool reference generation (exiftool not installed)"
+        return 0
+    fi
+
+    echo ""
+    echo "Generating ExifTool reference JSON files in $dir..."
+
+    find "$dir" -type f \( \
+        -iname "*.CR2" -o -iname "*.CR3" -o -iname "*.CRW" -o \
+        -iname "*.NEF" -o -iname "*.NRW" -o \
+        -iname "*.ARW" -o -iname "*.SRF" -o -iname "*.SR2" -o \
+        -iname "*.RAF" -o \
+        -iname "*.RW2" -o \
+        -iname "*.ORF" -o \
+        -iname "*.PEF" -o \
+        -iname "*.DNG" -o \
+        -iname "*.MRW" -o \
+        -iname "*.X3F" -o \
+        -iname "*.SRW" \
+    \) -print0 | while IFS= read -r -d '' raw_file; do
+        json_file="${raw_file%.*}.json"
+
+        if [[ -f "$json_file" ]]; then
+            continue
+        fi
+
+        echo "  $(basename "$raw_file")"
+
+        if command -v jq &> /dev/null; then
+            # Remove binary data fields from JSON output
+            exiftool -j -b "$raw_file" | \
+                jq 'del(.[0] | .. | select(type == "string" and (startswith("(Binary data") or . == "use -b option to extract")))' \
+                > "$json_file"
+        else
+            exiftool -j -b "$raw_file" > "$json_file"
+        fi
+    done
+
+    echo "ExifTool reference generation complete!"
+}
+
+# Main execution
+main() {
+    check_dependencies
+
+    echo "fpexif Test Data Setup"
+    echo "======================"
+    echo ""
+
+    if [[ "$SETUP_SMALL" == true ]]; then
+        setup_small_dataset
+
+        read -p "Generate ExifTool reference JSON files for small dataset? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            generate_exiftool_references "$SMALL_DIR"
+        fi
+        echo ""
+    fi
+
+    if [[ "$SETUP_LARGE" == true ]]; then
+        setup_large_dataset
+
+        read -p "Generate ExifTool reference JSON files for large dataset? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            generate_exiftool_references "$LARGE_DIR"
+        fi
+        echo ""
+    fi
+
+    echo "Setup complete!"
+    echo ""
+    echo "Directory structure:"
+    echo "  $SMALL_DIR  - Curated subset for quick testing"
+    echo "  $LARGE_DIR  - Comprehensive dataset with all manufacturers"
+    echo ""
+    echo "You can now run tests with:"
+    echo "  ./bin/mfr-test <manufacturer>            # Test against $SMALL_DIR"
+    echo "  ./bin/mfr-test <manufacturer> --data-lfs # Test against $LARGE_DIR"
+}
+
+main "$@"

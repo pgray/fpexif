@@ -34,6 +34,9 @@ pub const MANUFACTURER_FORMATS: &[(&str, &[&str])] = &[
     ("samsung", &["SRW"]),
     ("ricoh", &["DNG"]),
     ("leica", &["DNG", "RWL"]),
+    ("hasselblad", &["3FR", "FFF"]), // 3FR is Hasselblad RAW format
+    ("leaf", &["MOS"]),              // Leaf/Creo digital backs use MOS format
+    ("phaseone", &["IIQ", "TIF"]),   // Phase One digital backs use IIQ format
     ("dng", &["DNG"]),
 ];
 

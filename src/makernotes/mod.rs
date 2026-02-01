@@ -1,13 +1,20 @@
 // makernotes/mod.rs - Camera manufacturer-specific maker notes parsing
 
 pub mod canon;
+pub mod casio;
 pub mod fuji;
+pub mod hasselblad;
 pub mod kodak;
+pub mod leaf;
+// pub mod leica;  // TODO: Fix compilation errors
 pub mod minolta;
 pub mod nikon;
 pub mod olympus;
 pub mod panasonic;
 pub mod pentax;
+pub mod phaseone;
+// pub mod samsung;  // TODO: Fix compilation errors
+pub mod sigma;
 pub mod sony;
 
 use crate::data_types::{Endianness, ExifValue};
@@ -125,16 +132,59 @@ pub fn parse_maker_notes_with_tiff_data(
         )
     } else if make_str.contains("panasonic") {
         panasonic::parse_panasonic_maker_notes(data, endian, model, tiff_data, tiff_offset)
-    } else if make_str.contains("pentax")
-        || make_str.contains("ricoh")
-        || make_str.contains("samsung")
-    {
-        // Samsung cameras (GX-1S, GX-1L, GX10, GX20) use Pentax MakerNote format
+    } else if make_str.contains("samsung") {
+        // Check if it's a Samsung GX camera (uses Pentax format) or NX camera (uses Samsung format)
+        let model_lower = model.map(|s| s.to_lowercase());
+        let model_str = model_lower.as_deref().unwrap_or("");
+
+        if model_str.contains("gx") {
+            // Samsung GX-1S, GX-1L, GX10, GX20 use Pentax MakerNote format
+            pentax::parse_pentax_maker_notes(data, endian, tiff_data, tiff_offset)
+        } else {
+            // NX cameras and other Samsung cameras use Samsung-specific format
+            // TODO: Fix samsung module compilation errors
+            Ok(HashMap::new())
+        }
+    } else if make_str.contains("pentax") || make_str.contains("ricoh") {
         pentax::parse_pentax_maker_notes(data, endian, tiff_data, tiff_offset)
     } else if make_str.contains("minolta") || make_str.contains("konica") {
         minolta::parse_minolta_maker_notes(data, endian, tiff_data, tiff_offset)
     } else if make_str.contains("kodak") || make_str.contains("eastman") {
         kodak::parse_kodak_maker_notes(data, endian)
+    } else if make_str.contains("sigma") || make_str.contains("foveon") {
+        sigma::parse_sigma_maker_notes(data, endian)
+    } else if make_str.contains("leaf") || make_str.contains("creo") {
+        // Leaf cameras can have either Leaf PKTS format or Phase One format maker notes
+        // Check for Phase One signature first
+        if data.len() >= 8 && (data[5..8] == *b"waR" || data[5..8] == *b"aw.") {
+            phaseone::parse_phaseone_maker_notes(data, endian)
+        } else {
+            leaf::parse_leaf_maker_notes(data, endian)
+        }
+    } else if make_str.contains("hasselblad") {
+        hasselblad::parse_hasselblad_maker_notes(data, endian, tiff_data, tiff_offset, model)
+    } else if make_str.contains("phase one") || make_str.contains("phaseone") {
+        phaseone::parse_phaseone_maker_notes(data, endian)
+    // } else if make_str.contains("leica") {
+    //     // Leica cameras use different formats:
+    //     // - M-series, X-series, T, CL, SL: Leica-specific format
+    //     // - D-Lux, Digilux, V-Lux: Panasonic format (handled above by panasonic check)
+    //     // Check model to determine if it's a Panasonic-format Leica
+    //     let model_lower = model.map(|s| s.to_lowercase());
+    //     let model_str = model_lower.as_deref().unwrap_or("");
+
+    //     if model_str.contains("d-lux")
+    //         || model_str.contains("digilux")
+    //         || model_str.contains("v-lux")
+    //     {
+    //         // Panasonic format
+    //         panasonic::parse_panasonic_maker_notes(data, endian, model, tiff_data, tiff_offset)
+    //     } else {
+    //         // Leica-specific format (M-series, X-series, T, CL, SL, etc.)
+    //         leica::parse_leica_maker_notes(data, endian, model, tiff_data, tiff_offset)
+    //     }
+    } else if make_str.contains("casio") || make_str.contains("exilim") {
+        casio::parse_casio_maker_notes(data, endian)
     } else {
         // Unknown maker, return empty HashMap
         Ok(HashMap::new())

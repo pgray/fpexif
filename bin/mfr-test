@@ -12,6 +12,6 @@
 #   ./bin/mfr-test --list-baselines                     # List exiftool baselines
 #   ./bin/mfr-test --list-baselines-exiv2               # List exiv2 baselines
 #
-# Supported manufacturers: canon, nikon, sony, fujifilm, panasonic, olympus, dng
+# Supported manufacturers: canon, nikon, sony, fujifilm, panasonic, olympus, pentax, minolta, kodak, sigma, samsung, ricoh, leica, hasselblad, dng
 
 exec cargo run --features cli --bin mfr-test -- "$@"

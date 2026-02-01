@@ -168,3 +168,51 @@ fn test_circular_ifd_reference() {
     // Either way, it shouldn't hang
     let _ = result; // We just want to ensure it completes
 }
+
+#[test]
+fn test_unsupported_cam_file() {
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::path::Path;
+
+    // Create a temporary .cam file in /tmp
+    let cam_file_path = Path::new("/tmp/test_fpexif_unsupported.cam");
+
+    // Write some dummy content
+    let mut file = File::create(cam_file_path).expect("Failed to create test.cam");
+    file.write_all(b"dummy cam file content")
+        .expect("Failed to write to test.cam");
+    drop(file);
+
+    // Try to parse the .cam file
+    let parser = ExifParser::new();
+    let result = parser.parse_file(cam_file_path);
+
+    // Clean up
+    let _ = fs::remove_file(cam_file_path);
+
+    // Should fail with UnsupportedFormat error
+    assert!(result.is_err(), "Should fail on .cam file");
+
+    match result {
+        Err(ExifError::UnsupportedFormat(msg)) => {
+            assert!(
+                msg.contains("Casio"),
+                "Error message should mention Casio, got: {}",
+                msg
+            );
+            assert!(
+                msg.contains("proprietary"),
+                "Error message should mention proprietary format, got: {}",
+                msg
+            );
+            assert!(
+                msg.contains("not supported"),
+                "Error message should say not supported, got: {}",
+                msg
+            );
+        }
+        Err(e) => panic!("Expected UnsupportedFormat error, got: {:?}", e),
+        Ok(_) => panic!("Expected error, but parsing succeeded"),
+    }
+}
