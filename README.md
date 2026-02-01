@@ -145,6 +145,54 @@ See the [examples/](examples/) directory for comprehensive usage examples includ
    cargo test
    ```
 
+## Setting Up Test Data (Optional)
+
+For developers working on MakerNote parsing or testing against reference implementations (ExifTool/exiv2), you can download test RAW files:
+
+```bash
+# Download both small and large datasets (default)
+./bin/setup-fpexif-dir
+
+# Or download only the small curated set for quick testing
+./bin/setup-fpexif-dir --small
+
+# Or download only the large comprehensive dataset
+./bin/setup-fpexif-dir --large
+```
+
+This script will:
+- Download RAW files from [raw.pixls.us](https://raw.pixls.us) (git LFS repository)
+- Download RAW samples from [rawsamples.ch](https://rawsamples.ch) (7z archive)
+- Set up two directories:
+  - `/fpexif/raws` - Small curated set for quick testing
+  - `/fpexif/data.lfs` - Large comprehensive dataset with all manufacturers
+- Optionally generate ExifTool reference JSON files for comparison
+
+**Requirements:**
+- `git` with LFS support
+- `wget` for downloading archives
+- `p7zip` (7z) for extracting archives
+- `exiftool` (optional, for generating reference JSON)
+- `jq` (optional, for cleaning binary data from JSON)
+
+**Testing MakerNote parsing:**
+
+```bash
+# Test against small dataset
+./bin/mfr-test canon
+
+# Test against large dataset
+./bin/mfr-test canon --data-lfs
+
+# Save baseline before making changes
+./bin/mfr-test canon --save-baseline
+
+# Check for regressions after changes
+./bin/mfr-test canon --check
+```
+
+See [CLAUDE.md](CLAUDE.md) for detailed developer documentation.
+
 ## Supported Image Formats
 
 ### Modern Web Formats
