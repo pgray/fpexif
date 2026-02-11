@@ -3,7 +3,9 @@
 use crate::data_types::{Endianness, ExifValue};
 use crate::define_tag_decoder;
 use crate::errors::ExifError;
+use crate::extract_string;
 use crate::makernotes::MakerNoteTag;
+use crate::read_le_bytes;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -1754,7 +1756,7 @@ fn parse_vr_info(data: &[u8], _endian: Endianness, model: Option<&str>) -> Vec<(
     }
 
     // Offset 0x00: VRInfoVersion (undef[4])
-    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    let version = extract_string!(data, 0, 4);
     tags.push(("VRInfoVersion".to_string(), version));
 
     // Offset 0x04: VibrationReduction (int8u)
@@ -1803,7 +1805,7 @@ fn parse_distort_info(data: &[u8]) -> Vec<(String, String)> {
     }
 
     // Offset 0x00: DistortionVersion (undef[4])
-    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    let version = extract_string!(data, 0, 4);
     tags.push(("DistortionVersion".to_string(), version));
 
     // Offset 0x04: AutoDistortionControl (int8u)
@@ -1884,16 +1886,13 @@ fn parse_picture_control(data: &[u8]) -> Vec<(String, String)> {
     }
 
     // Offset 0x00: Version (undef[4])
-    let version = String::from_utf8_lossy(&data[0..4]).to_string();
+    let version = extract_string!(data, 0, 4);
     tags.push(("PictureControlVersion".to_string(), version.clone()));
 
     // Version 0100 structure (D300)
     if version == "0100" && data.len() >= 58 {
         // Offset 0x04: PictureControlName (string[20])
-        let name_bytes = &data[4..24];
-        let name = String::from_utf8_lossy(name_bytes)
-            .trim_end_matches('\0')
-            .to_string();
+        let name = extract_string!(data, 4, 20);
         if !name.is_empty() {
             let formatted_name = format_picture_control_string(&name);
             tags.push(("PictureControlName".to_string(), formatted_name));
@@ -4628,7 +4627,7 @@ fn decode_af_points_used(data: &[u8], schema: u8) -> String {
             if data.len() < 2 {
                 return "(none)".to_string();
             }
-            let bits = u16::from_le_bytes([data[0], data[1]]);
+            let bits = read_le_bytes!(data, 0, u16).unwrap_or(0);
             if bits == 0 {
                 return "(none)".to_string();
             }
@@ -5539,7 +5538,7 @@ fn parse_color_balance(
 
         // BlackLevel at offset 0x0020 (int16u) - only for ColorBalanceC
         if version != "0100" && data.len() >= 0x0022 {
-            let black_level = u16::from_le_bytes([data[0x0020], data[0x0021]]);
+            let black_level = read_le_bytes!(data, 0x0020, u16).unwrap_or(0);
             tags.push(("BlackLevel".to_string(), black_level.to_string()));
         }
     }

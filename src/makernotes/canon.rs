@@ -3,7 +3,10 @@
 use crate::data_types::{Endianness, ExifValue};
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
-use crate::{decode_field, define_tag_decoder};
+use crate::{
+    decode_field, decode_picture_styles, decode_with_special_values, define_tag_decoder,
+    format_4_values,
+};
 use std::collections::HashMap;
 
 // exiv2 group names for Canon sub-IFDs
@@ -1913,21 +1916,7 @@ define_tag_decoder! {
 
 /// Decode Contrast - ExifTool format (from Canon.pm using printParameter)
 pub fn decode_contrast_exiftool(value: u16) -> String {
-    if value == 0x7fff {
-        return "n/a".to_string();
-    }
-    let signed_val = if value > 0xfff0 {
-        (value as i32) - 0x10000
-    } else {
-        value as i32
-    };
-    if signed_val == 0 {
-        "Normal".to_string()
-    } else if signed_val > 0 {
-        format!("+{}", signed_val)
-    } else {
-        signed_val.to_string()
-    }
+    decode_with_special_values!(value, 0x7fff, "n/a", "Normal")
 }
 
 // Contrast exiv2: canonmn_int.cpp canonCsLnh
@@ -1942,21 +1931,7 @@ define_tag_decoder! {
 
 /// Decode Saturation - ExifTool format
 pub fn decode_saturation_exiftool(value: u16) -> String {
-    if value == 0x7fff {
-        return "n/a".to_string();
-    }
-    let signed_val = if value > 0xfff0 {
-        (value as i32) - 0x10000
-    } else {
-        value as i32
-    };
-    if signed_val == 0 {
-        "Normal".to_string()
-    } else if signed_val > 0 {
-        format!("+{}", signed_val)
-    } else {
-        signed_val.to_string()
-    }
+    decode_with_special_values!(value, 0x7fff, "n/a", "Normal")
 }
 
 // Saturation exiv2: canonmn_int.cpp canonCsLnh
@@ -6121,7 +6096,8 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
             let g1 = swap_words(data[rggb_idx + 2], data[rggb_idx + 3]);
             let g2 = swap_words(data[rggb_idx + 4], data[rggb_idx + 5]);
             let b = swap_words(data[rggb_idx + 6], data[rggb_idx + 7]);
-            let rggb_str = format!("{} {} {} {}", r, g1, g2, b);
+            let rggb_values = [r, g1, g2, b];
+            let rggb_str = format_4_values!(rggb_values, 0, " ");
             decoded.insert("RawMeasuredRGGB".to_string(), ExifValue::Ascii(rggb_str));
         }
 
@@ -6244,14 +6220,12 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
                 let g1 = swap_words(data[rggb_idx + 2], data[rggb_idx + 3]);
                 let g2 = swap_words(data[rggb_idx + 4], data[rggb_idx + 5]);
                 let b = swap_words(data[rggb_idx + 6], data[rggb_idx + 7]);
-                let rggb_str = format!("{} {} {} {}", r, g1, g2, b);
+                let rggb_values = [r, g1, g2, b];
+                let rggb_str = format_4_values!(rggb_values, 0, " ");
                 decoded.insert("RawMeasuredRGGB".to_string(), ExifValue::Ascii(rggb_str));
             }
             if data.len() > 0x1f8 + 3 {
-                let levels_str = format!(
-                    "{} {} {} {}",
-                    data[0x1f8], data[0x1f9], data[0x1fa], data[0x1fb]
-                );
+                let levels_str = format_4_values!(data, 0x1f8, " ");
                 decoded.insert(
                     "PerChannelBlackLevel".to_string(),
                     ExifValue::Ascii(levels_str),
@@ -6300,16 +6274,14 @@ pub fn decode_color_data(data: &[u16]) -> HashMap<String, ExifValue> {
             let g1 = swap_words(data[0x196], data[0x197]);
             let g2 = swap_words(data[0x198], data[0x199]);
             let b = swap_words(data[0x19a], data[0x19b]);
-            let rggb_str = format!("{} {} {} {}", r, g1, g2, b);
+            let rggb_values = [r, g1, g2, b];
+            let rggb_str = format_4_values!(rggb_values, 0, " ");
             decoded.insert("RawMeasuredRGGB".to_string(), ExifValue::Ascii(rggb_str));
         }
 
         // PerChannelBlackLevel at 0x1df
         if data.len() > 0x1df + 3 {
-            let levels_str = format!(
-                "{} {} {} {}",
-                data[0x1df], data[0x1e0], data[0x1e1], data[0x1e2]
-            );
+            let levels_str = format_4_values!(data, 0x1df, " ");
             decoded.insert(
                 "PerChannelBlackLevel".to_string(),
                 ExifValue::Ascii(levels_str),
@@ -8006,182 +7978,73 @@ pub fn decode_camera_info_psinfo_with_orientation(
         }
     };
 
-    // PSInfo2 structure offsets (from ExifTool Canon.pm PSInfo2)
-    let fields: &[(usize, &str)] = &[
-        (0x00, "ContrastStandard"),
-        (0x04, "SharpnessStandard"),
-        (0x08, "SaturationStandard"),
-        (0x0c, "ColorToneStandard"),
-        (0x18, "ContrastPortrait"),
-        (0x1c, "SharpnessPortrait"),
-        (0x20, "SaturationPortrait"),
-        (0x24, "ColorTonePortrait"),
-        (0x30, "ContrastLandscape"),
-        (0x34, "SharpnessLandscape"),
-        (0x38, "SaturationLandscape"),
-        (0x3c, "ColorToneLandscape"),
-        (0x48, "ContrastNeutral"),
-        (0x4c, "SharpnessNeutral"),
-        (0x50, "SaturationNeutral"),
-        (0x54, "ColorToneNeutral"),
-        (0x60, "ContrastFaithful"),
-        (0x64, "SharpnessFaithful"),
-        (0x68, "SaturationFaithful"),
-        (0x6c, "ColorToneFaithful"),
-        (0x78, "ContrastMonochrome"),
-        (0x7c, "SharpnessMonochrome"),
-        (0x90, "ContrastUserDef1"),
-        (0x94, "SharpnessUserDef1"),
-        (0x98, "SaturationUserDef1"),
-        (0x9c, "ColorToneUserDef1"),
-        (0xa8, "ContrastUserDef2"),
-        (0xac, "SharpnessUserDef2"),
-        (0xb0, "SaturationUserDef2"),
-        (0xb4, "ColorToneUserDef2"),
-        (0xc0, "ContrastUserDef3"),
-        (0xc4, "SharpnessUserDef3"),
-        (0xc8, "SaturationUserDef3"),
-        (0xcc, "ColorToneUserDef3"),
+    // PSInfo2 structure PictureStyle fields
+    // Convert data slice to u16 for decode_picture_styles! macro compatibility
+    let ps_data: Vec<u16> = data[ps_info_offset..]
+        .chunks(2)
+        .take_while(|chunk| chunk.len() == 2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .collect();
+
+    decode_picture_styles!(decoded, &ps_data,
+        0x00 => "Standard",
+        0x0c => "Portrait",
+        0x18 => "Landscape",
+        0x24 => "Neutral",
+        0x30 => "Faithful",
+        0x3c => "Monochrome",
+        0x48 => "UserDef1",
+        0x54 => "UserDef2",
+        0x60 => "UserDef3",
+    );
+
+    // FilterEffect and ToningEffect helper functions
+    let decode_filter = |value: i32| -> &'static str {
+        match value {
+            0 => "None",
+            1 => "Yellow",
+            2 => "Orange",
+            3 => "Red",
+            4 => "Green",
+            _ => "Unknown",
+        }
+    };
+
+    let decode_toning = |value: i32| -> &'static str {
+        match value {
+            0 => "None",
+            1 => "Sepia",
+            2 => "Blue",
+            3 => "Purple",
+            4 => "Green",
+            _ => "Unknown",
+        }
+    };
+
+    // FilterEffect and ToningEffect for Monochrome and UserDef1-3
+    let filter_offsets = [
+        ("Monochrome", 0x88, 0x8c),
+        ("UserDef1", 0xa0, 0xa4),
+        ("UserDef2", 0xb8, 0xbc),
+        ("UserDef3", 0xd0, 0xd4),
     ];
 
-    for &(offset, name) in fields {
-        let value = read_i32(offset);
-        // Skip "n/a" marker values (0xdeadbeef = -559038737)
-        if value != -559038737 {
-            decoded.insert(name.to_string(), ExifValue::SShort(vec![value as i16]));
+    for (style, filter_offset, toning_offset) in filter_offsets {
+        let filter_effect = read_i32(filter_offset);
+        if filter_effect != -559038737 {
+            decoded.insert(
+                format!("FilterEffect{}", style),
+                ExifValue::Ascii(decode_filter(filter_effect).to_string()),
+            );
         }
-    }
 
-    // FilterEffect and ToningEffect for Monochrome
-    let filter_effect = read_i32(0x88);
-    if filter_effect != -559038737 {
-        let filter_str = match filter_effect {
-            0 => "None",
-            1 => "Yellow",
-            2 => "Orange",
-            3 => "Red",
-            4 => "Green",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "FilterEffectMonochrome".to_string(),
-            ExifValue::Ascii(filter_str.to_string()),
-        );
-    }
-
-    let toning_effect = read_i32(0x8c);
-    if toning_effect != -559038737 {
-        let toning_str = match toning_effect {
-            0 => "None",
-            1 => "Sepia",
-            2 => "Blue",
-            3 => "Purple",
-            4 => "Green",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "ToningEffectMonochrome".to_string(),
-            ExifValue::Ascii(toning_str.to_string()),
-        );
-    }
-
-    // UserDef1 FilterEffect and ToningEffect
-    let filter_ud1 = read_i32(0xa0);
-    if filter_ud1 != -559038737 {
-        let filter_str = match filter_ud1 {
-            0 => "None",
-            1 => "Yellow",
-            2 => "Orange",
-            3 => "Red",
-            4 => "Green",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "FilterEffectUserDef1".to_string(),
-            ExifValue::Ascii(filter_str.to_string()),
-        );
-    }
-
-    let toning_ud1 = read_i32(0xa4);
-    if toning_ud1 != -559038737 {
-        let toning_str = match toning_ud1 {
-            0 => "None",
-            1 => "Sepia",
-            2 => "Blue",
-            3 => "Purple",
-            4 => "Green",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "ToningEffectUserDef1".to_string(),
-            ExifValue::Ascii(toning_str.to_string()),
-        );
-    }
-
-    // UserDef2 FilterEffect and ToningEffect
-    let filter_ud2 = read_i32(0xb8);
-    if filter_ud2 != -559038737 {
-        let filter_str = match filter_ud2 {
-            0 => "None",
-            1 => "Yellow",
-            2 => "Orange",
-            3 => "Red",
-            4 => "Green",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "FilterEffectUserDef2".to_string(),
-            ExifValue::Ascii(filter_str.to_string()),
-        );
-    }
-
-    let toning_ud2 = read_i32(0xbc);
-    if toning_ud2 != -559038737 {
-        let toning_str = match toning_ud2 {
-            0 => "None",
-            1 => "Sepia",
-            2 => "Blue",
-            3 => "Purple",
-            4 => "Green",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "ToningEffectUserDef2".to_string(),
-            ExifValue::Ascii(toning_str.to_string()),
-        );
-    }
-
-    // UserDef3 FilterEffect and ToningEffect
-    let filter_ud3 = read_i32(0xd0);
-    if filter_ud3 != -559038737 {
-        let filter_str = match filter_ud3 {
-            0 => "None",
-            1 => "Yellow",
-            2 => "Orange",
-            3 => "Red",
-            4 => "Green",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "FilterEffectUserDef3".to_string(),
-            ExifValue::Ascii(filter_str.to_string()),
-        );
-    }
-
-    let toning_ud3 = read_i32(0xd4);
-    if toning_ud3 != -559038737 {
-        let toning_str = match toning_ud3 {
-            0 => "None",
-            1 => "Sepia",
-            2 => "Blue",
-            3 => "Purple",
-            4 => "Green",
-            _ => "Unknown",
-        };
-        decoded.insert(
-            "ToningEffectUserDef3".to_string(),
-            ExifValue::Ascii(toning_str.to_string()),
-        );
+        let toning_effect = read_i32(toning_offset);
+        if toning_effect != -559038737 {
+            decoded.insert(
+                format!("ToningEffect{}", style),
+                ExifValue::Ascii(decode_toning(toning_effect).to_string()),
+            );
+        }
     }
 
     decoded
