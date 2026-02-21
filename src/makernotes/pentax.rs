@@ -6,6 +6,7 @@
 
 use crate::data_types::{Endianness, ExifValue};
 use crate::define_tag_decoder;
+use crate::define_wrapper;
 use crate::errors::ExifError;
 use crate::makernotes::MakerNoteTag;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
@@ -625,45 +626,52 @@ define_tag_decoder! {
 }
 
 // Legacy function aliases for backward compatibility
-pub fn decode_quality_exiftool(value: u16) -> &'static str {
-    decode_pentax_quality_exiftool(value)
-}
-
-pub fn decode_focus_mode_exiftool(value: u16) -> &'static str {
-    decode_pentax_focus_mode_exiftool(value)
-}
-
-pub fn decode_metering_mode_exiftool(value: u16) -> &'static str {
-    decode_pentax_metering_mode_exiftool(value)
-}
-
-pub fn decode_white_balance_exiftool(value: u16) -> &'static str {
-    decode_pentax_white_balance_exiftool(value)
-}
-
-pub fn decode_flash_mode_exiftool(value: u16) -> &'static str {
-    decode_pentax_flash_mode_exiftool(value)
-}
-
-pub fn decode_saturation_exiftool(value: u16) -> &'static str {
-    decode_pentax_saturation_exiftool(value)
-}
-
-pub fn decode_contrast_exiftool(value: u16) -> &'static str {
-    decode_pentax_contrast_exiftool(value)
-}
-
-pub fn decode_sharpness_exiftool(value: u16) -> &'static str {
-    decode_pentax_sharpness_exiftool(value)
-}
-
-pub fn decode_drive_mode_exiftool(value: u16) -> &'static str {
-    decode_pentax_drive_mode_exiftool(value)
-}
-
-pub fn decode_color_space_exiftool(value: u16) -> &'static str {
-    decode_pentax_color_space_exiftool(value)
-}
+define_wrapper!(decode_quality_exiftool, decode_pentax_quality_exiftool, u16);
+define_wrapper!(
+    decode_focus_mode_exiftool,
+    decode_pentax_focus_mode_exiftool,
+    u16
+);
+define_wrapper!(
+    decode_metering_mode_exiftool,
+    decode_pentax_metering_mode_exiftool,
+    u16
+);
+define_wrapper!(
+    decode_white_balance_exiftool,
+    decode_pentax_white_balance_exiftool,
+    u16
+);
+define_wrapper!(
+    decode_flash_mode_exiftool,
+    decode_pentax_flash_mode_exiftool,
+    u16
+);
+define_wrapper!(
+    decode_saturation_exiftool,
+    decode_pentax_saturation_exiftool,
+    u16
+);
+define_wrapper!(
+    decode_contrast_exiftool,
+    decode_pentax_contrast_exiftool,
+    u16
+);
+define_wrapper!(
+    decode_sharpness_exiftool,
+    decode_pentax_sharpness_exiftool,
+    u16
+);
+define_wrapper!(
+    decode_drive_mode_exiftool,
+    decode_pentax_drive_mode_exiftool,
+    u16
+);
+define_wrapper!(
+    decode_color_space_exiftool,
+    decode_pentax_color_space_exiftool,
+    u16
+);
 
 /// Get the name of a Pentax camera model from its ID
 /// Reference: Pentax.pm %pentaxModelID
