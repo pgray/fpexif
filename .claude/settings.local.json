@@ -43,7 +43,11 @@
       "Bash(do echo '=== $f ===')",
       "Bash(ffmpeg:*)",
       "Bash(paplay:*)",
-      "Bash(./bin/beep:*)"
+      "Bash(./bin/beep:*)",
+      "Bash(cargo update -p wasm-bindgen --precise 0.2.114)",
+      "Bash(cargo update -p wasm-bindgen -p js-sys -p serde-wasm-bindgen)",
+      "Bash(git checkout -b pgray-fixmoar)",
+      "Bash(git add src/makernotes/panasonic.rs Cargo.lock)"
     ],
     "deny": [],
     "ask": []

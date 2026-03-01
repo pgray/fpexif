@@ -66,7 +66,7 @@ pub const PANA_LANDMARK: u16 = 0x006F;
 pub const PANA_INTELLIGENT_RESOLUTION: u16 = 0x0070;
 pub const PANA_CLEAR_RETOUCH: u16 = 0x007C;
 pub const PANA_PHOTO_STYLE: u16 = 0x0089;
-pub const PANA_HDR_SHOT: u16 = 0x0093;
+pub const PANA_HDR_SHOT: u16 = 0x009E;
 pub const PANA_SHUTTER_TYPE: u16 = 0x009F;
 pub const PANA_FLASH_CURTAIN: u16 = 0x0048;
 pub const PANA_TOUCH_AE: u16 = 0x00AE;
@@ -101,6 +101,30 @@ pub const PANA_MERGED_IMAGES: u16 = 0x0076;
 pub const PANA_BURST_SPEED: u16 = 0x0077;
 pub const PANA_INTELLIGENT_D_RANGE: u16 = 0x0079;
 pub const PANA_INTERNAL_ND_FILTER: u16 = 0x009D;
+pub const PANA_INTELLIGENT_EXPOSURE: u16 = 0x005D;
+pub const PANA_FLASH_WARNING: u16 = 0x0062;
+pub const PANA_COUNTRY: u16 = 0x0069;
+pub const PANA_STATE: u16 = 0x006B;
+pub const PANA_CITY2: u16 = 0x0080;
+pub const PANA_WB_SHIFT_CREATIVE_CONTROL: u16 = 0x0092;
+pub const PANA_SWEEP_PANORAMA_DIRECTION: u16 = 0x0093;
+pub const PANA_SWEEP_PANORAMA_FOV: u16 = 0x0094;
+pub const PANA_TIMER_RECORDING: u16 = 0x0096;
+pub const PANA_FILTER_EFFECT: u16 = 0x00A1;
+pub const PANA_CLEAR_RETOUCH_VALUE: u16 = 0x00A3;
+pub const PANA_MONOCHROME_FILTER_EFFECT: u16 = 0x00AC;
+pub const PANA_HIGHLIGHT_SHADOW: u16 = 0x00AD;
+pub const PANA_TIMESTAMP: u16 = 0x00AF;
+pub const PANA_VIDEO_BURST_RESOLUTION: u16 = 0x00B3;
+pub const PANA_MULTI_EXPOSURE: u16 = 0x00B4;
+pub const PANA_RED_EYE_REMOVAL: u16 = 0x00B9;
+pub const PANA_VIDEO_BURST_MODE: u16 = 0x00BB;
+pub const PANA_DIFFRACTION_CORRECTION: u16 = 0x00BC;
+pub const PANA_FOCUS_BRACKET: u16 = 0x00BD;
+pub const PANA_LENS_TYPE_MAKE: u16 = 0x00C4;
+
+// Synthetic tag ID for composite AdvancedSceneMode (derived from SceneMode + AdvancedSceneType)
+pub const PANA_ADVANCED_SCENE_MODE_COMPOSITE: u16 = 0xFF01;
 
 /// Get the name of a Panasonic MakerNote tag
 pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
@@ -193,6 +217,27 @@ pub fn get_panasonic_tag_name(tag_id: u16) -> Option<&'static str> {
         PANA_BURST_SPEED => Some("BurstSpeed"),
         PANA_INTELLIGENT_D_RANGE => Some("IntelligentD-Range"),
         PANA_INTERNAL_ND_FILTER => Some("InternalNDFilter"),
+        PANA_INTELLIGENT_EXPOSURE => Some("IntelligentExposure"),
+        PANA_FLASH_WARNING => Some("FlashWarning"),
+        PANA_COUNTRY => Some("Country"),
+        PANA_STATE => Some("State"),
+        PANA_CITY2 => Some("City2"),
+        PANA_WB_SHIFT_CREATIVE_CONTROL => Some("WBShiftCreativeControl"),
+        PANA_SWEEP_PANORAMA_DIRECTION => Some("SweepPanoramaDirection"),
+        PANA_SWEEP_PANORAMA_FOV => Some("SweepPanoramaFieldOfView"),
+        PANA_TIMER_RECORDING => Some("TimerRecording"),
+        PANA_FILTER_EFFECT => Some("FilterEffect"),
+        PANA_CLEAR_RETOUCH_VALUE => Some("ClearRetouchValue"),
+        PANA_MONOCHROME_FILTER_EFFECT => Some("MonochromeFilterEffect"),
+        PANA_HIGHLIGHT_SHADOW => Some("HighlightShadow"),
+        PANA_TIMESTAMP => Some("TimeStamp"),
+        PANA_VIDEO_BURST_RESOLUTION => Some("VideoBurstResolution"),
+        PANA_MULTI_EXPOSURE => Some("MultiExposure"),
+        PANA_RED_EYE_REMOVAL => Some("RedEyeRemoval"),
+        PANA_VIDEO_BURST_MODE => Some("VideoBurstMode"),
+        PANA_DIFFRACTION_CORRECTION => Some("DiffractionCorrection"),
+        PANA_FOCUS_BRACKET => Some("FocusBracket"),
+        PANA_LENS_TYPE_MAKE => Some("LensTypeMake"),
         _ => None,
     }
 }
@@ -655,6 +700,157 @@ define_tag_decoder! {
     both: {
         0 => "No",
         1 => "Yes",
+    }
+}
+
+// IntelligentExposure (tag 0x005D): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    intelligent_exposure,
+    both: {
+        0 => "Off",
+        1 => "Low",
+        2 => "Standard",
+        3 => "High",
+    }
+}
+
+// FlashWarning (tag 0x0062): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    flash_warning,
+    both: {
+        0 => "No",
+        1 => "Yes (flash required but disabled)",
+    }
+}
+
+// SweepPanoramaDirection (tag 0x0093): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    sweep_panorama_direction,
+    type: u8,
+    both: {
+        0 => "Off",
+        1 => "Left to Right",
+        2 => "Right to Left",
+        3 => "Top to Bottom",
+        4 => "Bottom to Top",
+    }
+}
+
+// TimerRecording (tag 0x0096): Panasonic.pm / panasonicmn_int.cpp
+define_tag_decoder! {
+    timer_recording,
+    type: u8,
+    exiftool: {
+        0 => "Off",
+        1 => "Time Lapse",
+        2 => "Stop-motion Animation",
+        3 => "Focus Bracketing",
+    },
+    exiv2: {
+        0 => "Off",
+        1 => "Time Lapse",
+        2 => "Stop-Motion Animation",
+    }
+}
+
+// MonochromeFilterEffect (tag 0x00AC): Panasonic.pm
+define_tag_decoder! {
+    monochrome_filter_effect,
+    both: {
+        0 => "Off",
+        1 => "Yellow",
+        2 => "Orange",
+        3 => "Red",
+        4 => "Green",
+    }
+}
+
+// VideoBurstResolution (tag 0x00B3): Panasonic.pm
+define_tag_decoder! {
+    video_burst_resolution,
+    both: {
+        1 => "Off or 4K",
+        4 => "6K",
+    }
+}
+
+// MultiExposure (tag 0x00B4): Panasonic.pm
+define_tag_decoder! {
+    multi_exposure,
+    both: {
+        0 => "n/a",
+        1 => "Off",
+        2 => "On",
+    }
+}
+
+// RedEyeRemoval (tag 0x00B9): Panasonic.pm
+define_tag_decoder! {
+    red_eye_removal,
+    both: {
+        0 => "Off",
+        1 => "On",
+    }
+}
+
+// DiffractionCorrection (tag 0x00BC): Panasonic.pm
+define_tag_decoder! {
+    diffraction_correction,
+    both: {
+        0 => "Off",
+        1 => "Auto",
+    }
+}
+
+/// Decode FilterEffect (tag 0x00A1) from two int32u values
+/// The second value is a bitmask for the filter type
+pub fn decode_filter_effect_exiftool(val0: u32, val1: u32) -> &'static str {
+    if val0 == 0 {
+        match val1 {
+            0 => "Off",
+            1 => "Expressive",
+            2 => "Retro",
+            4 => "High Key",
+            8 => "Sepia",
+            16 => "High Dynamic",
+            32 => "Miniature Effect",
+            256 => "Low Key",
+            512 => "Toy Effect",
+            1024 => "Dynamic Monochrome",
+            2048 => "Soft Focus",
+            4096 => "Impressive Art",
+            8192 => "Cross Process",
+            16384 => "One Point Color",
+            32768 => "Star Filter",
+            524288 => "Old Days",
+            1048576 => "Sunshine",
+            2097152 => "Bleach Bypass",
+            4194304 => "Toy Pop",
+            8388608 => "Fantasy",
+            33554432 => "Monochrome",
+            67108864 => "Rough Monochrome",
+            134217728 => "Silky Monochrome",
+            _ => "Unknown",
+        }
+    } else {
+        "Unknown"
+    }
+}
+
+/// Decode VideoBurstMode (tag 0x00BB) from int32u value
+pub fn decode_video_burst_mode_exiftool(value: u32) -> &'static str {
+    match value {
+        0x01 => "Off",
+        0x04 => "Post Focus",
+        0x18 => "4K Burst",
+        0x28 => "4K Burst (Start/Stop)",
+        0x48 => "4K Pre-burst",
+        0x108 => "Loop Recording",
+        0x408 => "Focus Stacking",
+        0x810 => "6K Burst",
+        0x820 => "6K Burst (Start/Stop)",
+        0x1001 => "High Resolution Mode",
+        _ => "Unknown",
     }
 }
 
@@ -1201,6 +1397,16 @@ pub fn parse_panasonic_maker_notes(
                             PANA_INTELLIGENT_RESOLUTION => Some(
                                 decode_intelligent_resolution_exiftool(bytes[0] as u16).to_string(),
                             ),
+                            PANA_SWEEP_PANORAMA_DIRECTION => {
+                                Some(decode_sweep_panorama_direction_exiftool(bytes[0]).to_string())
+                            }
+                            PANA_TIMER_RECORDING => {
+                                Some(decode_timer_recording_exiftool(bytes[0]).to_string())
+                            }
+                            PANA_WB_SHIFT_CREATIVE_CONTROL => {
+                                // Signed int8 value
+                                Some(format!("{}", bytes[0] as i8))
+                            }
                             _ => None,
                         };
                         if let Some(s) = decoded {
@@ -1217,7 +1423,12 @@ pub fn parse_panasonic_maker_notes(
                         } else {
                             ExifValue::Byte(bytes)
                         }
-                    } else if tag_id == PANA_CITY || tag_id == PANA_LANDMARK {
+                    } else if tag_id == PANA_CITY
+                        || tag_id == PANA_LANDMARK
+                        || tag_id == PANA_COUNTRY
+                        || tag_id == PANA_STATE
+                        || tag_id == PANA_CITY2
+                    {
                         // City/Landmark: string fields, show empty for invalid data (like ExifTool)
                         let trimmed: Vec<u8> =
                             bytes.iter().copied().take_while(|&b| b != 0).collect();
@@ -1553,6 +1764,35 @@ pub fn parse_panasonic_maker_notes(
                                     None
                                 }
                             }
+                            PANA_INTELLIGENT_EXPOSURE => {
+                                Some(decode_intelligent_exposure_exiftool(v).to_string())
+                            }
+                            PANA_FLASH_WARNING => {
+                                Some(decode_flash_warning_exiftool(v).to_string())
+                            }
+                            PANA_SWEEP_PANORAMA_FOV => {
+                                // Raw numeric degrees value
+                                None
+                            }
+                            PANA_MONOCHROME_FILTER_EFFECT => {
+                                Some(decode_monochrome_filter_effect_exiftool(v).to_string())
+                            }
+                            PANA_VIDEO_BURST_RESOLUTION => {
+                                Some(decode_video_burst_resolution_exiftool(v).to_string())
+                            }
+                            PANA_MULTI_EXPOSURE => {
+                                Some(decode_multi_exposure_exiftool(v).to_string())
+                            }
+                            PANA_RED_EYE_REMOVAL => {
+                                Some(decode_red_eye_removal_exiftool(v).to_string())
+                            }
+                            PANA_DIFFRACTION_CORRECTION => {
+                                Some(decode_diffraction_correction_exiftool(v).to_string())
+                            }
+                            PANA_LENS_TYPE_MAKE => {
+                                // Raw numeric value, pass through
+                                None
+                            }
                             _ => None,
                         };
 
@@ -1561,6 +1801,11 @@ pub fn parse_panasonic_maker_notes(
                         } else {
                             ExifValue::Short(values)
                         }
+                    } else if values.len() == 2 && tag_id == PANA_HIGHLIGHT_SHADOW {
+                        // HighlightShadow: two signed values (highlight adj, shadow adj)
+                        let v0 = values[0] as i16;
+                        let v1 = values[1] as i16;
+                        ExifValue::Ascii(format!("{} {}", v0, v1))
                     } else {
                         ExifValue::Short(values)
                     }
@@ -1595,6 +1840,10 @@ pub fn parse_panasonic_maker_notes(
                         } else if tag_id == PANA_LANDMARK && value_offset == 0 {
                             // Landmark: 0 means empty/not set
                             ExifValue::Ascii(String::new())
+                        } else if tag_id == PANA_VIDEO_BURST_MODE {
+                            ExifValue::Ascii(
+                                decode_video_burst_mode_exiftool(value_offset).to_string(),
+                            )
                         } else {
                             ExifValue::Long(vec![value_offset])
                         }
@@ -1711,6 +1960,27 @@ pub fn parse_panasonic_maker_notes(
                                     .to_string();
                                 ExifValue::Ascii(format!("{} {}", x_str, y_str))
                             }
+                        }
+                        // FilterEffect: two int32u values as "val0 val1" -> decoded string
+                        else if tag_id == PANA_FILTER_EFFECT && values.len() == 1 {
+                            // Stored as rational but ExifTool reads as two int32u
+                            let (num, den) = values[0];
+                            let decoded = decode_filter_effect_exiftool(num, den);
+                            ExifValue::Ascii(decoded.to_string())
+                        }
+                        // ClearRetouchValue: rational value
+                        else if tag_id == PANA_CLEAR_RETOUCH_VALUE && values.len() == 1 {
+                            let (num, den) = values[0];
+                            if den != 0 {
+                                let val = num as f64 / den as f64;
+                                if val.fract() == 0.0 {
+                                    ExifValue::Ascii(format!("{}", val as i64))
+                                } else {
+                                    ExifValue::Ascii(format!("{}", val))
+                                }
+                            } else {
+                                ExifValue::Rational(values)
+                            }
                         } else {
                             ExifValue::Rational(values)
                         }
@@ -1815,6 +2085,9 @@ pub fn parse_panasonic_maker_notes(
                                 || tag_id == PANA_TITLE
                                 || tag_id == PANA_BABY_NAME
                                 || tag_id == PANA_LOCATION
+                                || tag_id == PANA_COUNTRY
+                                || tag_id == PANA_STATE
+                                || tag_id == PANA_CITY2
                             {
                                 // String fields that show empty when all zeros or invalid
                                 // ExifTool returns empty for these when they don't contain valid text
@@ -1910,7 +2183,12 @@ pub fn parse_panasonic_maker_notes(
                             continue;
                         }
                     }
-                    ExifValue::SShort(values)
+                    if values.len() == 2 && tag_id == PANA_HIGHLIGHT_SHADOW {
+                        // HighlightShadow: two signed values (highlight adj, shadow adj)
+                        ExifValue::Ascii(format!("{} {}", values[0], values[1]))
+                    } else {
+                        ExifValue::SShort(values)
+                    }
                 }
                 9 => {
                     // SLONG
@@ -2065,12 +2343,13 @@ pub fn parse_panasonic_maker_notes(
 
         if let (Some(scene), Some(adv_type)) = (scene_mode_val, adv_type_val) {
             let composite_value = compute_advanced_scene_mode(scene, adv_type);
-            // Update the AdvancedSceneMode tag with the computed composite value
+            // Insert composite AdvancedSceneMode as a separate synthetic tag
+            // so the original AdvancedSceneType (raw value) is preserved
             let value = ExifValue::Ascii(composite_value);
             tags.insert(
-                PANA_ADVANCED_SCENE_MODE,
+                PANA_ADVANCED_SCENE_MODE_COMPOSITE,
                 MakerNoteTag::with_exiv2(
-                    PANA_ADVANCED_SCENE_MODE,
+                    PANA_ADVANCED_SCENE_MODE_COMPOSITE,
                     Some("AdvancedSceneMode"),
                     value.clone(),
                     value,
