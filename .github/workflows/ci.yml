@@ -594,7 +594,7 @@ jobs:
           fi
 
       - name: Build wasm-pack package
-        run: wasm-pack build --target web --features wasm --scope pgray
+        run: wasm-pack build --target web --features wasm
 
       - name: Verify npm tarball
         run: |

@@ -1,3 +1,6 @@
+> **Warning**
+> This is an experiment and exercise in fully AI-built Rust with Claude, using high input data and high valid output data.
+
 # fpexif: A Pure Rust EXIF Metadata Library
 
 [![CI](https://github.com/pgray/fpexif/actions/workflows/ci.yml/badge.svg)](https://github.com/pgray/fpexif/actions/workflows/ci.yml)
