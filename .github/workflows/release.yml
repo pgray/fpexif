@@ -97,44 +97,6 @@ jobs:
           name: fpexif-${{ matrix.target }}
           path: fpexif-${{ matrix.target }}.tar.gz
 
-  build-macos:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    needs: [version-bump]
-    if: always() && (needs.version-bump.result == 'success' || needs.version-bump.result == 'skipped')
-    strategy:
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            os: macos-14
-
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.version-bump.outputs.tag || github.ref }}
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
-
-      - name: Build
-        run: cargo build --release --features cli --target ${{ matrix.target }}
-
-      - name: Package
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar czf ../../../fpexif-${{ matrix.target }}.tar.gz fpexif
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fpexif-${{ matrix.target }}
-          path: fpexif-${{ matrix.target }}.tar.gz
-
   build-wasm:
     name: Build WASM Package
     runs-on: ubuntu-latest
@@ -197,7 +159,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [version-bump, build-linux, build-macos, build-wasm, publish-crates]
+    needs: [version-bump, build-linux, build-wasm, publish-crates]
     runs-on: ubuntu-latest
     if: always() && needs.publish-crates.result == 'success'
     permissions:
