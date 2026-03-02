@@ -596,11 +596,8 @@ jobs:
       - name: Build wasm-pack package
         run: wasm-pack build --target web --features wasm
 
-      - name: Verify npm tarball
-        run: |
-          cd pkg
-          npm pack
-          ls -lh *.tgz
+      - name: Verify wasm-pack output
+        run: ls -lh pkg/fpexif_bg.wasm pkg/fpexif.js pkg/fpexif.d.ts pkg/package.json
 
 #   release-binaries:
 #     name: Build Release Binaries
