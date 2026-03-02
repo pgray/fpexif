@@ -1,6 +1,6 @@
 [package]
 name = "fpexif"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 authors = ["pgray <pgray@file.photo>"]
 description = "A pure Rust library for parsing EXIF metadata from 23+ image formats including JPEG, PNG, WebP, AVIF, HEIC, RAW"
