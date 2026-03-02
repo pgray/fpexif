@@ -83,17 +83,18 @@ Use fpexif directly in the browser with WebAssembly:
 
 #### Installation
 
-1. Install wasm-pack:
+Install from a [GitHub release](https://github.com/pgray/fpexif/releases):
 
-   ```bash
-   cargo install wasm-pack
-   ```
+```bash
+npm install https://github.com/pgray/fpexif/releases/download/v0.0.1/fpexif-wasm.tgz
+```
 
-2. Build the WASM package:
+Or build from source:
 
-   ```bash
-   wasm-pack build --target web
-   ```
+```bash
+cargo install wasm-pack
+wasm-pack build --target web
+```
 
    This creates a `pkg/` directory with the WASM module and JavaScript bindings.
 
