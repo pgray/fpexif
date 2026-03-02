@@ -120,6 +120,8 @@ console.log(tags);
 // }
 ```
 
+![WASM Demo](docs/wasm.png)
+
 See the [examples/](examples/) directory for comprehensive usage examples including React integration, batch processing, and Node.js support.
 
 ## Building from Source
