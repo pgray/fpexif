@@ -47,7 +47,8 @@
       "Bash(cargo update -p wasm-bindgen --precise 0.2.114)",
       "Bash(cargo update -p wasm-bindgen -p js-sys -p serde-wasm-bindgen)",
       "Bash(git checkout -b pgray-fixmoar)",
-      "Bash(git add src/makernotes/panasonic.rs Cargo.lock)"
+      "Bash(git add src/makernotes/panasonic.rs Cargo.lock)",
+      "Bash(gh api:*)"
     ],
     "deny": [],
     "ask": []

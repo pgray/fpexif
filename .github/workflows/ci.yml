@@ -587,6 +587,18 @@ jobs:
       - name: Run WASM tests with Deno
         run: deno test --allow-read tests/wasm_test.ts
 
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack &> /dev/null; then
+            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          fi
+
+      - name: Build wasm-pack package
+        run: wasm-pack build --target web --features wasm
+
+      - name: Verify wasm-pack output
+        run: ls -lh pkg/fpexif_bg.wasm pkg/fpexif.js pkg/fpexif.d.ts pkg/package.json
+
 #   release-binaries:
 #     name: Build Release Binaries
 #     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
