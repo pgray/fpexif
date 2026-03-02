@@ -9,6 +9,27 @@ readme = "README.md"
 repository = "https://github.com/pgray/fpexif"
 keywords = ["exif", "metadata", "image", "raw", "photography"]
 categories = ["multimedia::images", "parser-implementations"]
+exclude = [
+    "test-data/",
+    "analysis/",
+    "docs/",
+    "examples/",
+    "scripts/",
+    "bin/",
+    ".claude/",
+    ".github/",
+    ".mfr-baselines/",
+    ".pre-commit-config.yaml",
+    ".gitmodules",
+    "exiftool/",
+    "exiv2/",
+    "build-wasm.sh",
+    "tests/",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "MAKERNOTES.md",
+    "WASM_COMPATIBILITY.md",
+]
 
 [dependencies]
 # For hex encoding (used for displaying undefined data)
