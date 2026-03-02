@@ -9,6 +9,8 @@ fpexif is a pure Rust library for parsing, manipulating, and writing EXIF metada
 
 It aims to be a complete alternative to libraries like libexiv2 and ExifTool, with a focus on safety, performance, and ease of use.
 
+It only exists because of the exiv2 and exiftool authors/maintainers
+
 ## Features
 
 - Pure Rust implementation with no unsafe code
@@ -82,11 +84,13 @@ Use fpexif directly in the browser with WebAssembly:
 #### Installation
 
 1. Install wasm-pack:
+
    ```bash
    cargo install wasm-pack
    ```
 
 2. Build the WASM package:
+
    ```bash
    wasm-pack build --target web
    ```
@@ -96,7 +100,7 @@ Use fpexif directly in the browser with WebAssembly:
 #### Quick Example
 
 ```javascript
-import { initWasm, extractEssentialTags } from './pkg/fpexif.js';
+import { initWasm, extractEssentialTags } from "./pkg/fpexif.js";
 
 // Initialize WASM module
 await initWasm();
@@ -166,6 +170,7 @@ For developers working on MakerNote parsing or testing against reference impleme
 ```
 
 This script will:
+
 - Download RAW files from [raw.pixls.us](https://raw.pixls.us) (git LFS repository)
 - Download RAW samples from [rawsamples.ch](https://rawsamples.ch) (7z archive)
 - Set up two directories:
@@ -174,6 +179,7 @@ This script will:
 - Optionally generate ExifTool reference JSON files for comparison
 
 **Requirements:**
+
 - `git` with LFS support
 - `wget` for downloading archives
 - `p7zip` (7z) for extracting archives
@@ -284,6 +290,7 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 The following manufacturers have test images available and need MakerNote parsing implementation:
 
 ### Implemented
+
 - [x] Canon (CR2, CR3, CRW)
 - [x] Nikon (NEF, NRW)
 - [x] Sony (ARW, SRF, SR2)
@@ -292,6 +299,7 @@ The following manufacturers have test images available and need MakerNote parsin
 - [x] Olympus (ORF)
 
 ### TODO
+
 - [ ] Pentax (PEF) - 17 test images
 - [ ] Samsung (SRW) - 7 test images
 - [ ] Sigma/Foveon (X3F) - 8 test images
