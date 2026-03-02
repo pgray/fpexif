@@ -375,58 +375,59 @@ fn extract_from_tiff<R: Read + Seek>(
         let is_jpeg = compression == Some(6) || compression == Some(7);
 
         // Method 1: JPEGInterchangeFormat (typical for thumbnails)
-        if let (Some(offset), Some(length)) = (jpeg_offset, jpeg_length) {
-            if length > 0 && offset as usize + length as usize <= data.len() {
-                let jpeg_data = &data[offset as usize..(offset + length) as usize];
-                // Verify JPEG magic
-                if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8 {
-                    let desc = if subfile_type == Some(1) {
-                        format!("{} Thumbnail", ifd_name)
-                    } else {
-                        format!("{} Preview", ifd_name)
-                    };
-                    jpegs.push((
-                        EmbeddedJpeg {
-                            offset: offset as u64,
-                            length: length as u64,
-                            description: desc,
-                            dimensions: match (image_width, image_height) {
-                                (Some(w), Some(h)) => Some((w, h)),
-                                _ => None,
-                            },
+        if let (Some(offset), Some(length)) = (jpeg_offset, jpeg_length)
+            && length > 0
+            && offset as usize + length as usize <= data.len()
+        {
+            let jpeg_data = &data[offset as usize..(offset + length) as usize];
+            // Verify JPEG magic
+            if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8 {
+                let desc = if subfile_type == Some(1) {
+                    format!("{} Thumbnail", ifd_name)
+                } else {
+                    format!("{} Preview", ifd_name)
+                };
+                jpegs.push((
+                    EmbeddedJpeg {
+                        offset: offset as u64,
+                        length: length as u64,
+                        description: desc,
+                        dimensions: match (image_width, image_height) {
+                            (Some(w), Some(h)) => Some((w, h)),
+                            _ => None,
                         },
-                        jpeg_data.to_vec(),
-                    ));
-                }
+                    },
+                    jpeg_data.to_vec(),
+                ));
             }
         }
 
         // Method 2: StripOffsets with JPEG compression
-        if is_jpeg {
-            if let (Some(offset), Some(length)) = (strip_offsets, strip_byte_counts) {
-                if length > 0 && offset as usize + length as usize <= data.len() {
-                    let jpeg_data = &data[offset as usize..(offset + length) as usize];
-                    // Verify JPEG magic
-                    if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8 {
-                        let desc = if subfile_type == Some(0) {
-                            format!("{} Full Preview", ifd_name)
-                        } else {
-                            format!("{} Preview", ifd_name)
-                        };
-                        jpegs.push((
-                            EmbeddedJpeg {
-                                offset: offset as u64,
-                                length: length as u64,
-                                description: desc,
-                                dimensions: match (image_width, image_height) {
-                                    (Some(w), Some(h)) => Some((w, h)),
-                                    _ => None,
-                                },
-                            },
-                            jpeg_data.to_vec(),
-                        ));
-                    }
-                }
+        if is_jpeg
+            && let (Some(offset), Some(length)) = (strip_offsets, strip_byte_counts)
+            && length > 0
+            && offset as usize + length as usize <= data.len()
+        {
+            let jpeg_data = &data[offset as usize..(offset + length) as usize];
+            // Verify JPEG magic
+            if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8 {
+                let desc = if subfile_type == Some(0) {
+                    format!("{} Full Preview", ifd_name)
+                } else {
+                    format!("{} Preview", ifd_name)
+                };
+                jpegs.push((
+                    EmbeddedJpeg {
+                        offset: offset as u64,
+                        length: length as u64,
+                        description: desc,
+                        dimensions: match (image_width, image_height) {
+                            (Some(w), Some(h)) => Some((w, h)),
+                            _ => None,
+                        },
+                    },
+                    jpeg_data.to_vec(),
+                ));
             }
         }
 
@@ -581,71 +582,64 @@ fn extract_olympus_makernotes(
     }
 
     // Parse CameraSettings IFD for PreviewImage
-    if let Some(cs_offset) = camera_settings_offset {
-        if cs_offset + 2 <= data.len() {
-            let cs_count = read_u16(cs_offset) as usize;
-            if cs_count > 0 && cs_count < 500 {
-                let mut preview_valid = false;
-                let mut preview_start: Option<u32> = None;
-                let mut preview_length: Option<u32> = None;
+    if let Some(cs_offset) = camera_settings_offset
+        && cs_offset + 2 <= data.len()
+    {
+        let cs_count = read_u16(cs_offset) as usize;
+        if cs_count > 0 && cs_count < 500 {
+            let mut preview_valid = false;
+            let mut preview_start: Option<u32> = None;
+            let mut preview_length: Option<u32> = None;
 
-                for i in 0..cs_count {
-                    let entry_offset = cs_offset + 2 + i * 12;
-                    if entry_offset + 12 > data.len() {
-                        break;
-                    }
-
-                    let tag_id = read_u16(entry_offset);
-                    let value_offset = entry_offset + 8;
-
-                    match tag_id {
-                        0x0100 => {
-                            // PreviewImageValid
-                            preview_valid = read_u32(value_offset) == 1;
-                        }
-                        0x0101 => {
-                            // PreviewImageStart (absolute offset from file start)
-                            preview_start = Some(read_u32(value_offset));
-                        }
-                        0x0102 => {
-                            // PreviewImageLength
-                            preview_length = Some(read_u32(value_offset));
-                        }
-                        _ => {}
-                    }
+            for i in 0..cs_count {
+                let entry_offset = cs_offset + 2 + i * 12;
+                if entry_offset + 12 > data.len() {
+                    break;
                 }
 
-                if preview_valid {
-                    if let (Some(start), Some(length)) = (preview_start, preview_length) {
-                        // Preview offset is relative to MakerNote base
-                        let abs_start = base + start as usize;
-                        let length = length as usize;
-                        if abs_start + length <= data.len() && length > 0 {
-                            let jpeg_data = &data[abs_start..abs_start + length];
-                            if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8
-                            {
-                                jpegs.push((
-                                    EmbeddedJpeg {
-                                        offset: abs_start as u64,
-                                        length: length as u64,
-                                        description: "Olympus Preview".to_string(),
-                                        dimensions: None,
-                                    },
-                                    jpeg_data.to_vec(),
-                                ));
-                            }
-                        }
+                let tag_id = read_u16(entry_offset);
+                let value_offset = entry_offset + 8;
+
+                match tag_id {
+                    0x0100 => {
+                        // PreviewImageValid
+                        preview_valid = read_u32(value_offset) == 1;
+                    }
+                    0x0101 => {
+                        // PreviewImageStart (absolute offset from file start)
+                        preview_start = Some(read_u32(value_offset));
+                    }
+                    0x0102 => {
+                        // PreviewImageLength
+                        preview_length = Some(read_u32(value_offset));
+                    }
+                    _ => {}
+                }
+            }
+
+            if preview_valid && let (Some(start), Some(length)) = (preview_start, preview_length) {
+                // Preview offset is relative to MakerNote base
+                let abs_start = base + start as usize;
+                let length = length as usize;
+                if abs_start + length <= data.len() && length > 0 {
+                    let jpeg_data = &data[abs_start..abs_start + length];
+                    if jpeg_data.len() >= 2 && jpeg_data[0] == 0xFF && jpeg_data[1] == 0xD8 {
+                        jpegs.push((
+                            EmbeddedJpeg {
+                                offset: abs_start as u64,
+                                length: length as u64,
+                                description: "Olympus Preview".to_string(),
+                                dimensions: None,
+                            },
+                            jpeg_data.to_vec(),
+                        ));
                     }
                 }
             }
         }
     }
 
-    if jpegs.is_empty() {
-        None
-    } else {
-        Some(jpegs)
-    }
+    if jpegs.is_empty() { None } else { Some(jpegs) }
 }
 
 /// Extract JPEGs from Fujifilm RAF files

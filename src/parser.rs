@@ -153,21 +153,21 @@ where
 
     // Helper closure to parse and add SubIFD tags (lenient - ignores errors)
     let mut parse_subifd = |pointer_tag_id: u16, tag_group: TagGroup| {
-        if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(pointer_tag_id) {
-            if !offsets.is_empty() {
-                let subifd_offset = offsets[0] as usize;
-                if let Ok((subifd_tags, _)) = parse_ifd(
-                    &app1_data,
-                    tiff_offset + subifd_offset,
-                    tiff_offset,
-                    endian,
-                    tag_group,
-                    config,
-                ) {
-                    // Add the SubIFD tags
-                    for (tag_id, value) in subifd_tags {
-                        exif_data.tags.insert(tag_id, value);
-                    }
+        if let Some(ExifValue::Long(offsets)) = exif_data.get_tag_by_id(pointer_tag_id)
+            && !offsets.is_empty()
+        {
+            let subifd_offset = offsets[0] as usize;
+            if let Ok((subifd_tags, _)) = parse_ifd(
+                &app1_data,
+                tiff_offset + subifd_offset,
+                tiff_offset,
+                endian,
+                tag_group,
+                config,
+            ) {
+                // Add the SubIFD tags
+                for (tag_id, value) in subifd_tags {
+                    exif_data.tags.insert(tag_id, value);
                 }
             }
         }
@@ -412,74 +412,70 @@ where
             Some(&app1_data),
             tiff_offset,
             makernote_file_offset,
-        ) {
-            if !parsed_maker_notes.is_empty() {
-                exif_data.maker_notes = Some(parsed_maker_notes);
-            }
+        ) && !parsed_maker_notes.is_empty()
+        {
+            exif_data.maker_notes = Some(parsed_maker_notes);
         }
     }
 
     // Also check for DNG's DNGPrivateData tag (0xC634) which can contain MakerNotes
     // This is used by Pentax/Samsung/Ricoh DNG files to store original MakerNotes
-    if exif_data.maker_notes.is_none() {
-        if let Some(private_data) = exif_data.get_tag_by_id(0xC634) {
-            let private_bytes = match private_data {
-                ExifValue::Undefined(b) => Some(b.as_slice()),
-                ExifValue::Byte(b) => Some(b.as_slice()),
-                _ => None,
-            };
+    if exif_data.maker_notes.is_none()
+        && let Some(private_data) = exif_data.get_tag_by_id(0xC634)
+    {
+        let private_bytes = match private_data {
+            ExifValue::Undefined(b) => Some(b.as_slice()),
+            ExifValue::Byte(b) => Some(b.as_slice()),
+            _ => None,
+        };
 
-            if let Some(data) = private_bytes {
-                // Check for Pentax/Samsung format: "PENTAX \0" or "SAMSUNG\0" at start
-                if data.len() > 10
-                    && (data.starts_with(b"PENTAX \0") || data.starts_with(b"SAMSUNG\0"))
+        if let Some(data) = private_bytes {
+            // Check for Pentax/Samsung format: "PENTAX \0" or "SAMSUNG\0" at start
+            if data.len() > 10 && (data.starts_with(b"PENTAX \0") || data.starts_with(b"SAMSUNG\0"))
+            {
+                // Byte order at offset 8-9: "MM" or "II"
+                let mn_endian = if &data[8..10] == b"MM" {
+                    Endianness::Big
+                } else {
+                    Endianness::Little
+                };
+
+                // MakerNote IFD starts at offset 10
+                let mn_data = &data[10..];
+                if let Ok(parsed) = crate::makernotes::parse_maker_notes_with_tiff_data(
+                    mn_data,
+                    make.as_deref(),
+                    model.as_deref(),
+                    mn_endian,
+                    Some(data), // Use the private data as the base for relative offsets
+                    10,         // Offset to IFD within the private data
+                    None,       // DNG doesn't need makernote_file_offset
+                ) && !parsed.is_empty()
                 {
-                    // Byte order at offset 8-9: "MM" or "II"
-                    let mn_endian = if &data[8..10] == b"MM" {
-                        Endianness::Big
-                    } else {
-                        Endianness::Little
-                    };
-
-                    // MakerNote IFD starts at offset 10
-                    let mn_data = &data[10..];
-                    if let Ok(parsed) = crate::makernotes::parse_maker_notes_with_tiff_data(
-                        mn_data,
-                        make.as_deref(),
-                        model.as_deref(),
-                        mn_endian,
-                        Some(data), // Use the private data as the base for relative offsets
-                        10,         // Offset to IFD within the private data
-                        None,       // DNG doesn't need makernote_file_offset
-                    ) {
-                        if !parsed.is_empty() {
-                            exif_data.maker_notes = Some(parsed);
-                        }
-                    }
+                    exif_data.maker_notes = Some(parsed);
                 }
-                // Check for Ricoh format: "RICOH\0II" or "RICOH\0MM"
-                else if data.len() > 8 && data.starts_with(b"RICOH\0") {
-                    let mn_endian = if &data[6..8] == b"MM" {
-                        Endianness::Big
-                    } else {
-                        Endianness::Little
-                    };
+            }
+            // Check for Ricoh format: "RICOH\0II" or "RICOH\0MM"
+            else if data.len() > 8 && data.starts_with(b"RICOH\0") {
+                let mn_endian = if &data[6..8] == b"MM" {
+                    Endianness::Big
+                } else {
+                    Endianness::Little
+                };
 
-                    // MakerNote IFD starts at offset 8
-                    let mn_data = &data[8..];
-                    if let Ok(parsed) = crate::makernotes::parse_maker_notes_with_tiff_data(
-                        mn_data,
-                        make.as_deref(),
-                        model.as_deref(),
-                        mn_endian,
-                        Some(data),
-                        8,
-                        None, // DNG doesn't need makernote_file_offset
-                    ) {
-                        if !parsed.is_empty() {
-                            exif_data.maker_notes = Some(parsed);
-                        }
-                    }
+                // MakerNote IFD starts at offset 8
+                let mn_data = &data[8..];
+                if let Ok(parsed) = crate::makernotes::parse_maker_notes_with_tiff_data(
+                    mn_data,
+                    make.as_deref(),
+                    model.as_deref(),
+                    mn_endian,
+                    Some(data),
+                    8,
+                    None, // DNG doesn't need makernote_file_offset
+                ) && !parsed.is_empty()
+                {
+                    exif_data.maker_notes = Some(parsed);
                 }
             }
         }
@@ -487,16 +483,15 @@ where
 
     // For Sony ARW files, parse SR2Private IFD from DNGPrivateData offset
     // Sony stores tag 0xC634 as a LONG offset to the SR2Private IFD
-    if let Some(make_str) = &make {
-        if make_str.to_uppercase().contains("SONY") {
-            if let Some(sr2_tags) = parse_sony_sr2_private(&app1_data, tiff_offset, endian) {
-                if let Some(ref mut maker_notes) = exif_data.maker_notes {
-                    // Add SR2SubIFD tags to existing maker notes
-                    maker_notes.extend(sr2_tags);
-                } else {
-                    exif_data.maker_notes = Some(sr2_tags);
-                }
-            }
+    if let Some(make_str) = &make
+        && make_str.to_uppercase().contains("SONY")
+        && let Some(sr2_tags) = parse_sony_sr2_private(&app1_data, tiff_offset, endian)
+    {
+        if let Some(ref mut maker_notes) = exif_data.maker_notes {
+            // Add SR2SubIFD tags to existing maker notes
+            maker_notes.extend(sr2_tags);
+        } else {
+            exif_data.maker_notes = Some(sr2_tags);
         }
     }
 

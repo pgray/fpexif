@@ -894,17 +894,12 @@ fn parse_casio_ifd(
                         // Generic handling
                         if let Some(val) =
                             decode_u16_from_entry(data, tag_type, count, &value_bytes, endian)
+                            && let Some(name) = tag_name
                         {
-                            if let Some(name) = tag_name {
-                                tags.insert(
-                                    tag_id,
-                                    MakerNoteTag::new(
-                                        tag_id,
-                                        Some(name),
-                                        ExifValue::Short(vec![val]),
-                                    ),
-                                );
-                            }
+                            tags.insert(
+                                tag_id,
+                                MakerNoteTag::new(tag_id, Some(name), ExifValue::Short(vec![val])),
+                            );
                         }
                     }
                 }
@@ -1094,17 +1089,12 @@ fn parse_casio_ifd(
                         // Generic handling
                         if let Some(val) =
                             decode_u16_from_entry(data, tag_type, count, &value_bytes, endian)
+                            && let Some(name) = tag_name
                         {
-                            if let Some(name) = tag_name {
-                                tags.insert(
-                                    tag_id,
-                                    MakerNoteTag::new(
-                                        tag_id,
-                                        Some(name),
-                                        ExifValue::Short(vec![val]),
-                                    ),
-                                );
-                            }
+                            tags.insert(
+                                tag_id,
+                                MakerNoteTag::new(tag_id, Some(name), ExifValue::Short(vec![val])),
+                            );
                         }
                     }
                 }

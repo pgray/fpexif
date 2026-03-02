@@ -6,7 +6,7 @@ use std::process::Command;
 
 mod test_results;
 use test_results::{
-    value_mismatch_issue, FileTestResult, FormatTestResult, IssueCategory, TestIssue,
+    FileTestResult, FormatTestResult, IssueCategory, TestIssue, value_mismatch_issue,
 };
 
 /// Helper function to check if we're running in CI
@@ -120,69 +120,63 @@ fn test_file_against_exiftool(path: &str) -> FileTestResult {
             }
 
             // Check Make
-            if let Some(exiftool_make) = exiftool_data.get("Make").and_then(|v| v.as_str()) {
-                if let Some(fpexif::data_types::ExifValue::Ascii(fpexif_make)) =
+            if let Some(exiftool_make) = exiftool_data.get("Make").and_then(|v| v.as_str())
+                && let Some(fpexif::data_types::ExifValue::Ascii(fpexif_make)) =
                     exif_data.get_tag_by_name("Make")
-                {
-                    let et = normalize_string(exiftool_make);
-                    let fp = normalize_string(fpexif_make);
-                    if et != fp {
-                        issues.push(value_mismatch_issue("Make", &et, &fp));
-                    }
+            {
+                let et = normalize_string(exiftool_make);
+                let fp = normalize_string(fpexif_make);
+                if et != fp {
+                    issues.push(value_mismatch_issue("Make", &et, &fp));
                 }
             }
 
             // Check Model
-            if let Some(exiftool_model) = exiftool_data.get("Model").and_then(|v| v.as_str()) {
-                if let Some(fpexif::data_types::ExifValue::Ascii(fpexif_model)) =
+            if let Some(exiftool_model) = exiftool_data.get("Model").and_then(|v| v.as_str())
+                && let Some(fpexif::data_types::ExifValue::Ascii(fpexif_model)) =
                     exif_data.get_tag_by_name("Model")
-                {
-                    let et = normalize_string(exiftool_model);
-                    let fp = normalize_string(fpexif_model);
-                    if et != fp {
-                        issues.push(value_mismatch_issue("Model", &et, &fp));
-                    }
+            {
+                let et = normalize_string(exiftool_model);
+                let fp = normalize_string(fpexif_model);
+                if et != fp {
+                    issues.push(value_mismatch_issue("Model", &et, &fp));
                 }
             }
 
             // Check ISO
-            if let Some(exiftool_iso) = exiftool_data.get("ISO").and_then(|v| v.as_u64()) {
-                if let Some(fpexif::data_types::ExifValue::Short(ref vals)) =
+            if let Some(exiftool_iso) = exiftool_data.get("ISO").and_then(|v| v.as_u64())
+                && let Some(fpexif::data_types::ExifValue::Short(vals)) =
                     exif_data.get_tag_by_name("ISOSpeedRatings")
-                {
-                    if !vals.is_empty() && vals[0] as u64 != exiftool_iso {
-                        issues.push(value_mismatch_issue(
-                            "ISO",
-                            &exiftool_iso.to_string(),
-                            &vals[0].to_string(),
-                        ));
-                    }
-                }
+                && !vals.is_empty()
+                && vals[0] as u64 != exiftool_iso
+            {
+                issues.push(value_mismatch_issue(
+                    "ISO",
+                    &exiftool_iso.to_string(),
+                    &vals[0].to_string(),
+                ));
             }
 
             // Check FNumber
             if let Some(exiftool_aperture) = exiftool_data.get("FNumber").and_then(|v| {
                 v.as_f64()
                     .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
-            }) {
-                if let Some(fpexif::data_types::ExifValue::Rational(ref vals)) =
-                    exif_data.get_tag_by_name("FNumber")
-                {
-                    if !vals.is_empty() {
-                        let (num, den) = vals[0];
-                        let fpexif_f = if den > 0 {
-                            num as f64 / den as f64
-                        } else {
-                            0.0
-                        };
-                        if (fpexif_f - exiftool_aperture).abs() > 0.01 {
-                            issues.push(value_mismatch_issue(
-                                "FNumber",
-                                &format!("{:.2}", exiftool_aperture),
-                                &format!("{:.2}", fpexif_f),
-                            ));
-                        }
-                    }
+            }) && let Some(fpexif::data_types::ExifValue::Rational(vals)) =
+                exif_data.get_tag_by_name("FNumber")
+                && !vals.is_empty()
+            {
+                let (num, den) = vals[0];
+                let fpexif_f = if den > 0 {
+                    num as f64 / den as f64
+                } else {
+                    0.0
+                };
+                if (fpexif_f - exiftool_aperture).abs() > 0.01 {
+                    issues.push(value_mismatch_issue(
+                        "FNumber",
+                        &format!("{:.2}", exiftool_aperture),
+                        &format!("{:.2}", fpexif_f),
+                    ));
                 }
             }
 
@@ -193,25 +187,22 @@ fn test_file_against_exiftool(path: &str) -> FileTestResult {
                         .and_then(|s| s.split_whitespace().next())
                         .and_then(|n| n.parse::<f64>().ok())
                 })
-            }) {
-                if let Some(fpexif::data_types::ExifValue::Rational(ref vals)) =
-                    exif_data.get_tag_by_name("FocalLength")
-                {
-                    if !vals.is_empty() {
-                        let (num, den) = vals[0];
-                        let fpexif_focal = if den > 0 {
-                            num as f64 / den as f64
-                        } else {
-                            0.0
-                        };
-                        if (fpexif_focal - exiftool_focal).abs() > 0.1 {
-                            issues.push(value_mismatch_issue(
-                                "FocalLength",
-                                &format!("{:.1}", exiftool_focal),
-                                &format!("{:.1}", fpexif_focal),
-                            ));
-                        }
-                    }
+            }) && let Some(fpexif::data_types::ExifValue::Rational(vals)) =
+                exif_data.get_tag_by_name("FocalLength")
+                && !vals.is_empty()
+            {
+                let (num, den) = vals[0];
+                let fpexif_focal = if den > 0 {
+                    num as f64 / den as f64
+                } else {
+                    0.0
+                };
+                if (fpexif_focal - exiftool_focal).abs() > 0.1 {
+                    issues.push(value_mismatch_issue(
+                        "FocalLength",
+                        &format!("{:.1}", exiftool_focal),
+                        &format!("{:.1}", fpexif_focal),
+                    ));
                 }
             }
 
@@ -219,15 +210,13 @@ fn test_file_against_exiftool(path: &str) -> FileTestResult {
             if let Some(exiftool_datetime) = exiftool_data
                 .get("DateTimeOriginal")
                 .and_then(|v| v.as_str())
-            {
-                if let Some(fpexif::data_types::ExifValue::Ascii(fpexif_datetime)) =
+                && let Some(fpexif::data_types::ExifValue::Ascii(fpexif_datetime)) =
                     exif_data.get_tag_by_name("DateTimeOriginal")
-                {
-                    let et = normalize_string(exiftool_datetime);
-                    let fp = normalize_string(fpexif_datetime);
-                    if et != fp {
-                        issues.push(value_mismatch_issue("DateTimeOriginal", &et, &fp));
-                    }
+            {
+                let et = normalize_string(exiftool_datetime);
+                let fp = normalize_string(fpexif_datetime);
+                if et != fp {
+                    issues.push(value_mismatch_issue("DateTimeOriginal", &et, &fp));
                 }
             }
 
@@ -308,12 +297,11 @@ fn collect_files_recursive(dir: &Path, extension: &str, files: &mut Vec<String>)
             let path = entry.path();
             if path.is_dir() {
                 collect_files_recursive(&path, extension, files);
-            } else if let Some(ext) = path.extension() {
-                if ext.to_string_lossy().to_uppercase() == extension.to_uppercase() {
-                    if let Some(path_str) = path.to_str() {
-                        files.push(path_str.to_string());
-                    }
-                }
+            } else if let Some(ext) = path.extension()
+                && ext.to_string_lossy().to_uppercase() == extension.to_uppercase()
+                && let Some(path_str) = path.to_str()
+            {
+                files.push(path_str.to_string());
             }
         }
     }

@@ -1,6 +1,6 @@
 //! Terminal output formatting for test results
 
-use super::{baseline::BaselineMetadata, BaselineDiff, ManufacturerTestResult};
+use super::{BaselineDiff, ManufacturerTestResult, baseline::BaselineMetadata};
 use std::collections::HashMap;
 
 const LINE_WIDTH: usize = 80;

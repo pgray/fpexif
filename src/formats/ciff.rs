@@ -204,7 +204,7 @@ impl<R: Read + Seek> CiffParser<R> {
             _ => {
                 return Err(ExifError::Format(
                     "Invalid CIFF byte order marker".to_string(),
-                ))
+                ));
             }
         };
 
@@ -435,10 +435,10 @@ impl<R: Read + Seek> CiffParser<R> {
                 let mut start = 0;
                 for (i, &b) in data.iter().enumerate() {
                     if b == 0 {
-                        if i > start {
-                            if let Ok(s) = std::str::from_utf8(&data[start..i]) {
-                                parts.push(s.to_string());
-                            }
+                        if i > start
+                            && let Ok(s) = std::str::from_utf8(&data[start..i])
+                        {
+                            parts.push(s.to_string());
                         }
                         start = i + 1;
                     }
@@ -724,12 +724,12 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
     }
 
     // Add Artist/Owner (tag 0x013B)
-    if let Some(ref owner) = metadata.owner_name {
-        if !owner.is_empty() {
-            let mut owner_bytes = owner.as_bytes().to_vec();
-            owner_bytes.push(0);
-            ifd_entries.push((0x013B, 2, owner_bytes.len() as u32, owner_bytes));
-        }
+    if let Some(ref owner) = metadata.owner_name
+        && !owner.is_empty()
+    {
+        let mut owner_bytes = owner.as_bytes().to_vec();
+        owner_bytes.push(0);
+        ifd_entries.push((0x013B, 2, owner_bytes.len() as u32, owner_bytes));
     }
 
     // Add ISO (tag 0x8827 - ISOSpeedRatings)
@@ -779,17 +779,17 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
     // Add FNumber (tag 0x829D) - RATIONAL
     // Canon stores as APEX value, convert: fnumber = 2^(value/64)
     // Store with high precision; formatting (%.2g for CRW) is done in output.rs
-    if let Some(apex_fnum) = metadata.f_number {
-        if apex_fnum > 0 {
-            let fnum = 2.0_f64.powf((apex_fnum as f64) / 64.0);
-            // Express as rational with denominator 1000 for precision
-            let num = (fnum * 1000.0).round() as u32;
-            let denom = 1000u32;
-            let mut rational = Vec::new();
-            rational.extend_from_slice(&num.to_le_bytes());
-            rational.extend_from_slice(&denom.to_le_bytes());
-            ifd_entries.push((0x829D, 5, 1, rational));
-        }
+    if let Some(apex_fnum) = metadata.f_number
+        && apex_fnum > 0
+    {
+        let fnum = 2.0_f64.powf((apex_fnum as f64) / 64.0);
+        // Express as rational with denominator 1000 for precision
+        let num = (fnum * 1000.0).round() as u32;
+        let denom = 1000u32;
+        let mut rational = Vec::new();
+        rational.extend_from_slice(&num.to_le_bytes());
+        rational.extend_from_slice(&denom.to_le_bytes());
+        ifd_entries.push((0x829D, 5, 1, rational));
     }
 
     // Add FocalLength (tag 0x920A) - ASCII for CRW files
@@ -850,24 +850,24 @@ fn build_tiff_from_metadata(metadata: &CiffMetadata) -> ExifResult<Vec<u8>> {
     // For CRW files, output FocalPlaneXSize/YSize directly (matching ExifTool)
     // The raw values are in 1/1000 inch, convert to mm
     // Use private tag IDs 0xC001/0xC002 that will be mapped to FocalPlaneXSize/YSize in output
-    if let Some(xsize) = metadata.focal_plane_x_size {
-        if xsize > 0 {
-            // xsize is in 1/1000 inch, convert to mm: value * 25.4 / 1000
-            let size_mm = xsize as f64 * 25.4 / 1000.0;
-            let size_str = format!("{:.2} mm", size_mm);
-            let mut size_bytes = size_str.as_bytes().to_vec();
-            size_bytes.push(0);
-            ifd_entries.push((0xC001, 2, size_bytes.len() as u32, size_bytes));
-        }
+    if let Some(xsize) = metadata.focal_plane_x_size
+        && xsize > 0
+    {
+        // xsize is in 1/1000 inch, convert to mm: value * 25.4 / 1000
+        let size_mm = xsize as f64 * 25.4 / 1000.0;
+        let size_str = format!("{:.2} mm", size_mm);
+        let mut size_bytes = size_str.as_bytes().to_vec();
+        size_bytes.push(0);
+        ifd_entries.push((0xC001, 2, size_bytes.len() as u32, size_bytes));
     }
-    if let Some(ysize) = metadata.focal_plane_y_size {
-        if ysize > 0 {
-            let size_mm = ysize as f64 * 25.4 / 1000.0;
-            let size_str = format!("{:.2} mm", size_mm);
-            let mut size_bytes = size_str.as_bytes().to_vec();
-            size_bytes.push(0);
-            ifd_entries.push((0xC002, 2, size_bytes.len() as u32, size_bytes));
-        }
+    if let Some(ysize) = metadata.focal_plane_y_size
+        && ysize > 0
+    {
+        let size_mm = ysize as f64 * 25.4 / 1000.0;
+        let size_str = format!("{:.2} mm", size_mm);
+        let mut size_bytes = size_str.as_bytes().to_vec();
+        size_bytes.push(0);
+        ifd_entries.push((0xC002, 2, size_bytes.len() as u32, size_bytes));
     }
 
     // Sort entries by tag number (required by TIFF spec)

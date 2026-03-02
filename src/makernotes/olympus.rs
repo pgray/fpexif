@@ -581,7 +581,7 @@ pub fn decode_special_mode(values: &[u32]) -> String {
             return format!(
                 "{}, Sequence: {}, Panorama: Unknown ({})",
                 mode, values[1], n
-            )
+            );
         }
     };
 
@@ -899,7 +899,7 @@ fn decode_gradation(vals: &[i16]) -> String {
                 .iter()
                 .map(|v| v.to_string())
                 .collect::<Vec<_>>()
-                .join(" ")
+                .join(" ");
         }
     };
 
@@ -2243,7 +2243,12 @@ fn parse_ifd_entry(
         if tag_id == 0x2010 || tag_id == 0x2020 {
             eprintln!(
                 "DEBUG: tag {:04x}: raw_offset={}, src_base={}, offset={}, src_data.len={}, total_size={}",
-                tag_id, raw_offset, src_base, offset, src_data.len(), total_size
+                tag_id,
+                raw_offset,
+                src_base,
+                offset,
+                src_data.len(),
+                total_size
             );
         }
         if offset + total_size > src_data.len() {
@@ -3914,45 +3919,43 @@ fn parse_olympus_ifd(
                     OLYMPUS_RAW_DEVELOPMENT_IFD | OLYMPUS_RAW_DEVELOPMENT2_IFD => {
                         if let ExifValue::Long(offsets) =
                             tags.get(&storage_id).map(|t| &t.value).unwrap()
+                            && !offsets.is_empty()
                         {
-                            if !offsets.is_empty() {
-                                let sub_offset = offsets[0] as usize + base_offset;
-                                parse_olympus_ifd(
-                                    data,
-                                    sub_offset,
-                                    base_offset,
-                                    endian,
-                                    OlympusIfdType::RawDevelopment,
-                                    tags,
-                                    &format!("{}RawDev.", prefix),
-                                    value_data,
-                                    value_base_offset,
-                                    camera_model,
-                                    preview_offset_adjust,
-                                );
-                            }
+                            let sub_offset = offsets[0] as usize + base_offset;
+                            parse_olympus_ifd(
+                                data,
+                                sub_offset,
+                                base_offset,
+                                endian,
+                                OlympusIfdType::RawDevelopment,
+                                tags,
+                                &format!("{}RawDev.", prefix),
+                                value_data,
+                                value_base_offset,
+                                camera_model,
+                                preview_offset_adjust,
+                            );
                         }
                     }
                     OLYMPUS_IMAGE_PROCESSING_IFD => {
                         if let ExifValue::Long(offsets) =
                             tags.get(&storage_id).map(|t| &t.value).unwrap()
+                            && !offsets.is_empty()
                         {
-                            if !offsets.is_empty() {
-                                let sub_offset = offsets[0] as usize + base_offset;
-                                parse_olympus_ifd(
-                                    data,
-                                    sub_offset,
-                                    base_offset,
-                                    endian,
-                                    OlympusIfdType::ImageProcessing,
-                                    tags,
-                                    &format!("{}ImageProc.", prefix),
-                                    value_data,
-                                    value_base_offset,
-                                    camera_model,
-                                    preview_offset_adjust,
-                                );
-                            }
+                            let sub_offset = offsets[0] as usize + base_offset;
+                            parse_olympus_ifd(
+                                data,
+                                sub_offset,
+                                base_offset,
+                                endian,
+                                OlympusIfdType::ImageProcessing,
+                                tags,
+                                &format!("{}ImageProc.", prefix),
+                                value_data,
+                                value_base_offset,
+                                camera_model,
+                                preview_offset_adjust,
+                            );
                         }
                     }
                     OLYMPUS_FOCUS_INFO_IFD => {

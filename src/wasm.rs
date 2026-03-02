@@ -127,7 +127,7 @@ pub fn version() -> String {
 /// A JSON string containing information about embedded JPEGs
 #[wasm_bindgen]
 pub fn list_jpegs(data: &[u8]) -> Result<String, JsValue> {
-    use crate::extract::{extract_jpegs, JpegType};
+    use crate::extract::{JpegType, extract_jpegs};
     use std::io::Cursor;
 
     let cursor = Cursor::new(data);
@@ -167,7 +167,7 @@ pub fn list_jpegs(data: &[u8]) -> Result<String, JsValue> {
 /// The JPEG data as a byte array, or an error
 #[wasm_bindgen]
 pub fn extract_preview(data: &[u8]) -> Result<Vec<u8>, JsValue> {
-    use crate::extract::{extract_jpegs, JpegType};
+    use crate::extract::{JpegType, extract_jpegs};
     use std::io::Cursor;
 
     let cursor = Cursor::new(data);
@@ -192,7 +192,7 @@ pub fn extract_preview(data: &[u8]) -> Result<Vec<u8>, JsValue> {
 /// The JPEG data as a byte array, or an error
 #[wasm_bindgen]
 pub fn extract_thumbnail(data: &[u8]) -> Result<Vec<u8>, JsValue> {
-    use crate::extract::{extract_jpegs, JpegType};
+    use crate::extract::{JpegType, extract_jpegs};
     use std::io::Cursor;
 
     let cursor = Cursor::new(data);
@@ -217,8 +217,8 @@ pub fn extract_thumbnail(data: &[u8]) -> Result<Vec<u8>, JsValue> {
 /// A JSON string with base64-encoded JPEG data for each embedded image
 #[wasm_bindgen]
 pub fn extract_all_jpegs(data: &[u8]) -> Result<String, JsValue> {
-    use crate::extract::{extract_jpegs, JpegType};
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use crate::extract::{JpegType, extract_jpegs};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use std::io::Cursor;
 
     let cursor = Cursor::new(data);

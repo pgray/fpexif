@@ -95,7 +95,8 @@ fn main() {
 
     // Set test directory if --data-lfs flag is used
     if cli.data_lfs {
-        std::env::set_var("FPEXIF_TEST_FILES", "/fpexif/data.lfs");
+        // SAFETY: This is called at startup before any threads are spawned
+        unsafe { std::env::set_var("FPEXIF_TEST_FILES", "/fpexif/data.lfs") };
     }
 
     // Handle --list-baselines (no manufacturer required)
@@ -341,10 +342,10 @@ fn main() {
         );
 
         // Exit with error if regressions detected
-        if let Some(d) = diff {
-            if !d.regressions.is_empty() {
-                std::process::exit(1);
-            }
+        if let Some(d) = diff
+            && !d.regressions.is_empty()
+        {
+            std::process::exit(1);
         }
         return;
     }

@@ -4,7 +4,7 @@ mod test_results;
 use std::path::Path;
 use std::process::Command;
 use test_results::{
-    value_mismatch_issue, FileTestResult, FormatTestResult, IssueCategory, TestIssue,
+    FileTestResult, FormatTestResult, IssueCategory, TestIssue, value_mismatch_issue,
 };
 
 /// Helper function to check if we're running in CI

@@ -1758,11 +1758,7 @@ pub fn parse_panasonic_maker_notes(
                             }
                             PANA_LANDMARK => {
                                 // Landmark: 0 means empty/not set
-                                if v == 0 {
-                                    Some(String::new())
-                                } else {
-                                    None
-                                }
+                                if v == 0 { Some(String::new()) } else { None }
                             }
                             PANA_INTELLIGENT_EXPOSURE => {
                                 Some(decode_intelligent_exposure_exiftool(v).to_string())

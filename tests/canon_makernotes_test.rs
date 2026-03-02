@@ -1,11 +1,11 @@
 // Canon maker notes tests
 
+use fpexif::ExifParser;
 use fpexif::data_types::ExifValue;
 use fpexif::makernotes::canon::{
     decode_af_info2, decode_camera_settings, decode_file_info, decode_focal_length,
     decode_shot_info,
 };
-use fpexif::ExifParser;
 use std::path::Path;
 
 #[test]

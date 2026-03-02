@@ -3422,101 +3422,103 @@ fn parse_lens_data(
     }
     // Version 0204+: Encrypted, uses LensData0204 structure (offsets shifted by 1)
     // Per ExifTool: '$$valPt =~ /^0204/' -> LensData0204
-    else if version.starts_with("020") && version >= "0204" && data.len() >= 19 {
-        if let (Some(ser), Some(count)) = (serial, shutter_count) {
-            // Make mutable copy for decryption
-            let mut decrypted = data.to_vec();
+    else if version.starts_with("020")
+        && version >= "0204"
+        && data.len() >= 19
+        && let (Some(ser), Some(count)) = (serial, shutter_count)
+    {
+        // Make mutable copy for decryption
+        let mut decrypted = data.to_vec();
 
-            // Decrypt starting at byte 4 (version string is unencrypted)
-            nikon_decrypt(ser, count, &mut decrypted, 4);
+        // Decrypt starting at byte 4 (version string is unencrypted)
+        nikon_decrypt(ser, count, &mut decrypted, 4);
 
-            // LensData0204 structure:
-            // Offset 0x04: ExitPupilPosition (same as LensData01)
-            let exit_pupil_raw = decrypted[4];
-            let exit_pupil = if exit_pupil_raw > 0 {
-                2048.0 / exit_pupil_raw as f64
-            } else {
-                0.0
-            };
+        // LensData0204 structure:
+        // Offset 0x04: ExitPupilPosition (same as LensData01)
+        let exit_pupil_raw = decrypted[4];
+        let exit_pupil = if exit_pupil_raw > 0 {
+            2048.0 / exit_pupil_raw as f64
+        } else {
+            0.0
+        };
+        tags.push((
+            "ExitPupilPosition".to_string(),
+            format!("{:.1} mm", exit_pupil),
+        ));
+
+        // Offset 0x05: AFAperture (same as LensData01)
+        let af_aperture_raw = decrypted[5];
+        let af_aperture = 2.0_f64.powf(af_aperture_raw as f64 / 24.0);
+        tags.push(("AFAperture".to_string(), format!("{:.1}", af_aperture)));
+
+        // Offset 0x08: FocusPosition (same as LensData01)
+        let focus_pos = decrypted[8];
+        tags.push(("FocusPosition".to_string(), format!("0x{:02x}", focus_pos)));
+
+        // Offset 0x0a (10): FocusDistance (extra byte at 0x09 in this version)
+        // Formula: 0.01 * 10^(val/40) meters
+        // Store with high precision; reformatting to %.2f for display is done in output.rs
+        let focus_dist_raw = decrypted[10];
+        let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
+        tags.push(("FocusDistance".to_string(), format!("{:.6} m", focus_dist)));
+
+        // Offset 0x0c (12): LensIDNumber
+        let lens_id_number = decrypted[12];
+        tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
+
+        // Offset 0x0d (13): LensFStops raw value (for lens_id_bytes)
+        let lens_f_stops_raw = decrypted[13];
+
+        // Offset 0x0e (14): MinFocalLength
+        let min_focal_raw = decrypted[14];
+        let min_focal = 5.0 * 2.0_f64.powf(min_focal_raw as f64 / 24.0);
+        tags.push(("MinFocalLength".to_string(), format!("{:.1} mm", min_focal)));
+
+        // Offset 0x0f (15): MaxFocalLength
+        let max_focal_raw = decrypted[15];
+        let max_focal = 5.0 * 2.0_f64.powf(max_focal_raw as f64 / 24.0);
+        tags.push(("MaxFocalLength".to_string(), format!("{:.1} mm", max_focal)));
+
+        // Offset 0x10 (16): MaxApertureAtMinFocal
+        let max_ap_min_raw = decrypted[16];
+        let max_ap_min = 2.0_f64.powf(max_ap_min_raw as f64 / 24.0);
+        tags.push((
+            "MaxApertureAtMinFocal".to_string(),
+            format!("{:.1}", max_ap_min),
+        ));
+
+        // Offset 0x11 (17): MaxApertureAtMaxFocal
+        let max_ap_max_raw = decrypted[17];
+        let max_ap_max = 2.0_f64.powf(max_ap_max_raw as f64 / 24.0);
+        tags.push((
+            "MaxApertureAtMaxFocal".to_string(),
+            format!("{:.1}", max_ap_max),
+        ));
+
+        // Offset 0x12 (18): MCUVersion
+        let mcu_version = decrypted[18];
+        tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
+
+        // Offset 0x13 (19): EffectiveMaxAperture (shifted by 1 from LensData01)
+        if decrypted.len() >= 20 {
+            let eff_max_ap_raw = decrypted[19];
+            let eff_max_ap = 2.0_f64.powf(eff_max_ap_raw as f64 / 24.0);
             tags.push((
-                "ExitPupilPosition".to_string(),
-                format!("{:.1} mm", exit_pupil),
+                "EffectiveMaxAperture".to_string(),
+                format!("{:.1}", eff_max_ap),
             ));
-
-            // Offset 0x05: AFAperture (same as LensData01)
-            let af_aperture_raw = decrypted[5];
-            let af_aperture = 2.0_f64.powf(af_aperture_raw as f64 / 24.0);
-            tags.push(("AFAperture".to_string(), format!("{:.1}", af_aperture)));
-
-            // Offset 0x08: FocusPosition (same as LensData01)
-            let focus_pos = decrypted[8];
-            tags.push(("FocusPosition".to_string(), format!("0x{:02x}", focus_pos)));
-
-            // Offset 0x0a (10): FocusDistance (extra byte at 0x09 in this version)
-            // Formula: 0.01 * 10^(val/40) meters
-            // Store with high precision; reformatting to %.2f for display is done in output.rs
-            let focus_dist_raw = decrypted[10];
-            let focus_dist = 0.01 * 10.0_f64.powf(focus_dist_raw as f64 / 40.0);
-            tags.push(("FocusDistance".to_string(), format!("{:.6} m", focus_dist)));
-
-            // Offset 0x0c (12): LensIDNumber
-            let lens_id_number = decrypted[12];
-            tags.push(("LensIDNumber".to_string(), lens_id_number.to_string()));
-
-            // Offset 0x0d (13): LensFStops raw value (for lens_id_bytes)
-            let lens_f_stops_raw = decrypted[13];
-
-            // Offset 0x0e (14): MinFocalLength
-            let min_focal_raw = decrypted[14];
-            let min_focal = 5.0 * 2.0_f64.powf(min_focal_raw as f64 / 24.0);
-            tags.push(("MinFocalLength".to_string(), format!("{:.1} mm", min_focal)));
-
-            // Offset 0x0f (15): MaxFocalLength
-            let max_focal_raw = decrypted[15];
-            let max_focal = 5.0 * 2.0_f64.powf(max_focal_raw as f64 / 24.0);
-            tags.push(("MaxFocalLength".to_string(), format!("{:.1} mm", max_focal)));
-
-            // Offset 0x10 (16): MaxApertureAtMinFocal
-            let max_ap_min_raw = decrypted[16];
-            let max_ap_min = 2.0_f64.powf(max_ap_min_raw as f64 / 24.0);
-            tags.push((
-                "MaxApertureAtMinFocal".to_string(),
-                format!("{:.1}", max_ap_min),
-            ));
-
-            // Offset 0x11 (17): MaxApertureAtMaxFocal
-            let max_ap_max_raw = decrypted[17];
-            let max_ap_max = 2.0_f64.powf(max_ap_max_raw as f64 / 24.0);
-            tags.push((
-                "MaxApertureAtMaxFocal".to_string(),
-                format!("{:.1}", max_ap_max),
-            ));
-
-            // Offset 0x12 (18): MCUVersion
-            let mcu_version = decrypted[18];
-            tags.push(("MCUVersion".to_string(), mcu_version.to_string()));
-
-            // Offset 0x13 (19): EffectiveMaxAperture (shifted by 1 from LensData01)
-            if decrypted.len() >= 20 {
-                let eff_max_ap_raw = decrypted[19];
-                let eff_max_ap = 2.0_f64.powf(eff_max_ap_raw as f64 / 24.0);
-                tags.push((
-                    "EffectiveMaxAperture".to_string(),
-                    format!("{:.1}", eff_max_ap),
-                ));
-            }
-
-            // Store raw bytes for LensID composite lookup
-            lens_id_bytes = Some([
-                lens_id_number,
-                lens_f_stops_raw,
-                min_focal_raw,
-                max_focal_raw,
-                max_ap_min_raw,
-                max_ap_max_raw,
-                mcu_version,
-            ]);
         }
+
+        // Store raw bytes for LensID composite lookup
+        lens_id_bytes = Some([
+            lens_id_number,
+            lens_f_stops_raw,
+            min_focal_raw,
+            max_focal_raw,
+            max_ap_min_raw,
+            max_ap_max_raw,
+            mcu_version,
+        ]);
     }
 
     (tags, lens_id_bytes)
@@ -6831,28 +6833,28 @@ pub fn parse_nikon_maker_notes(
                 }
                 NIKON_POWER_UP_TIME_2 => {
                     // PowerUpTime: 7 bytes = year(2) + month + day + hour + min + sec
-                    if let ExifValue::Undefined(ref bytes) = value {
-                        if bytes.len() >= 7 {
-                            let year = match maker_endian {
-                                Endianness::Little => u16::from_le_bytes([bytes[0], bytes[1]]),
-                                Endianness::Big => u16::from_be_bytes([bytes[0], bytes[1]]),
-                            };
-                            let month = bytes[2];
-                            let day = bytes[3];
-                            let hour = bytes[4];
-                            let min = bytes[5];
-                            let sec = bytes[6];
-                            let formatted = format!(
-                                "{:04}:{:02}:{:02} {:02}:{:02}:{:02}",
-                                year, month, day, hour, min, sec
-                            );
-                            let tag = MakerNoteTag::new(
-                                tag_id,
-                                Some("PowerUpTime"),
-                                ExifValue::Ascii(formatted),
-                            );
-                            tags.insert(tag_id, tag);
-                        }
+                    if let ExifValue::Undefined(ref bytes) = value
+                        && bytes.len() >= 7
+                    {
+                        let year = match maker_endian {
+                            Endianness::Little => u16::from_le_bytes([bytes[0], bytes[1]]),
+                            Endianness::Big => u16::from_be_bytes([bytes[0], bytes[1]]),
+                        };
+                        let month = bytes[2];
+                        let day = bytes[3];
+                        let hour = bytes[4];
+                        let min = bytes[5];
+                        let sec = bytes[6];
+                        let formatted = format!(
+                            "{:04}:{:02}:{:02} {:02}:{:02}:{:02}",
+                            year, month, day, hour, min, sec
+                        );
+                        let tag = MakerNoteTag::new(
+                            tag_id,
+                            Some("PowerUpTime"),
+                            ExifValue::Ascii(formatted),
+                        );
+                        tags.insert(tag_id, tag);
                     }
                 }
                 NIKON_FLASH_INFO => {
@@ -7148,46 +7150,44 @@ pub fn parse_nikon_maker_notes(
     }
 
     // Deferred ShotInfo processing - version 02xx needs serial/shutter_count for decryption
-    if let Some(bytes) = shot_info_bytes {
-        if let (Some(ser), Some(count)) = (serial_number, shutter_count_val) {
-            // Get version string (unencrypted)
-            let version = if bytes.len() >= 4 {
-                String::from_utf8_lossy(&bytes[0..4]).to_string()
-            } else {
-                String::new()
-            };
+    if let Some(bytes) = shot_info_bytes
+        && let (Some(ser), Some(count)) = (serial_number, shutter_count_val)
+    {
+        // Get version string (unencrypted)
+        let version = if bytes.len() >= 4 {
+            String::from_utf8_lossy(&bytes[0..4]).to_string()
+        } else {
+            String::new()
+        };
 
-            // Determine FirmwareVersion length based on version
-            // - Versions 0246-0255 (D6, Z6/Z7, Z6_3): 8 bytes
-            // - Versions 08xx (Z series - Z6III, Z7II, Z50ii, etc.): 8 bytes
-            // - Earlier versions (02xx): 5 bytes
-            let firmware_len = match version.as_str() {
-                v if v.starts_with("08") => 8, // All 08xx versions
-                "0246" | "0249" | "0250" | "0251" | "0252" | "0253" | "0254" | "0255" => 8,
-                _ => 5,
-            };
-            let firmware_end = 4 + firmware_len;
+        // Determine FirmwareVersion length based on version
+        // - Versions 0246-0255 (D6, Z6/Z7, Z6_3): 8 bytes
+        // - Versions 08xx (Z series - Z6III, Z7II, Z50ii, etc.): 8 bytes
+        // - Earlier versions (02xx): 5 bytes
+        let firmware_len = match version.as_str() {
+            v if v.starts_with("08") => 8, // All 08xx versions
+            "0246" | "0249" | "0250" | "0251" | "0252" | "0253" | "0254" | "0255" => 8,
+            _ => 5,
+        };
+        let firmware_end = 4 + firmware_len;
 
-            // Decrypt ShotInfo starting at offset 4 (version string is unencrypted)
-            if bytes.len() >= firmware_end {
-                let mut decrypted = bytes.clone();
-                nikon_decrypt(ser, count, &mut decrypted, 4);
+        // Decrypt ShotInfo starting at offset 4 (version string is unencrypted)
+        if bytes.len() >= firmware_end {
+            let mut decrypted = bytes.clone();
+            nikon_decrypt(ser, count, &mut decrypted, 4);
 
-                // Extract FirmwareVersion from decrypted data
-                let firmware = String::from_utf8_lossy(&decrypted[4..firmware_end]);
-                if firmware.chars().any(|c| c.is_ascii_digit()) {
-                    let tag_id = 0x9381_u16;
-                    tags.insert(
+            // Extract FirmwareVersion from decrypted data
+            let firmware = String::from_utf8_lossy(&decrypted[4..firmware_end]);
+            if firmware.chars().any(|c| c.is_ascii_digit()) {
+                let tag_id = 0x9381_u16;
+                tags.insert(
+                    tag_id,
+                    MakerNoteTag::new(
                         tag_id,
-                        MakerNoteTag::new(
-                            tag_id,
-                            Some("FirmwareVersion"),
-                            ExifValue::Ascii(
-                                firmware.trim_end_matches('\0').trim_end().to_string(),
-                            ),
-                        ),
-                    );
-                }
+                        Some("FirmwareVersion"),
+                        ExifValue::Ascii(firmware.trim_end_matches('\0').trim_end().to_string()),
+                    ),
+                );
             }
         }
     }
@@ -7223,22 +7223,22 @@ pub fn parse_nikon_maker_notes(
 
     // Add computed AutoFocus tag based on FocusMode
     // AutoFocus is "On" unless FocusMode starts with "Manual"
-    if let Some(focus_mode_tag) = tags.get(&NIKON_FOCUS_MODE) {
-        if let ExifValue::Ascii(ref mode) = focus_mode_tag.value {
-            let auto_focus = if mode.starts_with("Manual") {
-                "Off"
-            } else {
-                "On"
-            };
-            tags.insert(
-                0xA000, // Pseudo tag ID for AutoFocus
-                MakerNoteTag::new(
-                    0xA000,
-                    Some("AutoFocus"),
-                    ExifValue::Ascii(auto_focus.to_string()),
-                ),
-            );
-        }
+    if let Some(focus_mode_tag) = tags.get(&NIKON_FOCUS_MODE)
+        && let ExifValue::Ascii(ref mode) = focus_mode_tag.value
+    {
+        let auto_focus = if mode.starts_with("Manual") {
+            "Off"
+        } else {
+            "On"
+        };
+        tags.insert(
+            0xA000, // Pseudo tag ID for AutoFocus
+            MakerNoteTag::new(
+                0xA000,
+                Some("AutoFocus"),
+                ExifValue::Ascii(auto_focus.to_string()),
+            ),
+        );
     }
 
     // Add LensID composite lookup

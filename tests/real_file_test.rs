@@ -16,12 +16,12 @@ fn find_image_files(dir: &Path) -> Vec<std::path::PathBuf> {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension() {
-                    let ext_upper = ext.to_string_lossy().to_uppercase();
-                    if SUPPORTED_EXTENSIONS.contains(&ext_upper.as_str()) {
-                        files.push(path);
-                    }
+            if path.is_file()
+                && let Some(ext) = path.extension()
+            {
+                let ext_upper = ext.to_string_lossy().to_uppercase();
+                if SUPPORTED_EXTENSIONS.contains(&ext_upper.as_str()) {
+                    files.push(path);
                 }
             }
         }

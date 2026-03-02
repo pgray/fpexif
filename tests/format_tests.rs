@@ -24,12 +24,12 @@ fn test_png_signature_validation() {
     // Valid PNG signature but no eXIf chunk
     let mut png = Vec::new();
     png.extend_from_slice(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]); // PNG signature
-                                                                              // IHDR chunk
+    // IHDR chunk
     png.extend_from_slice(&[0x00, 0x00, 0x00, 0x0D]); // Length
     png.extend_from_slice(b"IHDR");
     png.extend_from_slice(&[0; 13]); // IHDR data
     png.extend_from_slice(&[0; 4]); // CRC
-                                    // IEND chunk
+    // IEND chunk
     png.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // Length
     png.extend_from_slice(b"IEND");
     png.extend_from_slice(&[0; 4]); // CRC
@@ -65,7 +65,7 @@ fn test_invalid_tiff_magic() {
     tiff.extend_from_slice(&[0x49, 0x49]); // "II"
     tiff.extend_from_slice(&[0xFF, 0xFF]); // Invalid magic
     tiff.extend_from_slice(&[0x08, 0x00, 0x00, 0x00]); // IFD offset
-                                                       // Pad with enough data to avoid EOF errors
+    // Pad with enough data to avoid EOF errors
     tiff.extend_from_slice(&[0; 100]);
 
     let cursor = Cursor::new(tiff);
@@ -256,7 +256,7 @@ fn test_raf_with_jpeg_but_no_exif() {
     let mut raf = Vec::new();
     raf.extend_from_slice(b"FUJIFILMCCD-RAW"); // Valid RAF signature
     raf.extend_from_slice(&[0u8; 100]); // Some padding
-                                        // Add JPEG SOI and EOI without APP1
+    // Add JPEG SOI and EOI without APP1
     raf.extend_from_slice(&[0xFF, 0xD8]); // JPEG SOI
     raf.extend_from_slice(&[0xFF, 0xD9]); // JPEG EOI (no APP1)
     raf.extend_from_slice(&[0u8; 100]); // More padding

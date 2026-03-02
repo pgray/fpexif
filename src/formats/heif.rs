@@ -1,7 +1,7 @@
 // formats/heif.rs - HEIF/HEIC format EXIF extraction
 // HEIF (High Efficiency Image Format) uses ISO Base Media File Format with HEVC compression
 use crate::errors::{ExifError, ExifResult};
-use crate::formats::isobmff::{find_exif_data, IsobmffParser};
+use crate::formats::isobmff::{IsobmffParser, find_exif_data};
 use std::io::{Read, Seek};
 
 /// Extract EXIF data from HEIF/HEIC file

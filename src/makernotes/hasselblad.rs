@@ -23,8 +23,8 @@
 
 use crate::data_types::Endianness;
 use crate::errors::ExifError;
-use crate::makernotes::sony;
 use crate::makernotes::MakerNoteTag;
+use crate::makernotes::sony;
 use std::collections::HashMap;
 
 /// Parse Hasselblad maker notes

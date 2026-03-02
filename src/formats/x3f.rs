@@ -391,14 +391,14 @@ fn build_tiff_from_properties(properties: &[(String, String)]) -> Option<Vec<u8>
     }
 
     // Add DateTime (tag 0x0132) - need to convert from Unix timestamp
-    if let Some(s) = datetime {
-        if let Ok(ts) = s.parse::<i64>() {
-            // Convert Unix timestamp to EXIF format "YYYY:MM:DD HH:MM:SS"
-            let dt = format_unix_timestamp(ts);
-            let mut bytes = dt.as_bytes().to_vec();
-            bytes.push(0);
-            ifd0_entries.push((0x0132, 2, bytes.len() as u32, bytes));
-        }
+    if let Some(s) = datetime
+        && let Ok(ts) = s.parse::<i64>()
+    {
+        // Convert Unix timestamp to EXIF format "YYYY:MM:DD HH:MM:SS"
+        let dt = format_unix_timestamp(ts);
+        let mut bytes = dt.as_bytes().to_vec();
+        bytes.push(0);
+        ifd0_entries.push((0x0132, 2, bytes.len() as u32, bytes));
     }
 
     if ifd0_entries.is_empty() {
