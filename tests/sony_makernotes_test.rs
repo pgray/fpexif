@@ -1,7 +1,7 @@
 // Sony maker notes tests
 
-use fpexif::data_types::ExifValue;
 use fpexif::ExifParser;
+use fpexif::data_types::ExifValue;
 use std::path::Path;
 
 #[test]
@@ -121,10 +121,10 @@ fn test_sony_a100_value_decoding() {
 
         // Print any decoded values we find
         for (tag_id, tag) in maker_notes {
-            if let Some(tag_name) = tag.tag_name {
-                if let ExifValue::Ascii(s) = &tag.value {
-                    println!("Tag 0x{:04X} ({}): {}", tag_id, tag_name, s);
-                }
+            if let Some(tag_name) = tag.tag_name
+                && let ExifValue::Ascii(s) = &tag.value
+            {
+                println!("Tag 0x{:04X} ({}): {}", tag_id, tag_name, s);
             }
         }
     } else {

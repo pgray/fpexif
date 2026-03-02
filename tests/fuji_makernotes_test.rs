@@ -1,6 +1,6 @@
 // Fujifilm MakerNotes decoding tests
-use fpexif::data_types::ExifValue;
 use fpexif::ExifParser;
+use fpexif::data_types::ExifValue;
 use std::path::Path;
 
 #[test]

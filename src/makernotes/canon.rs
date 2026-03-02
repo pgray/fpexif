@@ -3027,13 +3027,13 @@ pub fn decode_camera_settings_exiftool(data: &[u16]) -> HashMap<String, ExifValu
     if data.len() > 22 {
         if data[22] == 65535 {
             decoded.insert("LensType".to_string(), ExifValue::Ascii("n/a".to_string()));
-        } else if data[22] > 0 {
-            if let Some(lens_name) = get_canon_lens_name(data[22]) {
-                decoded.insert(
-                    "LensType".to_string(),
-                    ExifValue::Ascii(lens_name.to_string()),
-                );
-            }
+        } else if data[22] > 0
+            && let Some(lens_name) = get_canon_lens_name(data[22])
+        {
+            decoded.insert(
+                "LensType".to_string(),
+                ExifValue::Ascii(lens_name.to_string()),
+            );
         }
     }
 
@@ -3433,13 +3433,13 @@ pub fn decode_camera_settings_exiv2(data: &[u16]) -> HashMap<String, ExifValue> 
     if data.len() > 22 {
         if data[22] == 65535 {
             decoded.insert("LensType".to_string(), ExifValue::Ascii("n/a".to_string()));
-        } else if data[22] > 0 {
-            if let Some(lens_name) = get_canon_lens_name(data[22]) {
-                decoded.insert(
-                    "LensType".to_string(),
-                    ExifValue::Ascii(lens_name.to_string()),
-                );
-            }
+        } else if data[22] > 0
+            && let Some(lens_name) = get_canon_lens_name(data[22])
+        {
+            decoded.insert(
+                "LensType".to_string(),
+                ExifValue::Ascii(lens_name.to_string()),
+            );
         }
     }
 
@@ -7949,38 +7949,38 @@ pub fn decode_camera_info_psinfo_with_orientation(
     }
 
     // FirmwareVersion at model-specific offset
-    if let Some(offset) = firmware_version_offset {
-        if data.len() > offset + 6 {
-            // Format: string[6] - extract null-terminated or space-padded string
-            let fw_bytes = &data[offset..offset + 6];
-            if let Ok(fw_str) = std::str::from_utf8(fw_bytes) {
-                let trimmed = fw_str.trim_end_matches('\0').trim_end();
-                if !trimmed.is_empty() {
-                    decoded.insert(
-                        "FirmwareVersion".to_string(),
-                        ExifValue::Ascii(trimmed.to_string()),
-                    );
-                }
+    if let Some(offset) = firmware_version_offset
+        && data.len() > offset + 6
+    {
+        // Format: string[6] - extract null-terminated or space-padded string
+        let fw_bytes = &data[offset..offset + 6];
+        if let Ok(fw_str) = std::str::from_utf8(fw_bytes) {
+            let trimmed = fw_str.trim_end_matches('\0').trim_end();
+            if !trimmed.is_empty() {
+                decoded.insert(
+                    "FirmwareVersion".to_string(),
+                    ExifValue::Ascii(trimmed.to_string()),
+                );
             }
         }
     }
 
     // CameraOrientation at model-specific offset
-    if let Some(offset) = camera_orientation_offset {
-        if data.len() > offset {
-            let value = data[offset];
-            let orientation = match value {
-                0 => "Horizontal (normal)",
-                1 => "Rotate 90 CW",
-                2 => "Rotate 270 CW",
-                _ => "", // Unknown value
-            };
-            if !orientation.is_empty() {
-                decoded.insert(
-                    "CameraOrientation".to_string(),
-                    ExifValue::Ascii(orientation.to_string()),
-                );
-            }
+    if let Some(offset) = camera_orientation_offset
+        && data.len() > offset
+    {
+        let value = data[offset];
+        let orientation = match value {
+            0 => "Horizontal (normal)",
+            1 => "Rotate 90 CW",
+            2 => "Rotate 270 CW",
+            _ => "", // Unknown value
+        };
+        if !orientation.is_empty() {
+            decoded.insert(
+                "CameraOrientation".to_string(),
+                ExifValue::Ascii(orientation.to_string()),
+            );
         }
     }
 
@@ -8098,11 +8098,7 @@ pub fn decode_camera_info_powershot(data: &[u8]) -> HashMap<String, ExifValue> {
         264 => Some(261),
         _ => {
             // For unknown counts, try count - 3 as a heuristic
-            if count > 3 {
-                Some(count - 3)
-            } else {
-                None
-            }
+            if count > 3 { Some(count - 3) } else { None }
         }
     };
 

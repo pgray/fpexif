@@ -1,7 +1,7 @@
 // formats/avif.rs - AVIF format EXIF extraction
 // AVIF uses ISO Base Media File Format with AV1 image codec
 use crate::errors::{ExifError, ExifResult};
-use crate::formats::isobmff::{find_exif_data, IsobmffParser};
+use crate::formats::isobmff::{IsobmffParser, find_exif_data};
 use std::io::{Read, Seek};
 
 /// Extract EXIF data from AVIF file

@@ -1,8 +1,8 @@
 // Comprehensive FileSize test across ALL manufacturers and formats
 
+use fpexif::ExifParser;
 #[cfg(feature = "serde")]
 use fpexif::output::{get_tag_value, to_exiftool_json};
-use fpexif::ExifParser;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -245,7 +245,8 @@ fn test_all_files_in_raws() {
     // CRITICAL: All SUCCESSFULLY PARSED files must have FileSize tag
     // Parse errors are expected for unsupported formats (CHDK CRW, etc.)
     assert_eq!(
-        actual_filesize_failures, 0,
+        actual_filesize_failures,
+        0,
         "ALL successfully parsed files must have FileSize tag! {} FileSize failures found (not counting {} parse/read errors)",
         actual_filesize_failures,
         grand_total - grand_passed - actual_filesize_failures
@@ -386,7 +387,8 @@ fn test_all_files_in_data_lfs() {
     // CRITICAL: All SUCCESSFULLY PARSED files must have FileSize tag
     // Parse errors are expected for unsupported formats (CHDK CRW, etc.)
     assert_eq!(
-        actual_filesize_failures, 0,
+        actual_filesize_failures,
+        0,
         "ALL successfully parsed files must have FileSize tag! {} FileSize failures found (not counting {} parse/read errors)",
         actual_filesize_failures,
         grand_total - grand_passed - actual_filesize_failures

@@ -1,8 +1,8 @@
 // Test essential tags across multiple file formats and manufacturers
 
+use fpexif::ExifParser;
 #[cfg(feature = "serde")]
 use fpexif::output::{get_tag_value, to_exiftool_json};
-use fpexif::ExifParser;
 use std::fs;
 use std::path::{Path, PathBuf};
 

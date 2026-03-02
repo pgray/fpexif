@@ -1,9 +1,9 @@
 //! Comparison logic for exiftool and baseline comparisons
 
 use super::{
-    baseline::{get_git_commit, Baseline},
     BaselineDiff, FileTestResult, IssueCategory, ManufacturerTestResult, TagChange, TagComparison,
     TestIssue,
+    baseline::{Baseline, get_git_commit},
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -327,19 +327,17 @@ fn values_match(a: &serde_json::Value, b: &serde_json::Value) -> bool {
 
     // Handle mixed number/string comparisons (e.g., FirmwareVersion "1.02" vs 1.02)
     // ExifTool sometimes outputs numeric-looking values as numbers
-    if let Some(a_str) = a.as_str() {
-        if let Some(b_num) = b.as_f64() {
-            if let Ok(a_num) = a_str.trim().parse::<f64>() {
-                return (a_num - b_num).abs() < 0.001;
-            }
-        }
+    if let Some(a_str) = a.as_str()
+        && let Some(b_num) = b.as_f64()
+        && let Ok(a_num) = a_str.trim().parse::<f64>()
+    {
+        return (a_num - b_num).abs() < 0.001;
     }
-    if let Some(b_str) = b.as_str() {
-        if let Some(a_num) = a.as_f64() {
-            if let Ok(b_num) = b_str.trim().parse::<f64>() {
-                return (a_num - b_num).abs() < 0.001;
-            }
-        }
+    if let Some(b_str) = b.as_str()
+        && let Some(a_num) = a.as_f64()
+        && let Ok(b_num) = b_str.trim().parse::<f64>()
+    {
+        return (a_num - b_num).abs() < 0.001;
     }
 
     // Otherwise compare directly
@@ -376,13 +374,13 @@ fn find_test_files(formats: &[&str], limit: Option<usize>) -> Vec<String> {
     files.sort();
 
     // Apply limit by taking evenly-spaced samples for diversity
-    if let Some(n) = limit {
-        if files.len() > n {
-            let step = files.len() as f64 / n as f64;
-            files = (0..n)
-                .map(|i| files[(i as f64 * step) as usize].clone())
-                .collect();
-        }
+    if let Some(n) = limit
+        && files.len() > n
+    {
+        let step = files.len() as f64 / n as f64;
+        files = (0..n)
+            .map(|i| files[(i as f64 * step) as usize].clone())
+            .collect();
     }
 
     files

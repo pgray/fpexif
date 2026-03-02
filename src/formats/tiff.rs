@@ -48,12 +48,12 @@ pub fn extract_exif_segment<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>
     // Special handling for Panasonic RW2 files (magic 0x0055)
     // RW2 files have a Panasonic-specific IFD that reuses standard TIFF tag IDs with wrong types.
     // The correct EXIF data is in an embedded JPEG pointed to by tag 0x002E (JpgFromRaw).
-    if magic == 0x0055 {
-        if let Some(embedded_exif) = extract_rw2_embedded_exif(&tiff_data, is_little_endian) {
-            return Ok(embedded_exif);
-        }
-        // Fall through to default behavior if we can't find embedded JPEG
+    if magic == 0x0055
+        && let Some(embedded_exif) = extract_rw2_embedded_exif(&tiff_data, is_little_endian)
+    {
+        return Ok(embedded_exif);
     }
+    // Fall through to default behavior if we can't find embedded JPEG
 
     // Create APP1 segment format: "Exif\0\0" + TIFF data
     // This allows the existing parser to work with TIFF-based RAW files
@@ -355,10 +355,10 @@ fn extract_make_from_ifd(tiff_data: &[u8], is_little_endian: bool) -> Option<Str
             // Read the Make string
             if value_offset < tiff_data.len() {
                 let make_bytes = &tiff_data[value_offset..];
-                if let Some(null_pos) = make_bytes.iter().position(|&b| b == 0) {
-                    if let Ok(make_str) = std::str::from_utf8(&make_bytes[..null_pos]) {
-                        return Some(make_str.to_string());
-                    }
+                if let Some(null_pos) = make_bytes.iter().position(|&b| b == 0)
+                    && let Ok(make_str) = std::str::from_utf8(&make_bytes[..null_pos])
+                {
+                    return Some(make_str.to_string());
                 }
             }
             break;
@@ -924,11 +924,7 @@ fn read_rw2_string(
         .take_while(|&&b| b != 0)
         .map(|&b| b as char)
         .collect();
-    if s.is_empty() {
-        None
-    } else {
-        Some(s)
-    }
+    if s.is_empty() { None } else { Some(s) }
 }
 
 /// Decode CFAPattern value to string

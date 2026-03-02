@@ -723,27 +723,27 @@ fn parse_kodak_binary_format(
     };
 
     // Parse KodakModel (offset 0x00, string[8])
-    if let Some(model) = read_string(KODAK_MODEL_OFFSET, 8) {
-        if !model.is_empty() {
-            tags.insert(
-                0xF000,
-                MakerNoteTag::new(0xF000, Some("KodakModel"), ExifValue::Ascii(model)),
-            );
-        }
+    if let Some(model) = read_string(KODAK_MODEL_OFFSET, 8)
+        && !model.is_empty()
+    {
+        tags.insert(
+            0xF000,
+            MakerNoteTag::new(0xF000, Some("KodakModel"), ExifValue::Ascii(model)),
+        );
     }
 
     // Parse Quality (offset 0x09)
-    if let Some(quality) = read_u8(KODAK_QUALITY_OFFSET) {
-        if quality > 0 {
-            tags.insert(
+    if let Some(quality) = read_u8(KODAK_QUALITY_OFFSET)
+        && quality > 0
+    {
+        tags.insert(
+            0xF001,
+            MakerNoteTag::new(
                 0xF001,
-                MakerNoteTag::new(
-                    0xF001,
-                    Some("Quality"),
-                    ExifValue::Ascii(decode_quality_exiftool(quality).to_string()),
-                ),
-            );
-        }
+                Some("Quality"),
+                ExifValue::Ascii(decode_quality_exiftool(quality).to_string()),
+            ),
+        );
     }
 
     // Parse BurstMode (offset 0x0a)
@@ -844,27 +844,27 @@ fn parse_kodak_binary_format(
     }
 
     // Parse ISO (offset 0x60, int16u)
-    if let Some(iso) = read_u16_le(KODAK_ISO_OFFSET) {
-        if iso > 0 {
-            tags.insert(
-                0xF00A,
-                MakerNoteTag::new(0xF00A, Some("ISO"), ExifValue::Short(vec![iso])),
-            );
-        }
+    if let Some(iso) = read_u16_le(KODAK_ISO_OFFSET)
+        && iso > 0
+    {
+        tags.insert(
+            0xF00A,
+            MakerNoteTag::new(0xF00A, Some("ISO"), ExifValue::Short(vec![iso])),
+        );
     }
 
     // Parse ColorMode (offset 0x66, int16u)
-    if let Some(color_mode) = read_u16_le(KODAK_COLOR_MODE_OFFSET) {
-        if color_mode > 0 {
-            tags.insert(
+    if let Some(color_mode) = read_u16_le(KODAK_COLOR_MODE_OFFSET)
+        && color_mode > 0
+    {
+        tags.insert(
+            0xF00B,
+            MakerNoteTag::new(
                 0xF00B,
-                MakerNoteTag::new(
-                    0xF00B,
-                    Some("ColorMode"),
-                    ExifValue::Ascii(decode_color_mode_exiftool(color_mode).to_string()),
-                ),
-            );
-        }
+                Some("ColorMode"),
+                ExifValue::Ascii(decode_color_mode_exiftool(color_mode).to_string()),
+            ),
+        );
     }
 
     // Parse Sharpness (offset 0x6b, int8s)

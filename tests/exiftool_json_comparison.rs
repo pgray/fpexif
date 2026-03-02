@@ -4,8 +4,8 @@ use std::process::Command;
 
 mod test_results;
 use test_results::{
-    is_critical_missing_field, missing_field_issue, value_mismatch_issue, FileTestResult,
-    FormatTestResult, IssueCategory, TestIssue,
+    FileTestResult, FormatTestResult, IssueCategory, TestIssue, is_critical_missing_field,
+    missing_field_issue, value_mismatch_issue,
 };
 
 /// Helper function to check if we're running in CI

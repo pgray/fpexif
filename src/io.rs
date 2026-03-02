@@ -1,6 +1,6 @@
 // io.rs - File I/O utilities for EXIF data
-use crate::errors::{ExifError, ExifResult};
 use crate::ExifData;
+use crate::errors::{ExifError, ExifResult};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;

@@ -1,5 +1,5 @@
 // Error handling tests
-use fpexif::{errors::ExifError, ExifParser};
+use fpexif::{ExifParser, errors::ExifError};
 
 #[test]
 fn test_io_error_handling() {

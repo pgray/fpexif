@@ -1989,17 +1989,16 @@ pub fn parse_pentax_maker_notes(
     // Post-process: Decrypt ShutterCount if we have Date and Time
     if let (Some(shutter_bytes), Some(date_bytes), Some(time_bytes)) =
         (&raw_shutter_count_bytes, &raw_date_bytes, &raw_time_bytes)
+        && let Some(decrypted) = decrypt_shutter_count(shutter_bytes, date_bytes, time_bytes)
     {
-        if let Some(decrypted) = decrypt_shutter_count(shutter_bytes, date_bytes, time_bytes) {
-            tags.insert(
+        tags.insert(
+            PENTAX_SHUTTER_COUNT,
+            MakerNoteTag::new(
                 PENTAX_SHUTTER_COUNT,
-                MakerNoteTag::new(
-                    PENTAX_SHUTTER_COUNT,
-                    Some("ShutterCount"),
-                    ExifValue::Ascii(decrypted.to_string()),
-                ),
-            );
-        }
+                Some("ShutterCount"),
+                ExifValue::Ascii(decrypted.to_string()),
+            ),
+        );
     }
 
     Ok(tags)

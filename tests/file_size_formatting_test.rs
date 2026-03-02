@@ -2,20 +2,19 @@
 
 #[cfg(all(feature = "serde", test))]
 mod file_size_tests {
-    use fpexif::output::to_exiftool_json;
     use fpexif::ExifData;
+    use fpexif::output::to_exiftool_json;
     use serde_json::Value;
 
     fn get_file_size_string(bytes: u64) -> String {
         let exif_data = ExifData::new();
         let json = to_exiftool_json(&exif_data, None, Some(bytes));
 
-        if let Value::Array(arr) = &json {
-            if let Some(Value::Object(obj)) = arr.first() {
-                if let Some(Value::String(size)) = obj.get("FileSize") {
-                    return size.clone();
-                }
-            }
+        if let Value::Array(arr) = &json
+            && let Some(Value::Object(obj)) = arr.first()
+            && let Some(Value::String(size)) = obj.get("FileSize")
+        {
+            return size.clone();
         }
         panic!("FileSize not found in JSON");
     }
@@ -67,24 +66,24 @@ mod file_size_tests {
         let test_size = 35651584u64;
         let json = to_exiftool_json(&exif_data, None, Some(test_size));
 
-        if let Value::Array(arr) = &json {
-            if let Some(Value::Object(obj)) = arr.first() {
-                // Check FileSizeBytes exists
-                assert!(
-                    obj.contains_key("FileSizeBytes"),
-                    "FileSizeBytes should exist"
-                );
+        if let Value::Array(arr) = &json
+            && let Some(Value::Object(obj)) = arr.first()
+        {
+            // Check FileSizeBytes exists
+            assert!(
+                obj.contains_key("FileSizeBytes"),
+                "FileSizeBytes should exist"
+            );
 
-                // Check it's a number
-                if let Some(Value::Number(size)) = obj.get("FileSizeBytes") {
-                    assert_eq!(
-                        size.as_u64().unwrap(),
-                        test_size,
-                        "FileSizeBytes should match input"
-                    );
-                } else {
-                    panic!("FileSizeBytes should be a number");
-                }
+            // Check it's a number
+            if let Some(Value::Number(size)) = obj.get("FileSizeBytes") {
+                assert_eq!(
+                    size.as_u64().unwrap(),
+                    test_size,
+                    "FileSizeBytes should match input"
+                );
+            } else {
+                panic!("FileSizeBytes should be a number");
             }
         }
     }

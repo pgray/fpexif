@@ -1,6 +1,6 @@
 // src/bin/cli.rs - Command line interface for fpexif
 use clap::{Parser, Subcommand};
-use fpexif::{tags, ExifData, ExifParser};
+use fpexif::{ExifData, ExifParser, tags};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -159,10 +159,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 fpexif::output::to_exiftool_json(&exif_data, Some(&filename), None);
 
                             // Extract the single object from the array
-                            if let serde_json::Value::Array(mut arr) = json_obj {
-                                if let Some(obj) = arr.pop() {
-                                    all_results.push(obj);
-                                }
+                            if let serde_json::Value::Array(mut arr) = json_obj
+                                && let Some(obj) = arr.pop()
+                            {
+                                all_results.push(obj);
                             }
                         }
                         Err(err) => {
@@ -217,7 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             test_dir,
             validate,
         } => {
-            use fpexif::extract::{extract_jpegs, validate_jpeg, JpegType};
+            use fpexif::extract::{JpegType, extract_jpegs, validate_jpeg};
             use std::fs::File;
             use std::io::BufReader;
 
@@ -289,7 +289,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .unwrap_or("output");
 
                         for (i, (info, data)) in jpegs.iter().enumerate() {
-                            let out_path = if let Some(ref out) = output {
+                            let out_path = if let Some(out) = output {
                                 if *all && jpegs.len() > 1 {
                                     // Multiple files: add index
                                     let stem = out
@@ -347,23 +347,23 @@ fn print_exif_data_exiftool(exif_data: &ExifData, source_file: Option<&str>) {
     let json = fpexif::output::to_exiftool_json(exif_data, source_file, None);
 
     // Extract the object from the array
-    if let serde_json::Value::Array(arr) = json {
-        if let Some(serde_json::Value::Object(obj)) = arr.into_iter().next() {
-            // Sort keys for consistent output
-            let mut keys: Vec<_> = obj.keys().collect();
-            keys.sort();
+    if let serde_json::Value::Array(arr) = json
+        && let Some(serde_json::Value::Object(obj)) = arr.into_iter().next()
+    {
+        // Sort keys for consistent output
+        let mut keys: Vec<_> = obj.keys().collect();
+        keys.sort();
 
-            for key in keys {
-                if let Some(value) = obj.get(key) {
-                    let display_value = match value {
-                        serde_json::Value::String(s) => s.clone(),
-                        serde_json::Value::Number(n) => n.to_string(),
-                        serde_json::Value::Bool(b) => b.to_string(),
-                        serde_json::Value::Null => "".to_string(),
-                        _ => value.to_string(),
-                    };
-                    println!("{:<32}: {}", key, display_value);
-                }
+        for key in keys {
+            if let Some(value) = obj.get(key) {
+                let display_value = match value {
+                    serde_json::Value::String(s) => s.clone(),
+                    serde_json::Value::Number(n) => n.to_string(),
+                    serde_json::Value::Bool(b) => b.to_string(),
+                    serde_json::Value::Null => "".to_string(),
+                    _ => value.to_string(),
+                };
+                println!("{:<32}: {}", key, display_value);
             }
         }
     }
@@ -527,7 +527,7 @@ fn run_jpeg_extraction_test(
     dir: &PathBuf,
     validate: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use fpexif::extract::{extract_jpegs, validate_jpeg, JpegType};
+    use fpexif::extract::{JpegType, extract_jpegs, validate_jpeg};
     use std::fs::{self, File};
     use std::io::BufReader;
 
@@ -705,47 +705,47 @@ fn print_exif_data(exif_data: &ExifData, verbose: bool) {
             match tag_id.id {
                 // Orientation
                 0x0112 => {
-                    if let fpexif::data_types::ExifValue::Short(values) = value {
-                        if !values.is_empty() {
-                            let desc = tags::get_orientation_description(values[0]);
-                            println!("  → {}", desc);
-                        }
+                    if let fpexif::data_types::ExifValue::Short(values) = value
+                        && !values.is_empty()
+                    {
+                        let desc = tags::get_orientation_description(values[0]);
+                        println!("  → {}", desc);
                     }
                 }
                 // Exposure Program
                 0x8822 => {
-                    if let fpexif::data_types::ExifValue::Short(values) = value {
-                        if !values.is_empty() {
-                            let desc = tags::get_exposure_program_description(values[0]);
-                            println!("  → {}", desc);
-                        }
+                    if let fpexif::data_types::ExifValue::Short(values) = value
+                        && !values.is_empty()
+                    {
+                        let desc = tags::get_exposure_program_description(values[0]);
+                        println!("  → {}", desc);
                     }
                 }
                 // Metering Mode
                 0x9207 => {
-                    if let fpexif::data_types::ExifValue::Short(values) = value {
-                        if !values.is_empty() {
-                            let desc = tags::get_metering_mode_description(values[0]);
-                            println!("  → {}", desc);
-                        }
+                    if let fpexif::data_types::ExifValue::Short(values) = value
+                        && !values.is_empty()
+                    {
+                        let desc = tags::get_metering_mode_description(values[0]);
+                        println!("  → {}", desc);
                     }
                 }
                 // Light Source
                 0x9208 => {
-                    if let fpexif::data_types::ExifValue::Short(values) = value {
-                        if !values.is_empty() {
-                            let desc = tags::get_light_source_description(values[0]);
-                            println!("  → {}", desc);
-                        }
+                    if let fpexif::data_types::ExifValue::Short(values) = value
+                        && !values.is_empty()
+                    {
+                        let desc = tags::get_light_source_description(values[0]);
+                        println!("  → {}", desc);
                     }
                 }
                 // Flash
                 0x9209 => {
-                    if let fpexif::data_types::ExifValue::Short(values) = value {
-                        if !values.is_empty() {
-                            let desc = tags::get_flash_description(values[0]);
-                            println!("  → {}", desc);
-                        }
+                    if let fpexif::data_types::ExifValue::Short(values) = value
+                        && !values.is_empty()
+                    {
+                        let desc = tags::get_flash_description(values[0]);
+                        println!("  → {}", desc);
                     }
                 }
                 _ => {}
@@ -754,15 +754,15 @@ fn print_exif_data(exif_data: &ExifData, verbose: bool) {
     }
 
     // Print maker notes if available
-    if let Some(maker_notes) = exif_data.get_maker_notes() {
-        if !maker_notes.is_empty() {
-            println!("\nMaker Notes ({} tags):", maker_notes.len());
-            let mut sorted_notes: Vec<_> = maker_notes.iter().collect();
-            sorted_notes.sort_by_key(|(id, _)| *id);
-            for (tag_id, tag) in sorted_notes {
-                let tag_name = tag.tag_name.unwrap_or("Unknown");
-                println!("  {} (0x{:04X}): {}", tag_name, tag_id, tag.value);
-            }
+    if let Some(maker_notes) = exif_data.get_maker_notes()
+        && !maker_notes.is_empty()
+    {
+        println!("\nMaker Notes ({} tags):", maker_notes.len());
+        let mut sorted_notes: Vec<_> = maker_notes.iter().collect();
+        sorted_notes.sort_by_key(|(id, _)| *id);
+        for (tag_id, tag) in sorted_notes {
+            let tag_name = tag.tag_name.unwrap_or("Unknown");
+            println!("  {} (0x{:04X}): {}", tag_name, tag_id, tag.value);
         }
     }
 }

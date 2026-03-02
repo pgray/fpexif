@@ -263,12 +263,11 @@ pub fn list_baselines_full(
 
     if let Ok(entries) = fs::read_dir(baselines_dir) {
         for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                if let Some(mfr) = entry.file_name().to_str() {
-                    if let Ok(baseline) = load_baseline_full(mfr, baseline_type, dataset) {
-                        results.push((mfr.to_string(), baseline.metadata));
-                    }
-                }
+            if entry.path().is_dir()
+                && let Some(mfr) = entry.file_name().to_str()
+                && let Ok(baseline) = load_baseline_full(mfr, baseline_type, dataset)
+            {
+                results.push((mfr.to_string(), baseline.metadata));
             }
         }
     }

@@ -3,8 +3,8 @@
 use crate::data_types::{Endianness, ExifValue};
 use crate::define_tag_decoder;
 use crate::errors::ExifError;
-use crate::makernotes::minolta;
 use crate::makernotes::MakerNoteTag;
+use crate::makernotes::minolta;
 use std::collections::HashMap;
 
 // exiv2 group names for Sony sub-IFDs
@@ -2832,45 +2832,39 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness, tags: &mut HashMap<u1
     }
 
     // ZoneMatchingValue - offset 0x1f (CS1) only
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x1f) {
-            let adjusted = (raw as i32) - 10;
-            insert_cs_tag(
-                tags,
-                CS_ZONE_MATCHING_VALUE,
-                "ZoneMatchingValue",
-                ExifValue::Ascii(format_adjustment_value(adjusted)),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x1f) {
+        let adjusted = (raw as i32) - 10;
+        insert_cs_tag(
+            tags,
+            CS_ZONE_MATCHING_VALUE,
+            "ZoneMatchingValue",
+            ExifValue::Ascii(format_adjustment_value(adjusted)),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // Brightness - offset 0x22 (CS1) only
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x22) {
-            let adjusted = (raw as i32) - 10;
-            insert_cs_tag(
-                tags,
-                CS_BRIGHTNESS,
-                "Brightness",
-                ExifValue::Ascii(format_adjustment_value(adjusted)),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x22) {
+        let adjusted = (raw as i32) - 10;
+        insert_cs_tag(
+            tags,
+            CS_BRIGHTNESS,
+            "Brightness",
+            ExifValue::Ascii(format_adjustment_value(adjusted)),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // FlashMode - offset 0x13 (CS1 only)
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x13) {
-            let decoded = decode_flash_mode_cs_exiftool(raw);
-            insert_cs_tag(
-                tags,
-                CS_FLASH_MODE,
-                "FlashMode",
-                ExifValue::Ascii(decoded.to_string()),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x13) {
+        let decoded = decode_flash_mode_cs_exiftool(raw);
+        insert_cs_tag(
+            tags,
+            CS_FLASH_MODE,
+            "FlashMode",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // FlashControl - offset 0x23 (CS1) or 0x1f (CS2)
@@ -2887,87 +2881,75 @@ fn parse_camera_settings(data: &[u8], _endian: Endianness, tags: &mut HashMap<u1
     }
 
     // PrioritySetupShutterRelease - offset 0x28 (CS1) only
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x28) {
-            let decoded = decode_priority_setup_cs_exiftool(raw);
-            insert_cs_tag(
-                tags,
-                CS_PRIORITY_SETUP_SHUTTER_RELEASE,
-                "PrioritySetupShutterRelease",
-                ExifValue::Ascii(decoded.to_string()),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x28) {
+        let decoded = decode_priority_setup_cs_exiftool(raw);
+        insert_cs_tag(
+            tags,
+            CS_PRIORITY_SETUP_SHUTTER_RELEASE,
+            "PrioritySetupShutterRelease",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // AFIlluminator - offset 0x29 (CS1) only
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x29) {
-            let decoded = decode_af_illuminator_cs_exiftool(raw);
-            insert_cs_tag(
-                tags,
-                CS_AF_ILLUMINATOR,
-                "AFIlluminator",
-                ExifValue::Ascii(decoded.to_string()),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x29) {
+        let decoded = decode_af_illuminator_cs_exiftool(raw);
+        insert_cs_tag(
+            tags,
+            CS_AF_ILLUMINATOR,
+            "AFIlluminator",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // AFWithShutter - offset 0x2a (CS1) only
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x2a) {
-            let decoded = decode_af_with_shutter_exiftool(raw);
-            insert_cs_tag(
-                tags,
-                CS_AF_WITH_SHUTTER,
-                "AFWithShutter",
-                ExifValue::Ascii(decoded.to_string()),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x2a) {
+        let decoded = decode_af_with_shutter_exiftool(raw);
+        insert_cs_tag(
+            tags,
+            CS_AF_WITH_SHUTTER,
+            "AFWithShutter",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // LongExposureNoiseReduction - offset 0x2b (CS1) only
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x2b) {
-            let decoded = decode_on_off_exiftool(raw);
-            insert_cs_tag(
-                tags,
-                CS_LONG_EXPOSURE_NR,
-                "LongExposureNoiseReduction",
-                ExifValue::Ascii(decoded.to_string()),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x2b) {
+        let decoded = decode_on_off_exiftool(raw);
+        insert_cs_tag(
+            tags,
+            CS_LONG_EXPOSURE_NR,
+            "LongExposureNoiseReduction",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // HighISONoiseReduction - offset 0x2c (CS1) only
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x2c) {
-            let decoded = decode_high_iso_nr_cs_exiftool(raw);
-            insert_cs_tag(
-                tags,
-                CS_HIGH_ISO_NR,
-                "HighISONoiseReduction",
-                ExifValue::Ascii(decoded.to_string()),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x2c) {
+        let decoded = decode_high_iso_nr_cs_exiftool(raw);
+        insert_cs_tag(
+            tags,
+            CS_HIGH_ISO_NR,
+            "HighISONoiseReduction",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // ImageStyle - offset 0x2d (CS1) only
-    if is_cs1 {
-        if let Some(raw) = read_cs_u16(data, 0x2d) {
-            let decoded = decode_image_style_cs_exiftool(raw);
-            insert_cs_tag(
-                tags,
-                CS_IMAGE_STYLE,
-                "ImageStyle",
-                ExifValue::Ascii(decoded.to_string()),
-                ExifValue::Short(vec![raw]),
-            );
-        }
+    if is_cs1 && let Some(raw) = read_cs_u16(data, 0x2d) {
+        let decoded = decode_image_style_cs_exiftool(raw);
+        insert_cs_tag(
+            tags,
+            CS_IMAGE_STYLE,
+            "ImageStyle",
+            ExifValue::Ascii(decoded.to_string()),
+            ExifValue::Short(vec![raw]),
+        );
     }
 
     // ExposureProgram - offset 0x3c (CS1 and CS2)
@@ -4409,7 +4391,7 @@ fn parse_mrw_info(data: &[u8], tags: &mut HashMap<u16, MakerNoteTag>) {
         if data.len() > 8 {
             let mrw_offset = u32::from_be_bytes([data[4], data[5], data[6], data[7]]) as usize;
             offset = 8; // Skip past the 8-byte MRM header
-                        // The mrw_offset points to the RAW data, segments are between header and RAW data
+            // The mrw_offset points to the RAW data, segments are between header and RAW data
             let _ = mrw_offset; // We scan through segments anyway
         }
     }
@@ -4545,34 +4527,34 @@ fn parse_tag9400(data: &[u8], endian: Endianness, tags: &mut HashMap<u16, MakerN
 
     // SequenceImageNumber (int32u)
     // ExifTool: ValueConv => '$val + 1'
-    if let Some(v) = read_u32_at(seq_img_off) {
-        if v < 100000 {
-            // Sanity check (allow 0, which becomes 1 after adjustment)
-            tags.insert(
+    if let Some(v) = read_u32_at(seq_img_off)
+        && v < 100000
+    {
+        // Sanity check (allow 0, which becomes 1 after adjustment)
+        tags.insert(
+            0xF408,
+            MakerNoteTag::new(
                 0xF408,
-                MakerNoteTag::new(
-                    0xF408,
-                    Some("SequenceImageNumber"),
-                    ExifValue::Long(vec![v + 1]),
-                ),
-            );
-        }
+                Some("SequenceImageNumber"),
+                ExifValue::Long(vec![v + 1]),
+            ),
+        );
     }
 
     // SequenceFileNumber (int32u)
     // ExifTool: ValueConv => '$val + 1'
-    if let Some(v) = read_u32_at(seq_file_off) {
-        if v < 100000 {
-            // Sanity check (allow 0, which becomes 1 after adjustment)
-            tags.insert(
+    if let Some(v) = read_u32_at(seq_file_off)
+        && v < 100000
+    {
+        // Sanity check (allow 0, which becomes 1 after adjustment)
+        tags.insert(
+            0xF40C,
+            MakerNoteTag::new(
                 0xF40C,
-                MakerNoteTag::new(
-                    0xF40C,
-                    Some("SequenceFileNumber"),
-                    ExifValue::Long(vec![v + 1]),
-                ),
-            );
-        }
+                Some("SequenceFileNumber"),
+                ExifValue::Long(vec![v + 1]),
+            ),
+        );
     }
 
     // SequenceLength - variant c uses "file" suffix, others use "shot"
@@ -5121,24 +5103,24 @@ fn parse_tag2010(
     }
 
     // StopsAboveBaseISO / Gain (0xF217) - int16u, ValueConv => '16 - $val/256'
-    if offsets.gain > 0 {
-        if let Some(v) = read_u16_at(offsets.gain) {
-            let stops = 16.0 - (v as f64 / 256.0);
-            // Format: "0" for 0, otherwise "%.1f"
-            let formatted = if stops.abs() < 0.01 {
-                "0".to_string()
-            } else {
-                format!("{:.1}", stops)
-            };
-            tags.insert(
+    if offsets.gain > 0
+        && let Some(v) = read_u16_at(offsets.gain)
+    {
+        let stops = 16.0 - (v as f64 / 256.0);
+        // Format: "0" for 0, otherwise "%.1f"
+        let formatted = if stops.abs() < 0.01 {
+            "0".to_string()
+        } else {
+            format!("{:.1}", stops)
+        };
+        tags.insert(
+            0xF217,
+            MakerNoteTag::new(
                 0xF217,
-                MakerNoteTag::new(
-                    0xF217,
-                    Some("StopsAboveBaseISO"),
-                    ExifValue::Ascii(formatted),
-                ),
-            );
-        }
+                Some("StopsAboveBaseISO"),
+                ExifValue::Ascii(formatted),
+            ),
+        );
     }
 
     // DynamicRangeOptimizer (0xF21B)
@@ -5283,77 +5265,75 @@ fn parse_tag2010(
     }
 
     // WB_RGBLevels (0xF264) - int16u[3]
-    if offsets.wb_rgb_levels > 0 {
-        if let (Some(r), Some(g), Some(b)) = (
+    if offsets.wb_rgb_levels > 0
+        && let (Some(r), Some(g), Some(b)) = (
             read_u16_at(offsets.wb_rgb_levels),
             read_u16_at(offsets.wb_rgb_levels + 2),
             read_u16_at(offsets.wb_rgb_levels + 4),
-        ) {
-            if r > 0 && g > 0 && b > 0 {
-                tags.insert(
-                    0xF264,
-                    MakerNoteTag::new(
-                        0xF264,
-                        Some("WB_RGBLevels"),
-                        ExifValue::Ascii(format!("{} {} {}", r, g, b)),
-                    ),
-                );
-            }
-        }
+        )
+        && r > 0
+        && g > 0
+        && b > 0
+    {
+        tags.insert(
+            0xF264,
+            MakerNoteTag::new(
+                0xF264,
+                Some("WB_RGBLevels"),
+                ExifValue::Ascii(format!("{} {} {}", r, g, b)),
+            ),
+        );
     }
 
     // FocalLength from Tag2010 (not always available)
     // Note: ExifTool only outputs this for some models
 
     // MinFocalLength (0xF30C)
-    if offsets.min_focal_length > 0 {
-        if let Some(v) = read_u16_at(offsets.min_focal_length) {
-            if v > 0 {
-                let focal = v as f64 / 10.0;
-                tags.insert(
-                    0xF30C,
-                    MakerNoteTag::new(
-                        0xF30C,
-                        Some("MinFocalLength"),
-                        ExifValue::Ascii(format!("{:.1} mm", focal)),
-                    ),
-                );
-            }
-        }
+    if offsets.min_focal_length > 0
+        && let Some(v) = read_u16_at(offsets.min_focal_length)
+        && v > 0
+    {
+        let focal = v as f64 / 10.0;
+        tags.insert(
+            0xF30C,
+            MakerNoteTag::new(
+                0xF30C,
+                Some("MinFocalLength"),
+                ExifValue::Ascii(format!("{:.1} mm", focal)),
+            ),
+        );
     }
 
     // MaxFocalLength (0xF30E)
-    if offsets.max_focal_length > 0 {
-        if let Some(v) = read_u16_at(offsets.max_focal_length) {
-            if v > 0 {
-                let focal = v as f64 / 10.0;
-                tags.insert(
-                    0xF30E,
-                    MakerNoteTag::new(
-                        0xF30E,
-                        Some("MaxFocalLength"),
-                        ExifValue::Ascii(format!("{:.1} mm", focal)),
-                    ),
-                );
-            }
-        }
+    if offsets.max_focal_length > 0
+        && let Some(v) = read_u16_at(offsets.max_focal_length)
+        && v > 0
+    {
+        let focal = v as f64 / 10.0;
+        tags.insert(
+            0xF30E,
+            MakerNoteTag::new(
+                0xF30E,
+                Some("MaxFocalLength"),
+                ExifValue::Ascii(format!("{:.1} mm", focal)),
+            ),
+        );
     }
 
     // SonyISO (0xF320) - ValueConv => '100 * 2**(16 - $val/256)'
-    if offsets.sony_iso > 0 {
-        if let Some(v) = read_u16_at(offsets.sony_iso) {
-            if v > 0 {
-                let iso = 100.0 * 2.0_f64.powf(16.0 - v as f64 / 256.0);
-                tags.insert(
-                    0xF320,
-                    MakerNoteTag::new(
-                        0xF320,
-                        Some("SonyISO"),
-                        ExifValue::Ascii(format!("{:.0}", iso)),
-                    ),
-                );
-            }
-        }
+    if offsets.sony_iso > 0
+        && let Some(v) = read_u16_at(offsets.sony_iso)
+        && v > 0
+    {
+        let iso = 100.0 * 2.0_f64.powf(16.0 - v as f64 / 256.0);
+        tags.insert(
+            0xF320,
+            MakerNoteTag::new(
+                0xF320,
+                Some("SonyISO"),
+                ExifValue::Ascii(format!("{:.0}", iso)),
+            ),
+        );
     }
 
     // LensFormat (0xF7F1)
@@ -6197,24 +6177,24 @@ pub fn parse_sony_maker_notes(
             // Collect SR2SubIFD information
             match tag_id {
                 SONY_SR2_SUBIFD_OFFSET => {
-                    if let ExifValue::Long(ref v) = value {
-                        if !v.is_empty() {
-                            sr2_offset = Some(v[0]);
-                        }
+                    if let ExifValue::Long(ref v) = value
+                        && !v.is_empty()
+                    {
+                        sr2_offset = Some(v[0]);
                     }
                 }
                 SONY_SR2_SUBIFD_LENGTH => {
-                    if let ExifValue::Long(ref v) = value {
-                        if !v.is_empty() {
-                            sr2_length = Some(v[0]);
-                        }
+                    if let ExifValue::Long(ref v) = value
+                        && !v.is_empty()
+                    {
+                        sr2_length = Some(v[0]);
                     }
                 }
                 SONY_SR2_SUBIFD_KEY => {
-                    if let ExifValue::Long(ref v) = value {
-                        if !v.is_empty() {
-                            sr2_key = Some(v[0]);
-                        }
+                    if let ExifValue::Long(ref v) = value
+                        && !v.is_empty()
+                    {
+                        sr2_key = Some(v[0]);
                     }
                 }
                 _ => {}
@@ -6545,40 +6525,40 @@ pub fn parse_sony_maker_notes(
             // Handle MinoltaMakerNote subdirectory (tag 0xB028)
             // Used by Sony A100 - contains CameraInfoA100 with AFMode etc
             if tag_id == SONY_MINOLTA_MAKER_NOTE {
-                if let ExifValue::Long(ref v) = decoded_value {
-                    if !v.is_empty() {
-                        // The value is an offset pointer to the MinoltaMakerNote IFD
-                        let minolta_offset = v[0] as usize;
-                        if let Some(tiff) = tiff_data {
-                            let abs_offset = tiff_offset + minolta_offset;
-                            if abs_offset < tiff.len() {
-                                // Parse the MinoltaMakerNote starting at this offset
-                                let minolta_data = &tiff[abs_offset..];
-                                if let Ok(minolta_tags) = minolta::parse_minolta_maker_notes(
-                                    minolta_data,
-                                    endian,
-                                    Some(tiff),
-                                    tiff_offset,
-                                ) {
-                                    // Merge Minolta MakerNote tags for A100
-                                    // - WhiteBalance (0x0115): should override Sony MakerNote WhiteBalance
-                                    // - CameraInfoA100 sub-tags (0x2000-0x2FFF): AFMode, AFPoint, AFAreaMode
-                                    // - CameraSettingsA100 sub-tags (0x3000-0x3FFF): FocusMode (tag 0x0c)
-                                    for (minolta_tag_id, minolta_tag) in minolta_tags {
-                                        // Include Minolta WhiteBalance - it overrides Sony MakerNote value
-                                        if minolta_tag_id == minolta::MINOLTA_WHITE_BALANCE {
-                                            tags.insert(SONY_WHITE_BALANCE, minolta_tag);
-                                        }
-                                        // Include CameraInfoA100 sub-tags (0x2000-0x2FFF)
-                                        else if (0x2000..0x3000).contains(&minolta_tag_id) {
-                                            let composite_id = 0x4000 + (minolta_tag_id - 0x2000);
-                                            tags.insert(composite_id, minolta_tag);
-                                        }
-                                        // Include CameraSettingsA100 sub-tags (0x3000-0x3FFF)
-                                        else if (0x3000..0x4000).contains(&minolta_tag_id) {
-                                            let composite_id = 0x5000 + (minolta_tag_id - 0x3000);
-                                            tags.insert(composite_id, minolta_tag);
-                                        }
+                if let ExifValue::Long(ref v) = decoded_value
+                    && !v.is_empty()
+                {
+                    // The value is an offset pointer to the MinoltaMakerNote IFD
+                    let minolta_offset = v[0] as usize;
+                    if let Some(tiff) = tiff_data {
+                        let abs_offset = tiff_offset + minolta_offset;
+                        if abs_offset < tiff.len() {
+                            // Parse the MinoltaMakerNote starting at this offset
+                            let minolta_data = &tiff[abs_offset..];
+                            if let Ok(minolta_tags) = minolta::parse_minolta_maker_notes(
+                                minolta_data,
+                                endian,
+                                Some(tiff),
+                                tiff_offset,
+                            ) {
+                                // Merge Minolta MakerNote tags for A100
+                                // - WhiteBalance (0x0115): should override Sony MakerNote WhiteBalance
+                                // - CameraInfoA100 sub-tags (0x2000-0x2FFF): AFMode, AFPoint, AFAreaMode
+                                // - CameraSettingsA100 sub-tags (0x3000-0x3FFF): FocusMode (tag 0x0c)
+                                for (minolta_tag_id, minolta_tag) in minolta_tags {
+                                    // Include Minolta WhiteBalance - it overrides Sony MakerNote value
+                                    if minolta_tag_id == minolta::MINOLTA_WHITE_BALANCE {
+                                        tags.insert(SONY_WHITE_BALANCE, minolta_tag);
+                                    }
+                                    // Include CameraInfoA100 sub-tags (0x2000-0x2FFF)
+                                    else if (0x2000..0x3000).contains(&minolta_tag_id) {
+                                        let composite_id = 0x4000 + (minolta_tag_id - 0x2000);
+                                        tags.insert(composite_id, minolta_tag);
+                                    }
+                                    // Include CameraSettingsA100 sub-tags (0x3000-0x3FFF)
+                                    else if (0x3000..0x4000).contains(&minolta_tag_id) {
+                                        let composite_id = 0x5000 + (minolta_tag_id - 0x3000);
+                                        tags.insert(composite_id, minolta_tag);
                                     }
                                 }
                             }
@@ -6615,34 +6595,31 @@ pub fn parse_sony_maker_notes(
     // Post-processing: Quality tag priority
     // When tag 0x202E (Quality3) is present with valid decoded value, remove 0x0102 (ImageQuality)
     // ExifTool prefers 0x202E for newer cameras as it provides more detailed info
-    if tags.contains_key(&SONY_QUALITY_3) {
-        if let Some(quality3_tag) = tags.get(&SONY_QUALITY_3) {
-            // Check if it was successfully decoded (not raw bytes)
-            if let ExifValue::Ascii(_) = &quality3_tag.value {
-                tags.remove(&SONY_IMAGE_QUALITY);
-            }
+    if tags.contains_key(&SONY_QUALITY_3)
+        && let Some(quality3_tag) = tags.get(&SONY_QUALITY_3)
+    {
+        // Check if it was successfully decoded (not raw bytes)
+        if let ExifValue::Ascii(_) = &quality3_tag.value {
+            tags.remove(&SONY_IMAGE_QUALITY);
         }
     }
 
     // Post-processing: Fix AFPointSelected for SLT/ILCA models
     // SLT and ILCA models map value 0 to "Auto", while NEX/ILCE/DSC map to "n/a"
     // Check if we have a SonyModelID that indicates SLT/ILCA model
-    if let Some(model_tag) = tags.get(&SONY_SONY_MODEL_ID) {
-        if let ExifValue::Ascii(model_name) = &model_tag.value {
-            // SLT-*, HV, and ILCA-* models use "Auto" for AFPointSelected value 0
-            let is_slt_or_ilca = model_name.starts_with("SLT-")
-                || model_name.starts_with("ILCA-")
-                || model_name == "HV";
+    if let Some(model_tag) = tags.get(&SONY_SONY_MODEL_ID)
+        && let ExifValue::Ascii(model_name) = &model_tag.value
+    {
+        // SLT-*, HV, and ILCA-* models use "Auto" for AFPointSelected value 0
+        let is_slt_or_ilca =
+            model_name.starts_with("SLT-") || model_name.starts_with("ILCA-") || model_name == "HV";
 
-            if is_slt_or_ilca {
-                if let Some(af_tag) = tags.get_mut(&SONY_AF_POINT_SELECTED) {
-                    if let ExifValue::Ascii(s) = &af_tag.value {
-                        if s == "n/a" {
-                            af_tag.value = ExifValue::Ascii("Auto".to_string());
-                        }
-                    }
-                }
-            }
+        if is_slt_or_ilca
+            && let Some(af_tag) = tags.get_mut(&SONY_AF_POINT_SELECTED)
+            && let ExifValue::Ascii(s) = &af_tag.value
+            && s == "n/a"
+        {
+            af_tag.value = ExifValue::Ascii("Auto".to_string());
         }
     }
 

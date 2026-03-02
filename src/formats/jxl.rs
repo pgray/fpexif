@@ -1,6 +1,6 @@
 // formats/jxl.rs - JPEG XL format EXIF extraction
 use crate::errors::{ExifError, ExifResult};
-use crate::formats::isobmff::{find_exif_data, IsobmffParser};
+use crate::formats::isobmff::{IsobmffParser, find_exif_data};
 use std::io::{Read, Seek, SeekFrom};
 
 // JPEG XL codestream signature
@@ -49,15 +49,15 @@ fn extract_from_codestream<R: Read + Seek>(mut reader: R) -> ExifResult<Vec<u8>>
     buffer.truncate(bytes_read);
 
     // Search for "Exif\0\0" marker
-    if let Some(pos) = find_subsequence(&buffer, b"Exif\0\0") {
-        if pos + 6 + 8 <= buffer.len() {
-            let tiff_start = pos + 6;
-            if (buffer[tiff_start] == b'I' && buffer[tiff_start + 1] == b'I')
-                || (buffer[tiff_start] == b'M' && buffer[tiff_start + 1] == b'M')
-            {
-                let max_len = std::cmp::min(512 * 1024, buffer.len() - pos);
-                return Ok(buffer[pos..pos + max_len].to_vec());
-            }
+    if let Some(pos) = find_subsequence(&buffer, b"Exif\0\0")
+        && pos + 6 + 8 <= buffer.len()
+    {
+        let tiff_start = pos + 6;
+        if (buffer[tiff_start] == b'I' && buffer[tiff_start + 1] == b'I')
+            || (buffer[tiff_start] == b'M' && buffer[tiff_start + 1] == b'M')
+        {
+            let max_len = std::cmp::min(512 * 1024, buffer.len() - pos);
+            return Ok(buffer[pos..pos + max_len].to_vec());
         }
     }
 
